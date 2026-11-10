@@ -52,6 +52,7 @@ import { HireMeModal } from "./HireMeModal";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { GetTheCardModal } from "./GetTheCardModal";
+import { openCollegeVerificationModal, ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT } from "../../utils/collegeVerificationModalEvents";
 import { CARD_THEMES } from "./CardStudio/types";
 import { useToast } from "../../context/ToastContext";
 import { getPlatformIcon, sanitizePlatformUrl } from "../../utils/platformLinks";
@@ -584,6 +585,21 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             window.removeEventListener("offline", handleOffline);
         };
     }, []);
+
+    // Refresh public profile data when college verification completes
+    useEffect(() => {
+        const handleUpdate = () => {
+            if (username && !isDemoProfileUsername(username)) {
+                invalidatePublicProfileClientCache(username);
+                fetchPublicProfile(username, true).then((data) => {
+                    setProfile(data);
+                }).catch(() => {});
+            }
+        };
+
+        window.addEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleUpdate);
+        return () => window.removeEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleUpdate);
+    }, [username]);
 
     const handleCopyDiagnostics = () => {
         const diag = diagnoseProfileError(rawError, username);
@@ -1539,6 +1555,28 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                             Verified Directory
                                                         </span>
                                                     ) : null}
+
+                                                    {profile.isOwner && !profile.isCollegeVerified && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openCollegeVerificationModal({
+                                                                collegeId: profile.college?.id,
+                                                                collegeName: profile.college?.officialName,
+                                                            })}
+                                                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] hover:bg-[#ffe043] border border-black text-[10px] font-black text-black uppercase shadow-[1px_1px_0px_#000] cursor-pointer transition-all shrink-0"
+                                                        >
+                                                            <GraduationCap className="w-3 h-3 stroke-[2.5]" />
+                                                            <span>
+                                                                {profile.collegeVerificationStatus === "PENDING" || profile.collegeVerificationStatus === "PROCESSING"
+                                                                    ? "Review Pending"
+                                                                    : profile.collegeVerificationStatus === "INVALIDATED"
+                                                                    ? "Re-verify"
+                                                                    : profile.collegeVerificationStatus === "REJECTED"
+                                                                    ? "Resubmit"
+                                                                    : "Get Verified"}
+                                                            </span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                                 {(profile.college.city || profile.college.state) && (
                                                     <span className="text-[10px] text-neutral-600 font-semibold block truncate mt-0.5">

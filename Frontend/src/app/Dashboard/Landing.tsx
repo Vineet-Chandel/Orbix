@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Code2, GitBranch } from "lucide-react";
+import { Code2, GitBranch, GraduationCap } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { NotificationBell } from "../../components/NotificationBell";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
+import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
 import { Sidebar, type SidebarTab } from "./Sidebar";
 import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
@@ -282,6 +284,12 @@ export default function Dashboard() {
                                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
                                             Today, {formattedDate}
                                         </span>
+                                        {user?.isCollegeVerified && (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                <VerifiedBadge size="xs" />
+                                                <span>{user.college?.officialName || "College Verified"}</span>
+                                            </span>
+                                        )}
                                         <span className="text-xs font-bold text-neutral-700 hidden sm:inline">
                                             · Unified Developer Command Center
                                         </span>
@@ -323,6 +331,66 @@ export default function Dashboard() {
                                     <NotificationBell variant="neo" />
                                 </div>
                             </div>
+
+                            {/* College Verification Prompt Banner (if not fully verified and not a club account) */}
+                            {user && user.accountType !== "club" && !user.isCollegeVerified && (
+                                <div className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                    user.collegeVerificationStatus === "PENDING" || user.collegeVerificationStatus === "PROCESSING"
+                                        ? "bg-amber-50"
+                                        : user.collegeVerificationStatus === "INVALIDATED"
+                                        ? "bg-orange-50"
+                                        : user.collegeVerificationStatus === "REJECTED"
+                                        ? "bg-rose-50"
+                                        : "bg-[#FFE566]"
+                                }`}>
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                                            <GraduationCap className="w-5 h-5 text-black stroke-[2.5]" />
+                                        </div>
+                                        <div className="min-w-0 space-y-0.5">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-xs font-black uppercase tracking-wider text-black">
+                                                    {user.collegeVerificationStatus === "PENDING" || user.collegeVerificationStatus === "PROCESSING"
+                                                        ? "College Verification Under Review"
+                                                        : user.collegeVerificationStatus === "INVALIDATED"
+                                                        ? "College Re-Verification Required"
+                                                        : user.collegeVerificationStatus === "REJECTED"
+                                                        ? "Verification Resubmission Needed"
+                                                        : "Get College Verified"}
+                                                </span>
+                                                <span className="px-2 py-0.5 rounded-full bg-white border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000]">
+                                                    {user.college?.officialName || "Student Affiliation"}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs font-medium text-neutral-800">
+                                                {user.collegeVerificationStatus === "PENDING" || user.collegeVerificationStatus === "PROCESSING"
+                                                    ? "Your student enrollment application is in the founder review queue. Verified badges and leaderboards will activate upon approval."
+                                                    : user.collegeVerificationStatus === "INVALIDATED"
+                                                    ? "Your college affiliation has changed. Please submit verification for your new college to reactivate your verified badge."
+                                                    : user.collegeVerificationStatus === "REJECTED"
+                                                    ? "Your previous verification was rejected. Please review feedback and resubmit your student ID or ERP profile."
+                                                    : "Verify your collegiate enrollment to unlock official university badges, contest rankings, and leaderboards."}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => openCollegeVerificationModal({
+                                            collegeId: user?.college?.id || user?.collegeId,
+                                            collegeName: user?.college?.officialName,
+                                        })}
+                                        className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] cursor-pointer transition-all shrink-0 self-start sm:self-auto"
+                                    >
+                                        {user.collegeVerificationStatus === "PENDING" || user.collegeVerificationStatus === "PROCESSING"
+                                            ? "View Status"
+                                            : user.collegeVerificationStatus === "INVALIDATED"
+                                            ? "Verify New College"
+                                            : user.collegeVerificationStatus === "REJECTED"
+                                            ? "Review & Resubmit"
+                                            : "Verify College"}
+                                    </button>
+                                </div>
+                            )}
 
                             {/* PRACTICE VIEW */}
                             {activeDashboardField === "practice" && (

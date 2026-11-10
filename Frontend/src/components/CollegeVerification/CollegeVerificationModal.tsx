@@ -16,10 +16,24 @@ import {
     ArrowLeft,
     RotateCcw,
     Check,
+    RefreshCw,
     } from "lucide-react";
 import { OrbixButton } from "../OrbixButton";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { useToast } from "../../context/ToastContext";
+import { ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT } from "../../utils/collegeVerificationModalEvents";
+
+function phoneMatchesCanonical(input: string, canonical: string | null): boolean {
+    if (!input || !canonical) return false;
+    const digitsInput = input.replace(/\D/g, "");
+    const digitsCanonical = canonical.replace(/\D/g, "");
+    if (!digitsInput || !digitsCanonical) return false;
+    if (digitsInput === digitsCanonical) return true;
+    // Match 10-digit Indian mobile numbers against canonical +91 format
+    const tailInput = digitsInput.length > 10 ? digitsInput.slice(-10) : digitsInput;
+    const tailCanonical = digitsCanonical.length > 10 ? digitsCanonical.slice(-10) : digitsCanonical;
+    return tailInput.length === 10 && tailInput === tailCanonical;
+}
 import {
     fetchCollegeVerificationStatus,
     previewDocumentOcr,
@@ -62,6 +76,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
     const [activeApp, setActiveApp] = useState<CollegeVerificationRecord | null>(null);
     const [latestApp, setLatestApp] = useState<CollegeVerificationRecord | null>(null);
     const [currentVerificationState, setCurrentVerificationState] = useState<string>("NOT_VERIFIED");
+    const [serverCollege, setServerCollege] = useState<{ id: string; officialName: string } | null>(null);
 
     // Document Upload Form
     const [documentType, setDocumentType] = useState<"student_id" | "erp_profile" | "student_id_both_sides">("student_id");
@@ -88,19 +103,68 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
     const [academicYear, setAcademicYear] = useState("");
     const [collegeNameInput, setCollegeNameInput] = useState("");
 
+    const effectiveCollegeId = currentCollegeId || serverCollege?.id || activeApp?.college_id || null;
+    const effectiveCollegeName = currentCollegeName || serverCollege?.officialName || collegeNameInput || "";
+
     // Contact verification channels
     const [institutionEmail, setInstitutionEmail] = useState("");
     const [isEmailSent, setIsEmailSent] = useState(false);
     const [isEmailSending, setIsEmailSending] = useState(false);
     const [emailCooldown, setEmailCooldown] = useState(0);
     const [emailDomainMatched, setEmailDomainMatched] = useState<boolean | null>(null);
+    const [serverVerifiedEmail, setServerVerifiedEmail] = useState<string | null>(null);
+    const [isRefreshingChannels, setIsRefreshingChannels] = useState(false);
 
     const [phoneNumber, setPhoneNumber] = useState("");
     const [isPhoneSending, setIsPhoneSending] = useState(false);
     const [phoneCooldown, setPhoneCooldown] = useState(0);
     const [phoneOtp, setPhoneOtp] = useState("");
-    const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+    const [localPhoneVerified, setLocalPhoneVerified] = useState(false);
+    const [serverVerifiedPhone, setServerVerifiedPhone] = useState<string | null>(null);
     const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
+
+    // Authoritative verified status derived strictly from server confirmation matching current input values
+    const isEmailVerified = Boolean(
+        serverVerifiedEmail &&
+            institutionEmail.trim().length > 0 &&
+            institutionEmail.trim().toLowerCase() === serverVerifiedEmail.trim().toLowerCase()
+    );
+    const isPhoneVerified = Boolean(
+        (localPhoneVerified && phoneMatchesCanonical(phoneNumber, serverVerifiedPhone || phoneNumber)) ||
+            (serverVerifiedPhone && phoneMatchesCanonical(phoneNumber, serverVerifiedPhone))
+    );
+
+    // Background scroll lock
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = "hidden";
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
+
+    // Clean up temporary image object URLs on unmount or close
+    useEffect(() => {
+        if (!isOpen) {
+            if (frontPreview) {
+                try { URL.revokeObjectURL(frontPreview); } catch {}
+                setFrontPreview(null);
+            }
+            if (backPreview) {
+                try { URL.revokeObjectURL(backPreview); } catch {}
+                setBackPreview(null);
+            }
+            setFrontFile(null);
+            setBackFile(null);
+            setPhoneOtp("");
+            setLocalPhoneVerified(false);
+            setServerVerifiedPhone(null);
+            setServerVerifiedEmail(null);
+            setIsEmailSent(false);
+        }
+    }, [isOpen]);
 
     // Cooldown countdown timers
     useEffect(() => {
@@ -119,37 +183,101 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
         return () => clearInterval(interval);
     }, [phoneCooldown]);
 
-    // Fetch initial status on modal open
-    const loadVerificationStatus = async () => {
-        setIsLoadingStatus(true);
+    // Sync verification status and pre-submission verified channels from server
+    const loadVerificationStatus = async (options?: { updateStep?: boolean; silent?: boolean }) => {
+        const updateStep = options?.updateStep !== false;
+        const silent = options?.silent === true;
+        if (!silent) {
+            setIsLoadingStatus(true);
+        } else {
+            setIsRefreshingChannels(true);
+        }
         try {
             const data = await fetchCollegeVerificationStatus();
             setCurrentVerificationState(data.status);
             setActiveApp(data.activeApplication);
             setLatestApp(data.latestApplication);
+            if (data.currentCollege) {
+                setServerCollege({
+                    id: data.currentCollege.id,
+                    officialName: data.currentCollege.officialName,
+                });
+                if (!collegeNameInput) {
+                    setCollegeNameInput(data.currentCollege.officialName);
+                }
+            }
 
-            if (data.status === "PENDING" || data.status === "PROCESSING" || data.status === "APPROVED") {
-                setStep("STATUS_VIEW");
-            } else if (data.status === "REJECTED") {
-                setStep("STATUS_VIEW");
+            if (data.verifiedChannels?.email && data.verifiedChannels?.emailVerifiedAt) {
+                setServerVerifiedEmail(data.verifiedChannels.email);
+                setInstitutionEmail((prev) => (prev.trim() ? prev : data.verifiedChannels!.email || ""));
             } else {
-                setStep("DOCUMENT");
+                setServerVerifiedEmail(null);
+            }
+
+            if (data.verifiedChannels?.phone && data.verifiedChannels?.phoneVerifiedAt) {
+                setServerVerifiedPhone(data.verifiedChannels.phone);
+                setPhoneNumber((prev) => (prev.trim() ? prev : data.verifiedChannels!.phone || ""));
+                setLocalPhoneVerified(true);
+            } else if (!localPhoneVerified) {
+                setServerVerifiedPhone(null);
+            }
+
+            if (updateStep) {
+                if (data.status === "PENDING" || data.status === "PROCESSING" || data.status === "APPROVED" || data.status === "REJECTED" || data.status === "INVALIDATED") {
+                    setStep("STATUS_VIEW");
+                } else {
+                    setStep("DOCUMENT");
+                }
             }
         } catch (err: any) {
             console.error("Failed to load verification status:", err);
         } finally {
-            setIsLoadingStatus(false);
+            if (!silent) {
+                setIsLoadingStatus(false);
+            } else {
+                setIsRefreshingChannels(false);
+            }
         }
     };
 
     useEffect(() => {
         if (isOpen) {
-            loadVerificationStatus();
+            loadVerificationStatus({ updateStep: true });
             if (currentCollegeName) {
                 setCollegeNameInput(currentCollegeName);
             }
         }
     }, [isOpen, currentCollegeName]);
+
+    // Synchronize verified email/phone state across tabs (e.g. clicking email link in another tab)
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleSync = () => {
+            if (step === "CONTACT_INFO" || step === "FINAL_SUBMIT") {
+                loadVerificationStatus({ updateStep: false, silent: true });
+            }
+        };
+
+        window.addEventListener("focus", handleSync);
+        window.addEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleSync);
+
+        let channel: BroadcastChannel | null = null;
+        try {
+            if (typeof BroadcastChannel !== "undefined") {
+                channel = new BroadcastChannel("orbix_college_verification");
+                channel.onmessage = () => handleSync();
+            }
+        } catch {}
+
+        return () => {
+            window.removeEventListener("focus", handleSync);
+            window.removeEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleSync);
+            if (channel) {
+                try { channel.close(); } catch {}
+            }
+        };
+    }, [isOpen, step]);
 
     // Handle modal backdrop dismissal
     const { handleBackdropClick } = useModalDismiss({
@@ -209,7 +337,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
 
         setIsScanningOcr(true);
         try {
-            const ocrResult = await previewDocumentOcr(frontFile, currentCollegeName || collegeNameInput);
+            const ocrResult = await previewDocumentOcr(frontFile, effectiveCollegeName);
 
             setOcrConfidence(ocrResult.confidence);
             setRawOcrData(ocrResult.extractedFields);
@@ -261,7 +389,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
             return;
         }
 
-        if (!currentCollegeId) {
+        if (!effectiveCollegeId) {
             toast.error("Please save your college in Profile before requesting institutional email verification.", {
                 title: "College Affiliation Required",
             });
@@ -270,7 +398,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
 
         setIsEmailSending(true);
         try {
-            const res = await sendInstitutionalEmail(institutionEmail.trim(), currentCollegeId);
+            const res = await sendInstitutionalEmail(institutionEmail.trim(), effectiveCollegeId);
             setIsEmailSent(true);
             setEmailCooldown(res.cooldownSeconds || 60);
             setEmailDomainMatched(res.domainMatched);
@@ -312,7 +440,8 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
         setIsVerifyingPhone(true);
         try {
             const res = await verifyCollegePhoneOtp(phoneNumber.trim(), phoneOtp.trim());
-            setIsPhoneVerified(true);
+            setServerVerifiedPhone(res.canonical || phoneNumber.trim());
+            setLocalPhoneVerified(true);
             toast.success(res.message, { title: "Phone Verified" });
         } catch (err: any) {
             toast.error(err.message || "Failed to verify phone code.", { title: "Verification Error" });
@@ -323,7 +452,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
 
     // Final Application Submit
     const handleSubmitApplication = async () => {
-        if (!currentCollegeId) {
+        if (!effectiveCollegeId) {
             toast.error("No verified institution selected in profile.", { title: "Institution Missing" });
             return;
         }
@@ -333,10 +462,26 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
             return;
         }
 
+        if (!isEmailVerified) {
+            toast.error("Institutional email verification is required before submitting your application.", {
+                title: "Email Verification Required",
+            });
+            setStep("CONTACT_INFO");
+            return;
+        }
+
+        if (!isPhoneVerified) {
+            toast.error("Mobile phone OTP verification is required before submitting your application.", {
+                title: "Phone Verification Required",
+            });
+            setStep("CONTACT_INFO");
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const formData = new FormData();
-            formData.append("collegeId", currentCollegeId);
+            formData.append("collegeId", effectiveCollegeId);
             formData.append("documentType", documentType);
             formData.append("documents", frontFile);
             if (backFile && documentType === "student_id_both_sides") {
@@ -347,12 +492,8 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
             formData.append("enrollmentNumber", enrollmentNumber.trim());
             formData.append("courseName", courseName.trim());
             formData.append("academicYear", academicYear.trim());
-            if (institutionEmail.trim()) {
-                formData.append("institutionEmail", institutionEmail.trim());
-            }
-            if (phoneNumber.trim()) {
-                formData.append("phoneNumber", phoneNumber.trim());
-            }
+            formData.append("institutionEmail", institutionEmail.trim());
+            formData.append("phoneNumber", phoneNumber.trim());
             formData.append("ocrConfidence", String(ocrConfidence));
             formData.append("extractedData", JSON.stringify(rawOcrData));
 
@@ -380,7 +521,15 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
         setFrontPreview(null);
         setBackFile(null);
         setBackPreview(null);
+        setPhoneOtp("");
+        setPhoneCooldown(0);
+        setLocalPhoneVerified(false);
+        setServerVerifiedPhone(null);
+        setIsEmailSent(false);
+        setEmailCooldown(0);
+        setServerVerifiedEmail(null);
         setStep("DOCUMENT");
+        loadVerificationStatus({ updateStep: false, silent: true });
     };
 
     return createPortal(
@@ -409,7 +558,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                 College Enrollment Verification
                             </h3>
                             <p className="text-xs text-neutral-600 font-bold truncate">
-                                {currentCollegeName ? currentCollegeName : "Verify authentic institutional enrollment"}
+                                {effectiveCollegeName ? effectiveCollegeName : "Verify authentic institutional enrollment"}
                             </p>
                         </div>
                     </div>
@@ -540,6 +689,34 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                     >
                                         <RotateCcw className="w-4 h-4 mr-2" />
                                         Resubmit Verification Application
+                                    </OrbixButton>
+                                </div>
+                            ) : currentVerificationState === "INVALIDATED" ? (
+                                <div className="p-4 sm:p-5 rounded-xl bg-amber-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-300 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
+                                            <AlertTriangle className="w-6 h-6 text-black stroke-[2.5]" />
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 block">
+                                                Affiliation Changed
+                                            </span>
+                                            <h4 className="text-sm sm:text-base font-black text-black">
+                                                Re-Verification Required
+                                            </h4>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
+                                        Your college affiliation was recently updated. In accordance with Orbix fair-play rules, any verification under your previous college has been invalidated. Please submit a new verification application matching your current institution.
+                                    </p>
+
+                                    <OrbixButton
+                                        onClick={handleStartResubmission}
+                                        className="w-full bg-[#FFE566] text-black font-black uppercase text-xs"
+                                    >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Start New College Verification
                                     </OrbixButton>
                                 </div>
                             ) : null}
@@ -833,70 +1010,119 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                         </div>
                     ) : step === "CONTACT_INFO" ? (
                         /* ========================================================================= */
-                        /* STEP 3: CONTACT CHANNELS (Institutional Email & Phone OTP) */
+                        /* STEP 3: CONTACT CHANNELS (Mandatory Institutional Email & Phone OTP) */
                         /* ========================================================================= */
                         <div className="space-y-4">
                             <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
                                 <p className="text-xs font-black text-black">
-                                    Institutional Email & Phone Verification
+                                    Mandatory Institutional Email & Phone Verification
                                 </p>
                                 <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
-                                    Verifying your university email and mobile number accelerates founder approval. Note that ownership of an email or phone alone does not establish enrollment; official document review remains mandatory.
+                                    You must verify BOTH your institutional email link and your mobile phone OTP before submitting your application. Ownership of email and phone alongside official document review is required for founder approval.
                                 </p>
                             </div>
 
                             {/* Institutional Email Card */}
                             <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <div className="flex items-center gap-2">
                                         <Mail className="w-4 h-4 text-black stroke-[2.5]" />
                                         <label className="text-xs font-black uppercase tracking-wider text-black">
-                                            Institutional Email (Optional)
+                                            Institutional Email <span className="text-rose-600">*</span>
                                         </label>
                                     </div>
-                                    {emailDomainMatched && (
-                                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-900 uppercase">
-                                            Domain Matched
-                                        </span>
-                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                        {emailDomainMatched && (
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-black text-[10px] font-black text-emerald-900 uppercase">
+                                                Domain Matched
+                                            </span>
+                                        )}
+                                        {isEmailVerified ? (
+                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-900 uppercase inline-flex items-center gap-1">
+                                                <Check className="w-3 h-3 stroke-[3]" />
+                                                Email Verified
+                                            </span>
+                                        ) : (
+                                            <span className="px-2.5 py-0.5 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-950 uppercase">
+                                                Required
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="flex gap-2">
                                     <input
                                         type="email"
                                         value={institutionEmail}
-                                        onChange={(e) => setInstitutionEmail(e.target.value)}
+                                        onChange={(e) => {
+                                            setInstitutionEmail(e.target.value);
+                                            if (serverVerifiedEmail && e.target.value.trim().toLowerCase() !== serverVerifiedEmail.trim().toLowerCase()) {
+                                                setIsEmailSent(false);
+                                            }
+                                        }}
+                                        disabled={isEmailVerified}
                                         placeholder="e.g. yourname@institution.edu"
-                                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000]"
+                                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] disabled:opacity-75"
                                     />
-                                    <button
-                                        type="button"
-                                        onClick={handleSendEmailLink}
-                                        disabled={isEmailSending || emailCooldown > 0 || !institutionEmail.trim()}
-                                        className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
-                                    >
-                                        {isEmailSending ? "Sending..." : emailCooldown > 0 ? `Resend (${emailCooldown}s)` : "Send Link"}
-                                    </button>
+                                    {!isEmailVerified ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleSendEmailLink}
+                                            disabled={isEmailSending || emailCooldown > 0 || !institutionEmail.trim()}
+                                            className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
+                                        >
+                                            {isEmailSending ? "Sending..." : emailCooldown > 0 ? `Resend (${emailCooldown}s)` : "Send Link"}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setServerVerifiedEmail(null);
+                                                setIsEmailSent(false);
+                                                setEmailCooldown(0);
+                                            }}
+                                            className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-[11px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                        >
+                                            Change
+                                        </button>
+                                    )}
                                 </div>
-                                {isEmailSent && (
-                                    <p className="text-[11px] text-emerald-700 font-bold">
-                                        Verification link dispatched! You can click the link in your email now or after submitting.
-                                    </p>
+
+                                {!isEmailVerified && isEmailSent && (
+                                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-between gap-2 flex-wrap">
+                                        <p className="text-[11px] text-amber-950 font-bold">
+                                            Verification link dispatched! Click the confirmation link in your email, then verify status here.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => loadVerificationStatus({ updateStep: false, silent: true })}
+                                            disabled={isRefreshingChannels}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FFE566] hover:bg-[#ffe043] text-black text-[11px] font-black uppercase border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer disabled:opacity-50"
+                                        >
+                                            <RefreshCw className={`w-3 h-3 stroke-[2.5] ${isRefreshingChannels ? "animate-spin" : ""}`} />
+                                            {isRefreshingChannels ? "Checking..." : "Check Status"}
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
                             {/* Phone Verification Card */}
                             <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <div className="flex items-center gap-2">
                                         <Phone className="w-4 h-4 text-black stroke-[2.5]" />
                                         <label className="text-xs font-black uppercase tracking-wider text-black">
-                                            Mobile Phone OTP (Optional)
+                                            Mobile Phone OTP <span className="text-rose-600">*</span>
                                         </label>
                                     </div>
-                                    {isPhoneVerified && (
-                                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-900 uppercase">
+                                    {isPhoneVerified ? (
+                                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-900 uppercase inline-flex items-center gap-1">
+                                            <Check className="w-3 h-3 stroke-[3]" />
                                             Phone Verified
+                                        </span>
+                                    ) : (
+                                        <span className="px-2.5 py-0.5 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-950 uppercase">
+                                            Required
                                         </span>
                                     )}
                                 </div>
@@ -910,7 +1136,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                         placeholder="10-digit mobile number"
                                         className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] disabled:opacity-75"
                                     />
-                                    {!isPhoneVerified && (
+                                    {!isPhoneVerified ? (
                                         <button
                                             type="button"
                                             onClick={handleSendPhoneOtp}
@@ -918,6 +1144,19 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                             className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
                                         >
                                             {isPhoneSending ? "Sending..." : phoneCooldown > 0 ? `Resend (${phoneCooldown}s)` : "Send OTP"}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLocalPhoneVerified(false);
+                                                setServerVerifiedPhone(null);
+                                                setPhoneOtp("");
+                                                setPhoneCooldown(0);
+                                            }}
+                                            className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-[11px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                        >
+                                            Change
                                         </button>
                                     )}
                                 </div>
@@ -944,6 +1183,27 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                 )}
                             </div>
 
+                            {/* Explicit Checklist of Incomplete Requirements */}
+                            {(!isEmailVerified || !isPhoneVerified) && (
+                                <div className="p-3 rounded-xl bg-rose-50 border-2 border-rose-300 text-rose-950 text-xs font-bold space-y-1">
+                                    <p className="text-[11px] font-black uppercase tracking-wider text-rose-900">
+                                        Complete Both Verification Steps to Continue:
+                                    </p>
+                                    {!isEmailVerified && (
+                                        <p className="text-[11px] flex items-center gap-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-rose-700 shrink-0" />
+                                            Incomplete: Institutional email verification link must be clicked and confirmed.
+                                        </p>
+                                    )}
+                                    {!isPhoneVerified && (
+                                        <p className="text-[11px] flex items-center gap-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-rose-700 shrink-0" />
+                                            Incomplete: 6-digit mobile phone SMS OTP must be verified.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Navigation */}
                             <div className="flex items-center justify-between gap-3 pt-2">
                                 <button
@@ -955,8 +1215,23 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                     Back
                                 </button>
                                 <OrbixButton
-                                    onClick={() => setStep("FINAL_SUBMIT")}
-                                    className="bg-[#FFE566] text-black font-black uppercase text-xs"
+                                    onClick={() => {
+                                        if (!isEmailVerified) {
+                                            toast.error("Please complete institutional email verification first.", {
+                                                title: "Email Verification Incomplete",
+                                            });
+                                            return;
+                                        }
+                                        if (!isPhoneVerified) {
+                                            toast.error("Please verify your mobile phone OTP first.", {
+                                                title: "Phone Verification Incomplete",
+                                            });
+                                            return;
+                                        }
+                                        setStep("FINAL_SUBMIT");
+                                    }}
+                                    disabled={!isEmailVerified || !isPhoneVerified}
+                                    className="bg-[#FFE566] text-black font-black uppercase text-xs disabled:opacity-50"
                                 >
                                     Review Application Summary
                                     <ArrowRight className="w-3.5 h-3.5 ml-1.5 inline" />
@@ -976,7 +1251,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                 <div className="space-y-2 text-xs divide-y divide-black/10">
                                     <div className="flex justify-between py-1">
                                         <span className="text-neutral-600 font-bold">College / Institution</span>
-                                        <span className="font-black text-black text-right">{currentCollegeName}</span>
+                                        <span className="font-black text-black text-right">{effectiveCollegeName || currentCollegeName}</span>
                                     </div>
                                     <div className="flex justify-between py-1">
                                         <span className="text-neutral-600 font-bold">Student Name</span>
@@ -994,18 +1269,24 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                         <span className="text-neutral-600 font-bold">Academic Year</span>
                                         <span className="font-black text-black">{academicYear || "Not specified"}</span>
                                     </div>
-                                    {institutionEmail && (
-                                        <div className="flex justify-between py-1">
-                                            <span className="text-neutral-600 font-bold">Institutional Email</span>
-                                            <span className="font-black text-black">{institutionEmail}</span>
-                                        </div>
-                                    )}
-                                    {phoneNumber && (
-                                        <div className="flex justify-between py-1">
-                                            <span className="text-neutral-600 font-bold">Phone Number</span>
-                                            <span className="font-black text-black">{phoneNumber}</span>
-                                        </div>
-                                    )}
+                                    <div className="flex justify-between items-center py-1 gap-2">
+                                        <span className="text-neutral-600 font-bold">Institutional Email</span>
+                                        <span className="font-black text-black flex items-center gap-1.5">
+                                            {institutionEmail}
+                                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[9px] font-black text-emerald-900 uppercase">
+                                                Verified
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 gap-2">
+                                        <span className="text-neutral-600 font-bold">Phone Number</span>
+                                        <span className="font-black text-black flex items-center gap-1.5">
+                                            {phoneNumber}
+                                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[9px] font-black text-emerald-900 uppercase">
+                                                Verified
+                                            </span>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 

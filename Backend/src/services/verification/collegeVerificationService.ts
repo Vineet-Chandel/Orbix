@@ -2,11 +2,11 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { query } from "../../database/client.js";
+import { query, pool } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { sendVerificationEmail, sendCollegeVerificationEmail } from "../email/resendService.js";
 import { sendVerificationSms, normalizePhoneNumber } from "../sms/smsGatewayService.js";
-import { cloudinary, isCloudinaryConfigured } from "../../config/cloudinary.js";
+import { cloudinary, isCloudinaryConfigured, DEFAULT_VERIFICATION_FOLDER } from "../../config/cloudinary.js";
 import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
 import { invalidateAllUserCaches } from "../../redis/cache/cache-profile.js";
 import { CollegeOcrService, type OcrExtractedData } from "./collegeOcrService.js";
@@ -14,7 +14,61 @@ import { CollegeOcrService, type OcrExtractedData } from "./collegeOcrService.js
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const JWT_SECRET = process.env.JWT_SECRET || "orbix_secret_fallback_key_2026";
+const INSECURE_PROXY_SECRETS = new Set([
+    "",
+    "orbix_secret_fallback_key_2026",
+    "orbix_jwt_secret_fallback_2026",
+    "your_jwt_secret_key_here",
+    "your_document_proxy_hmac_secret",
+    "your_document_proxy_hmac_secret_here_minimum_32_characters",
+    "changeme",
+    "secret",
+    "default_secret",
+]);
+const MIN_PRODUCTION_PROXY_SECRET_LENGTH = 32;
+
+// Process-scoped ephemeral key reserved strictly for unconfigured non-production development runs.
+let devOnlyEphemeralProxySecret: string | null = null;
+let devProxyNoticeLogged = false;
+
+/**
+ * Resolves the dedicated DOCUMENT_PROXY_HMAC_SECRET for local document-proxy tokens.
+ * Never reuses JWT_SECRET. Fails closed in production if absent, placeholder, or < 32 chars.
+ */
+export function getDocumentProxySigningSecret(): string {
+    const raw = process.env.DOCUMENT_PROXY_HMAC_SECRET?.trim() || "";
+    const isProduction = process.env.NODE_ENV === "production";
+    const lower = raw.toLowerCase();
+    const isPlaceholder =
+        INSECURE_PROXY_SECRETS.has(lower) || lower.includes("your_document_proxy");
+
+    if (isProduction) {
+        if (!raw || isPlaceholder || raw.length < MIN_PRODUCTION_PROXY_SECRET_LENGTH) {
+            const err: any = new Error(
+                "Document proxy signing configuration error: A strong DOCUMENT_PROXY_HMAC_SECRET environment variable (minimum 32 characters) is required in production."
+            );
+            err.statusCode = 500;
+            err.isConfigError = true;
+            throw err;
+        }
+        return raw;
+    }
+
+    if (raw && !isPlaceholder) {
+        return raw;
+    }
+
+    if (!devOnlyEphemeralProxySecret) {
+        devOnlyEphemeralProxySecret = crypto.randomBytes(32).toString("hex");
+    }
+    if (!devProxyNoticeLogged) {
+        devProxyNoticeLogged = true;
+        console.warn(
+            "[CollegeVerification] NOTICE: DOCUMENT_PROXY_HMAC_SECRET is not configured; using an ephemeral development-only per-process HMAC secret (disallowed in production)."
+        );
+    }
+    return devOnlyEphemeralProxySecret;
+}
 
 /**
  * Resolves and validates canonical frontend URL for verification links.
@@ -65,13 +119,79 @@ export interface StoredDocument {
     uploadedAt: string;
 }
 
+export interface SubmitApplicationDeps {
+    query?: ((text: string, params?: any[]) => Promise<any>) | undefined;
+    pool?: {
+        connect: () => Promise<{
+            query: (text: string, params?: any[]) => Promise<any>;
+            release: () => void;
+        }>;
+    } | undefined;
+    client?: {
+        query: (text: string, params?: any[]) => Promise<any>;
+        release?: () => void;
+    } | undefined;
+    uploader?: {
+        upload_stream: (options: any, callback: (error: any, result: any) => void) => any;
+        destroy: (publicId: string, options: any) => Promise<any>;
+    } | undefined;
+    isCloudinaryConfigured?: (() => boolean) | undefined;
+}
+
+export interface VerificationChannelDeps {
+    query?: ((text: string, params?: any[]) => Promise<any>) | undefined;
+    emailSender?: ((options: {
+        to: string;
+        studentName: string;
+        collegeName: string;
+        verificationLink: string;
+        expiresInHours?: number;
+    }) => Promise<any>) | undefined;
+    smsSender?: ((options: {
+        to: string;
+        otp: string;
+        clubName?: string;
+    }) => Promise<any>) | undefined;
+    skipRateLimit?: boolean | undefined;
+}
+
+export interface ApproveApplicationDeps {
+    pool?: {
+        connect: () => Promise<{
+            query: (text: string, params?: any[]) => Promise<any>;
+            release: () => void;
+        }>;
+        query?: (text: string, params?: any[]) => Promise<any>;
+    };
+    client?: {
+        query: (text: string, params?: any[]) => Promise<any>;
+        release?: () => void;
+    };
+    query?: (text: string, params?: any[]) => Promise<any>;
+    cache?: {
+        deleteUserDetailsCache?: (userId: string) => Promise<any>;
+        invalidateAllUserCaches?: (user: { username: string; id: string }) => Promise<any>;
+    };
+    notificationHook?: (application: any) => Promise<void>;
+    auditHook?: (event: {
+        action: string;
+        applicationId: string;
+        userId: string;
+        reviewerId: string;
+        status: string;
+        timestamp: Date;
+    }) => Promise<void>;
+}
+
 export class CollegeVerificationService {
     /**
      * Retrieves current verification state, active submission, and submission history for a student.
      */
-    public static async getStatus(userId: string) {
+    public static async getStatus(userId: string, deps?: VerificationChannelDeps) {
+        const activeQuery = deps?.query || query;
+
         // 1. Fetch user's currently linked college
-        const userRes = await query(
+        const userRes = await activeQuery(
             `SELECT u.id, u.college_id, u.college, u.college_updated_at,
                     i.id AS "instId", i.official_name AS "instName", i.city, i.state, i.aishe_code AS "aisheCode", i.website
              FROM users u
@@ -97,7 +217,7 @@ export class CollegeVerificationService {
             : null;
 
         // 2. Query all verification submissions for this user (most recent first)
-        const appsRes = await query(
+        const appsRes = await activeQuery(
             `SELECT cv.*, 
                     i.official_name AS "collegeName", i.city AS "collegeCity", i.state AS "collegeState",
                     reviewer.username AS "reviewerUsername"
@@ -109,15 +229,15 @@ export class CollegeVerificationService {
             [userId]
         );
 
-        const allApplications = appsRes.rows.map((row) => this.formatApplicationRow(row, false));
+        const allApplications = appsRes.rows.map((row: any) => this.formatApplicationRow(row, false));
 
         // 3. Determine authoritative state
         // A user is APPROVED if and only if there is an APPROVED record matching their CURRENT college
         const approvedRecord = allApplications.find(
-            (a) => a.status === "APPROVED" && currentCollege && a.college_id === currentCollege.id
+            (a: any) => a.status === "APPROVED" && currentCollege && a.college_id === currentCollege.id
         );
 
-        let logicalStatus: "NOT_VERIFIED" | "PENDING" | "PROCESSING" | "APPROVED" | "REJECTED" = "NOT_VERIFIED";
+        let logicalStatus: "NOT_VERIFIED" | "PENDING" | "PROCESSING" | "APPROVED" | "REJECTED" | "INVALIDATED" = "NOT_VERIFIED";
         let activeApplication: any = null;
         let latestApplication: any = allApplications[0] || null;
 
@@ -127,15 +247,47 @@ export class CollegeVerificationService {
         } else {
             // Check for pending/processing active submission
             const pendingRecord = allApplications.find(
-                (a) => a.status === "PENDING" || a.status === "PROCESSING"
+                (a: any) => a.status === "PENDING" || a.status === "PROCESSING"
             );
             if (pendingRecord) {
                 logicalStatus = pendingRecord.status as "PENDING" | "PROCESSING";
                 activeApplication = pendingRecord;
+            } else if (latestApplication && latestApplication.status === "INVALIDATED") {
+                logicalStatus = "INVALIDATED";
             } else if (latestApplication && latestApplication.status === "REJECTED") {
                 logicalStatus = "REJECTED";
             } else {
                 logicalStatus = "NOT_VERIFIED";
+            }
+        }
+
+        // 4. Query unclaimed pre-submission verified email & phone belonging to this user
+        let preVerifiedEmail: { institution_email: string; verified_at: any } | null = null;
+        let preVerifiedPhone: { phone: string; verified_at: any } | null = null;
+
+        if (!activeApplication) {
+            const emailRes = await activeQuery(
+                `SELECT institution_email, verified_at
+                 FROM college_verification_email_tokens
+                 WHERE user_id = $1 AND status = 'verified' AND verification_id IS NULL
+                 ORDER BY verified_at DESC
+                 LIMIT 1;`,
+                [userId]
+            );
+            if (emailRes.rows[0]?.verified_at) {
+                preVerifiedEmail = emailRes.rows[0];
+            }
+
+            const phoneRes = await activeQuery(
+                `SELECT phone, verified_at
+                 FROM college_verification_phone_otps
+                 WHERE user_id = $1 AND status = 'verified' AND verification_id IS NULL
+                 ORDER BY verified_at DESC
+                 LIMIT 1;`,
+                [userId]
+            );
+            if (phoneRes.rows[0]?.verified_at) {
+                preVerifiedPhone = phoneRes.rows[0];
             }
         }
 
@@ -147,6 +299,12 @@ export class CollegeVerificationService {
             activeApplication,
             latestApplication,
             history: allApplications,
+            verifiedChannels: {
+                email: preVerifiedEmail?.institution_email || activeApplication?.institution_email || null,
+                emailVerifiedAt: preVerifiedEmail?.verified_at || activeApplication?.email_verified_at || null,
+                phone: preVerifiedPhone?.phone || activeApplication?.phone_number || null,
+                phoneVerifiedAt: preVerifiedPhone?.verified_at || activeApplication?.phone_verified_at || null,
+            },
         };
     }
 
@@ -166,7 +324,7 @@ export class CollegeVerificationService {
         institutionEmail?: string | null;
         phoneNumber?: string | null;
         ocrConfidence?: number;
-    }) {
+    }, deps?: SubmitApplicationDeps) {
         const {
             userId,
             collegeId,
@@ -190,6 +348,10 @@ export class CollegeVerificationService {
             ocrConfidence = 0,
         } = params;
 
+        const activeQuery = deps?.client
+            ? (text: string, params?: any[]) => deps.client!.query(text, params)
+            : (deps?.query || query);
+
         // 1. Validation: files required
         if (!files || files.length === 0) {
             const err: any = new Error("Please upload at least one valid document image (ID card or ERP screenshot).");
@@ -203,12 +365,41 @@ export class CollegeVerificationService {
             throw err;
         }
 
-        // 2. Validate user and college alignment
-        const userRes = await query(`SELECT id, college_id FROM users WHERE id = $1 LIMIT 1;`, [userId]);
+        // 2. Mandatory input validation: institutional email and phone number
+        const cleanEmail = typeof institutionEmail === "string" ? institutionEmail.trim().toLowerCase() : "";
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+            const err: any = new Error(
+                "A verified institutional email address is required before submitting your application."
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const cleanPhoneInput = typeof phoneNumber === "string" ? phoneNumber.trim() : "";
+        const normPhone = normalizePhoneNumber(cleanPhoneInput);
+        if (!cleanPhoneInput || !normPhone.isValid) {
+            const err: any = new Error(
+                "A verified 10-digit mobile phone number is required before submitting your application."
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // 3. Validate user, student eligibility (exclude clubs), and college alignment
+        const userRes = await activeQuery(`SELECT id, college_id, account_type FROM users WHERE id = $1 LIMIT 1;`, [userId]);
         const user = userRes.rows[0];
         if (!user) {
             const err: any = new Error("User account not found");
             err.statusCode = 404;
+            throw err;
+        }
+
+        if (user.account_type === "club") {
+            const err: any = new Error(
+                "Club accounts have a dedicated club verification workflow and cannot submit student college verification."
+            );
+            err.statusCode = 403;
             throw err;
         }
 
@@ -220,16 +411,16 @@ export class CollegeVerificationService {
             throw err;
         }
 
-        // 3. Verify institution exists
-        const instRes = await query(`SELECT id, official_name, website FROM institutions WHERE id = $1 LIMIT 1;`, [collegeId]);
+        // 4. Verify institution exists
+        const instRes = await activeQuery(`SELECT id, official_name, website FROM institutions WHERE id = $1 LIMIT 1;`, [collegeId]);
         if (!instRes.rows[0]) {
             const err: any = new Error("Selected institution was not found in directory.");
             err.statusCode = 404;
             throw err;
         }
 
-        // 4. Duplicate active submission check
-        const activeRes = await query(
+        // 5. Duplicate active submission check
+        const activeRes = await activeQuery(
             `SELECT id, status FROM college_verifications 
              WHERE user_id = $1 AND status IN ('PENDING', 'PROCESSING') 
              LIMIT 1;`,
@@ -243,95 +434,195 @@ export class CollegeVerificationService {
             throw err;
         }
 
-        // 5. Secure document upload
-        const storedDocs: StoredDocument[] = [];
-        for (const file of files) {
-            const val = CollegeOcrService.validateImageBuffer(file.buffer);
-            if (!val.isValid) {
-                const err: any = new Error(val.error || "Invalid file format");
-                err.statusCode = 400;
-                throw err;
-            }
-
-            const doc = await this.savePrivateDocument(file.buffer, file.originalname, val.format || "jpg");
-            storedDocs.push(doc);
-        }
-
-        // 6. Check if email was already verified via token
-        let emailVerifiedAt: Date | null = null;
-        if (institutionEmail) {
-            const tokenRes = await query(
-                `SELECT verified_at FROM college_verification_email_tokens 
-                 WHERE user_id = $1 AND LOWER(institution_email) = LOWER($2) AND status = 'verified' 
-                 ORDER BY verified_at DESC LIMIT 1;`,
-                [userId, institutionEmail.trim()]
+        // 6. Mandatory server-side verification checks (never trust client flags or timestamps)
+        const tokenRes = await activeQuery(
+            `SELECT id, institution_email, verified_at
+             FROM college_verification_email_tokens
+             WHERE user_id = $1
+               AND LOWER(institution_email) = LOWER($2)
+               AND status = 'verified'
+               AND verification_id IS NULL
+             ORDER BY verified_at DESC LIMIT 1;`,
+            [userId, cleanEmail]
+        );
+        const verifiedEmailRow = tokenRes.rows[0];
+        if (!verifiedEmailRow || !verifiedEmailRow.verified_at) {
+            const err: any = new Error(
+                "Institutional email verification is incomplete. Please verify the confirmation link sent to your institutional email before submitting."
             );
-            if (tokenRes.rows[0]?.verified_at) {
-                emailVerifiedAt = tokenRes.rows[0].verified_at;
-            }
+            err.statusCode = 400;
+            throw err;
         }
 
-        // 7. Check if phone was already verified via OTP
-        let phoneVerifiedAt: Date | null = null;
-        if (phoneNumber) {
-            const norm = normalizePhoneNumber(phoneNumber);
-            if (norm.isValid) {
-                const phoneRes = await query(
-                    `SELECT verified_at FROM college_verification_phone_otps 
-                     WHERE user_id = $1 AND phone = $2 AND status = 'verified' 
-                     ORDER BY verified_at DESC LIMIT 1;`,
-                    [userId, norm.canonical]
+        const phoneRes = await activeQuery(
+            `SELECT id, phone, verified_at
+             FROM college_verification_phone_otps
+             WHERE user_id = $1
+               AND phone = $2
+               AND status = 'verified'
+               AND verification_id IS NULL
+             ORDER BY verified_at DESC LIMIT 1;`,
+            [userId, normPhone.canonical]
+        );
+        const verifiedPhoneRow = phoneRes.rows[0];
+        if (!verifiedPhoneRow || !verifiedPhoneRow.verified_at) {
+            const err: any = new Error(
+                "Mobile phone OTP verification is incomplete. Please verify your phone number with the 6-digit SMS code before submitting."
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const emailVerifiedAt: Date = verifiedEmailRow.verified_at;
+        const phoneVerifiedAt: Date = verifiedPhoneRow.verified_at;
+
+        // 7. Secure document upload with automatic rollback on partial/database failure
+        const storedDocs: StoredDocument[] = [];
+        try {
+            for (const file of files) {
+                const val = CollegeOcrService.validateImageBuffer(file.buffer);
+                if (!val.isValid) {
+                    const err: any = new Error(val.error || "Invalid file format");
+                    err.statusCode = 400;
+                    throw err;
+                }
+
+                const doc = await this.savePrivateDocument(
+                    file.buffer,
+                    file.originalname,
+                    val.format || "jpg",
+                    deps?.uploader,
+                    deps?.isCloudinaryConfigured
                 );
-                if (phoneRes.rows[0]?.verified_at) {
-                    phoneVerifiedAt = phoneRes.rows[0].verified_at;
+                storedDocs.push(doc);
+            }
+
+            // 8. Atomically insert application and claim both verified tokens for this application
+            const useTransaction = Boolean(deps?.client || deps?.pool || !deps?.query);
+            const isExternalClient = Boolean(deps?.client);
+            let txClient: { query: (text: string, params?: any[]) => Promise<any>; release?: () => void } | null = null;
+
+            if (useTransaction) {
+                txClient = deps?.client
+                    ? deps.client
+                    : await (deps?.pool || pool).connect();
+            }
+
+            const runTxQuery = txClient
+                ? (text: string, params?: any[]) => txClient!.query(text, params)
+                : activeQuery;
+
+            let created: any;
+            try {
+                if (txClient) {
+                    await txClient.query("BEGIN;");
+                }
+
+                const insertRes = await runTxQuery(
+                    `INSERT INTO college_verifications (
+                        user_id,
+                        college_id,
+                        status,
+                        document_type,
+                        document_paths,
+                        extracted_data,
+                        student_name,
+                        enrollment_number,
+                        course_name,
+                        academic_year,
+                        institution_email,
+                        email_verified_at,
+                        phone_number,
+                        phone_verified_at,
+                        ocr_confidence
+                     ) VALUES ($1, $2, 'PENDING', $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                     RETURNING *;`,
+                    [
+                        userId,
+                        collegeId,
+                        documentType,
+                        JSON.stringify(storedDocs),
+                        JSON.stringify(extractedData || {}),
+                        studentName || extractedData?.studentName || null,
+                        enrollmentNumber || extractedData?.enrollmentNumber || null,
+                        courseName || extractedData?.courseName || null,
+                        academicYear || extractedData?.academicYear || null,
+                        cleanEmail,
+                        emailVerifiedAt,
+                        normPhone.canonical,
+                        phoneVerifiedAt,
+                        ocrConfidence,
+                    ]
+                );
+
+                created = insertRes.rows[0];
+                if (!created?.id) {
+                    throw new Error("Failed to persist college verification application.");
+                }
+
+                // Bind verified email token to this specific application so it cannot be reused
+                const claimEmailRes = await runTxQuery(
+                    `UPDATE college_verification_email_tokens
+                     SET verification_id = $1
+                     WHERE id = $2 AND user_id = $3 AND status = 'verified' AND verification_id IS NULL
+                     RETURNING id;`,
+                    [created.id, verifiedEmailRow.id, userId]
+                );
+                if (!claimEmailRes.rows?.[0]) {
+                    const err: any = new Error(
+                        "Institutional email verification has already been claimed by another submission. Please verify your email again."
+                    );
+                    err.statusCode = 409;
+                    throw err;
+                }
+
+                // Bind verified phone OTP to this specific application so it cannot be reused
+                const claimPhoneRes = await runTxQuery(
+                    `UPDATE college_verification_phone_otps
+                     SET verification_id = $1
+                     WHERE id = $2 AND user_id = $3 AND status = 'verified' AND verification_id IS NULL
+                     RETURNING id;`,
+                    [created.id, verifiedPhoneRow.id, userId]
+                );
+                if (!claimPhoneRes.rows?.[0]) {
+                    const err: any = new Error(
+                        "Mobile phone verification has already been claimed by another submission. Please verify your phone OTP again."
+                    );
+                    err.statusCode = 409;
+                    throw err;
+                }
+
+                if (txClient) {
+                    await txClient.query("COMMIT;");
+                }
+            } catch (dbErr) {
+                if (txClient) {
+                    try {
+                        await txClient.query("ROLLBACK;");
+                    } catch {}
+                }
+                throw dbErr;
+            } finally {
+                if (!isExternalClient && txClient && typeof txClient.release === "function") {
+                    txClient.release();
                 }
             }
+
+            return {
+                success: true,
+                message: "College verification application submitted successfully. Orbix founders will review your submission.",
+                application: this.formatApplicationRow(created, false),
+            };
+        } catch (submissionErr: any) {
+            // Clean up all newly uploaded documents created during this attempt
+            if (storedDocs.length > 0) {
+                console.warn(
+                    `[CollegeVerification] Submission failed: ${submissionErr?.message || "error"}. Cleaning up ${storedDocs.length} newly uploaded asset(s)...`
+                );
+                await this.cleanupUploadedDocuments(storedDocs, deps?.uploader);
+            }
+            throw submissionErr;
         }
-
-        // 8. Insert into college_verifications
-        const insertRes = await query(
-            `INSERT INTO college_verifications (
-                user_id,
-                college_id,
-                status,
-                document_type,
-                document_paths,
-                extracted_data,
-                student_name,
-                enrollment_number,
-                course_name,
-                academic_year,
-                institution_email,
-                email_verified_at,
-                phone_number,
-                phone_verified_at,
-                ocr_confidence
-             ) VALUES ($1, $2, 'PENDING', $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-             RETURNING *;`,
-            [
-                userId,
-                collegeId,
-                documentType,
-                JSON.stringify(storedDocs),
-                JSON.stringify(extractedData || {}),
-                studentName || extractedData?.studentName || null,
-                enrollmentNumber || extractedData?.enrollmentNumber || null,
-                courseName || extractedData?.courseName || null,
-                academicYear || extractedData?.academicYear || null,
-                institutionEmail || extractedData?.institutionEmail || null,
-                emailVerifiedAt,
-                phoneNumber || extractedData?.phoneNumber || null,
-                phoneVerifiedAt,
-                ocrConfidence,
-            ]
-        );
-
-        const created = insertRes.rows[0];
-        return {
-            success: true,
-            message: "College verification application submitted successfully. Orbix founders will review your submission.",
-            application: this.formatApplicationRow(created, false),
-        };
     }
 
     /**
@@ -343,8 +634,9 @@ export class CollegeVerificationService {
         collegeId: string;
         ipAddress?: string;
         userAgent?: string;
-    }) {
+    }, deps?: VerificationChannelDeps) {
         const { userId, email, collegeId, ipAddress = "unknown", userAgent = "unknown" } = params;
+        const activeQuery = deps?.query || query;
         const normalizedEmail = email.trim().toLowerCase();
 
         // 1. Email format check
@@ -355,9 +647,39 @@ export class CollegeVerificationService {
             throw err;
         }
 
-        // 2. Fetch institution and check domain association where available
-        const instRes = await query(`SELECT id, official_name, website FROM institutions WHERE id = $1 LIMIT 1;`, [collegeId]);
+        // 2. Validate student eligibility and college alignment
+        const userCheckRes = await activeQuery(
+            `SELECT id, college_id, account_type, firstname, lastname, username FROM users WHERE id = $1 LIMIT 1;`,
+            [userId]
+        );
+        const userRow = userCheckRes.rows[0];
+        if (!userRow) {
+            const err: any = new Error("User account not found.");
+            err.statusCode = 404;
+            throw err;
+        }
+        if (userRow.account_type === "club") {
+            const err: any = new Error("Club accounts cannot request student college email verification.");
+            err.statusCode = 403;
+            throw err;
+        }
+        if (!userRow.college_id || userRow.college_id !== collegeId) {
+            const err: any = new Error(
+                "Selected college must match your saved profile college before sending verification email."
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // 3. Fetch institution and check domain association where available
+        const instRes = await activeQuery(`SELECT id, official_name, website FROM institutions WHERE id = $1 LIMIT 1;`, [collegeId]);
         const inst = instRes.rows[0];
+        if (!inst) {
+            const err: any = new Error("Selected institution was not found in directory.");
+            err.statusCode = 404;
+            throw err;
+        }
+
         let domainMatched = false;
         let instDomain = "";
 
@@ -375,8 +697,8 @@ export class CollegeVerificationService {
             }
         }
 
-        // 3. Rate limiting via Redis
-        if (redis && redis.status === "ready") {
+        // 4. Rate limiting via Redis
+        if (!deps?.skipRateLimit && redis && redis.status === "ready") {
             const cooldownKey = `college_email_cooldown:${userId}`;
             const ttl = await redis.ttl(cooldownKey);
             if (ttl > 0) {
@@ -397,22 +719,25 @@ export class CollegeVerificationService {
             await redis.set(cooldownKey, "1", "EX", 60);
         }
 
-        // 4. Generate secure token
+        // 5. Resolve canonical URL before expiring/inserting tokens so production misconfig fails cleanly
+        const frontendBase = getCanonicalFrontendUrl();
+
+        // 6. Generate secure token
         const rawToken = crypto.randomBytes(32).toString("hex");
         const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-        // Invalidate prior pending tokens for this user & email
-        await query(
+        // Invalidate prior pending tokens for this user
+        await activeQuery(
             `UPDATE college_verification_email_tokens 
              SET status = 'expired' 
-             WHERE user_id = $1 AND LOWER(institution_email) = $2 AND status = 'pending';`,
-            [userId, normalizedEmail]
+             WHERE user_id = $1 AND status = 'pending';`,
+            [userId]
         );
 
         let activeVerificationId: string | null = null;
         try {
-            const vRes = await query(
+            const vRes = await activeQuery(
                 `SELECT id FROM college_verifications WHERE user_id = $1 AND status IN ('PENDING', 'PROCESSING') LIMIT 1;`,
                 [userId]
             );
@@ -421,29 +746,29 @@ export class CollegeVerificationService {
             }
         } catch {}
 
-        await query(
+        const insertTokenRes = await activeQuery(
             `INSERT INTO college_verification_email_tokens (
                 user_id, verification_id, institution_email, token_hash, status, expires_at
-             ) VALUES ($1, $2, $3, $4, 'pending', $5);`,
+             ) VALUES ($1, $2, $3, $4, 'pending', $5)
+             RETURNING id;`,
             [userId, activeVerificationId, normalizedEmail, tokenHash, expiresAt]
         );
+        const insertedTokenId = insertTokenRes?.rows?.[0]?.id;
 
-        // 5. Send Institutional Verification Email via Resend / SMTP
-        const frontendBase = getCanonicalFrontendUrl();
+        // 7. Send Institutional Verification Email via Resend / SMTP (fail closed on error or prod simulation)
         const verificationLink = `${frontendBase}/profile?verify_college_email=${rawToken}`;
         const collegeName = inst?.official_name || "your institution";
 
-        let studentDisplayName = "Student";
-        try {
-            const uRow = await query(`SELECT firstname, lastname, username FROM users WHERE id = $1 LIMIT 1;`, [userId]);
-            if (uRow.rows[0]) {
-                const full = [uRow.rows[0].firstname, uRow.rows[0].lastname].filter(Boolean).join(" ");
-                studentDisplayName = full || uRow.rows[0].username || "Student";
-            }
-        } catch {}
+        const full = [userRow.firstname, userRow.lastname].filter(Boolean).join(" ");
+        const studentDisplayName = full || userRow.username || "Student";
+
+        const activeEmailSender = deps?.emailSender || sendCollegeVerificationEmail;
+        const isProduction = process.env.NODE_ENV === "production";
+        let emailResult: any = null;
+        let emailDispatchError: any = null;
 
         try {
-            await sendCollegeVerificationEmail({
+            emailResult = await activeEmailSender({
                 to: normalizedEmail,
                 studentName: studentDisplayName,
                 collegeName,
@@ -451,7 +776,46 @@ export class CollegeVerificationService {
                 expiresInHours: 24,
             });
         } catch (emailErr: any) {
-            console.warn("[CollegeVerification] Send email notice (simulated delivery if unconfigured):", emailErr.message);
+            emailDispatchError = emailErr;
+        }
+
+        const simulatedInProduction = isProduction && emailResult?.simulated === true;
+        const deliveryFailed =
+            Boolean(emailDispatchError) ||
+            emailResult?.success === false ||
+            simulatedInProduction;
+
+        if (deliveryFailed) {
+            // Roll back unused pending token & cooldown so failed dispatch does not leave stale active state
+            if (insertedTokenId) {
+                try {
+                    await activeQuery(
+                        `UPDATE college_verification_email_tokens SET status = 'expired' WHERE id = $1;`,
+                        [insertedTokenId]
+                    );
+                } catch {}
+            }
+            if (!deps?.skipRateLimit && redis && redis.status === "ready") {
+                try {
+                    await redis.del(`college_email_cooldown:${userId}`);
+                } catch {}
+            }
+
+            const rawEmailErr = simulatedInProduction
+                ? "Simulated institutional email delivery is prohibited in production."
+                : emailDispatchError?.message ||
+                  emailResult?.error ||
+                  "Failed to dispatch institutional verification email.";
+            const safeMsg = String(rawEmailErr)
+                .split(rawToken).join("[REDACTED]")
+                .split(verificationLink).join("[REDACTED]");
+            console.error("[CollegeVerification] Email delivery failed (token redacted):", safeMsg);
+
+            const err: any = new Error(
+                "Unable to send verification link to your institutional email right now. Please try again later."
+            );
+            err.statusCode = isProduction && (!emailResult?.provider || simulatedInProduction) ? 503 : 502;
+            throw err;
         }
 
         return {
@@ -466,7 +830,20 @@ export class CollegeVerificationService {
     /**
      * Verifies the institutional email link token.
      */
-    public static async verifyInstitutionalEmailToken(token: string, userId?: string, verificationId?: string) {
+    public static async verifyInstitutionalEmailToken(
+        token: string,
+        userId?: string,
+        verificationId?: string,
+        deps?: VerificationChannelDeps
+    ) {
+        const activeQuery = deps?.query || query;
+
+        if (!userId || typeof userId !== "string") {
+            const err: any = new Error("Authentication is required to verify your institutional email link.");
+            err.statusCode = 401;
+            throw err;
+        }
+
         if (!token || typeof token !== "string") {
             const err: any = new Error("Verification token is required.");
             err.statusCode = 400;
@@ -475,7 +852,7 @@ export class CollegeVerificationService {
 
         const tokenHash = crypto.createHash("sha256").update(token.trim()).digest("hex");
 
-        const tokenRes = await query(
+        const tokenRes = await activeQuery(
             `SELECT id, user_id, verification_id, institution_email, status, expires_at 
              FROM college_verification_email_tokens 
              WHERE token_hash = $1 
@@ -490,6 +867,13 @@ export class CollegeVerificationService {
             throw err;
         }
 
+        // Strict user ownership check before exposing status or mutating token
+        if (row.user_id !== userId) {
+            const err: any = new Error("This verification token belongs to a different user account.");
+            err.statusCode = 403;
+            throw err;
+        }
+
         if (row.status === "verified") {
             const err: any = new Error("Verification token has already been used.");
             err.statusCode = 400;
@@ -498,17 +882,10 @@ export class CollegeVerificationService {
 
         if (row.status === "expired" || new Date(row.expires_at).getTime() < Date.now()) {
             if (row.status !== "expired") {
-                await query(`UPDATE college_verification_email_tokens SET status = 'expired' WHERE id = $1;`, [row.id]);
+                await activeQuery(`UPDATE college_verification_email_tokens SET status = 'expired' WHERE id = $1;`, [row.id]);
             }
             const err: any = new Error("Verification token has expired. Please request a new verification email.");
             err.statusCode = 400;
-            throw err;
-        }
-
-        // Validate user binding if userId is provided
-        if (userId && row.user_id !== userId) {
-            const err: any = new Error("This verification token belongs to a different user account.");
-            err.statusCode = 403;
             throw err;
         }
 
@@ -521,16 +898,23 @@ export class CollegeVerificationService {
 
         const verifiedAt = new Date();
 
-        // Mark token verified
-        await query(
+        // Mark token verified atomically to prevent concurrent race conditions
+        const updateTokenRes = await activeQuery(
             `UPDATE college_verification_email_tokens 
              SET status = 'verified', verified_at = $1 
-             WHERE id = $2;`,
+             WHERE id = $2 AND status = 'pending'
+             RETURNING id;`,
             [verifiedAt, row.id]
         );
 
+        if (!updateTokenRes.rows[0]) {
+            const err: any = new Error("Verification token has already been used.");
+            err.statusCode = 400;
+            throw err;
+        }
+
         // If user has an active or pending verification, update its institutional email state
-        await query(
+        await activeQuery(
             `UPDATE college_verifications 
              SET institution_email = $1, email_verified_at = $2, updated_at = CURRENT_TIMESTAMP 
              WHERE user_id = $3 AND status IN ('PENDING', 'PROCESSING');`,
@@ -553,8 +937,9 @@ export class CollegeVerificationService {
         phone: string;
         ipAddress?: string;
         userAgent?: string;
-    }) {
+    }, deps?: VerificationChannelDeps) {
         const { userId, phone, ipAddress = "unknown", userAgent = "unknown" } = params;
+        const activeQuery = deps?.query || query;
         const norm = normalizePhoneNumber(phone);
 
         if (!norm.isValid) {
@@ -563,10 +948,24 @@ export class CollegeVerificationService {
             throw err;
         }
 
+        // Verify student eligibility (exclude clubs)
+        const userRes = await activeQuery(`SELECT id, account_type FROM users WHERE id = $1 LIMIT 1;`, [userId]);
+        const userRow = userRes.rows[0];
+        if (!userRow) {
+            const err: any = new Error("User account not found.");
+            err.statusCode = 404;
+            throw err;
+        }
+        if (userRow.account_type === "club") {
+            const err: any = new Error("Club accounts cannot use student college phone verification.");
+            err.statusCode = 403;
+            throw err;
+        }
+
         const canonical = norm.canonical;
 
         // Rate limiting via Redis
-        if (redis && redis.status === "ready") {
+        if (!deps?.skipRateLimit && redis && redis.status === "ready") {
             const cooldownKey = `college_phone_cooldown:${userId}`;
             const ttl = await redis.ttl(cooldownKey);
             if (ttl > 0) {
@@ -592,28 +991,80 @@ export class CollegeVerificationService {
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
         // Invalidate prior pending OTPs for this user
-        await query(
+        await activeQuery(
             `UPDATE college_verification_phone_otps 
              SET status = 'expired' 
              WHERE user_id = $1 AND status = 'pending';`,
             [userId]
         );
 
-        await query(
+        let activeVerificationId: string | null = null;
+        try {
+            const vRes = await activeQuery(
+                `SELECT id FROM college_verifications WHERE user_id = $1 AND status IN ('PENDING', 'PROCESSING') LIMIT 1;`,
+                [userId]
+            );
+            if (vRes.rows[0]) {
+                activeVerificationId = vRes.rows[0].id;
+            }
+        } catch {}
+
+        const insertOtpRes = await activeQuery(
             `INSERT INTO college_verification_phone_otps (
-                user_id, phone, otp_hash, status, attempts, expires_at
-             ) VALUES ($1, $2, $3, 'pending', 0, $4);`,
-            [userId, canonical, otpHash, expiresAt]
+                user_id, verification_id, phone, otp_hash, status, attempts, expires_at
+             ) VALUES ($1, $2, $3, $4, 'pending', 0, $5)
+             RETURNING id;`,
+            [userId, activeVerificationId, canonical, otpHash, expiresAt]
         );
+        const insertedOtpId = insertOtpRes?.rows?.[0]?.id;
+
+        const activeSmsSender = deps?.smsSender || sendVerificationSms;
+        const isProduction = process.env.NODE_ENV === "production";
+        let smsResult: any = null;
+        let smsDispatchError: any = null;
 
         try {
-            await sendVerificationSms({
+            smsResult = await activeSmsSender({
                 to: canonical,
                 otp: rawOtp,
                 clubName: "Orbix College Verification",
             });
         } catch (smsErr: any) {
-            console.warn("[CollegeVerification] SMS delivery warning:", smsErr.message);
+            smsDispatchError = smsErr;
+        }
+
+        const simulatedInProduction = isProduction && smsResult?.simulated === true;
+        const deliveryFailed =
+            Boolean(smsDispatchError) ||
+            smsResult?.success === false ||
+            simulatedInProduction;
+
+        if (deliveryFailed) {
+            if (insertedOtpId) {
+                try {
+                    await activeQuery(
+                        `UPDATE college_verification_phone_otps SET status = 'expired' WHERE id = $1;`,
+                        [insertedOtpId]
+                    );
+                } catch {}
+            }
+            if (!deps?.skipRateLimit && redis && redis.status === "ready") {
+                try {
+                    await redis.del(`college_phone_cooldown:${userId}`);
+                } catch {}
+            }
+
+            const rawErr = simulatedInProduction
+                ? "Simulated SMS delivery is prohibited in production."
+                : smsDispatchError?.message || smsResult?.error || "Failed to send SMS verification code.";
+            const redactedErr = String(rawErr).split(rawOtp).join("[REDACTED]");
+            console.error("[CollegeVerification] SMS delivery failed (OTP redacted):", redactedErr);
+
+            const err: any = new Error(
+                "Unable to send SMS verification code right now. Please try again later."
+            );
+            err.statusCode = isProduction && (!smsResult?.providerError || simulatedInProduction) ? 503 : 502;
+            throw err;
         }
 
         return {
@@ -632,8 +1083,9 @@ export class CollegeVerificationService {
         userId: string;
         phone: string;
         otp: string;
-    }) {
+    }, deps?: VerificationChannelDeps) {
         const { userId, phone, otp } = params;
+        const activeQuery = deps?.query || query;
         const norm = normalizePhoneNumber(phone);
 
         if (!norm.isValid) {
@@ -649,7 +1101,7 @@ export class CollegeVerificationService {
         }
 
         const canonical = norm.canonical;
-        const tokenRes = await query(
+        const tokenRes = await activeQuery(
             `SELECT id, otp_hash, attempts, expires_at 
              FROM college_verification_phone_otps 
              WHERE user_id = $1 AND phone = $2 AND status = 'pending' 
@@ -665,14 +1117,14 @@ export class CollegeVerificationService {
         }
 
         if (row.attempts >= 5) {
-            await query(`UPDATE college_verification_phone_otps SET status = 'expired' WHERE id = $1;`, [row.id]);
+            await activeQuery(`UPDATE college_verification_phone_otps SET status = 'expired' WHERE id = $1;`, [row.id]);
             const err: any = new Error("Too many incorrect attempts. Please request a new code.");
             err.statusCode = 400;
             throw err;
         }
 
         if (new Date(row.expires_at).getTime() < Date.now()) {
-            await query(`UPDATE college_verification_phone_otps SET status = 'expired' WHERE id = $1;`, [row.id]);
+            await activeQuery(`UPDATE college_verification_phone_otps SET status = 'expired' WHERE id = $1;`, [row.id]);
             const err: any = new Error("Verification code has expired. Please request a new code.");
             err.statusCode = 400;
             throw err;
@@ -680,7 +1132,7 @@ export class CollegeVerificationService {
 
         const submittedHash = crypto.createHash("sha256").update(otp.trim()).digest("hex");
         if (submittedHash !== row.otp_hash) {
-            await query(`UPDATE college_verification_phone_otps SET attempts = attempts + 1 WHERE id = $1;`, [row.id]);
+            await activeQuery(`UPDATE college_verification_phone_otps SET attempts = attempts + 1 WHERE id = $1;`, [row.id]);
             const remaining = 4 - row.attempts;
             const err: any = new Error(`Incorrect verification code. ${remaining > 0 ? `${remaining} attempts remaining.` : ""}`);
             err.statusCode = 400;
@@ -689,15 +1141,23 @@ export class CollegeVerificationService {
 
         const verifiedAt = new Date();
 
-        await query(
+        // Atomically mark OTP verified to prevent concurrent race conditions
+        const updateOtpRes = await activeQuery(
             `UPDATE college_verification_phone_otps 
              SET status = 'verified', verified_at = $1 
-             WHERE id = $2;`,
+             WHERE id = $2 AND status = 'pending'
+             RETURNING id;`,
             [verifiedAt, row.id]
         );
 
+        if (!updateOtpRes.rows[0]) {
+            const err: any = new Error("Verification code has already been used or expired.");
+            err.statusCode = 400;
+            throw err;
+        }
+
         // Update active verification record with verified phone number
-        await query(
+        await activeQuery(
             `UPDATE college_verifications 
              SET phone_number = $1, phone_verified_at = $2, updated_at = CURRENT_TIMESTAMP 
              WHERE user_id = $3 AND status IN ('PENDING', 'PROCESSING');`,
@@ -822,12 +1282,33 @@ export class CollegeVerificationService {
     }
 
     /**
-     * Founder Review: Approves a college verification application.
+     * Founder Review: Concurrency-Safe Atomic Approval of a college verification application.
+     * Enforces conditional status transitions in PostgreSQL:
+     * - Allows approval ONLY from eligible review states ('PENDING', 'PROCESSING').
+     * - Serializes concurrent founder reviews via row-level locks on the application record.
+     * - Enforces atomic transaction rollback on failure.
+     * - Guarantees the winning founder's UUID and review timestamp cannot be overwritten by losing requests.
+     * - Restricts post-commit side effects (notifications, cache invalidation, audit hooks) strictly to the winning request.
      */
-    public static async approveApplication(id: string, reviewerId: string, notes?: string) {
-        // Check application
-        const appRes = await query(
-            `SELECT cv.*, u.college_id AS "userCollegeId" 
+    public static async approveApplication(
+        id: string,
+        reviewerId: string,
+        notes?: string,
+        deps?: ApproveApplicationDeps
+    ) {
+        if (!id || typeof id !== "string") {
+            const err: any = new Error("Application ID is required.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const initialQuery = deps?.client
+            ? (text: string, params?: any[]) => deps!.client!.query(text, params)
+            : (deps?.query || query);
+
+        // 1. Initial lookup to retrieve user details and perform pre-flight eligibility check
+        const appRes = await initialQuery(
+            `SELECT cv.*, u.college_id AS "userCollegeId", u.username, u.firstname, u.lastname, u.account_type AS "userAccountType"
              FROM college_verifications cv
              JOIN users u ON cv.user_id = u.id
              WHERE cv.id = $1 LIMIT 1;`,
@@ -841,67 +1322,258 @@ export class CollegeVerificationService {
             throw err;
         }
 
+        // Fast-path eligibility checks
         if (app.status === "APPROVED") {
             const err: any = new Error("This application has already been approved.");
+            err.statusCode = 409;
+            throw err;
+        }
+        if (app.status === "REJECTED") {
+            const err: any = new Error("This application has been rejected and cannot be approved.");
+            err.statusCode = 409;
+            throw err;
+        }
+        if (app.status === "INVALIDATED") {
+            const err: any = new Error("This application has been invalidated and cannot be approved.");
+            err.statusCode = 409;
+            throw err;
+        }
+        if (app.status !== "PENDING" && app.status !== "PROCESSING") {
+            const err: any = new Error(`Application is not in an eligible state for approval (current status: ${app.status}).`);
+            err.statusCode = 409;
+            throw err;
+        }
+        if (app.userAccountType === "club") {
+            const err: any = new Error("Club accounts cannot be approved through student college verification.");
+            err.statusCode = 403;
+            throw err;
+        }
+        if (!app.email_verified_at && !app.phone_verified_at) {
+            const err: any = new Error(
+                "Cannot approve application: both institutional email verification and mobile phone OTP verification are required."
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!app.email_verified_at) {
+            const err: any = new Error(
+                "Cannot approve application: institutional email verification is missing or unverified."
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!app.phone_verified_at) {
+            const err: any = new Error(
+                "Cannot approve application: mobile phone OTP verification is missing or unverified."
+            );
             err.statusCode = 400;
             throw err;
         }
 
+        // 2. Acquire transactional client
+        const isExternalClient = Boolean(deps?.client);
+        let client: { query: (text: string, params?: any[]) => Promise<any>; release?: () => void };
+
+        if (deps?.client) {
+            client = deps.client;
+        } else if (deps?.pool) {
+            client = await deps.pool.connect();
+        } else {
+            client = await pool.connect();
+        }
+
+        let approvedRow: any = null;
         const now = new Date();
 
-        // Transactional approval
-        // 1. Invalidate any prior APPROVED verifications for this user
-        await query(
-            `UPDATE college_verifications 
-             SET status = 'INVALIDATED', updated_at = $1 
-             WHERE user_id = $2 AND status = 'APPROVED' AND id != $3;`,
-            [now, app.user_id, id]
-        );
-
-        // 2. Mark this verification APPROVED
-        const updateRes = await query(
-            `UPDATE college_verifications 
-             SET status = 'APPROVED', reviewed_by = $1, reviewed_at = $2, reviewer_notes = $3, updated_at = $2 
-             WHERE id = $4 
-             RETURNING *;`,
-            [reviewerId, now, notes || "Approved by founder", id]
-        );
-
-        // 3. Update users table cache column
-        await query(
-            `UPDATE users 
-             SET is_college_verified = true, college_verified_at = $1 
-             WHERE id = $2;`,
-            [now, app.user_id]
-        );
-
-        // 4. Invalidate auth and profile cache
         try {
-            await deleteUserDetailsCache(app.user_id);
-            const user = await query(`SELECT username FROM users WHERE id = $1;`, [app.user_id]);
-            if (user.rows[0]?.username) {
-                await invalidateAllUserCaches({ username: user.rows[0].username, id: app.user_id });
+            await client.query("BEGIN;");
+
+            // 3. ATOMIC CONDITIONAL UPDATE:
+            // PostgreSQL serializes concurrent updates to the same row.
+            // Enforces both review-state eligibility AND mandatory verified email & phone timestamps atomically.
+            const updateRes = await client.query(
+                `UPDATE college_verifications
+                 SET status = 'APPROVED',
+                     reviewed_by = $1,
+                     reviewed_at = $2,
+                     reviewer_notes = $3,
+                     updated_at = $2
+                 WHERE id = $4
+                   AND status IN ('PENDING', 'PROCESSING')
+                   AND email_verified_at IS NOT NULL
+                   AND phone_verified_at IS NOT NULL
+                 RETURNING *;`,
+                [reviewerId, now, notes || "Approved by founder", id]
+            );
+
+            // 4. LOSING REQUEST / PRECONDITION FAILURE HANDLING:
+            // If zero rows updated, inspect current database state to distinguish race conflicts from unmet verification factors.
+            if (!updateRes.rows || updateRes.rows.length === 0) {
+                await client.query("ROLLBACK;");
+
+                // Safely inspect current database state to deliver accurate diagnostics
+                const currentRes = await client.query(
+                    `SELECT status, reviewed_by, reviewed_at, email_verified_at, phone_verified_at FROM college_verifications WHERE id = $1 LIMIT 1;`,
+                    [id]
+                );
+                const current = currentRes.rows[0];
+                const currentStatus = current?.status;
+
+                if (currentStatus === "PENDING" || currentStatus === "PROCESSING") {
+                    if (!current?.email_verified_at && !current?.phone_verified_at) {
+                        const err: any = new Error(
+                            "Cannot approve application: both institutional email verification and mobile phone OTP verification are required."
+                        );
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                    if (!current?.email_verified_at) {
+                        const err: any = new Error(
+                            "Cannot approve application: institutional email verification is missing or unverified."
+                        );
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                    if (!current?.phone_verified_at) {
+                        const err: any = new Error(
+                            "Cannot approve application: mobile phone OTP verification is missing or unverified."
+                        );
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                }
+
+                let conflictMessage = "This application has already been approved.";
+                if (currentStatus === "APPROVED") {
+                    conflictMessage = "This application has already been approved.";
+                } else if (currentStatus === "REJECTED") {
+                    conflictMessage = "This application has been rejected and cannot be approved.";
+                } else if (currentStatus === "INVALIDATED") {
+                    conflictMessage = "This application has been invalidated and cannot be approved.";
+                } else if (currentStatus) {
+                    conflictMessage = `Application is not in an eligible state for approval (current status: ${currentStatus}).`;
+                }
+
+                const conflictErr: any = new Error(conflictMessage);
+                conflictErr.statusCode = 409;
+                conflictErr.conflictDetails = {
+                    currentStatus,
+                    reviewedBy: current?.reviewed_by,
+                    reviewedAt: current?.reviewed_at,
+                };
+                throw conflictErr;
             }
-        } catch {}
+
+            approvedRow = updateRes.rows[0];
+
+            // 5. Invalidate any prior APPROVED verifications for this user
+            // (Maintains Invariant 2: exactly one approved verification per user)
+            await client.query(
+                `UPDATE college_verifications
+                 SET status = 'INVALIDATED', updated_at = $1
+                 WHERE user_id = $2 AND status = 'APPROVED' AND id != $3;`,
+                [now, app.user_id, id]
+            );
+
+            // 6. Update users table cache columns atomically within the same transaction
+            await client.query(
+                `UPDATE users
+                 SET is_college_verified = true, college_verified_at = $1
+                 WHERE id = $2;`,
+                [now, app.user_id]
+            );
+
+            await client.query("COMMIT;");
+        } catch (txErr: any) {
+            try {
+                await client.query("ROLLBACK;");
+            } catch {}
+            throw txErr;
+        } finally {
+            if (!isExternalClient && client && typeof client.release === "function") {
+                client.release();
+            }
+        }
+
+        // 7. POST-COMMIT SIDE EFFECTS (Executed strictly for the WINNING request):
+        // Since transaction has committed, side-effect failures must NOT claim approval failed.
+        try {
+            const deleteCache = deps?.cache?.deleteUserDetailsCache || deleteUserDetailsCache;
+            const invalidateAll = deps?.cache?.invalidateAllUserCaches || invalidateAllUserCaches;
+
+            await deleteCache(app.user_id);
+            const userLookup = await (deps?.query || query)(`SELECT username FROM users WHERE id = $1;`, [app.user_id]);
+            const username = userLookup.rows[0]?.username;
+            if (username) {
+                await invalidateAll({ username, id: app.user_id });
+            }
+
+            // In-app user notification
+            try {
+                if (username) {
+                    await (deps?.query || query)(
+                        `INSERT INTO user_notifications (
+                            user_id, username, title, body, type, metadata
+                         ) VALUES ($1, $2, $3, $4, 'system', $5);`,
+                        [
+                            app.user_id,
+                            username,
+                            "College Verification Approved!",
+                            "Your college verification application has been approved. Your verified badge is now active!",
+                            JSON.stringify({ verificationId: id, collegeId: app.college_id }),
+                        ]
+                    );
+                }
+            } catch (notifErr: any) {
+                console.warn("[CollegeVerification] Non-fatal notification delivery error:", notifErr?.message || notifErr);
+            }
+
+            // External audit hook (if configured)
+            if (deps?.auditHook) {
+                await deps.auditHook({
+                    action: "COLLEGE_VERIFICATION_APPROVED",
+                    applicationId: id,
+                    userId: app.user_id,
+                    reviewerId,
+                    status: "APPROVED",
+                    timestamp: now,
+                });
+            }
+
+            // External notification hook (if configured)
+            if (deps?.notificationHook) {
+                await deps.notificationHook(approvedRow);
+            }
+        } catch (sideEffectErr: any) {
+            console.error("[CollegeVerification] Non-fatal post-commit side-effect error:", sideEffectErr?.message || sideEffectErr);
+        }
 
         return {
             success: true,
             message: "College verification application approved successfully.",
-            application: this.formatApplicationRow(updateRes.rows[0], false),
+            application: this.formatApplicationRow(approvedRow, false),
         };
     }
 
     /**
-     * Founder Review: Rejects a college verification application with a mandatory rejection reason.
+     * Founder Review: Concurrency-Safe Rejection of a college verification application with mandatory reason.
      */
-    public static async rejectApplication(id: string, reviewerId: string, reason: string, notes?: string) {
+    public static async rejectApplication(
+        id: string,
+        reviewerId: string,
+        reason: string,
+        notes?: string,
+        deps?: { query?: (text: string, params?: any[]) => Promise<any> }
+    ) {
         if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
             const err: any = new Error("A clear rejection reason is mandatory to guide the student.");
             err.statusCode = 400;
             throw err;
         }
 
-        const appRes = await query(`SELECT * FROM college_verifications WHERE id = $1 LIMIT 1;`, [id]);
+        const queryFn = deps?.query || query;
+
+        const appRes = await queryFn(`SELECT * FROM college_verifications WHERE id = $1 LIMIT 1;`, [id]);
         const app = appRes.rows[0];
         if (!app) {
             const err: any = new Error("Application not found");
@@ -909,18 +1581,49 @@ export class CollegeVerificationService {
             throw err;
         }
 
+        if (app.status === "APPROVED") {
+            const err: any = new Error("An approved application cannot be rejected.");
+            err.statusCode = 409;
+            throw err;
+        }
+        if (app.status === "REJECTED") {
+            const err: any = new Error("This application has already been rejected.");
+            err.statusCode = 409;
+            throw err;
+        }
+        if (app.status !== "PENDING" && app.status !== "PROCESSING") {
+            const err: any = new Error(`Application is not in an eligible state for review (current status: ${app.status}).`);
+            err.statusCode = 409;
+            throw err;
+        }
+
         const now = new Date();
 
-        const updateRes = await query(
+        const updateRes = await queryFn(
             `UPDATE college_verifications 
              SET status = 'REJECTED', rejection_reason = $1, reviewed_by = $2, reviewed_at = $3, reviewer_notes = $4, updated_at = $3 
              WHERE id = $5 
+               AND status IN ('PENDING', 'PROCESSING')
              RETURNING *;`,
             [reason.trim(), reviewerId, now, notes || null, id]
         );
 
+        if (!updateRes.rows || updateRes.rows.length === 0) {
+            const currentRes = await queryFn(`SELECT status FROM college_verifications WHERE id = $1 LIMIT 1;`, [id]);
+            const currentStatus = currentRes.rows[0]?.status;
+            const err: any = new Error(
+                currentStatus === "APPROVED"
+                    ? "An approved application cannot be rejected."
+                    : currentStatus === "REJECTED"
+                    ? "This application has already been rejected."
+                    : `Application is not in an eligible state for review (current status: ${currentStatus || "unknown"}).`
+            );
+            err.statusCode = 409;
+            throw err;
+        }
+
         // If user has no other approved verification, update users table
-        await query(
+        await queryFn(
             `UPDATE users 
              SET is_college_verified = false 
              WHERE id = $1 AND NOT EXISTS (
@@ -931,7 +1634,7 @@ export class CollegeVerificationService {
 
         try {
             await deleteUserDetailsCache(app.user_id);
-            const user = await query(`SELECT username FROM users WHERE id = $1;`, [app.user_id]);
+            const user = await queryFn(`SELECT username FROM users WHERE id = $1;`, [app.user_id]);
             if (user.rows[0]?.username) {
                 await invalidateAllUserCaches({ username: user.rows[0].username, id: app.user_id });
             }
@@ -980,21 +1683,25 @@ export class CollegeVerificationService {
     private static async savePrivateDocument(
         buffer: Buffer,
         originalName: string,
-        format: "jpg" | "png" | "webp"
+        format: "jpg" | "png" | "webp",
+        uploaderOverride?: any,
+        isConfiguredOverride?: () => boolean
     ): Promise<StoredDocument> {
         const isProduction = process.env.NODE_ENV === "production";
+        const checkConfigured = isConfiguredOverride || isCloudinaryConfigured;
+        const activeUploader = uploaderOverride || cloudinary.uploader;
 
-        if (isCloudinaryConfigured()) {
+        if (checkConfigured()) {
             try {
                 return await new Promise<StoredDocument>((resolve, reject) => {
-                    const stream = cloudinary.uploader.upload_stream(
+                    const stream = activeUploader.upload_stream(
                         {
-                            folder: "orbix/college_verifications",
+                            folder: process.env.CLOUDINARY_VERIFICATION_FOLDER || DEFAULT_VERIFICATION_FOLDER,
                             resource_type: "image",
                             type: "authenticated",
                             format,
                         },
-                        (error, result) => {
+                        (error: any, result: any) => {
                             if (error || !result) {
                                 return reject(new Error(`Cloudinary upload failed: ${error?.message || "Unknown error"}`));
                             }
@@ -1012,7 +1719,7 @@ export class CollegeVerificationService {
                     stream.end(buffer);
                 });
             } catch (cloudErr: any) {
-                if (isProduction) {
+                if (isProduction || uploaderOverride) {
                     throw new Error(`Production document storage failed: ${cloudErr.message}. Upload aborted to safeguard student privacy.`);
                 }
                 console.warn("[CollegeVerification] Cloudinary upload notice (falling back to secure local storage):", cloudErr.message);
@@ -1040,6 +1747,104 @@ export class CollegeVerificationService {
     }
 
     /**
+     * Safely deletes a document uploaded during a failed submission attempt.
+     * Restricts deletion to assets explicitly created during this submission.
+     */
+    public static async deleteUploadedDocument(
+        doc: StoredDocument,
+        uploaderOverride?: { destroy: (publicId: string, options: any) => Promise<any> }
+    ): Promise<boolean> {
+        if (!doc) return false;
+
+        if (doc.storage === "cloudinary" && doc.publicId) {
+            const activeUploader = uploaderOverride || cloudinary.uploader;
+
+            try {
+                // College verification documents are uploaded with type: "authenticated"
+                let result = await activeUploader.destroy(doc.publicId, {
+                    resource_type: "image",
+                    type: "authenticated",
+                    invalidate: true,
+                });
+
+                if (result?.result !== "ok" && result?.result !== "not found") {
+                    result = await activeUploader.destroy(doc.publicId, {
+                        resource_type: "image",
+                        invalidate: true,
+                    });
+                }
+
+                const isSuccess = result?.result === "ok" || result?.result === "not found";
+                if (!isSuccess) {
+                    console.error("[CollegeVerification Cleanup] Cloudinary deletion API returned failure:", {
+                        publicId: doc.publicId,
+                        result: result?.result,
+                        error: result?.error?.message || result?.error || "Unknown error",
+                    });
+                }
+                return isSuccess;
+            } catch (err: any) {
+                console.error("[CollegeVerification Cleanup] Cloudinary deletion threw exception:", {
+                    publicId: doc.publicId,
+                    error: err?.message || String(err),
+                });
+                return false;
+            }
+        }
+
+        if (doc.storage === "local" && doc.filename) {
+            try {
+                const safeName = path.basename(doc.filename);
+                const filePath = path.join(LOCAL_UPLOAD_DIR, safeName);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+                return true;
+            } catch (err: any) {
+                console.error("[CollegeVerification Cleanup] Local file deletion error:", {
+                    filename: doc.filename,
+                    error: err?.message || String(err),
+                });
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Cleans up all newly uploaded documents if a submission attempt fails.
+     * Ensures failure of one deletion does not stop remaining deletions.
+     */
+    public static async cleanupUploadedDocuments(
+        docs: StoredDocument[],
+        uploaderOverride?: { destroy: (publicId: string, options: any) => Promise<any> }
+    ): Promise<{ cleaned: string[]; failed: string[] }> {
+        const cleaned: string[] = [];
+        const failed: string[] = [];
+
+        for (const doc of docs) {
+            const identifier = doc.publicId || doc.filename || "unknown";
+            try {
+                const success = await this.deleteUploadedDocument(doc, uploaderOverride);
+                if (success) {
+                    cleaned.push(identifier);
+                } else {
+                    failed.push(identifier);
+                }
+            } catch (err: any) {
+                failed.push(identifier);
+                console.error("[CollegeVerification Cleanup] Unhandled exception during asset cleanup:", {
+                    identifier,
+                    error: err?.message || String(err),
+                });
+            }
+        }
+
+        return { cleaned, failed };
+    }
+
+    /**
      * Generates a short-lived signed URL (300 seconds TTL) for founder document preview.
      */
     public static generateSignedDocumentUrl(doc: StoredDocument): string {
@@ -1057,12 +1862,16 @@ export class CollegeVerificationService {
             }
         }
 
-        // Local storage signed token proxy
+        // Local storage signed token proxy — requires strong configured signing secret in production
+        const signingSecret = getDocumentProxySigningSecret();
+        if (!doc.filename || typeof doc.filename !== "string") {
+            throw new Error("Local document filename missing for proxy URL signing.");
+        }
         const payload = JSON.stringify({
             f: doc.filename,
             exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
         });
-        const hmac = crypto.createHmac("sha256", JWT_SECRET).update(payload).digest("hex");
+        const hmac = crypto.createHmac("sha256", signingSecret).update(payload).digest("hex");
         const token = Buffer.from(`${payload}::${hmac}`).toString("base64url");
 
         return `/api/internal/college-verifications/document-proxy/${token}`;
@@ -1071,20 +1880,48 @@ export class CollegeVerificationService {
     /**
      * Resolves local file path from signed proxy token.
      */
-    public static resolveDocumentFromProxyToken(token: string): { filePath: string; mimeType: string } | null {
+    public static resolveDocumentFromProxyToken(
+        token: string,
+        uploadDirOverride?: string
+    ): { filePath: string; mimeType: string } | null {
+        const signingSecret = getDocumentProxySigningSecret();
+
         try {
             const raw = Buffer.from(token, "base64url").toString("utf8");
-            const [payloadStr, hmac] = raw.split("::");
+            const sepIndex = raw.lastIndexOf("::");
+            if (sepIndex <= 0) return null;
+
+            const payloadStr = raw.slice(0, sepIndex);
+            const hmac = raw.slice(sepIndex + 2);
             if (!payloadStr || !hmac) return null;
 
-            const expectedHmac = crypto.createHmac("sha256", JWT_SECRET).update(payloadStr).digest("hex");
-            if (hmac !== expectedHmac) return null;
+            const expectedHmac = crypto.createHmac("sha256", signingSecret).update(payloadStr).digest("hex");
+            const hmacBuf = Buffer.from(hmac, "hex");
+            const expectedBuf = Buffer.from(expectedHmac, "hex");
+            if (
+                hmacBuf.length !== 32 ||
+                hmacBuf.length !== expectedBuf.length ||
+                !crypto.timingSafeEqual(hmacBuf, expectedBuf)
+            ) {
+                return null;
+            }
 
             const payload = JSON.parse(payloadStr);
-            if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+            if (
+                !payload ||
+                typeof payload.f !== "string" ||
+                !payload.f.trim() ||
+                typeof payload.exp !== "number" ||
+                payload.exp < Math.floor(Date.now() / 1000)
+            ) {
+                return null;
+            }
 
             const filename = path.basename(payload.f); // prevent path traversal
-            const filePath = path.join(LOCAL_UPLOAD_DIR, filename);
+            if (!filename || filename === "." || filename === "..") return null;
+
+            const baseDir = uploadDirOverride || LOCAL_UPLOAD_DIR;
+            const filePath = path.join(baseDir, filename);
             if (!fs.existsSync(filePath)) return null;
 
             const ext = path.extname(filename).toLowerCase().replace(".", "");

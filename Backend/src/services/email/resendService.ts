@@ -30,19 +30,50 @@ export interface SendEmailResult {
   sandboxRestricted?: boolean;
 }
 
+export interface EmailDispatchDeps {
+  resendClient?: {
+    emails: {
+      send: (payload: any) => Promise<{ data?: any; error?: any }>;
+    };
+  } | null;
+  smtpTransporter?: Pick<Transporter, "sendMail"> | null;
+}
+
 let resendClientInstance: Resend | null = null;
+let cachedResendApiKey: string | null = null;
 let smtpTransporterInstance: Transporter | null = null;
+let cachedSmtpConfigKey: string | null = null;
+
+function isPlaceholderEmailValue(val: string | undefined, extraPatterns: string[] = []): boolean {
+  if (!val || !val.trim()) return true;
+  const lower = val.trim().toLowerCase();
+  const basePatterns = ["your_resend_api_key", "yourdomain.com", "your_email@gmail.com", "placeholder"];
+  return [...basePatterns, ...extraPatterns].some((p) => lower.includes(p));
+}
+
+function isVerifiedProductionResendSender(fromEmail: string | undefined): boolean {
+  if (!fromEmail || !fromEmail.trim()) return false;
+  const lower = fromEmail.trim().toLowerCase();
+  if (!lower.includes("@")) return false;
+  if (lower.includes("@resend.dev") || lower.includes("@yourdomain.com") || lower.includes("your_")) {
+    return false;
+  }
+  return true;
+}
 
 /**
  * Returns an authenticated Resend client instance if RESEND_API_KEY is configured.
  */
 export function getResendClient(): Resend | null {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey || apiKey.trim() === "" || apiKey.includes("your_resend_api_key")) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (isPlaceholderEmailValue(apiKey)) {
+    resendClientInstance = null;
+    cachedResendApiKey = null;
     return null;
   }
-  if (!resendClientInstance) {
-    resendClientInstance = new Resend(apiKey.trim());
+  if (!resendClientInstance || cachedResendApiKey !== apiKey) {
+    resendClientInstance = new Resend(apiKey);
+    cachedResendApiKey = apiKey!;
   }
   return resendClientInstance;
 }
@@ -52,32 +83,53 @@ export function getResendClient(): Resend | null {
  * Supports standard SMTP (Gmail App Passwords, SendGrid, Amazon SES, Brevo, custom SMTP).
  */
 export function getSmtpTransporter(): Transporter | null {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+  const user = process.env.SMTP_USER?.trim();
+  const pass = (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD)?.trim();
+  const explicitHost = process.env.SMTP_HOST?.trim();
+  const fromEmail = (process.env.SMTP_FROM_EMAIL || user)?.trim();
 
-  if (!user || !pass || !user.trim() || !pass.trim()) {
+  if (
+    !user ||
+    !pass ||
+    isPlaceholderEmailValue(user) ||
+    isPlaceholderEmailValue(pass, ["xxxx"]) ||
+    !fromEmail ||
+    !fromEmail.includes("@")
+  ) {
+    smtpTransporterInstance = null;
+    cachedSmtpConfigKey = null;
     return null;
   }
 
-  if (!smtpTransporterInstance) {
-    const host = process.env.SMTP_HOST || (user.includes("@gmail.com") ? "smtp.gmail.com" : "localhost");
-    const port = Number(process.env.SMTP_PORT) || 465;
-    const secure = process.env.SMTP_SECURE !== undefined
-      ? process.env.SMTP_SECURE === "true"
-      : port === 465;
+  const isGmail = user.toLowerCase().includes("@gmail.com");
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction && !explicitHost && !isGmail) {
+    smtpTransporterInstance = null;
+    cachedSmtpConfigKey = null;
+    return null;
+  }
 
+  const host = explicitHost || (isGmail ? "smtp.gmail.com" : "localhost");
+  const port = Number(process.env.SMTP_PORT) || 465;
+  const secure = process.env.SMTP_SECURE !== undefined
+    ? process.env.SMTP_SECURE === "true"
+    : port === 465;
+
+  const configKey = `${host}|${port}|${secure}|${user}|${pass}|${fromEmail}`;
+  if (!smtpTransporterInstance || cachedSmtpConfigKey !== configKey) {
     smtpTransporterInstance = nodemailer.createTransport({
       host,
       port,
       secure,
       auth: {
-        user: user.trim(),
-        pass: pass.trim().replace(/\s+/g, ""), // clean accidental spaces in app passwords
+        user,
+        pass: pass.replace(/\s+/g, ""), // clean accidental spaces in app passwords
       },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,
     });
+    cachedSmtpConfigKey = configKey;
   }
 
   return smtpTransporterInstance;
@@ -100,7 +152,7 @@ function isResendSandboxError(errorMsg?: string): boolean {
  * Sends an email using Nodemailer SMTP transporter.
  */
 async function sendViaSmtp(
-  transporter: Transporter,
+  transporter: Pick<Transporter, "sendMail">,
   options: { to: string; subject: string; html: string; text: string; fromName: string }
 ): Promise<SendEmailResult> {
   const { to, subject, html, text, fromName } = options;
@@ -119,15 +171,17 @@ async function sendViaSmtp(
     console.log(`[SMTP Transporter] Email dispatched successfully to ${to} (MessageId: ${info.messageId})`);
     return {
       success: true,
+      simulated: false,
       provider: "smtp",
       messageId: info.messageId,
     };
   } catch (smtpErr: any) {
-    console.error(`[SMTP Error] Failed sending email to ${to}:`, smtpErr.message || smtpErr);
+    console.error(`[SMTP Error] Failed sending email to ${to}:`, smtpErr?.message || "SMTP dispatch error");
     return {
       success: false,
+      simulated: false,
       provider: "smtp",
-      error: smtpErr.message || "Failed to dispatch email via SMTP",
+      error: smtpErr?.message || "Failed to dispatch email via SMTP",
     };
   }
 }
@@ -144,30 +198,58 @@ interface DispatchEmailPayload {
 
 /**
  * Unified Multi-Provider Email Dispatcher.
- * Intelligently chooses between Resend API, Nodemailer SMTP, and dev simulation.
- * Automatically fails over to SMTP if Resend sandbox restricts non-owner destinations.
+ * Intelligently chooses between Resend API, SMTP, and non-production simulation.
+ * Fails closed in production when no verified provider is configured or when delivery fails.
  */
-async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailResult> {
+export async function dispatchEmail(
+  payload: DispatchEmailPayload,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
   const { to, subject, html, text, fromName, defaultFromEmail, logContext } = payload;
   const normalizedTo = to.trim().toLowerCase();
+  const isProduction = process.env.NODE_ENV === "production";
 
-  const resendClient = getResendClient();
-  const smtpTransporter = getSmtpTransporter();
+  const resendClient = deps?.resendClient !== undefined ? deps.resendClient : getResendClient();
+  const smtpTransporter = deps?.smtpTransporter !== undefined ? deps.smtpTransporter : getSmtpTransporter();
   const providerPref = (process.env.EMAIL_PROVIDER || "auto").toLowerCase();
 
-  // 0. Simulation Mode: Neither Resend nor SMTP is configured
-  if (!resendClient && !smtpTransporter) {
-    console.log(`\n======================================================`);
-    console.log(`[EMAIL DISPATCHER] ⚠️ Neither Resend API key nor SMTP credentials configured.`);
-    console.log(`[DEV MODE SIMULATION] ${logContext} to ${normalizedTo}: ${subject}`);
-    console.log(`======================================================\n`);
+  const customFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
+  const isCustomDomain = isVerifiedProductionResendSender(customFromEmail);
+  const resendUsable = Boolean(resendClient && (!isProduction || isCustomDomain));
 
-    return {
-      success: true,
-      simulated: true,
-      provider: "simulation",
-      messageId: `simulated_${Date.now()}`,
-    };
+  // 0. No usable provider configured
+  if (
+    (!resendUsable && !smtpTransporter) ||
+    (providerPref === "smtp" && !smtpTransporter) ||
+    (providerPref === "resend" && !resendUsable)
+  ) {
+    if (isProduction) {
+      const reason =
+        resendClient && !isCustomDomain
+          ? "RESEND_FROM_EMAIL must be configured with a verified custom sender domain in production (sandbox @resend.dev or placeholder senders are rejected)."
+          : "No verified production email provider (Resend with verified sender domain or SMTP) is configured.";
+      console.error(`[EMAIL DISPATCHER] Production email delivery blocked for ${logContext}: ${reason}`);
+      return {
+        success: false,
+        simulated: false,
+        sandboxRestricted: Boolean(resendClient && !isCustomDomain),
+        error: reason,
+      };
+    }
+
+    // Explicit non-production simulation ONLY when no provider is selected/usable
+    if (!resendClient && !smtpTransporter) {
+      console.log(
+        `[DEV MODE SIMULATION] Non-production email simulation for ${logContext} to ${normalizedTo} (content redacted).`
+      );
+
+      return {
+        success: true,
+        simulated: true,
+        provider: "simulation",
+        messageId: `simulated_${Date.now()}`,
+      };
+    }
   }
 
   // 1. Explicit SMTP preference
@@ -177,93 +259,80 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
 
   // 2. Resend API Flow
   if (resendClient && providerPref !== "smtp") {
-    const customFromEmail = process.env.RESEND_FROM_EMAIL;
-    const isCustomDomain = Boolean(customFromEmail && !customFromEmail.includes("@resend.dev"));
-
-    // If using Resend sandbox (@resend.dev), it only delivers to the owner's email or internal @resend.dev test emails
     const isResendInternalTestAddress = normalizedTo.endsWith("@resend.dev");
 
-    // Proactive SMTP routing: If destination is outside sandbox and SMTP is configured, route directly via SMTP!
+    // In production, never dispatch through unverified sandbox sender; route directly to SMTP if configured.
     if (!isCustomDomain && !isResendInternalTestAddress && smtpTransporter) {
-      console.log(`[Email Dispatcher] Target (${normalizedTo}) is outside Resend sandbox. Routing directly via SMTP...`);
+      console.log(`[Email Dispatcher] Resend custom sender unconfigured for ${normalizedTo}. Routing via SMTP...`);
       return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
     }
 
-    try {
-      const from = customFromEmail
-        ? (customFromEmail.includes("<") ? customFromEmail : `${fromName} <${customFromEmail}>`)
-        : `${fromName} <${defaultFromEmail}>`;
-      const { data, error } = await resendClient.emails.send({
-        from,
-        to: [normalizedTo],
-        subject,
-        html,
-        text,
-      });
+    if (resendUsable) {
+      try {
+        const from = customFromEmail
+          ? (customFromEmail.includes("<") ? customFromEmail : `${fromName} <${customFromEmail}>`)
+          : `${fromName} <${defaultFromEmail}>`;
+        const { data, error } = await resendClient.emails.send({
+          from,
+          to: [normalizedTo],
+          subject,
+          html,
+          text,
+        });
 
-      if (error) {
-        const errorMsg = error.message || "Failed to dispatch via Resend";
-        console.error(`[Resend API Error]:`, error);
+        if (error) {
+          const errorMsg = error.message || "Failed to dispatch via Resend";
+          console.error(`[Resend API Error] Delivery failed for ${logContext}:`, errorMsg);
 
-        // If trial sandbox limitation error:
-        if (isResendSandboxError(errorMsg)) {
-          // Immediate automated fallback to SMTP if configured
-          if (smtpTransporter) {
-            console.log(`[Email Dispatcher] Resend sandbox restriction encountered. Automatically failing over to SMTP for ${normalizedTo}...`);
+          if (isResendSandboxError(errorMsg)) {
+            if (smtpTransporter && providerPref !== "resend") {
+              console.log(`[Email Dispatcher] Resend sandbox restriction encountered. Failing over to SMTP...`);
+              return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+            }
+
+            return {
+              success: false,
+              simulated: false,
+              sandboxRestricted: true,
+              provider: "resend",
+              error: errorMsg,
+            };
+          }
+
+          if (smtpTransporter && providerPref !== "resend") {
+            console.log(`[Email Dispatcher] Resend delivery error. Attempting failover to SMTP...`);
             return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
           }
 
-          // Otherwise log detailed guidance
-          console.warn(`\n======================================================`);
-          console.warn(`[EMAIL DELIVERY LIMITATION: RESEND SANDBOX MODE]`);
-          console.warn(`Recipient: ${normalizedTo}`);
-          console.warn(`Reason: Resend test sandbox only permits sending to the account owner email.`);
-          console.warn(`To deliver live emails to any recipient in production:`);
-          console.warn(`  Option 1 (SMTP/Gmail): Add to Backend/.env:`);
-          console.warn(`     SMTP_USER=your_email@gmail.com`);
-          console.warn(`     SMTP_PASS=your_16_char_google_app_password`);
-          console.warn(`  Option 2 (Resend Custom Domain): Verify domain at resend.com/domains and set:`);
-          console.warn(`     RESEND_FROM_EMAIL=Orbix Security <support@yourdomain.com>`);
-          console.warn(`======================================================\n`);
-
           return {
             success: false,
-            sandboxRestricted: true,
+            simulated: false,
             provider: "resend",
             error: errorMsg,
           };
         }
 
-        // If non-sandbox error and SMTP is available, attempt fallback
-        if (smtpTransporter) {
-          console.log(`[Email Dispatcher] Resend error (${errorMsg}). Attempting fallback to SMTP...`);
+        console.log(`[Resend API] ${logContext} sent successfully to ${normalizedTo} (ID: ${data?.id})`);
+        return {
+          success: true,
+          simulated: false,
+          provider: "resend",
+          messageId: data?.id,
+        };
+      } catch (resendEx: any) {
+        const safeErr = resendEx?.message || "Internal error sending email via Resend";
+        console.error(`[Resend Exception] Delivery failed for ${logContext}:`, safeErr);
+        if (smtpTransporter && providerPref !== "resend") {
+          console.log(`[Email Dispatcher] Resend exception. Failing over to SMTP...`);
           return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
         }
-
         return {
           success: false,
+          simulated: false,
           provider: "resend",
-          error: errorMsg,
+          error: safeErr,
         };
       }
-
-      console.log(`[Resend API] ${logContext} sent successfully to ${normalizedTo} (ID: ${data?.id})`);
-      return {
-        success: true,
-        provider: "resend",
-        messageId: data?.id,
-      };
-    } catch (resendEx: any) {
-      console.error(`[Resend Exception]:`, resendEx);
-      if (smtpTransporter) {
-        console.log(`[Email Dispatcher] Resend exception. Failing over to SMTP...`);
-        return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
-      }
-      return {
-        success: false,
-        provider: "resend",
-        error: resendEx.message || "Internal error sending email via Resend",
-      };
     }
   }
 
@@ -274,6 +343,7 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
 
   return {
     success: false,
+    simulated: false,
     error: "No usable email transport configured.",
   };
 }
@@ -581,7 +651,10 @@ function generateSecurityNotificationHtml(options: {
 /**
  * Sends an email verification code using the multi-provider dispatcher (Resend / SMTP).
  */
-export async function sendVerificationEmail(options: SendVerificationEmailOptions): Promise<SendEmailResult> {
+export async function sendVerificationEmail(
+  options: SendVerificationEmailOptions,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
   const { to, name = "Developer", otp } = options;
   const html = generateVerificationEmailHtml({ name, otp, email: to });
   const text = `Hello ${name},\n\nYour Orbix account verification code is: ${otp}\n\nThis code expires in 10 minutes.`;
@@ -594,7 +667,7 @@ export async function sendVerificationEmail(options: SendVerificationEmailOption
     fromName: "Orbix Team",
     defaultFromEmail: "onboarding@resend.dev",
     logContext: "Verification email",
-  });
+  }, deps);
 }
 
 /**
@@ -852,7 +925,10 @@ export function buildCollegeVerificationEmailTemplate(options: SendCollegeVerifi
 /**
  * Sends a single-use institutional email verification link for student college verification.
  */
-export async function sendCollegeVerificationEmail(options: SendCollegeVerificationEmailOptions): Promise<SendEmailResult> {
+export async function sendCollegeVerificationEmail(
+  options: SendCollegeVerificationEmailOptions,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
   const { to } = options;
   const template = buildCollegeVerificationEmailTemplate(options);
 
@@ -864,5 +940,5 @@ export async function sendCollegeVerificationEmail(options: SendCollegeVerificat
     fromName: "Orbix College Verification",
     defaultFromEmail: "onboarding@resend.dev",
     logContext: "College institutional email verification",
-  });
+  }, deps);
 }

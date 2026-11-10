@@ -279,6 +279,8 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                     const pending = appRows.find(r => r.status === 'PENDING' || r.status === 'PROCESSING');
                     if (pending) {
                         collegeVerificationStatus = pending.status;
+                    } else if (appRows[0]?.status === 'INVALIDATED') {
+                        collegeVerificationStatus = 'INVALIDATED';
                     } else if (appRows[0]?.status === 'REJECTED') {
                         collegeVerificationStatus = 'REJECTED';
                     } else {
@@ -762,6 +764,13 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                     `UPDATE college_verifications 
                      SET status = 'INVALIDATED', updated_at = CURRENT_TIMESTAMP 
                      WHERE user_id = $1 AND status IN ('APPROVED', 'PENDING', 'PROCESSING');`,
+                    [authUser.id]
+                );
+                // Also expire unclaimed institutional email tokens tied to the previous institution
+                await client.query(
+                    `UPDATE college_verification_email_tokens
+                     SET status = 'expired'
+                     WHERE user_id = $1 AND verification_id IS NULL AND status IN ('pending', 'verified');`,
                     [authUser.id]
                 );
             }

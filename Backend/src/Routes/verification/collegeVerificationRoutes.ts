@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { requireFounder, isAuthorizedFounder } from "../../middlewares/founder.middleware.js";
@@ -13,6 +13,22 @@ const upload = multer({
     },
 });
 
+/**
+ * Ensures student college verification endpoints are strictly restricted to authenticated non-club student accounts.
+ */
+const requireStudentAccount = (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user?.id) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    if (req.user.accountType === "club" || req.user.account_type === "club") {
+        return res.status(403).json({
+            success: false,
+            message: "Club accounts use the dedicated club verification workflow and cannot access student college verification.",
+        });
+    }
+    next();
+};
+
 export const studentCollegeVerificationRouter = Router();
 export const founderCollegeVerificationRouter = Router();
 
@@ -24,13 +40,9 @@ export const founderCollegeVerificationRouter = Router();
  * GET /api/verification/college/status
  * Retrieves current student's college verification status and history.
  */
-studentCollegeVerificationRouter.get("/status", authenticate, async (req: Request, res: Response) => {
+studentCollegeVerificationRouter.get("/status", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
     try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
-
+        const userId = req.user!.id;
         const result = await CollegeVerificationService.getStatus(userId);
         return res.status(200).json(result);
     } catch (err: any) {
@@ -49,6 +61,7 @@ studentCollegeVerificationRouter.get("/status", authenticate, async (req: Reques
 studentCollegeVerificationRouter.post(
     "/ocr-preview",
     authenticate,
+    requireStudentAccount,
     upload.single("document"),
     async (req: Request, res: Response) => {
         try {
@@ -91,13 +104,11 @@ studentCollegeVerificationRouter.post(
 studentCollegeVerificationRouter.post(
     "/submit",
     authenticate,
+    requireStudentAccount,
     upload.array("documents", 2),
     async (req: Request, res: Response) => {
         try {
-            const userId = req.user?.id;
-            if (!userId) {
-                return res.status(401).json({ success: false, message: "Unauthorized" });
-            }
+            const userId = req.user!.id;
 
             const rawFiles = req.files as Express.Multer.File[] | undefined;
             if (!rawFiles || rawFiles.length === 0) {
@@ -174,12 +185,9 @@ studentCollegeVerificationRouter.post(
  * POST /api/verification/college/email/send
  * Dispatches an institutional email verification link with domain matching.
  */
-studentCollegeVerificationRouter.post("/email/send", authenticate, async (req: Request, res: Response) => {
+studentCollegeVerificationRouter.post("/email/send", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
     try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
+        const userId = req.user!.id;
 
         const { email, collegeId } = req.body;
         if (!email || !collegeId) {
@@ -214,7 +222,7 @@ studentCollegeVerificationRouter.post("/email/send", authenticate, async (req: R
 
 /**
  * GET & POST /api/verification/college/email/verify
- * Validates the single-use institutional email token.
+ * Validates the single-use institutional email token strictly for the authenticated owner.
  */
 const handleEmailTokenVerification = async (req: Request, res: Response) => {
     try {
@@ -223,7 +231,7 @@ const handleEmailTokenVerification = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: "Verification token is required." });
         }
 
-        const userId = req.user?.id;
+        const userId = req.user!.id;
         const verificationId = (req.query.verificationId as string) || req.body?.verificationId;
         const result = await CollegeVerificationService.verifyInstitutionalEmailToken(token, userId, verificationId);
 
@@ -238,19 +246,16 @@ const handleEmailTokenVerification = async (req: Request, res: Response) => {
     }
 };
 
-studentCollegeVerificationRouter.get("/email/verify", handleEmailTokenVerification);
-studentCollegeVerificationRouter.post("/email/verify", handleEmailTokenVerification);
+studentCollegeVerificationRouter.get("/email/verify", authenticate, requireStudentAccount, handleEmailTokenVerification);
+studentCollegeVerificationRouter.post("/email/verify", authenticate, requireStudentAccount, handleEmailTokenVerification);
 
 /**
  * POST /api/verification/college/phone/send-otp
  * Dispatches an SMS verification OTP to the student's phone.
  */
-studentCollegeVerificationRouter.post("/phone/send-otp", authenticate, async (req: Request, res: Response) => {
+studentCollegeVerificationRouter.post("/phone/send-otp", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
     try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
+        const userId = req.user!.id;
 
         const { phone } = req.body;
         if (!phone) {
@@ -283,12 +288,9 @@ studentCollegeVerificationRouter.post("/phone/send-otp", authenticate, async (re
  * POST /api/verification/college/phone/verify-otp
  * Verifies the 6-digit SMS OTP.
  */
-studentCollegeVerificationRouter.post("/phone/verify-otp", authenticate, async (req: Request, res: Response) => {
+studentCollegeVerificationRouter.post("/phone/verify-otp", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
     try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
+        const userId = req.user!.id;
 
         const { phone, otp } = req.body;
         if (!phone || !otp) {
@@ -402,6 +404,7 @@ founderCollegeVerificationRouter.post("/application/:id/approve", authenticate, 
         return res.status(statusCode).json({
             success: false,
             message: err.message || "Failed to approve application.",
+            ...(err.conflictDetails ? { conflictDetails: err.conflictDetails } : {}),
         });
     }
 });
@@ -439,7 +442,7 @@ founderCollegeVerificationRouter.post("/application/:id/reject", authenticate, r
  * GET /api/internal/college-verifications/document-proxy/:token
  * Streams private document using secure short-lived HMAC token.
  */
-founderCollegeVerificationRouter.get("/document-proxy/:token", async (req: Request, res: Response) => {
+founderCollegeVerificationRouter.get("/document-proxy/:token", authenticate, requireFounder, async (req: Request, res: Response) => {
     try {
         const token = String(Array.isArray(req.params.token) ? req.params.token[0] : (req.params.token || ""));
         const resolved = CollegeVerificationService.resolveDocumentFromProxyToken(token);
@@ -452,6 +455,12 @@ founderCollegeVerificationRouter.get("/document-proxy/:token", async (req: Reque
         res.setHeader("Cache-Control", "private, no-cache, no-store, must-revalidate");
         res.sendFile(resolved.filePath);
     } catch (err: any) {
+        if (err?.isConfigError || err?.statusCode === 500) {
+            return res.status(500).json({
+                success: false,
+                message: "Document proxy signing service is misconfigured on server.",
+            });
+        }
         return res.status(404).send("Document not found");
     }
 });

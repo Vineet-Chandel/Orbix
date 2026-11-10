@@ -5,6 +5,8 @@ import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { OrbixLoadingProvider, OrbixLoader } from "./components/ui/loader";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
+import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
+import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
 
 // Code-split other routes & showcases to keep initial homepage bundle ultra-lean
 const SignInPage = lazy(() => import('./LandingPages/Auth-Pages/Signin/Landing'));
@@ -77,6 +79,10 @@ const App = () => {
     <OrbixLoadingProvider>
       <ToastProvider>
         <BrowserRouter>
+          {/* Authoritative Single Institutional Email Token Listener & Single Global Verification Modal Host */}
+          <CollegeEmailVerificationListener />
+          <GlobalCollegeVerificationModal />
+
           <Suspense
             fallback={
               <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center text-black">

@@ -155,7 +155,7 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({
             {/* ========================================================================= */}
             {/* 1. ACCOUNT CENTER (PROMINENT HERO SECTION)                                */}
             {/* ========================================================================= */}
-            {(!query || "account center verify privacy password manage".includes(query)) && (
+            {(!query || "account center verify verification college university enrollment degree privacy password manage".includes(query)) && (
                 <div className="space-y-2.5">
                     <div className="flex items-center justify-between px-1">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">

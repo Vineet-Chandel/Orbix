@@ -13,6 +13,8 @@ export const DEFAULT_RESUME_FOLDER = process.env.CLOUDINARY_RESUME_FOLDER || "or
 export const DEFAULT_RESUME_MAX_BYTES = 5 * 1024 * 1024; // 5 MB strict limit
 export const ALLOWED_RESUME_FORMATS = ["pdf"] as const;
 
+export const DEFAULT_VERIFICATION_FOLDER = process.env.CLOUDINARY_VERIFICATION_FOLDER || "orbix/college_verifications";
+
 /**
  * Returns true if all essential Cloudinary credentials are configured
  */

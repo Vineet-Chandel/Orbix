@@ -66,7 +66,7 @@ export interface CollegeVerificationRecord {
 
 export interface VerificationStatusResponse {
     success: boolean;
-    status: "NOT_VERIFIED" | "PENDING" | "PROCESSING" | "APPROVED" | "REJECTED";
+    status: "NOT_VERIFIED" | "PENDING" | "PROCESSING" | "APPROVED" | "REJECTED" | "INVALIDATED";
     isCollegeVerified: boolean;
     currentCollege: {
         id: string;
@@ -79,6 +79,12 @@ export interface VerificationStatusResponse {
     activeApplication: CollegeVerificationRecord | null;
     latestApplication: CollegeVerificationRecord | null;
     history: CollegeVerificationRecord[];
+    verifiedChannels?: {
+        email: string | null;
+        emailVerifiedAt: string | null;
+        phone: string | null;
+        phoneVerifiedAt: string | null;
+    };
 }
 
 export interface FounderQueueResponse {
@@ -217,6 +223,8 @@ export async function verifyCollegePhoneOtp(phone: string, otp: string): Promise
     success: boolean;
     message: string;
     phone: string;
+    canonical?: string;
+    verifiedAt?: string;
 }> {
     const res = await fetch("/api/verification/college/phone/verify-otp", {
         method: "POST",
