@@ -102,6 +102,12 @@ export const workspaceApi = {
             { suspend, reason, clubId }
         ),
 
+    removeMember: (targetUserId: string, clubId?: string) =>
+        apiClient.delete<{ success: boolean; message: string }>(
+            `/club/workspace/members/${targetUserId}`,
+            { params: clubId ? { clubId } : undefined }
+        ),
+
     // =========================================================================
     // DEPARTMENTS
     // =========================================================================
@@ -187,6 +193,23 @@ export const workspaceApi = {
     ) =>
         apiClient.post<{ success: boolean; message: string }>(
             "/club/workspace/departments/transfer",
+            { ...data, clubId }
+        ),
+
+    reorderDepartments: (departmentIds: string[], clubId?: string) =>
+        apiClient.put<{ success: boolean; message: string }>(
+            "/club/workspace/departments/reorder",
+            { departmentIds, clubId }
+        ),
+
+    updateDepartmentMemberRole: (
+        departmentId: string,
+        memberId: string,
+        data: { departmentRole?: "lead" | "co_lead" | "member"; roleTitle?: string },
+        clubId?: string
+    ) =>
+        apiClient.patch<{ success: boolean; message: string }>(
+            `/club/workspace/departments/${departmentId}/members/${memberId}/role`,
             { ...data, clubId }
         ),
 

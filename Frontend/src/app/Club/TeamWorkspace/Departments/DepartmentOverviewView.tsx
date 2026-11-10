@@ -12,6 +12,8 @@ import {
     CheckSquare,
     Camera,
     ChevronRight,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -54,8 +56,41 @@ export const DepartmentOverviewView: React.FC<DepartmentOverviewViewProps> = ({
     const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
     const [seeding, setSeeding] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
+    const [reordering, setReordering] = useState(false);
 
     const canCreateDepartment = isAdmin || Boolean(capabilities?.capabilities.departments.create);
+    const canManageDepartments = isAdmin || Boolean(capabilities?.capabilities.departments.manageAll);
+
+    const handleMoveDepartment = async (deptId: string, direction: "up" | "down", e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (reordering) return;
+        const currentActive = departments.filter((d) => d.status === "active");
+        const idx = currentActive.findIndex((d) => d.id === deptId);
+        if (idx === -1) return;
+        const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= currentActive.length) return;
+
+        const newOrder = [...currentActive];
+        const temp = newOrder[idx];
+        newOrder[idx] = newOrder[targetIdx];
+        newOrder[targetIdx] = temp;
+
+        try {
+            setReordering(true);
+            const res = await workspaceApi.reorderDepartments(
+                newOrder.map((d) => d.id),
+                clubId
+            );
+            if (res.success) {
+                toast.success("Department order updated.");
+                onReload();
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to reorder departments.");
+        } finally {
+            setReordering(false);
+        }
+    };
 
     const handleSeedDefaults = async () => {
         try {
@@ -143,7 +178,7 @@ export const DepartmentOverviewView: React.FC<DepartmentOverviewViewProps> = ({
 
             {/* Department Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {visibleDepartments.map((dept) => {
+                {visibleDepartments.map((dept, idx) => {
                     const IconComp = ICON_MAP[dept.icon] || Folder;
 
                     return (
@@ -162,6 +197,26 @@ export const DepartmentOverviewView: React.FC<DepartmentOverviewViewProps> = ({
                                     </div>
 
                                     <div className="flex items-center gap-1.5">
+                                        {canManageDepartments && dept.status === "active" && (
+                                            <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => handleMoveDepartment(dept.id, "up", e)}
+                                                    disabled={reordering || idx === 0}
+                                                    className="p-1 hover:bg-neutral-100 border border-black rounded transition disabled:opacity-25"
+                                                    title="Move Up in order"
+                                                >
+                                                    <ArrowUp className="w-3 h-3 text-black" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleMoveDepartment(dept.id, "down", e)}
+                                                    disabled={reordering || idx === visibleDepartments.length - 1}
+                                                    className="p-1 hover:bg-neutral-100 border border-black rounded transition disabled:opacity-25"
+                                                    title="Move Down in order"
+                                                >
+                                                    <ArrowDown className="w-3 h-3 text-black" />
+                                                </button>
+                                            </div>
+                                        )}
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black bg-neutral-100 border border-black rounded-full">
                                             <Users className="w-3 h-3 text-neutral-600" />
                                             {dept.memberCount ?? 0} members

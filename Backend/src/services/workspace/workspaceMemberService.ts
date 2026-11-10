@@ -186,6 +186,85 @@ export class WorkspaceMemberService {
         return updated;
     }
 
+    /**
+     * Removes a member from workspace and all assigned departments, respecting role hierarchy.
+     */
+    static async removeMember(
+        workspaceId: string,
+        actorUserId: string,
+        targetUserId: string,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const actorCtx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!actorCtx) {
+            throw new Error("Unauthorized: Workspace access denied.");
+        }
+
+        const targetMember = await WorkspaceRepository.findMember(workspaceId, targetUserId);
+        if (!targetMember) {
+            throw new Error("Target user is not a member of this workspace.");
+        }
+
+        // Protection: Cannot remove workspace owner
+        if (targetMember.role?.slug === "owner" || targetMember.role?.rank === 1000) {
+            throw new Error("The workspace owner cannot be removed.");
+        }
+
+        // Hierarchy rule: Actor must outrank target (unless owner)
+        const actorRank = actorCtx.isOwner ? 1000 : (actorCtx.member.role?.rank || 0);
+        const targetRank = targetMember.role?.rank || 0;
+        if (actorRank <= targetRank && !actorCtx.isOwner) {
+            throw new Error("Cannot remove a member with equal or higher hierarchy rank.");
+        }
+
+        // Permission check
+        const isMgr = actorCtx.isWorkspaceManager;
+        const mgrPerms = (actorCtx.workspace.managerPermissions || {}) as Record<string, any>;
+        const canRemove =
+            actorCtx.isOwner ||
+            actorCtx.isAdmin ||
+            (isMgr && !!mgrPerms.can_manage_members) ||
+            actorCtx.permissions.includes("members:remove");
+
+        if (!canRemove) {
+            throw new Error("Forbidden: You do not possess permission to remove workspace members.");
+        }
+
+        // 1. Remove from all department member associations
+        await query(
+            `DELETE FROM public.workspace_department_members WHERE workspace_id = $1 AND user_id = $2;`,
+            [workspaceId, targetUserId]
+        );
+
+        // 2. Remove workspace membership row
+        const delRes = await query(
+            `DELETE FROM public.workspace_members WHERE workspace_id = $1 AND user_id = $2;`,
+            [workspaceId, targetUserId]
+        );
+
+        // 3. Invalidate Redis capabilities & permissions caches
+        await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetUserId);
+        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, targetUserId);
+
+        // 4. Audit log
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "member_removed",
+            targetType: "member",
+            targetId: targetMember.id,
+            details: {
+                targetUserId,
+                targetRole: targetMember.role?.name,
+                targetRank,
+            },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return (delRes.rowCount || 0) > 0;
+    }
+
     // =========================================================================
     // 3. SECURE CRYPTOGRAPHIC INVITATION WORKFLOW
     // =========================================================================

@@ -15,6 +15,7 @@ import {
     FileText,
     MessageSquare,
     ChevronRight,
+    Megaphone,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -23,12 +24,14 @@ import type {
     WorkspaceDepartmentInsight,
     WorkspaceDepartment,
     WorkspaceActivityEvent,
+    MemberCapabilityResolution,
 } from "../../../../types/workspace";
 
 interface WorkspaceOverviewViewProps {
     clubId: string;
     departments: WorkspaceDepartment[];
     isAdmin: boolean;
+    capabilities?: MemberCapabilityResolution | null;
     onNavigateToSection: (section: "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "activity" | "audit") => void;
     onSelectDepartment?: (departmentId: string) => void;
 }
@@ -37,6 +40,7 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
     clubId,
     departments,
     isAdmin,
+    capabilities,
     onNavigateToSection,
     onSelectDepartment,
 }) => {
@@ -45,6 +49,17 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
     const [deptInsights, setDeptInsights] = useState<Record<string, WorkspaceDepartmentInsight>>({});
     const [loading, setLoading] = useState<boolean>(true);
     const [refreshing, setRefreshing] = useState<boolean>(false);
+
+    // Filter departments strictly authorized to this user (prevents leaking restricted departments)
+    const isGlobalManager = isAdmin || Boolean(capabilities?.capabilities.departments.viewAll);
+    const authorizedDepartments = departments.filter((d) => {
+        if (isGlobalManager) return true;
+        const assignedIds = [
+            ...(capabilities?.capabilities.departments.memberDepartmentIds || []),
+            ...(capabilities?.leadDepartmentIds || []),
+        ];
+        return assignedIds.includes(d.id);
+    });
 
     const loadData = useCallback(async (isRefresh = false) => {
         try {
@@ -56,8 +71,8 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
                 setMetrics(overviewRes.data);
             }
 
-            // Fetch insights for available departments in parallel (up to 6)
-            const targetDepts = departments.slice(0, 8);
+            // Fetch insights only for authorized departments (up to 8)
+            const targetDepts = authorizedDepartments.slice(0, 8);
             const insightsMap: Record<string, WorkspaceDepartmentInsight> = {};
 
             await Promise.all(
@@ -81,7 +96,7 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
             setLoading(false);
             setRefreshing(false);
         }
-    }, [clubId, departments, toast]);
+    }, [clubId, authorizedDepartments, toast]);
 
     useEffect(() => {
         loadData();
@@ -148,9 +163,18 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
             {/* Top Overview Bar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b-2 border-black">
                 <div>
-                    <h2 className="text-xl font-black text-black tracking-tight">
-                        Workspace Overview & Insights
-                    </h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-xl font-black text-black tracking-tight">
+                            Workspace Overview & Insights
+                        </h2>
+                        <span className="px-2 py-0.5 text-[10px] font-black border border-black rounded-full bg-yellow-100 text-yellow-800">
+                            {isGlobalManager
+                                ? "Chapter-Wide Scope"
+                                : (capabilities?.leadDepartmentIds?.length || 0) > 0
+                                ? `Department Scope (${authorizedDepartments.length} depts)`
+                                : "Personal Team Scope"}
+                        </span>
+                    </div>
                     <p className="text-xs text-neutral-600 mt-0.5">
                         Real-time operational health, task velocity, and department progress
                     </p>
@@ -175,6 +199,39 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Relevant Announcements Banner */}
+            {metrics?.recentAnnouncements && metrics.recentAnnouncements.length > 0 && (
+                <div className="bg-[#FFE566] border-2 border-black rounded-xl p-4 shadow-neo space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Megaphone className="w-4 h-4 text-black" />
+                            <h4 className="text-xs font-black uppercase text-black tracking-wide">
+                                Latest Chapter Announcement
+                            </h4>
+                        </div>
+                        <span className="text-[10px] font-bold text-neutral-800">
+                            #{metrics.recentAnnouncements[0].channelName || "announcements"}
+                        </span>
+                    </div>
+                    <p className="text-xs font-bold text-neutral-900 leading-relaxed">
+                        {metrics.recentAnnouncements[0].content}
+                    </p>
+                    <div className="text-[10px] font-medium text-neutral-700 flex items-center justify-between pt-1 border-t border-black/10">
+                        <span>
+                            Posted by {metrics.recentAnnouncements[0].sender?.firstName || metrics.recentAnnouncements[0].sender?.username || "Lead"}
+                        </span>
+                        <span>
+                            {new Date(metrics.recentAnnouncements[0].createdAt).toLocaleDateString([], {
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                            })}
+                        </span>
+                    </div>
+                </div>
+            )}
 
             {/* Metrics Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
@@ -205,7 +262,7 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
                         <FolderKanban className="w-4 h-4 text-purple-600" />
                     </div>
                     <div className="mt-2 text-2xl font-black text-black">
-                        {metrics?.totalDepartments ?? departments.length}
+                        {metrics?.totalDepartments ?? authorizedDepartments.length}
                     </div>
                     <p className="mt-1 text-[11px] text-neutral-600 font-medium">
                         Operational units
@@ -301,15 +358,15 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
                     </button>
                 </div>
 
-                {departments.length === 0 ? (
+                {authorizedDepartments.length === 0 ? (
                     <div className="bg-white border-2 border-black rounded-xl p-8 text-center shadow-neo">
                         <FolderKanban className="w-10 h-10 text-neutral-400 mx-auto mb-2" />
-                        <p className="text-sm font-bold text-neutral-700">No departments configured yet.</p>
+                        <p className="text-sm font-bold text-neutral-700">No departments configured or assigned.</p>
                         <p className="text-xs text-neutral-500 mt-1">Set up departments to organize teams and delegate task responsibilities.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {departments.map((dept) => {
+                        {authorizedDepartments.map((dept) => {
                             const insight = deptInsights[dept.id];
                             const totalSub = insight?.submissionProgress?.total || 0;
                             const approvedSub = insight?.submissionProgress?.approved || 0;

@@ -9,6 +9,9 @@ import {
     Trash2,
     Archive,
     RotateCcw,
+    Edit3,
+    UserCheck,
+    Check,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -60,6 +63,19 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
     // Change Lead sub-state
     const [isChangingLead, setIsChangingLead] = useState(false);
     const [newLeadUserId, setNewLeadUserId] = useState("");
+
+    // Edit Department Details sub-state
+    const [isEditingDetails, setIsEditingDetails] = useState(false);
+    const [editName, setEditName] = useState("");
+    const [editDesc, setEditDesc] = useState("");
+    const [editColor, setEditColor] = useState("#4F46E5");
+    const [savingDetails, setSavingDetails] = useState(false);
+
+    // Scoped Role Assignment sub-state
+    const [editingRoleMember, setEditingRoleMember] = useState<WorkspaceDepartmentMember | null>(null);
+    const [scopedRole, setScopedRole] = useState<"lead" | "co_lead" | "member">("member");
+    const [scopedTitle, setScopedTitle] = useState("");
+    const [savingScopedRole, setSavingScopedRole] = useState(false);
 
     const loadDetails = async () => {
         try {

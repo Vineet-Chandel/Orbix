@@ -591,6 +591,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     clubId={club.id}
                     departments={departments}
                     isAdmin={isAdmin}
+                    capabilities={capabilities}
                     onNavigateToSection={(sec) => setActiveSection(sec)}
                     onSelectDepartment={() => {
                         setActiveSection("departments");

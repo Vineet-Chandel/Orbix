@@ -421,6 +421,37 @@ workspaceRouter.post("/departments", authenticate, async (req: Request, res: Res
 });
 
 /**
+ * PUT /api/club/workspace/departments/reorder
+ * Reorder departments
+ */
+workspaceRouter.put("/departments/reorder", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const { departmentIds } = req.body;
+        if (!Array.isArray(departmentIds)) {
+            return res.status(400).json({ success: false, message: "departmentIds array is required." });
+        }
+
+        const success = await WorkspaceDepartmentService.reorderDepartments(
+            workspace.id,
+            authUser.id,
+            departmentIds,
+            getAuditContext(req)
+        );
+
+        return res.json({ success, message: "Departments reordered successfully." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to reorder departments." });
+    }
+});
+
+/**
  * GET /api/club/workspace/departments/:deptId
  * View department details and members
  */
@@ -604,6 +635,38 @@ workspaceRouter.delete("/departments/:deptId/members/:memberId", authenticate, a
 });
 
 /**
+ * PATCH /api/club/workspace/departments/:deptId/members/:memberId/role
+ * Updates scoped role (lead, co_lead, member) and role title for department member
+ */
+workspaceRouter.patch("/departments/:deptId/members/:memberId/role", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const deptId = String(req.params.deptId);
+        const memberId = String(req.params.memberId);
+        const { departmentRole, roleTitle } = req.body;
+        const authUser = (req as any).user;
+
+        const success = await WorkspaceDepartmentService.updateDepartmentMemberRole(
+            workspace.id,
+            authUser.id,
+            deptId,
+            memberId,
+            { departmentRole, roleTitle },
+            getAuditContext(req)
+        );
+
+        return res.json({ success, message: "Department member role updated successfully." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to update department member role." });
+    }
+});
+
+/**
  * POST /api/club/workspace/departments/transfer
  * Transfer a member from one department to another with historical preservation
  */
@@ -683,8 +746,8 @@ workspaceRouter.get("/members", authenticate, async (req: Request, res: Response
         if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
 
         const authUser = (req as any).user;
-        const callerMember = await WorkspaceRepository.findMember(workspace.id, authUser.id);
-        if (!callerMember || callerMember.isSuspended) {
+        const ctx = await WorkspaceService.resolveContext(workspace.id, authUser.id);
+        if (!ctx || (!ctx.member && !ctx.isOwner) || (ctx.member?.isSuspended)) {
             return res.status(403).json({ success: false, message: "Workspace access denied." });
         }
 
@@ -707,9 +770,23 @@ workspaceRouter.get("/members", authenticate, async (req: Request, res: Response
 
         const result = await WorkspaceRepository.listMembers(workspace.id, queryOpts);
 
+        // Sanitize private information (email, etc.) if caller is not an administrator or workspace manager
+        const canSeePrivate = ctx.isOwner || ctx.isAdmin || ctx.isWorkspaceManager;
+        const sanitizedMembers = canSeePrivate
+            ? result.members
+            : result.members.map((m) => ({
+                ...m,
+                user: m.user
+                    ? {
+                        ...m.user,
+                        email: undefined,
+                    }
+                    : m.user,
+            }));
+
         return res.json({
             success: true,
-            members: result.members,
+            members: sanitizedMembers,
             total: result.total,
         });
     } catch (err: any) {
@@ -789,6 +866,35 @@ workspaceRouter.patch("/members/:targetUserId/suspension", authenticate, async (
         });
     } catch (err: any) {
         return res.status(400).json({ success: false, message: err.message || "Failed to update suspension status." });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/members/:targetUserId
+ * Removes a member from workspace and all departments, respecting role hierarchy
+ */
+workspaceRouter.delete("/members/:targetUserId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const targetUserId = String(req.params.targetUserId);
+        if (!targetUserId) return res.status(400).json({ success: false, message: "targetUserId is required." });
+
+        const success = await WorkspaceMemberService.removeMember(
+            workspace.id,
+            authUser.id,
+            targetUserId,
+            getAuditContext(req)
+        );
+
+        return res.json({ success, message: "Member removed from workspace successfully." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to remove member." });
     }
 });
 
