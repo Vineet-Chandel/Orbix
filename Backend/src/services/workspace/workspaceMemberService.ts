@@ -1,0 +1,425 @@
+// Backend/src/services/workspace/workspaceMemberService.ts
+import crypto from "crypto";
+import { pool, query } from "../../database/client.js";
+import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
+import { WorkspaceService } from "./workspaceService.js";
+import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import type {
+    WorkspaceMember,
+    WorkspaceInvitation,
+    TeamWorkspace,
+} from "../../types/workspaceTypes.js";
+
+export class WorkspaceMemberService {
+    // =========================================================================
+    // 1. WORKSPACE MANAGER APPOINTMENT (CLUB MANAGER / OWNER EXCLUSIVE)
+    // =========================================================================
+
+    /**
+     * Appoints or replaces the designated Workspace Manager
+     * Only the Club Owner has authority to invoke this.
+     */
+    static async appointWorkspaceManager(
+        workspaceId: string,
+        actorUserId: string,
+        managerUserId: string,
+        permissions: string[] = [],
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<TeamWorkspace> {
+        const workspace = await WorkspaceRepository.findById(workspaceId);
+        if (!workspace) throw new Error("Workspace not found.");
+
+        if (workspace.ownerId !== actorUserId) {
+            throw new Error("Only the Club Owner has authority to appoint or change the Workspace Manager.");
+        }
+
+        // Verify target user is an active member of this workspace
+        const member = await WorkspaceRepository.findMember(workspaceId, managerUserId);
+        if (!member || member.isSuspended) {
+            throw new Error("Target user must be an active workspace member to become Workspace Manager.");
+        }
+
+        const updated = await WorkspaceRepository.setWorkspaceManager(
+            workspaceId,
+            managerUserId,
+            permissions
+        );
+
+        if (!updated) throw new Error("Failed to appoint Workspace Manager.");
+
+        // Invalidate permissions cache
+        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, managerUserId);
+        await WorkspaceRedisService.invalidateWorkspace(workspace.clubId);
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "workspace_manager_appointed",
+            targetType: "workspace_manager",
+            targetId: managerUserId,
+            details: { managerUserId, permissions },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return updated;
+    }
+
+    /**
+     * Revokes the Workspace Manager designation
+     */
+    static async revokeWorkspaceManager(
+        workspaceId: string,
+        actorUserId: string,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<TeamWorkspace> {
+        const workspace = await WorkspaceRepository.findById(workspaceId);
+        if (!workspace) throw new Error("Workspace not found.");
+
+        if (workspace.ownerId !== actorUserId) {
+            throw new Error("Only the Club Owner has authority to revoke the Workspace Manager.");
+        }
+
+        const previousManagerId = workspace.managerUserId;
+        const updated = await WorkspaceRepository.setWorkspaceManager(workspaceId, null, []);
+        if (!updated) throw new Error("Failed to revoke Workspace Manager.");
+
+        if (previousManagerId) {
+            await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, previousManagerId);
+        }
+        await WorkspaceRedisService.invalidateWorkspace(workspace.clubId);
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "workspace_manager_revoked",
+            targetType: "workspace_manager",
+            targetId: previousManagerId,
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return updated;
+    }
+
+    // =========================================================================
+    // 2. MEMBER OPERATIONS: ROLE ASSIGNMENT, PROMOTE & DEMOTE
+    // =========================================================================
+
+    /**
+     * Changes a member's role (promote or demote)
+     * Enforces strict hierarchy rank boundaries.
+     */
+    static async assignMemberRole(
+        workspaceId: string,
+        actorUserId: string,
+        targetUserId: string,
+        newRoleId: string,
+        roleTitle?: string,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<WorkspaceMember> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("members:assign_role"))) {
+            throw new Error("Unauthorized to assign member roles.");
+        }
+
+        const targetMember = await WorkspaceRepository.findMember(workspaceId, targetUserId);
+        if (!targetMember) throw new Error("Target user is not a member of this workspace.");
+
+        const targetNewRole = await WorkspaceRepository.findRoleById(workspaceId, newRoleId);
+        if (!targetNewRole) throw new Error("Target role does not exist in this workspace.");
+
+        // Hierarchy Protection 1: Cannot alter role of the Owner
+        if (targetMember.role?.slug === "owner" || targetMember.role?.rank === 1000) {
+            throw new Error("The workspace owner role is permanent and cannot be modified.");
+        }
+
+        // Hierarchy Protection 2: Cannot grant the Owner role to anyone else
+        if (targetNewRole.slug === "owner" || targetNewRole.rank === 1000) {
+            throw new Error("The workspace owner role cannot be granted through regular role assignment.");
+        }
+
+        // Hierarchy Protection 3: Actor must outrank target user
+        const actorRank = ctx.member.role?.rank || 0;
+        const currentTargetRank = targetMember.role?.rank || 0;
+        if (actorRank <= currentTargetRank && !ctx.isOwner) {
+            throw new Error("Cannot modify roles of a member with equal or higher rank.");
+        }
+
+        // Hierarchy Protection 4: Actor cannot assign a role with rank >= actor's rank
+        if (targetNewRole.rank >= actorRank && !ctx.isOwner) {
+            throw new Error("Cannot assign a role with equal or higher rank than your own.");
+        }
+
+        const updated = await WorkspaceRepository.updateMemberRole(
+            workspaceId,
+            targetUserId,
+            newRoleId,
+            roleTitle || targetNewRole.name
+        );
+
+        if (!updated) throw new Error("Failed to update member role.");
+
+        // Invalidate Redis permissions cache for target user
+        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, targetUserId);
+
+        const isPromotion = targetNewRole.rank > currentTargetRank;
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: isPromotion ? "member_promoted" : "member_demoted",
+            targetType: "member",
+            targetId: targetMember.id,
+            details: {
+                targetUserId,
+                previousRoleId: targetMember.roleId,
+                previousRole: targetMember.role?.name,
+                newRoleId,
+                newRole: targetNewRole.name,
+                rankDelta: targetNewRole.rank - currentTargetRank,
+            },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return updated;
+    }
+
+    // =========================================================================
+    // 3. SECURE CRYPTOGRAPHIC INVITATION WORKFLOW
+    // =========================================================================
+
+    /**
+     * Generates a secure single-use invitation token and stores its SHA-256 hash
+     */
+    static async createInvitation(
+        workspaceId: string,
+        actorUserId: string,
+        data: {
+            email: string;
+            roleId: string;
+            departmentId?: string | null;
+            invitationMessage?: string | null;
+        },
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<{ invitation: WorkspaceInvitation; rawToken: string }> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("members:invite"))) {
+            throw new Error("Unauthorized to invite members into this workspace.");
+        }
+
+        const email = data.email.trim().toLowerCase();
+        if (!email || !email.includes("@")) {
+            throw new Error("Valid email address is required.");
+        }
+
+        // Validate role exists and actor has rank to assign it
+        const role = await WorkspaceRepository.findRoleById(workspaceId, data.roleId);
+        if (!role) throw new Error("Selected role does not exist.");
+
+        const actorRank = ctx.member.role?.rank || 0;
+        if (role.rank >= actorRank && !ctx.isOwner) {
+            throw new Error("Cannot invite a member with a role equal to or higher than your own.");
+        }
+
+        // Validate optional department
+        if (data.departmentId) {
+            const dept = await WorkspaceRepository.findDepartmentById(workspaceId, data.departmentId);
+            if (!dept) throw new Error("Selected department does not exist.");
+        }
+
+        // Check if user already exists in workspace
+        const existingUserRes = await query(
+            `SELECT id FROM public.users WHERE LOWER(email) = $1 LIMIT 1;`,
+            [email]
+        );
+        const existingUserId = existingUserRes.rows[0]?.id || null;
+
+        if (existingUserId) {
+            const alreadyMember = await WorkspaceRepository.findMember(workspaceId, existingUserId);
+            if (alreadyMember && alreadyMember.membershipStatus === "active") {
+                throw new Error("This user is already an active member of this workspace.");
+            }
+        }
+
+        // Generate 64-character cryptographically secure token
+        const rawToken = crypto.randomBytes(32).toString("hex");
+        // Compute SHA-256 hash for database persistence
+        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+        const invitation = await WorkspaceRepository.createInvitation(null, {
+            workspaceId,
+            inviterId: actorUserId,
+            email,
+            roleId: data.roleId,
+            departmentId: data.departmentId || null,
+            invitedUserId: existingUserId,
+            tokenHash,
+            invitationMessage: data.invitationMessage || null,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        });
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "invitation_created",
+            targetType: "invitation",
+            targetId: invitation.id,
+            details: { email, roleId: data.roleId, departmentId: data.departmentId },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return { invitation, rawToken };
+    }
+
+    /**
+     * Revokes a pending invitation
+     */
+    static async revokeInvitation(
+        workspaceId: string,
+        actorUserId: string,
+        invitationId: string,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("members:remove"))) {
+            throw new Error("Unauthorized to revoke invitations.");
+        }
+
+        const invitation = await WorkspaceRepository.findInvitationById(workspaceId, invitationId);
+        if (!invitation || invitation.status !== "pending") {
+            throw new Error("Invitation not found or is no longer pending.");
+        }
+
+        const revoked = await WorkspaceRepository.updateInvitationStatus(invitationId, "revoked", {
+            revokedAt: new Date(),
+            revokedBy: actorUserId,
+        });
+
+        if (revoked) {
+            await WorkspaceRepository.logAudit(null, {
+                workspaceId,
+                actorId: actorUserId,
+                action: "invitation_revoked",
+                targetType: "invitation",
+                targetId: invitationId,
+                details: { email: invitation.email },
+                ipAddress: reqMeta.ipAddress || null,
+                userAgent: reqMeta.userAgent || null,
+            });
+        }
+
+        return revoked;
+    }
+
+    /**
+     * Accepts an invitation using the raw token
+     * Enforces single-use, non-expired, and tenant isolation.
+     */
+    static async acceptInvitation(
+        rawToken: string,
+        acceptingUserId: string,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<{ workspace: TeamWorkspace; member: WorkspaceMember }> {
+        const tokenHash = crypto.createHash("sha256").update(rawToken.trim()).digest("hex");
+        const invitation = await WorkspaceRepository.findInvitationByTokenHash(tokenHash);
+
+        if (!invitation) {
+            throw new Error("Invalid or unrecognized invitation token.");
+        }
+
+        if (invitation.status !== "pending") {
+            throw new Error(`This invitation has already been ${invitation.status}.`);
+        }
+
+        if (new Date(invitation.expiresAt) < new Date()) {
+            await WorkspaceRepository.updateInvitationStatus(invitation.id, "expired");
+            throw new Error("This invitation has expired.");
+        }
+
+        // Verify accepting user
+        const userRes = await query(
+            `SELECT id, email, username FROM public.users WHERE id = $1 LIMIT 1;`,
+            [acceptingUserId]
+        );
+        const user = userRes.rows[0];
+        if (!user) throw new Error("Authenticated user not found.");
+
+        const workspace = await WorkspaceRepository.findById(invitation.workspaceId);
+        if (!workspace || workspace.workspaceStatus === "archived") {
+            throw new Error("The associated workspace is no longer active.");
+        }
+
+        // Multi-record operation inside transaction
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN;");
+
+            // 1. Create or restore workspace membership
+            const member = await WorkspaceRepository.createMember(client, {
+                workspaceId: workspace.id,
+                userId: acceptingUserId,
+                roleId: invitation.roleId,
+                departmentId: invitation.departmentId || null,
+                roleTitle: invitation.role?.name || "Member",
+                membershipStatus: "active",
+                invitedBy: invitation.inviterId,
+            });
+
+            // 2. If invitation was department-scoped, auto-assign into department
+            if (invitation.departmentId) {
+                await WorkspaceRepository.addDepartmentMember(client, {
+                    workspaceId: workspace.id,
+                    departmentId: invitation.departmentId,
+                    memberId: member.id,
+                    userId: acceptingUserId,
+                    departmentRole: "member",
+                    roleTitle: "Department Member",
+                    assignedBy: invitation.inviterId,
+                });
+            }
+
+            // 3. Mark invitation as accepted (single-use enforcement)
+            await client.query(
+                `UPDATE public.workspace_invitations
+                 SET status = 'accepted',
+                     accepted_at = NOW(),
+                     invited_user_id = $2,
+                     updated_at = NOW()
+                 WHERE id = $1;`,
+                [invitation.id, acceptingUserId]
+            );
+
+            // 4. Log audit record
+            await WorkspaceRepository.logAudit(client, {
+                workspaceId: workspace.id,
+                actorId: acceptingUserId,
+                action: "invitation_accepted",
+                targetType: "member",
+                targetId: member.id,
+                details: {
+                    invitationId: invitation.id,
+                    email: invitation.email,
+                    roleId: invitation.roleId,
+                    departmentId: invitation.departmentId,
+                },
+                ipAddress: reqMeta.ipAddress || null,
+                userAgent: reqMeta.userAgent || null,
+            });
+
+            await client.query("COMMIT;");
+
+            // Invalidate permissions cache
+            await WorkspaceRedisService.invalidateMemberPermissions(workspace.id, acceptingUserId);
+
+            const fullMember = await WorkspaceRepository.findMember(workspace.id, acceptingUserId);
+            return { workspace, member: fullMember || member };
+        } catch (err: any) {
+            await client.query("ROLLBACK;");
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+}

@@ -1,0 +1,2468 @@
+// Backend/src/Routes/workspace/workspaceRoutes.ts
+import { Router, type Request, type Response } from "express";
+import { authenticate } from "../../middlewares/auth.middleware.js";
+import { WorkspaceService } from "../../services/workspace/workspaceService.js";
+import { WorkspaceDepartmentService } from "../../services/workspace/workspaceDepartmentService.js";
+import { WorkspaceMemberService } from "../../services/workspace/workspaceMemberService.js";
+import { WorkspaceChannelService, workspaceEventBus } from "../../services/workspace/workspaceChannelService.js";
+import { WorkspaceTaskService } from "../../services/workspace/workspaceTaskService.js";
+import { WorkspaceFileService } from "../../services/workspace/workspaceFileService.js";
+import { WorkspaceNotificationController } from "../../controllers/workspace/workspaceNotificationController.js";
+import { WorkspaceDashboardController } from "../../controllers/workspace/workspaceDashboardController.js";
+import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
+import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import { query } from "../../database/client.js";
+import multer from "multer";
+
+const fileUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB max video limit
+});
+
+export const workspaceRouter = Router();
+
+/**
+ * Middleware helper to resolve clubId from query, body, or caller's verified club
+ */
+async function resolveClubId(req: Request, res: Response): Promise<string | null> {
+    const authUser = (req as any).user;
+    if (!authUser || !authUser.id) {
+        res.status(401).json({ success: false, message: "Authentication required." });
+        return null;
+    }
+
+    const requestedClubId = (req.query.clubId as string) || req.body?.clubId || req.params?.clubId;
+    if (requestedClubId) {
+        return requestedClubId;
+    }
+
+    const clubRes = await query(
+        `SELECT vc.id FROM public.verified_clubs vc
+         LEFT JOIN public.club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
+         WHERE vc.auth_user_id = $1 OR cm.user_id = $1
+         LIMIT 1;`,
+        [authUser.id]
+    );
+
+    if (clubRes.rows.length === 0) {
+        res.status(404).json({ success: false, message: "No club found associated with your account." });
+        return null;
+    }
+
+    return clubRes.rows[0].id;
+}
+
+// =========================================================================
+// 1. HEALTH & DIAGNOSTICS
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/health
+ */
+workspaceRouter.get("/health", async (_req: Request, res: Response) => {
+    const redisHealthy = await WorkspaceRedisService.isHealthy();
+    return res.json({
+        success: true,
+        subsystem: "team-workspace",
+        redisHealthy,
+        redisNamespace: process.env.WORKSPACE_REDIS_NAMESPACE || "orbix:team-workspace:",
+        timestamp: new Date().toISOString(),
+    });
+});
+
+// =========================================================================
+// AUDIT CONTEXT HELPER
+// =========================================================================
+
+function getAuditContext(req: Request): { ipAddress?: string; userAgent?: string } {
+    const ctx: { ipAddress?: string; userAgent?: string } = {};
+    const ip = req.ip || req.socket.remoteAddress;
+    if (ip) ctx.ipAddress = ip;
+    const ua = req.headers["user-agent"];
+    if (ua) ctx.userAgent = typeof ua === "string" ? ua : ua[0];
+    return ctx;
+}
+
+// =========================================================================
+// 2. WORKSPACE RETRIEVAL & PROVISIONING
+// =========================================================================
+
+/**
+ * GET /api/club/workspace
+ */
+workspaceRouter.get("/", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const auditCtx = getAuditContext(req);
+
+        const { workspace, member, isNew } = await WorkspaceService.getOrCreateWorkspaceForClub(
+            clubId,
+            authUser.id,
+            auditCtx
+        );
+
+        const roles = await WorkspaceRepository.listRoles(workspace.id);
+        const departments = await WorkspaceDepartmentService.listDepartments(workspace.id);
+        const { total: memberCount } = await WorkspaceRepository.listMembers(workspace.id, { status: "active" });
+
+        return res.json({
+            success: true,
+            isNew,
+            workspace,
+            currentMember: member,
+            memberCount,
+            roles,
+            departments,
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/workspace error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to retrieve or provision workspace.",
+        });
+    }
+});
+
+// =========================================================================
+// 3. WORKSPACE MANAGER DESIGNATION (CLUB OWNER ONLY)
+// =========================================================================
+
+/**
+ * POST /api/club/workspace/manager
+ * Appoints or replaces the designated Workspace Manager
+ */
+workspaceRouter.post("/manager", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const { managerUserId, permissions } = req.body;
+        if (!managerUserId) {
+            return res.status(400).json({ success: false, message: "managerUserId is required." });
+        }
+
+        const updated = await WorkspaceMemberService.appointWorkspaceManager(
+            workspace.id,
+            authUser.id,
+            managerUserId,
+            permissions || [],
+            getAuditContext(req)
+        );
+
+        return res.json({
+            success: true,
+            workspace: updated,
+            message: "Workspace Manager appointed successfully.",
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to appoint Workspace Manager." });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/manager
+ * Revokes the Workspace Manager designation
+ */
+workspaceRouter.delete("/manager", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+
+        const updated = await WorkspaceMemberService.revokeWorkspaceManager(
+            workspace.id,
+            authUser.id,
+            getAuditContext(req)
+        );
+
+        return res.json({
+            success: true,
+            workspace: updated,
+            message: "Workspace Manager revoked successfully.",
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to revoke Workspace Manager." });
+    }
+});
+
+// =========================================================================
+// 4. DEPARTMENTS MANAGEMENT
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/departments
+ * List departments for active workspace
+ */
+workspaceRouter.get("/departments", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const includeArchived = req.query.includeArchived === "true" || req.query.includeArchived === "1";
+        const departments = await WorkspaceDepartmentService.listDepartments(workspace.id, includeArchived);
+
+        return res.json({ success: true, departments });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to list departments." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/departments/seed-defaults
+ * Seed suggested default departments (Tech, Design, Content, Operations, Media)
+ */
+workspaceRouter.post("/departments/seed-defaults", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+
+        const departments = await WorkspaceDepartmentService.seedSuggestedDepartments(
+            workspace.id,
+            authUser.id,
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({
+            success: true,
+            departments,
+            message: `Created ${departments.length} suggested departments.`,
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to seed default departments." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/departments
+ * Create custom department
+ */
+workspaceRouter.post("/departments", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+
+        const department = await WorkspaceDepartmentService.createDepartment(
+            workspace.id,
+            authUser.id,
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({
+            success: true,
+            department,
+            message: `Department "${department.name}" created successfully.`,
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to create department." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/departments/:deptId
+ * View department details and members
+ */
+workspaceRouter.get("/departments/:deptId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const deptId = String(req.params.deptId);
+        if (!deptId) return res.status(400).json({ success: false, message: "Department ID is required." });
+        const result = await WorkspaceDepartmentService.getDepartmentDetails(workspace.id, deptId);
+
+        return res.json({ success: true, ...result });
+    } catch (err: any) {
+        return res.status(404).json({ success: false, message: err.message || "Department not found." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/departments/:deptId
+ * Edit department details
+ */
+workspaceRouter.patch("/departments/:deptId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const deptId = String(req.params.deptId);
+        if (!deptId) return res.status(400).json({ success: false, message: "Department ID is required." });
+        const authUser = (req as any).user;
+
+        const updated = await WorkspaceDepartmentService.updateDepartment(
+            workspace.id,
+            authUser.id,
+            deptId,
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.json({
+            success: true,
+            department: updated,
+            message: `Department "${updated.name}" updated successfully.`,
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to update department." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/departments/:deptId/archive
+ */
+workspaceRouter.post("/departments/:deptId/archive", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const deptId = String(req.params.deptId);
+        if (!deptId) return res.status(400).json({ success: false, message: "Department ID is required." });
+        const authUser = (req as any).user;
+
+        const updated = await WorkspaceDepartmentService.archiveDepartment(
+            workspace.id,
+            authUser.id,
+            deptId,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, department: updated, message: "Department archived." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to archive department." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/departments/:deptId/restore
+ */
+workspaceRouter.post("/departments/:deptId/restore", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const deptId = String(req.params.deptId);
+        if (!deptId) return res.status(400).json({ success: false, message: "Department ID is required." });
+        const authUser = (req as any).user;
+
+        const updated = await WorkspaceDepartmentService.restoreDepartment(
+            workspace.id,
+            authUser.id,
+            deptId,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, department: updated, message: "Department restored." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to restore department." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/departments/:deptId/members
+ * Add member to department (supports multi-department membership)
+ */
+workspaceRouter.post("/departments/:deptId/members", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const deptId = String(req.params.deptId);
+        if (!deptId) return res.status(400).json({ success: false, message: "Department ID is required." });
+        const { memberId, role, roleTitle } = req.body;
+        if (!memberId) {
+            return res.status(400).json({ success: false, message: "memberId is required." });
+        }
+
+        const authUser = (req as any).user;
+
+        const deptMember = await WorkspaceDepartmentService.addMemberToDepartment(
+            workspace.id,
+            authUser.id,
+            deptId,
+            memberId,
+            role || "member",
+            roleTitle,
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({
+            success: true,
+            deptMember,
+            message: "Member added to department successfully.",
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to add member to department." });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/departments/:deptId/members/:memberId
+ */
+workspaceRouter.delete("/departments/:deptId/members/:memberId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const deptId = String(req.params.deptId);
+        const memberId = String(req.params.memberId);
+        if (!deptId || !memberId) return res.status(400).json({ success: false, message: "Both deptId and memberId are required." });
+        const authUser = (req as any).user;
+
+        const removed = await WorkspaceDepartmentService.removeMemberFromDepartment(
+            workspace.id,
+            authUser.id,
+            deptId,
+            memberId,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: removed, message: "Member removed from department." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to remove member." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/departments/transfer
+ * Transfer a member from one department to another
+ */
+workspaceRouter.post("/departments/transfer", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const { memberId, fromDeptId, toDeptId } = req.body;
+        if (!memberId || !fromDeptId || !toDeptId) {
+            return res.status(400).json({ success: false, message: "memberId, fromDeptId, and toDeptId are required." });
+        }
+
+        const authUser = (req as any).user;
+
+        await WorkspaceDepartmentService.transferMember(
+            workspace.id,
+            authUser.id,
+            memberId,
+            fromDeptId,
+            toDeptId,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, message: "Member transferred to new department successfully." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to transfer member." });
+    }
+});
+
+// =========================================================================
+// 5. MEMBER DIRECTORY & ROLE OPERATIONS
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/members
+ */
+workspaceRouter.get("/members", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const callerMember = await WorkspaceRepository.findMember(workspace.id, authUser.id);
+        if (!callerMember || callerMember.isSuspended) {
+            return res.status(403).json({ success: false, message: "Workspace access denied." });
+        }
+
+        const { status, departmentId, roleId, search, limit, offset } = req.query as Record<string, string>;
+        const queryOpts: {
+            status?: string;
+            departmentId?: string;
+            roleId?: string;
+            search?: string;
+            limit?: number;
+            offset?: number;
+        } = {
+            limit: limit ? parseInt(limit, 10) : 50,
+            offset: offset ? parseInt(offset, 10) : 0,
+        };
+        if (status) queryOpts.status = status;
+        if (departmentId) queryOpts.departmentId = departmentId;
+        if (roleId) queryOpts.roleId = roleId;
+        if (search) queryOpts.search = search;
+
+        const result = await WorkspaceRepository.listMembers(workspace.id, queryOpts);
+
+        return res.json({
+            success: true,
+            members: result.members,
+            total: result.total,
+        });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to load workspace members." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/members/:targetUserId/role
+ * Assign roles (promote / demote with rank validation)
+ */
+workspaceRouter.patch("/members/:targetUserId/role", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const targetUserId = String(req.params.targetUserId);
+        if (!targetUserId) return res.status(400).json({ success: false, message: "targetUserId is required." });
+        const { roleId, roleTitle } = req.body;
+        if (!roleId) return res.status(400).json({ success: false, message: "roleId is required." });
+
+        const authUser = (req as any).user;
+
+        const updated = await WorkspaceMemberService.assignMemberRole(
+            workspace.id,
+            authUser.id,
+            targetUserId,
+            roleId,
+            roleTitle,
+            getAuditContext(req)
+        );
+
+        return res.json({
+            success: true,
+            member: updated,
+            message: "Member role updated successfully.",
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to assign role." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/members/:targetUserId/suspension
+ */
+workspaceRouter.patch("/members/:targetUserId/suspension", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const targetUserId = String(req.params.targetUserId);
+        if (!targetUserId) return res.status(400).json({ success: false, message: "Target user ID is required." });
+        const { suspend, reason } = req.body;
+
+        const updated = await WorkspaceService.setMemberSuspension(
+            workspace.id,
+            targetUserId,
+            authUser.id,
+            Boolean(suspend),
+            reason,
+            getAuditContext(req)
+        );
+
+        return res.json({
+            success: true,
+            member: updated,
+            message: suspend
+                ? "Member has been suspended from this workspace."
+                : "Member has been reinstated in this workspace.",
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to update suspension status." });
+    }
+});
+
+// =========================================================================
+// 6. CRYPTOGRAPHIC INVITATIONS
+// =========================================================================
+
+/**
+ * POST /api/club/workspace/invitations
+ * Generates single-use invitation token with SHA-256 hash
+ */
+workspaceRouter.post("/invitations", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+
+        const { email, roleId, departmentId, invitationMessage } = req.body;
+        if (!email || !roleId) {
+            return res.status(400).json({ success: false, message: "Both email and roleId are required." });
+        }
+
+        const { invitation, rawToken } = await WorkspaceMemberService.createInvitation(
+            workspace.id,
+            authUser.id,
+            { email, roleId, departmentId, invitationMessage },
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({
+            success: true,
+            invitation,
+            token: rawToken,
+            inviteLink: `/club/team-workspace/join?token=${rawToken}`,
+            message: `Invitation generated for ${email}.`,
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to create invitation." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/invitations
+ */
+workspaceRouter.get("/invitations", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const status = (req.query.status as string) || undefined;
+        const invitations = await WorkspaceRepository.listInvitations(workspace.id, status);
+
+        return res.json({ success: true, invitations });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to load invitations." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/invitations/:invitationId/revoke
+ */
+workspaceRouter.post("/invitations/:invitationId/revoke", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const invitationId = String(req.params.invitationId);
+        if (!invitationId) return res.status(400).json({ success: false, message: "invitationId is required." });
+        const authUser = (req as any).user;
+
+        await WorkspaceMemberService.revokeInvitation(
+            workspace.id,
+            authUser.id,
+            invitationId,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, message: "Invitation revoked successfully." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to revoke invitation." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/invitations/accept
+ * Accept invitation using raw token
+ */
+workspaceRouter.post("/invitations/accept", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { token } = req.body;
+        if (!token || typeof token !== "string") {
+            return res.status(400).json({ success: false, message: "Invitation token is required." });
+        }
+
+        const authUser = (req as any).user;
+
+        const { workspace, member } = await WorkspaceMemberService.acceptInvitation(
+            token,
+            authUser.id,
+            getAuditContext(req)
+        );
+
+        return res.json({
+            success: true,
+            workspace,
+            member,
+            message: `Successfully joined ${workspace.name}!`,
+        });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to accept invitation." });
+    }
+});
+
+// =========================================================================
+// 7. ROLES
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/roles
+ */
+workspaceRouter.get("/roles", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const roles = await WorkspaceRepository.listRoles(workspace.id);
+        return res.json({ success: true, roles });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to load roles." });
+    }
+});
+
+// =========================================================================
+// 8. CHANNEL CATEGORIES (PHASE 04)
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/categories
+ * Lists categories and channels visible to the authenticated user
+ */
+workspaceRouter.get("/categories", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const categories = await WorkspaceChannelService.listCategoriesWithChannels(workspace.id, authUser.id);
+        return res.json({ success: true, categories });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to list categories." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/categories
+ * Create a new channel category (workspace-wide or department-specific)
+ */
+workspaceRouter.post("/categories", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const category = await WorkspaceChannelService.createCategory(
+            workspace.id,
+            authUser.id,
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({ success: true, category });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to create category." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/categories/:categoryId
+ */
+workspaceRouter.patch("/categories/:categoryId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const updated = await WorkspaceChannelService.updateCategory(
+            workspace.id,
+            authUser.id,
+            String(req.params.categoryId),
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, category: updated });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to update category." });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/categories/:categoryId
+ */
+workspaceRouter.delete("/categories/:categoryId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        await WorkspaceChannelService.deleteCategory(
+            workspace.id,
+            authUser.id,
+            String(req.params.categoryId),
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, message: "Category deleted successfully." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to delete category." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/categories/:categoryId/overrides
+ */
+workspaceRouter.post("/categories/:categoryId/overrides", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const override = await WorkspaceChannelService.setCategoryOverride(
+            workspace.id,
+            authUser.id,
+            String(req.params.categoryId),
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, override });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to set category override." });
+    }
+});
+
+// =========================================================================
+// 9. CHANNELS (PHASE 04)
+// =========================================================================
+
+/**
+ * POST /api/club/workspace/channels
+ * Create a new channel
+ */
+workspaceRouter.post("/channels", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const channel = await WorkspaceChannelService.createChannel(
+            workspace.id,
+            authUser.id,
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({ success: true, channel });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to create channel." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/channels/:channelId
+ * Strictly enforces privacy: unauthorized callers receive 404
+ */
+workspaceRouter.get("/channels/:channelId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const channel = await WorkspaceChannelService.getChannelDetails(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId)
+        );
+
+        return res.json({ success: true, channel });
+    } catch (err: any) {
+        // Return 404 for unauthorized or not found to prevent private channel existence leakage
+        return res.status(404).json({ success: false, message: "Channel not found." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/channels/:channelId
+ */
+workspaceRouter.patch("/channels/:channelId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const updated = await WorkspaceChannelService.updateChannel(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, channel: updated });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to update channel." });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/channels/:channelId
+ */
+workspaceRouter.delete("/channels/:channelId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        await WorkspaceChannelService.deleteChannel(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, message: "Channel deleted successfully." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to delete channel." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/channels/:channelId/sync
+ * Sync channel permissions with parent category
+ */
+workspaceRouter.post("/channels/:channelId/sync", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        await WorkspaceChannelService.syncChannelWithCategory(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, message: "Channel permissions synced with category." });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to sync channel." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/channels/:channelId/overrides
+ */
+workspaceRouter.post("/channels/:channelId/overrides", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const override = await WorkspaceChannelService.setChannelOverride(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, override });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to set channel override." });
+    }
+});
+
+// =========================================================================
+// 10. MESSAGES & REACTIONS (PHASE 04)
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/channels/:channelId/messages
+ * List messages with pagination (before, after, limit, threadId)
+ * Returns 404 if channel is private and user is unauthorized
+ */
+workspaceRouter.get("/channels/:channelId/messages", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const queryOpts: { threadId?: string | null; before?: string; after?: string; limit?: number } = {
+            threadId: (req.query.threadId as string) || null,
+            limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+        };
+        if (req.query.before) queryOpts.before = String(req.query.before);
+        if (req.query.after) queryOpts.after = String(req.query.after);
+
+        const messages = await WorkspaceChannelService.listMessages(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            queryOpts
+        );
+
+        return res.json({ success: true, messages });
+    } catch (err: any) {
+        return res.status(404).json({ success: false, message: "Channel not found." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/channels/:channelId/messages
+ * Send a message
+ */
+workspaceRouter.post("/channels/:channelId/messages", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const message = await WorkspaceChannelService.sendMessage(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({ success: true, message });
+    } catch (err: any) {
+        return res.status(403).json({ success: false, message: err.message || "Failed to post message." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/channels/:channelId/messages/:messageId
+ * Edit own message
+ */
+workspaceRouter.patch("/channels/:channelId/messages/:messageId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const { content } = req.body;
+        if (!content || typeof content !== "string" || !content.trim()) {
+            return res.status(400).json({ success: false, message: "Message content cannot be empty." });
+        }
+
+        const updated = await WorkspaceChannelService.editMessage(
+            workspace.id,
+            authUser.id,
+            String(req.params.messageId),
+            content
+        );
+
+        return res.json({ success: true, message: updated });
+    } catch (err: any) {
+        return res.status(403).json({ success: false, message: err.message || "Failed to edit message." });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/channels/:channelId/messages/:messageId
+ * Delete own message or delete any if admin
+ */
+workspaceRouter.delete("/channels/:channelId/messages/:messageId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        await WorkspaceChannelService.deleteMessage(
+            workspace.id,
+            authUser.id,
+            String(req.params.messageId)
+        );
+
+        return res.json({ success: true, message: "Message deleted successfully." });
+    } catch (err: any) {
+        return res.status(403).json({ success: false, message: err.message || "Failed to delete message." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/channels/:channelId/messages/:messageId/pin
+ * Pin / unpin message
+ */
+workspaceRouter.post("/channels/:channelId/messages/:messageId/pin", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const isPinned = req.body.isPinned !== false;
+        await WorkspaceChannelService.togglePinMessage(
+            workspace.id,
+            authUser.id,
+            String(req.params.messageId),
+            isPinned
+        );
+
+        return res.json({ success: true, isPinned });
+    } catch (err: any) {
+        return res.status(403).json({ success: false, message: err.message || "Failed to pin/unpin message." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/channels/:channelId/messages/:messageId/reactions
+ * Toggle emoji reaction
+ */
+workspaceRouter.post("/channels/:channelId/messages/:messageId/reactions", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const { emoji } = req.body;
+        if (!emoji || typeof emoji !== "string") {
+            return res.status(400).json({ success: false, message: "Emoji string is required." });
+        }
+
+        const added = await WorkspaceChannelService.toggleReaction(
+            workspace.id,
+            authUser.id,
+            String(req.params.messageId),
+            emoji
+        );
+
+        return res.json({ success: true, added });
+    } catch (err: any) {
+        return res.status(403).json({ success: false, message: err.message || "Failed to toggle reaction." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/messages/search
+ * Search messages with privacy isolation
+ */
+workspaceRouter.get("/messages/search", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const queryText = (req.query.q as string) || "";
+        if (!queryText.trim()) {
+            return res.json({ success: true, messages: [] });
+        }
+
+        const messages = await WorkspaceChannelService.searchMessages(
+            workspace.id,
+            authUser.id,
+            queryText,
+            req.query.limit ? parseInt(req.query.limit as string, 10) : 30
+        );
+
+        return res.json({ success: true, messages });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Search failed." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/channels/:channelId/read
+ * Mark channel read
+ */
+workspaceRouter.post("/channels/:channelId/read", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        await WorkspaceChannelService.markChannelRead(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            req.body?.lastReadMessageId || null
+        );
+
+        return res.json({ success: true });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to mark read." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/channels/unread
+ * Get unread message counts per channel
+ */
+workspaceRouter.get("/channels-unread", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const unreadCounts = await WorkspaceChannelService.getUnreadCounts(workspace.id, authUser.id);
+        return res.json({ success: true, unreadCounts });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to get unread counts." });
+    }
+});
+
+// =========================================================================
+// 11. THREADS (PHASE 04)
+// =========================================================================
+
+/**
+ * POST /api/club/workspace/channels/:channelId/threads
+ * Create a new thread
+ */
+workspaceRouter.post("/channels/:channelId/threads", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const { parentMessageId, name } = req.body;
+        if (!parentMessageId || !name) {
+            return res.status(400).json({ success: false, message: "parentMessageId and name are required." });
+        }
+
+        const thread = await WorkspaceChannelService.createThread(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            parentMessageId,
+            name,
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({ success: true, thread });
+    } catch (err: any) {
+        return res.status(403).json({ success: false, message: err.message || "Failed to create thread." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/threads/:threadId
+ * Strictly enforces privacy: unauthorized callers receive 404
+ */
+workspaceRouter.get("/threads/:threadId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const thread = await WorkspaceChannelService.getThread(
+            workspace.id,
+            authUser.id,
+            String(req.params.threadId)
+        );
+
+        return res.json({ success: true, thread });
+    } catch (err: any) {
+        return res.status(404).json({ success: false, message: "Thread not found." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/channels/:channelId/threads
+ * List threads in a channel
+ */
+workspaceRouter.get("/channels/:channelId/threads", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const threads = await WorkspaceChannelService.listThreads(
+            workspace.id,
+            authUser.id,
+            String(req.params.channelId),
+            req.query.includeArchived === "true"
+        );
+
+        return res.json({ success: true, threads });
+    } catch (err: any) {
+        return res.status(404).json({ success: false, message: "Channel not found." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/threads/:threadId
+ * Lock or archive thread
+ */
+workspaceRouter.patch("/threads/:threadId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const thread = await WorkspaceChannelService.updateThread(
+            workspace.id,
+            authUser.id,
+            String(req.params.threadId),
+            req.body,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, thread });
+    } catch (err: any) {
+        return res.status(403).json({ success: false, message: err.message || "Failed to update thread." });
+    }
+});
+
+// =========================================================================
+// 12. REALTIME SSE STREAM (PHASE 04)
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/realtime/stream
+ * Authenticated Server-Sent Events stream with privacy isolation
+ */
+workspaceRouter.get("/realtime/stream", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        // Establish SSE stream
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.flushHeaders?.();
+
+        // Send connection initialization event
+        res.write(`data: ${JSON.stringify({ event: "connected", workspaceId: workspace.id, timestamp: new Date().toISOString() })}\n\n`);
+
+        // Event listener callback
+        const eventHandler = async (data: { event: string; payload: any; timestamp: string }) => {
+            try {
+                // If the event is channel-specific, check caller permission to prevent leaking private channel activity
+                const channelId = data.payload?.channelId || data.payload?.channel?.id;
+                if (channelId) {
+                    const allowed = await WorkspaceChannelService.canViewChannel(workspace.id, channelId, authUser.id);
+                    if (!allowed) {
+                        return; // Drop event for this client
+                    }
+                }
+
+                res.write(`data: ${JSON.stringify(data)}\n\n`);
+            } catch (err) {
+                // Ignore serialization / permission errors during streaming
+            }
+        };
+
+        const eventName = `workspace:${workspace.id}`;
+        workspaceEventBus.on(eventName, eventHandler);
+
+        // Keep-alive heartbeat every 25 seconds
+        const heartbeat = setInterval(() => {
+            res.write(`: heartbeat\n\n`);
+        }, 25000);
+
+        req.on("close", () => {
+            clearInterval(heartbeat);
+            workspaceEventBus.off(eventName, eventHandler);
+            res.end();
+        });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to establish SSE stream." });
+    }
+});
+
+// =========================================================================
+// 8. PHASE 05: TASK MANAGEMENT SYSTEM ENDPOINTS
+// =========================================================================
+
+/**
+ * POST /api/club/workspace/tasks
+ * Creates a new task in the workspace.
+ */
+workspaceRouter.post("/tasks", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const {
+            title,
+            description,
+            departmentId,
+            priority,
+            startDate,
+            dueDate,
+            assignedRoleId,
+            checklist,
+            referenceLinks,
+            isRestricted,
+            assigneeUserIds,
+        } = req.body;
+
+        if (!title || !title.trim()) {
+            return res.status(400).json({ success: false, message: "Task title is required." });
+        }
+
+        const task = await WorkspaceTaskService.createTask(workspace.id, authUser.id, {
+            title,
+            description,
+            departmentId: departmentId || null,
+            priority,
+            startDate,
+            dueDate,
+            assignedRoleId: assignedRoleId || null,
+            checklist,
+            referenceLinks,
+            isRestricted,
+            assigneeUserIds,
+        });
+
+        return res.status(201).json({ success: true, task });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/tasks
+ * Lists tasks with filtering, search, and department isolation.
+ */
+workspaceRouter.get("/tasks", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const {
+            departmentId,
+            status,
+            priority,
+            assigneeUserId,
+            creatorId,
+            search,
+            isArchived,
+            sortBy,
+            sortDir,
+            limit,
+            offset,
+        } = req.query;
+
+        const result = await WorkspaceTaskService.listTasks(workspace.id, authUser.id, {
+            departmentId: departmentId as string,
+            status: status ? (Array.isArray(status) ? (status as any) : (status as any)) : undefined,
+            priority: priority as any,
+            assigneeUserId: assigneeUserId as string,
+            creatorId: creatorId as string,
+            search: search as string,
+            isArchived: isArchived ? isArchived === "true" : undefined,
+            sortBy: sortBy as any,
+            sortDir: sortDir as any,
+            limit: limit ? parseInt(limit as string, 10) : undefined,
+            offset: offset ? parseInt(offset as string, 10) : undefined,
+        });
+
+        return res.json({ success: true, tasks: result.tasks, total: result.total });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/tasks/my-tasks
+ * Categorized tasks for "My Tasks" views.
+ */
+workspaceRouter.get("/tasks/my-tasks", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const tab = (req.query.tab as any) || "assigned_to_me";
+        const tasks = await WorkspaceTaskService.getMyTasks(workspace.id, authUser.id, tab);
+
+        return res.json({ success: true, tab, tasks });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/tasks/:taskId
+ * Retrieves full task details.
+ */
+workspaceRouter.get("/tasks/:taskId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const task = await WorkspaceTaskService.getTask(workspace.id, authUser.id, req.params.taskId);
+        return res.json({ success: true, task });
+    } catch (err: any) {
+        const status = err.message.includes("not found") ? 404 : err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/tasks/:taskId
+ * Updates task fields with optimistic concurrency protection.
+ */
+workspaceRouter.patch("/tasks/:taskId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const {
+            title,
+            description,
+            departmentId,
+            priority,
+            startDate,
+            dueDate,
+            assignedRoleId,
+            checklist,
+            referenceLinks,
+            isRestricted,
+            displayOrder,
+            expectedVersion,
+        } = req.body;
+
+        const task = await WorkspaceTaskService.updateTask(
+            workspace.id,
+            authUser.id,
+            req.params.taskId,
+            {
+                title,
+                description,
+                departmentId,
+                priority,
+                startDate,
+                dueDate,
+                assignedRoleId,
+                checklist,
+                referenceLinks,
+                isRestricted,
+                displayOrder,
+            },
+            expectedVersion
+        );
+
+        return res.json({ success: true, task });
+    } catch (err: any) {
+        const status = err.message.includes("Concurrency conflict")
+            ? 409
+            : err.message.includes("Unauthorized")
+            ? 403
+            : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/tasks/:taskId/transition
+ * Executes a status transition according to the explicit state machine.
+ */
+workspaceRouter.post("/tasks/:taskId/transition", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const { targetStatus, expectedVersion, reason } = req.body;
+        if (!targetStatus) {
+            return res.status(400).json({ success: false, message: "targetStatus is required." });
+        }
+
+        const task = await WorkspaceTaskService.transitionTaskStatus(
+            workspace.id,
+            authUser.id,
+            req.params.taskId,
+            targetStatus,
+            expectedVersion,
+            reason
+        );
+
+        return res.json({ success: true, task });
+    } catch (err: any) {
+        const status = err.message.includes("Concurrency conflict")
+            ? 409
+            : err.message.includes("Self-review") || err.message.includes("Unauthorized")
+            ? 403
+            : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/tasks/:taskId/assign
+ * Reassigns members to a task with reassignment history tracking.
+ */
+workspaceRouter.post("/tasks/:taskId/assign", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const { assigneeUserIds } = req.body;
+        if (!Array.isArray(assigneeUserIds)) {
+            return res.status(400).json({ success: false, message: "assigneeUserIds array is required." });
+        }
+
+        const task = await WorkspaceTaskService.setTaskAssignees(
+            workspace.id,
+            authUser.id,
+            req.params.taskId,
+            assigneeUserIds
+        );
+
+        return res.json({ success: true, task });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/tasks/:taskId/submit
+ * Submits work deliverables for review.
+ */
+workspaceRouter.post("/tasks/:taskId/submit", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const { content, attachments, expectedVersion } = req.body;
+        if (!content || !content.trim()) {
+            return res.status(400).json({ success: false, message: "Submission content is required." });
+        }
+
+        const result = await WorkspaceTaskService.submitTask(
+            workspace.id,
+            authUser.id,
+            req.params.taskId,
+            content,
+            attachments || [],
+            expectedVersion
+        );
+
+        return res.status(201).json({ success: true, task: result.task, submission: result.submission });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/tasks/:taskId/review
+ * Reviews deliverable: approve or request changes (enforcing self-review protection).
+ */
+workspaceRouter.post("/tasks/:taskId/review", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const { submissionId, decision, comments, expectedVersion } = req.body;
+        if (!submissionId || !decision || !comments || !comments.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "submissionId, decision ('approved' | 'changes_requested'), and comments are required.",
+            });
+        }
+
+        const result = await WorkspaceTaskService.reviewTask(
+            workspace.id,
+            authUser.id,
+            req.params.taskId,
+            submissionId,
+            decision,
+            comments,
+            expectedVersion
+        );
+
+        return res.json({ success: true, task: result.task, review: result.review });
+    } catch (err: any) {
+        const status = err.message.includes("Self-review") || err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/tasks/:taskId/comments
+ * Adds a comment or reply to the task discussion.
+ */
+workspaceRouter.post("/tasks/:taskId/comments", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const { content, parentCommentId, mentions, attachments } = req.body;
+        if (!content || !content.trim()) {
+            return res.status(400).json({ success: false, message: "Comment content cannot be empty." });
+        }
+
+        const comment = await WorkspaceTaskService.addComment(
+            workspace.id,
+            authUser.id,
+            req.params.taskId,
+            content,
+            parentCommentId,
+            mentions,
+            attachments
+        );
+
+        return res.status(201).json({ success: true, comment });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/tasks/:taskId/comments
+ * Retrieves threaded comments for a task.
+ */
+workspaceRouter.get("/tasks/:taskId/comments", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const comments = await WorkspaceTaskService.getComments(workspace.id, authUser.id, req.params.taskId);
+        return res.json({ success: true, comments });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/tasks/:taskId/watch
+ * Toggles watcher subscription.
+ */
+workspaceRouter.post("/tasks/:taskId/watch", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const result = await WorkspaceTaskService.toggleWatcher(workspace.id, authUser.id, req.params.taskId);
+        return res.json({ success: true, isWatching: result.isWatching });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/tasks/:taskId/activity
+ * Retrieves chronological task audit stream.
+ */
+workspaceRouter.get("/tasks/:taskId/activity", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+        const activity = await WorkspaceTaskService.getActivity(workspace.id, authUser.id, req.params.taskId, limit);
+        return res.json({ success: true, activity });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/tasks/:taskId/checklist
+ * Updates checklist items.
+ */
+workspaceRouter.post("/tasks/:taskId/checklist", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const { checklist, expectedVersion } = req.body;
+        if (!Array.isArray(checklist)) {
+            return res.status(400).json({ success: false, message: "checklist array is required." });
+        }
+
+        const task = await WorkspaceTaskService.updateChecklist(
+            workspace.id,
+            authUser.id,
+            req.params.taskId,
+            checklist,
+            expectedVersion
+        );
+
+        return res.json({ success: true, task });
+    } catch (err: any) {
+        const status = err.message.includes("Concurrency conflict")
+            ? 409
+            : err.message.includes("Unauthorized")
+            ? 403
+            : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/tasks/:taskId
+ * Soft-deletes (archives) a task.
+ */
+workspaceRouter.delete("/tasks/:taskId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const task = await WorkspaceTaskService.archiveTask(workspace.id, authUser.id, req.params.taskId);
+        return res.json({ success: true, task });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+// =========================================================================
+// 8. MEDIA & DOCUMENT MANAGEMENT (PHASE 06)
+// =========================================================================
+
+/**
+ * POST /api/club/workspace/files/upload-intent
+ * Requests a short-lived signed authorization for client direct upload to Cloudinary.
+ */
+workspaceRouter.post("/files/upload-intent", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const {
+            fileName,
+            fileSizeBytes,
+            mimeType,
+            checksum,
+            departmentId,
+            parentResourceType,
+            parentResourceId,
+        } = req.body;
+
+        if (!fileName || !fileSizeBytes || !mimeType || !parentResourceType) {
+            return res.status(400).json({
+                success: false,
+                message: "fileName, fileSizeBytes, mimeType, and parentResourceType are required.",
+            });
+        }
+
+        const intent = await WorkspaceFileService.createUploadIntent(
+            workspace.id,
+            authUser.id,
+            {
+                fileName,
+                fileSizeBytes: Number(fileSizeBytes),
+                mimeType,
+                checksum,
+                departmentId,
+                parentResourceType,
+                parentResourceId,
+            }
+        );
+
+        return res.status(201).json({ success: true, intent });
+    } catch (err: any) {
+        const status = err.message.includes("Forbidden") || err.message.includes("Unauthorized")
+            ? 403
+            : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/files/register-upload
+ * Completes single-use upload registration and persists asset metadata.
+ */
+workspaceRouter.post("/files/register-upload", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const {
+            intentId,
+            cloudinaryPublicId,
+            cloudinaryAssetId,
+            secureUrl,
+            url,
+            format,
+            fileSizeBytes,
+            mimeType,
+            checksum,
+        } = req.body;
+
+        if (!intentId || !cloudinaryPublicId || !secureUrl) {
+            return res.status(400).json({
+                success: false,
+                message: "intentId, cloudinaryPublicId, and secureUrl are required.",
+            });
+        }
+
+        const file = await WorkspaceFileService.registerUpload(
+            workspace.id,
+            authUser.id,
+            {
+                intentId,
+                cloudinaryPublicId,
+                cloudinaryAssetId,
+                secureUrl,
+                url,
+                format,
+                fileSizeBytes: Number(fileSizeBytes),
+                mimeType,
+                checksum,
+            }
+        );
+
+        return res.status(201).json({ success: true, file });
+    } catch (err: any) {
+        const status = err.message.includes("Forbidden") || err.message.includes("Unauthorized")
+            ? 403
+            : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/club/workspace/files/direct-upload
+ * Server-side stream upload with binary magic-byte & stored XSS inspection.
+ */
+workspaceRouter.post(
+    "/files/direct-upload",
+    authenticate,
+    fileUpload.single("file"),
+    async (req: Request, res: Response) => {
+        try {
+            const clubId = await resolveClubId(req, res);
+            if (!clubId) return;
+
+            const authUser = (req as any).user;
+            const workspace = await WorkspaceRepository.findByClubId(clubId);
+            if (!workspace) {
+                return res.status(404).json({ success: false, message: "Workspace not found." });
+            }
+
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: "No file provided in form-data ('file')." });
+            }
+
+            const { departmentId, parentResourceType, parentResourceId } = req.body;
+
+            const file = await WorkspaceFileService.directUpload(
+                workspace.id,
+                authUser.id,
+                req.file.buffer,
+                {
+                    originalFilename: req.file.originalname,
+                    mimeType: req.file.mimetype,
+                    departmentId: departmentId || null,
+                    parentResourceType: parentResourceType || "attachment",
+                    parentResourceId: parentResourceId || null,
+                }
+            );
+
+            return res.status(201).json({ success: true, file });
+        } catch (err: any) {
+            const status = err.message.includes("Forbidden") || err.message.includes("Unauthorized")
+                ? 403
+                : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
+);
+
+/**
+ * GET /api/club/workspace/files/:fileId/delivery-url
+ * Authorizes access and generates an ephemeral signed delivery URL.
+ */
+workspaceRouter.get("/files/:fileId/delivery-url", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const thumbnail = req.query.thumbnail === "true";
+        const download = req.query.download === "true";
+        const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+
+        const delivery = await WorkspaceFileService.getAuthorizedDeliveryUrl(
+            workspace.id,
+            authUser.id,
+            String(req.params.fileId),
+            { thumbnail, download, page }
+        );
+
+        return res.json({ success: true, ...delivery });
+    } catch (err: any) {
+        const status = err.message.includes("Forbidden") || err.message.includes("Unauthorized")
+            ? 403
+            : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/files
+ * Lists workspace files with optional filters and access checks.
+ */
+workspaceRouter.get("/files", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const filters: any = {
+            departmentId: req.query.departmentId as string,
+            channelId: req.query.channelId as string,
+            taskId: req.query.taskId as string,
+            submissionId: req.query.submissionId as string,
+            parentResourceType: req.query.parentResourceType as any,
+            parentResourceId: req.query.parentResourceId as string,
+            mimeTypeCategory: req.query.mimeTypeCategory as any,
+            uploaderId: req.query.uploaderId as string,
+            status: req.query.status as any,
+            search: req.query.search as string,
+            limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+            offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+        };
+
+        const result = await WorkspaceFileService.listFiles(workspace.id, authUser.id, filters);
+        return res.json({ success: true, files: result.files, total: result.total });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/files/storage/usage
+ * Retrieves workspace storage quota utilization.
+ */
+workspaceRouter.get("/files/storage/usage", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const storage = await WorkspaceFileService.getWorkspaceStorageUsage(workspace.id, authUser.id);
+        return res.json({ success: true, storage });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/files/:fileId
+ * Securely deletes an asset from Cloudinary and cleans database records.
+ */
+workspaceRouter.delete("/files/:fileId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        await WorkspaceFileService.deleteFile(workspace.id, authUser.id, String(req.params.fileId));
+        return res.json({ success: true, message: "File successfully deleted from workspace." });
+    } catch (err: any) {
+        const status = err.message.includes("Forbidden") || err.message.includes("Unauthorized")
+            ? 403
+            : 400;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+// =========================================================================
+// PHASE 07: NOTIFICATIONS, PREFERENCES & RESEND WEBHOOK
+// =========================================================================
+
+/**
+ * POST /api/club/workspace/webhooks/resend
+ * Public Resend webhook receiver (signed payload verification)
+ */
+workspaceRouter.post("/webhooks/resend", WorkspaceNotificationController.handleResendWebhook);
+
+/**
+ * GET /api/club/workspace/notifications
+ */
+workspaceRouter.get("/notifications", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceNotificationController.listNotifications(req, res);
+});
+
+/**
+ * PATCH /api/club/workspace/notifications/:notificationId/read
+ */
+workspaceRouter.patch("/notifications/:notificationId/read", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceNotificationController.markAsRead(req, res);
+});
+
+/**
+ * POST /api/club/workspace/notifications/read-all
+ */
+workspaceRouter.post("/notifications/read-all", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceNotificationController.markAllAsRead(req, res);
+});
+
+/**
+ * GET /api/club/workspace/notifications/preferences
+ */
+workspaceRouter.get("/notifications/preferences", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceNotificationController.getPreferences(req, res);
+});
+
+/**
+ * PUT /api/club/workspace/notifications/preferences
+ */
+workspaceRouter.put("/notifications/preferences", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceNotificationController.updatePreferences(req, res);
+});
+
+/**
+ * Parameterized workspace routes
+ */
+workspaceRouter.get("/:workspaceId/notifications", authenticate, WorkspaceNotificationController.listNotifications);
+workspaceRouter.patch("/:workspaceId/notifications/:notificationId/read", authenticate, WorkspaceNotificationController.markAsRead);
+workspaceRouter.post("/:workspaceId/notifications/read-all", authenticate, WorkspaceNotificationController.markAllAsRead);
+workspaceRouter.get("/:workspaceId/notifications/preferences", authenticate, WorkspaceNotificationController.getPreferences);
+workspaceRouter.put("/:workspaceId/notifications/preferences", authenticate, WorkspaceNotificationController.updatePreferences);
+
+// =========================================================================
+// PHASE 08: WORKSPACE DASHBOARD, ACTIVITY, AUDIT & SEARCH
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/dashboard/overview
+ */
+workspaceRouter.get("/dashboard/overview", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.getOverview(req, res);
+});
+
+/**
+ * GET /api/club/workspace/dashboard/departments/:departmentId
+ */
+workspaceRouter.get("/dashboard/departments/:departmentId", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.getDepartmentInsight(req, res);
+});
+
+/**
+ * GET /api/club/workspace/activity
+ */
+workspaceRouter.get("/activity", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.getActivityFeed(req, res);
+});
+
+/**
+ * GET /api/club/workspace/audit-logs
+ */
+workspaceRouter.get("/audit-logs", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.getAuditLogs(req, res);
+});
+
+/**
+ * GET /api/club/workspace/search
+ */
+workspaceRouter.get("/search", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.search(req, res);
+});
+
+/**
+ * Parameterized dashboard, activity, audit & search routes
+ */
+workspaceRouter.get("/:workspaceId/dashboard/overview", authenticate, WorkspaceDashboardController.getOverview);
+workspaceRouter.get("/:workspaceId/dashboard/departments/:departmentId", authenticate, WorkspaceDashboardController.getDepartmentInsight);
+workspaceRouter.get("/:workspaceId/activity", authenticate, WorkspaceDashboardController.getActivityFeed);
+workspaceRouter.get("/:workspaceId/audit-logs", authenticate, WorkspaceDashboardController.getAuditLogs);
+workspaceRouter.get("/:workspaceId/search", authenticate, WorkspaceDashboardController.search);
+
+
+
+

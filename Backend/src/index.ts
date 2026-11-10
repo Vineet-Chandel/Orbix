@@ -27,6 +27,7 @@ import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { eventFormRouter } from './Routes/events/eventFormRoutes.js';
 import { clubCredibilityRouter } from './Routes/club/clubCredibilityRoutes.js';
 import projectRouter from './Routes/projects/projectRoutes.js';
+import { workspaceRouter } from './Routes/workspace/workspaceRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import { startAccountPurgeWorker } from './services/account/accountPurgeService.js';
 import redis from './redis/client.js';
@@ -113,6 +114,10 @@ apiRouter.use('/', eventFormRouter); // Handles /api/club/events/:id/form & /api
 // Notifications & Institutions
 apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/institutions', institutionsRouter);
+
+// Team Workspace
+apiRouter.use('/club/workspace', workspaceRouter);
+apiRouter.use('/workspace', workspaceRouter);
 
 // Clubs (both /api/club and /api/clubs)
 apiRouter.use('/club', clubCredibilityRouter);

@@ -205,135 +205,141 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                 </div>
 
                 {/* 6 Dimensional Performance Meters (8 cols) */}
-                <div className="lg:col-span-8 p-6 rounded-3xl bg-white dark:bg-[#141414] border-3 border-black shadow-[5px_5px_0px_#000] space-y-4">
-                    <div className="flex items-center justify-between border-b-2 border-black/10 dark:border-white/10 pb-3">
-                        <h4 className="text-sm font-black uppercase tracking-wider text-black dark:text-white flex items-center gap-2">
-                            <Sliders className="w-4 h-4 stroke-[2.5]" />
-                            <span>Dimensional Reliability Rubric</span>
-                        </h4>
-                        <span className="text-xs font-bold text-neutral-500">
-                            Scale: 0 to 100
-                        </span>
+                <div className="lg:col-span-8 p-6 rounded-3xl bg-white dark:bg-[#141414] border-3 border-black shadow-[5px_5px_0px_#000] flex flex-col justify-between space-y-4">
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b-2 border-black/10 dark:border-white/10 pb-3">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black dark:text-white flex items-center gap-2">
+                                <Sliders className="w-4 h-4 stroke-[2.5]" />
+                                <span>Dimensional Reliability Rubric</span>
+                            </h4>
+                            <span className="text-xs font-bold text-neutral-500">
+                                Scale: 0 to 100
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Event Delivery */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                    <span>Event Delivery Against Promises (30%)</span>
+                                    <span className="font-black text-black dark:text-white">
+                                        {snapshot.dimensionalScores.eventDelivery || 50}/100
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
+                                    <div
+                                        className="h-full bg-[#a2ff86] border-r-2 border-black"
+                                        style={{ width: `${snapshot.dimensionalScores.eventDelivery || 50}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Schedule Reliability */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                    <span>Schedule & Execution Reliability (15%)</span>
+                                    <span className="font-black text-black dark:text-white">
+                                        {snapshot.dimensionalScores.scheduleReliability || 50}/100
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
+                                    <div
+                                        className="h-full bg-[#38BDF8] border-r-2 border-black"
+                                        style={{ width: `${snapshot.dimensionalScores.scheduleReliability || 50}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Participant Communication */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                    <span>Participant Communication (15%)</span>
+                                    <span className="font-black text-black dark:text-white">
+                                        {snapshot.dimensionalScores.communication || 50}/100
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
+                                    <div
+                                        className="h-full bg-[#C084FC] border-r-2 border-black"
+                                        style={{ width: `${snapshot.dimensionalScores.communication || 50}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Attendee Experience */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                    <span>Verified Participant Feedback (20%)</span>
+                                    <span className="font-black text-black dark:text-white">
+                                        {snapshot.dimensionalScores.participantExperience || 50}/100
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
+                                    <div
+                                        className="h-full bg-[#FFE566] border-r-2 border-black"
+                                        style={{ width: `${snapshot.dimensionalScores.participantExperience || 50}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Cancellation Reliability */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                    <span>Cancellation & Notice Discipline</span>
+                                    <span className="font-black text-black dark:text-white">
+                                        {snapshot.dimensionalScores.cancellationReliability || 50}/100
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
+                                    <div
+                                        className="h-full bg-[#FB7185] border-r-2 border-black"
+                                        style={{ width: `${snapshot.dimensionalScores.cancellationReliability || 50}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Certificate Integrity */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                    <span>Certificate Accuracy & Integrity</span>
+                                    <span className="font-black text-black dark:text-white">
+                                        {snapshot.dimensionalScores.certificateIntegrity || 50}/100
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
+                                    <div
+                                        className="h-full bg-emerald-400 border-r-2 border-black"
+                                        style={{ width: `${snapshot.dimensionalScores.certificateIntegrity || 50}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Event Delivery */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span>Event Delivery Against Promises (30%)</span>
-                                <span className="font-black text-black dark:text-white">
-                                    {snapshot.dimensionalScores.eventDelivery || 50}/100
-                                </span>
-                            </div>
-                            <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
-                                <div
-                                    className="h-full bg-[#a2ff86] border-r-2 border-black"
-                                    style={{ width: `${snapshot.dimensionalScores.eventDelivery || 50}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Schedule Reliability */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span>Schedule & Execution Reliability (15%)</span>
-                                <span className="font-black text-black dark:text-white">
-                                    {snapshot.dimensionalScores.scheduleReliability || 50}/100
-                                </span>
-                            </div>
-                            <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
-                                <div
-                                    className="h-full bg-[#38BDF8] border-r-2 border-black"
-                                    style={{ width: `${snapshot.dimensionalScores.scheduleReliability || 50}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Participant Communication */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span>Participant Communication (15%)</span>
-                                <span className="font-black text-black dark:text-white">
-                                    {snapshot.dimensionalScores.communication || 50}/100
-                                </span>
-                            </div>
-                            <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
-                                <div
-                                    className="h-full bg-[#C084FC] border-r-2 border-black"
-                                    style={{ width: `${snapshot.dimensionalScores.communication || 50}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Attendee Experience */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span>Verified Participant Feedback (20%)</span>
-                                <span className="font-black text-black dark:text-white">
-                                    {snapshot.dimensionalScores.participantExperience || 50}/100
-                                </span>
-                            </div>
-                            <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
-                                <div
-                                    className="h-full bg-[#FFE566] border-r-2 border-black"
-                                    style={{ width: `${snapshot.dimensionalScores.participantExperience || 50}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Cancellation Reliability */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span>Cancellation & Notice Discipline</span>
-                                <span className="font-black text-black dark:text-white">
-                                    {snapshot.dimensionalScores.cancellationReliability || 50}/100
-                                </span>
-                            </div>
-                            <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
-                                <div
-                                    className="h-full bg-[#FB7185] border-r-2 border-black"
-                                    style={{ width: `${snapshot.dimensionalScores.cancellationReliability || 50}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Certificate Integrity */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span>Certificate Accuracy & Integrity</span>
-                                <span className="font-black text-black dark:text-white">
-                                    {snapshot.dimensionalScores.certificateIntegrity || 50}/100
-                                </span>
-                            </div>
-                            <div className="w-full h-3 rounded-full bg-neutral-100 dark:bg-neutral-800 border-2 border-black overflow-hidden shadow-[1px_1px_0px_#000]">
-                                <div
-                                    className="h-full bg-emerald-400 border-r-2 border-black"
-                                    style={{ width: `${snapshot.dimensionalScores.certificateIntegrity || 50}%` }}
-                                />
-                            </div>
+                    {/* Credibility Tiers inside Dimensional Reliability Rubric */}
+                    <div className="pt-3 border-t-2 border-black/10 dark:border-white/10 flex flex-wrap items-center justify-between gap-2.5 text-xs font-bold">
+                        <span className="font-black uppercase tracking-wider text-neutral-500 text-[11px] shrink-0">
+                            Credibility Tiers:
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <span className="px-2.5 py-1 rounded-xl bg-[#FECDD3] text-rose-950 border border-black shadow-[1px_1px_0px_#000] text-[11px] font-bold">
+                                0–39 Critical
+                            </span>
+                            <span className="px-2.5 py-1 rounded-xl bg-[#FEF3C7] text-amber-950 border border-black shadow-[1px_1px_0px_#000] text-[11px] font-bold">
+                                40–59 Developing
+                            </span>
+                            <span className="px-2.5 py-1 rounded-xl bg-[#FEF08A] text-amber-950 border border-black shadow-[1px_1px_0px_#000] text-[11px] font-bold">
+                                60–74 Reliable
+                            </span>
+                            <span className="px-2.5 py-1 rounded-xl bg-[#BBF7D0] text-emerald-950 border border-black shadow-[1px_1px_0px_#000] text-[11px] font-bold">
+                                75–89 Trusted
+                            </span>
+                            <span className="px-2.5 py-1 rounded-xl bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] text-[11px] font-bold">
+                                90–100 Exceptional
+                            </span>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Score Bands Guide Pill Box */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#121212] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3 text-xs font-bold">
-                <span className="font-black uppercase tracking-wider text-neutral-500">Credibility Tiers:</span>
-                <span className="px-2.5 py-1 rounded-xl bg-[#FECDD3] text-rose-950 border border-black shadow-[1px_1px_0px_#000]">
-                    0–39 Critical
-                </span>
-                <span className="px-2.5 py-1 rounded-xl bg-[#FEF3C7] text-amber-950 border border-black shadow-[1px_1px_0px_#000]">
-                    40–59 Developing
-                </span>
-                <span className="px-2.5 py-1 rounded-xl bg-[#FEF08A] text-amber-950 border border-black shadow-[1px_1px_0px_#000]">
-                    60–74 Reliable
-                </span>
-                <span className="px-2.5 py-1 rounded-xl bg-[#BBF7D0] text-emerald-950 border border-black shadow-[1px_1px_0px_#000]">
-                    75–89 Trusted
-                </span>
-                <span className="px-2.5 py-1 rounded-xl bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
-                    90–100 Exceptional
-                </span>
             </div>
 
             {/* Section 2: Credibility Ledger (Immutable Audit History) */}

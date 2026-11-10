@@ -40,6 +40,7 @@ import ClubInboxModal from "./ClubInboxModal";
 import { ClubEventModal } from "./ClubEventModal";
 import { ClubEventAnalyticsSection } from "./ClubEventAnalyticsSection";
 import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
+import { WorkspaceShell } from "./TeamWorkspace/WorkspaceShell";
 import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
@@ -988,15 +989,21 @@ export default function ClubDashboardPage() {
                             </div>
                         )}
 
+                        {/* TAB: CLUB TEAM WORKSPACE */}
+                        {activeTab === "team-workspace" && (
+                            <WorkspaceShell
+                                club={club}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                            />
+                        )}
+
                         {/* TAB: CLUB TEAM & ORGANISATION */}
-                        {(activeTab === "team" || activeTab === "team-workspace" || activeTab === "recruitment") && (
+                        {(activeTab === "team" || activeTab === "recruitment") && (
                             <ClubTeamWorkspace
                                 club={club}
                                 hideHeaderTitle={true}
                                 initialTab={
-                                    activeTab === "team-workspace"
-                                        ? "departments"
-                                        : activeTab === "recruitment"
+                                    activeTab === "recruitment"
                                         ? "invitations"
                                         : "overview"
                                 }
