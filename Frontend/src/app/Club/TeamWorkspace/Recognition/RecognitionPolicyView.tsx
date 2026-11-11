@@ -13,6 +13,7 @@ import type {
     WorkspaceRecognitionPolicy,
     WorkspaceRecognitionCategory,
 } from "../../../../types/workspace";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface RecognitionPolicyViewProps {
     clubId: string;
@@ -168,15 +169,12 @@ export const RecognitionPolicyView: React.FC<RecognitionPolicyViewProps> = ({
                                 : "Recognition is paused. Point awarding and leaderboards are disabled for this workspace."}
                         </p>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={isEnabled}
-                            onChange={(e) => setIsEnabled(e.target.checked)}
-                            className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-neutral-300 border-2 border-black peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-black after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-2 after:border-black after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FFE566]"></div>
-                    </label>
+                    <NeoCheckbox
+                        checked={isEnabled}
+                        onCheckedChange={(checked) => setIsEnabled(checked)}
+                        size="md"
+                        aria-label="Toggle Recognition System"
+                    />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

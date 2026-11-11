@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type { WorkspaceRecognitionBudget, WorkspaceMember } from "../../../../types/workspace";
+import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface AwardBudgetsViewProps {
     clubId: string;
@@ -127,18 +128,20 @@ export const AwardBudgetsView: React.FC<AwardBudgetsViewProps> = ({
                             <label className="block text-[11px] font-black uppercase tracking-wider text-black mb-1">
                                 Workspace Manager
                             </label>
-                            <select
+                            <NeoSelect
                                 value={selectedManagerId}
-                                onChange={(e) => setSelectedManagerId(e.target.value)}
-                                className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold focus:outline-none shadow-[2px_2px_0px_#000]"
-                            >
-                                <option value="">Select Manager...</option>
-                                {budgets.map((b) => (
-                                    <option key={b.userId} value={b.userId}>
-                                        {b.user?.firstName || ""} {b.user?.lastName || ""} (@{b.user?.username})
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setSelectedManagerId(val)}
+                                placeholder="Select Manager..."
+                                size="sm"
+                                triggerClassName="w-full text-xs font-bold"
+                                options={[
+                                    { value: "", label: "Select Manager..." },
+                                    ...budgets.map((b) => ({
+                                        value: b.userId,
+                                        label: `${b.user?.firstName || ""} ${b.user?.lastName || ""} (@${b.user?.username})`.trim(),
+                                    })),
+                                ]}
+                            />
                         </div>
 
                         <div>

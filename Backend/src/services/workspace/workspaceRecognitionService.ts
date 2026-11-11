@@ -189,7 +189,7 @@ export class WorkspaceRecognitionService {
                 workspaceId,
                 recipientId: dto.recipientUserId,
                 issuerId: issuerUserId,
-                departmentId: dto.departmentId || recipientMember.departmentId || null,
+                departmentId: dto.departmentId || recipientMember.departmentId || ((recipientMember as any).departments?.[0]?.id ?? null),
                 transactionType: "award",
                 pointsDelta: amount,
                 categoryId: category.id,

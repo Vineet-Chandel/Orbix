@@ -341,8 +341,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             {/* Reply Input */}
             <div className="p-3 border-t-2 border-black bg-white">
                 {thread.isLocked ? (
-                    <div className="py-2 px-3 rounded-xl bg-[#FFE566] border-2 border-black text-center text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
-                        🔒 This thread has been locked by a moderator.
+                    <div className="py-2 px-3 rounded-xl bg-[#FFE566] border-2 border-black text-center text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                        <span>This thread has been locked by a moderator.</span>
                     </div>
                 ) : (
                     <form onSubmit={handleSendReply} className="flex items-center gap-2">

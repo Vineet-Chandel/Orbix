@@ -22,7 +22,6 @@ import {
     AlertTriangle,
     X,
     ExternalLink,
-    ChevronDown,
     LayoutGrid,
     List,
     Shield,
@@ -39,6 +38,7 @@ import type {
 import { FileUploadZone } from "./FileUploadZone";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { MediaPreviewModal } from "./MediaPreviewModal";
+import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface ResourceLibraryViewProps {
     clubId: string;
@@ -613,19 +613,20 @@ export const ResourceLibraryView: React.FC<ResourceLibraryViewProps> = ({
                 {/* Sort & View Mode Switcher */}
                 <div className="flex items-center gap-2 shrink-0">
                     {/* Sort Dropdown */}
-                    <div className="relative">
-                        <select
+                    <div className="min-w-[150px]">
+                        <NeoSelect
                             value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as any)}
-                            className="appearance-none pl-3 pr-8 py-2 bg-neutral-50 hover:bg-neutral-100 border-2 border-black rounded-xl text-xs font-black text-black focus:outline-none cursor-pointer shadow-neo-xs"
-                        >
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
-                            <option value="name">Name (A-Z)</option>
-                            <option value="size_desc">Size (Largest)</option>
-                            <option value="size_asc">Size (Smallest)</option>
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-600" />
+                            onChange={(val) => setSortBy(val as any)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-black"
+                            options={[
+                                { value: "newest", label: "Newest First" },
+                                { value: "oldest", label: "Oldest First" },
+                                { value: "name", label: "Name (A-Z)" },
+                                { value: "size_desc", label: "Size (Largest)" },
+                                { value: "size_asc", label: "Size (Smallest)" },
+                            ]}
+                        />
                     </div>
 
                     {/* View Switcher */}
@@ -1005,32 +1006,32 @@ export const ResourceLibraryView: React.FC<ResourceLibraryViewProps> = ({
                                 <label className="block text-xs font-black text-black mb-1">
                                     Resource Scope
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={selectedUploadResourceType}
-                                    onChange={(e) => setSelectedUploadResourceType(e.target.value as any)}
-                                    className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold text-black focus:outline-none shadow-neo-xs cursor-pointer"
-                                >
-                                    <option value="resource">General Shared Resource</option>
-                                    <option value="attachment">Department Attachment</option>
-                                </select>
+                                    onChange={(val) => setSelectedUploadResourceType(val as any)}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={[
+                                        { value: "resource", label: "General Shared Resource" },
+                                        { value: "attachment", label: "Department Attachment" },
+                                    ]}
+                                />
                             </div>
 
                             <div>
                                 <label className="block text-xs font-black text-black mb-1">
                                     Target Department (Optional)
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={selectedUploadDeptId}
-                                    onChange={(e) => setSelectedUploadDeptId(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold text-black focus:outline-none shadow-neo-xs cursor-pointer"
-                                >
-                                    <option value="">None (Workspace-Wide)</option>
-                                    {accessibleDepartments.map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => setSelectedUploadDeptId(val)}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={[
+                                        { value: "", label: "None (Workspace-Wide)" },
+                                        ...accessibleDepartments.map((d) => ({ value: d.id, label: d.name })),
+                                    ]}
+                                />
                             </div>
                         </div>
 

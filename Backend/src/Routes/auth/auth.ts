@@ -12,6 +12,7 @@ import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
 import { handleGetMyProfile, parseLinks } from '../profile/profile.js';
 import { EmailVerificationService } from '../../services/email/emailVerificationService.js';
+import { OnboardingEmailService } from '../../services/email/onboardingEmailService.js';
 import { TwoFactorAuthService } from '../../services/auth/twoFactorAuthService.js';
 import { enrichUserWithClubData } from '../../services/club/clubEnrichmentService.js';
 import {
@@ -376,6 +377,14 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             password_hash: hashedPassword,
             termsAccepted: validatedData.termsAccepted,
             accountType: "personal"
+        });
+
+        // Send founder welcome gesture email asynchronously
+        OnboardingEmailService.sendPersonalWelcomeEmailAsync({
+            to: validatedData.gmail,
+            firstName: validatedData.firstName,
+            username: validatedData.username,
+            userId,
         });
 
         // 4. Return Success

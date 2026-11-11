@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import {
     Trophy,
     Award,
+    Medal,
+    Lightbulb,
     TrendingUp,
     TrendingDown,
     Minus,
@@ -19,6 +21,7 @@ import {
     Percent,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
+import { NeoSelect } from "../../../../components/NeoSelect";
 import type {
     LeaderboardPeriod,
     ThreeLeaderboardsResponse,
@@ -91,22 +94,22 @@ export const ThreeLeaderboardsView: React.FC<ThreeLeaderboardsViewProps> = ({
         }
         if (rank === 1) {
             return (
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30 text-sm">
-                    🥇
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30 text-sm" title="1st Place">
+                    <Trophy className="w-4 h-4 text-amber-300 stroke-[2.5]" />
                 </span>
             );
         }
         if (rank === 2) {
             return (
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300/20 text-slate-200 font-bold border border-slate-300/30 text-sm">
-                    🥈
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300/20 text-slate-200 font-bold border border-slate-300/30 text-sm" title="2nd Place">
+                    <Medal className="w-4 h-4 text-slate-200 stroke-[2.5]" />
                 </span>
             );
         }
         if (rank === 3) {
             return (
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/30 text-sm">
-                    🥉
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/30 text-sm" title="3rd Place">
+                    <Award className="w-4 h-4 text-amber-600 stroke-[2.5]" />
                 </span>
             );
         }
@@ -121,7 +124,7 @@ export const ThreeLeaderboardsView: React.FC<ThreeLeaderboardsViewProps> = ({
         if (trend.direction === "new") {
             return (
                 <span className="inline-flex items-center text-xs font-semibold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                    ★ New
+                    <Sparkles className="w-3 h-3 mr-1" /> New
                 </span>
             );
         }
@@ -326,18 +329,19 @@ export const ThreeLeaderboardsView: React.FC<ThreeLeaderboardsViewProps> = ({
                 {activeBoard === "contributors" && (
                     <div className="flex items-center gap-2">
                         <Filter className="w-3.5 h-3.5 text-slate-400" />
-                        <select
+                        <NeoSelect
                             value={departmentFilter}
-                            onChange={(e) => setDepartmentFilter(e.target.value)}
-                            className="bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-amber-500/50"
-                        >
-                            <option value="all">All Departments</option>
-                            {departments.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                    {d.name}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setDepartmentFilter(val)}
+                            options={[
+                                { value: "all", label: "All Departments" },
+                                ...departments.map((d) => ({
+                                    value: d.id,
+                                    label: d.name,
+                                })),
+                            ]}
+                            placeholder="All Departments"
+                            size="sm"
+                        />
                     </div>
                 )}
             </div>
@@ -826,8 +830,11 @@ export const ThreeLeaderboardsView: React.FC<ThreeLeaderboardsViewProps> = ({
                                 </div>
                             </div>
 
-                            <div className="text-xs text-slate-400 leading-relaxed bg-slate-800/30 p-3 rounded-lg border border-slate-800">
-                                💡 <strong>Safeguards Policy:</strong> Cancelled tasks and archived tasks are excluded from performance evaluation. Normalized recognition is capped per member to prevent point inflation from skewing operational delivery metrics.
+                            <div className="text-xs text-slate-400 leading-relaxed bg-slate-800/30 p-3 rounded-lg border border-slate-800 flex items-start gap-2">
+                                <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                <div>
+                                    <strong>Safeguards Policy:</strong> Cancelled tasks and archived tasks are excluded from performance evaluation. Normalized recognition is capped per member to prevent point inflation from skewing operational delivery metrics.
+                                </div>
                             </div>
                         </div>
 

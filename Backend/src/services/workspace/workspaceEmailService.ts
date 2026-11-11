@@ -5,7 +5,7 @@ import { WorkspaceEmailTemplates, type EmailTemplateContext } from "./workspaceE
 import type { WorkspaceEmailType, WorkspaceEmailDelivery } from "../../types/workspaceTypes.js";
 
 const APP_BASE_URL = process.env.APP_BASE_URL || "https://orbix.campus";
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Orbix Team Workspace <workspace@orbix.campus>";
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "team@vineetchandel.in";
 
 let resendInstance: Resend | null = null;
 

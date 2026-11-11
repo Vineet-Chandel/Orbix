@@ -6,6 +6,7 @@ import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { userDetailsCache } from "../../redis/cache/cache-auth.js";
 import { createSession } from "../session/sessionService.js";
+import { OnboardingEmailService } from "../email/onboardingEmailService.js";
 
 const DEFAULT_AVATAR_URL = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
 const ACCESS_TOKEN_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -566,6 +567,14 @@ export class OAuthService {
             username: createdUser.username,
             termsAccepted: true,
             accountType: "personal",
+        });
+
+        // Send founder welcome gesture email asynchronously for new OAuth signup
+        OnboardingEmailService.sendPersonalWelcomeEmailAsync({
+            to: normalizedEmail,
+            firstName: createdUser.firstName,
+            username: createdUser.username,
+            userId: createdUser.id,
         });
 
         return { user: createdUser, isNewUser: true };

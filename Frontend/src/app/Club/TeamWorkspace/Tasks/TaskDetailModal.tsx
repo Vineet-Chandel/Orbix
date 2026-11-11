@@ -21,6 +21,7 @@ import {
     Edit3,
     Save,
     Eye,
+    Paperclip,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type {
@@ -37,6 +38,8 @@ import { useToast } from "../../../../context/ToastContext";
 import { FileUploadZone } from "../Files/FileUploadZone";
 import { AttachmentList } from "../Files/AttachmentList";
 import { NeoCheckbox } from "../../../../components/NeoCheckbox";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoDateTimePicker } from "../../../../components/NeoDateTimePicker";
 
 interface TaskDetailModalProps {
     isOpen: boolean;
@@ -878,7 +881,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                                                             rel="noreferrer"
                                                                             className="flex items-center gap-1.5 p-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold text-blue-600 hover:border-black hover:underline truncate"
                                                                         >
-                                                                            <span>📎</span>
+                                                                            <Paperclip className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                                                             <span className="truncate">{att.name || att.url}</span>
                                                                         </a>
                                                                     ))}
@@ -1153,27 +1156,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                             <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">
                                                 Priority
                                             </label>
-                                            <select
+                                            <NeoSelect
                                                 value={editPriority}
-                                                onChange={(e) => setEditPriority(e.target.value as WorkspaceTaskPriority)}
-                                                className="w-full p-2 bg-neutral-50 border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
-                                            >
-                                                <option value="low">Low</option>
-                                                <option value="medium">Medium</option>
-                                                <option value="high">High</option>
-                                                <option value="urgent">Urgent</option>
-                                            </select>
+                                                onChange={(v) => setEditPriority(v as WorkspaceTaskPriority)}
+                                                size="sm"
+                                                triggerClassName="w-full text-xs font-bold"
+                                                options={[
+                                                    { value: "low", label: "Low" },
+                                                    { value: "medium", label: "Medium" },
+                                                    { value: "high", label: "High" },
+                                                    { value: "urgent", label: "Urgent" },
+                                                ]}
+                                            />
                                         </div>
 
                                         <div>
                                             <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">
                                                 Start Date
                                             </label>
-                                            <input
-                                                type="date"
+                                            <NeoDateTimePicker
+                                                mode="date"
                                                 value={editStartDate}
-                                                onChange={(e) => setEditStartDate(e.target.value)}
-                                                className="w-full p-2 bg-neutral-50 border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
+                                                onChange={(val) => setEditStartDate(val)}
+                                                className="w-full"
                                             />
                                         </div>
 
@@ -1181,11 +1186,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                             <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">
                                                 Due Date
                                             </label>
-                                            <input
-                                                type="date"
+                                            <NeoDateTimePicker
+                                                mode="date"
                                                 value={editDueDate}
-                                                onChange={(e) => setEditDueDate(e.target.value)}
-                                                className="w-full p-2 bg-neutral-50 border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
+                                                onChange={(val) => setEditDueDate(val)}
+                                                className="w-full"
                                             />
                                         </div>
 

@@ -57,22 +57,29 @@ function isResendSandboxError(errorMsg?: string): boolean {
   );
 }
 
-interface DispatchEmailPayload {
+export const DEFAULT_SYSTEM_FROM = process.env.RESEND_FROM_EMAIL || "team@vineetchandel.in";
+export const DEFAULT_FOUNDER_FROM = process.env.FOUNDER_FROM_EMAIL || "Vineet <vineet@vineetchandel.in>";
+export const DEFAULT_FOUNDER_REPLY_TO = process.env.FOUNDER_REPLY_EMAIL || "vineet@vineetchandel.in";
+
+export interface DispatchEmailPayload {
   to: string;
   subject: string;
   html: string;
   text: string;
-  fromName: string;
-  defaultFromEmail: string;
   logContext: string;
+  from?: string;
+  customFrom?: string;
+  replyTo?: string;
+  fromName?: string;
+  defaultFromEmail?: string;
 }
 
 /**
  * Unified Resend Email Dispatcher.
  * Dispatches live transactional emails via Resend API, with robust local dev simulation.
  */
-async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailResult> {
-  const { to, subject, html, text, fromName, defaultFromEmail, logContext } = payload;
+export async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailResult> {
+  const { to, subject, html, text, logContext, replyTo, customFrom, from: payloadFrom } = payload;
   const normalizedTo = to.trim().toLowerCase();
 
   const resendClient = getResendClient();
@@ -82,6 +89,9 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
     console.log(`\n======================================================`);
     console.log(`[EMAIL DISPATCHER] ℹ️ Resend API key unset or mock mode.`);
     console.log(`[DEV MODE SIMULATION] ${logContext} to ${normalizedTo}: ${subject}`);
+    if (replyTo) {
+      console.log(`[DEV MODE SIMULATION] Reply-To: ${replyTo}`);
+    }
     console.log(`======================================================\n`);
 
     return {
@@ -93,18 +103,23 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
   }
 
   // 1. Resend API Flow
-  const customFromEmail = process.env.RESEND_FROM_EMAIL;
+  // Strict compliance with sender rules:
+  // - Founder emails are dispatched directly from Vineet <vineet@vineetchandel.in>
+  // - All other transactional & system emails strictly use team@vineetchandel.in
+  const from = payloadFrom || customFrom || process.env.RESEND_FROM_EMAIL || "team@vineetchandel.in";
   try {
-    const from = customFromEmail
-      ? (customFromEmail.includes("<") ? customFromEmail : `${fromName} <${customFromEmail}>`)
-      : `${fromName} <${defaultFromEmail}>`;
-    const { data, error } = await resendClient.emails.send({
+    const sendOptions: any = {
       from,
       to: [normalizedTo],
       subject,
       html,
       text,
-    });
+    };
+    if (replyTo) {
+      sendOptions.reply_to = replyTo;
+    }
+
+    const { data, error } = await resendClient.emails.send(sendOptions);
 
     if (error) {
       const errorMsg = error.message || "Failed to dispatch via Resend";
@@ -463,8 +478,6 @@ export async function sendVerificationEmail(options: SendVerificationEmailOption
     subject: `Orbix Verification Code: ${otp}`,
     html,
     text,
-    fromName: "Orbix Team",
-    defaultFromEmail: "onboarding@resend.dev",
     logContext: "Verification email",
   });
 }
@@ -505,8 +518,6 @@ export async function sendSecurityNotificationEmail(options: SendSecurityNotific
     subject,
     html,
     text,
-    fromName: "Orbix Security",
-    defaultFromEmail: "onboarding@resend.dev",
     logContext: "Security notification",
   });
 }
@@ -661,8 +672,15 @@ export async function sendGuardianConsentEmail(options: SendGuardianConsentEmail
     subject,
     html,
     text,
-    fromName: "Orbix Minor Protection",
-    defaultFromEmail: "onboarding@resend.dev",
     logContext: "Guardian consent verification",
   });
 }
+
+export { OnboardingEmailService } from "./onboardingEmailService.js";
+export type {
+  SendPersonalWelcomeEmailOptions,
+  SendClubApplicationReceivedEmailOptions,
+  SendClubApplicationStaffAlertEmailOptions,
+  SendClubVerifiedEmailOptions,
+  SendClubVerifiedStaffAlertEmailOptions,
+} from "./onboardingEmailService.js";

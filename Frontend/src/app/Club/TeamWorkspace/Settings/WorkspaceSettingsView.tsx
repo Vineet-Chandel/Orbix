@@ -20,6 +20,8 @@ import type {
     MemberCapabilityResolution,
 } from "../../../../types/workspace";
 import { WorkspaceManagerModal } from "../Manager/WorkspaceManagerModal";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface WorkspaceSettingsViewProps {
     clubId: string;
@@ -280,20 +282,21 @@ export const WorkspaceSettingsView: React.FC<WorkspaceSettingsViewProps> = ({
                                     New members joining the workspace will be automatically assigned this role.
                                 </p>
                             </div>
-                            <select
-                                value={defaultRoleId}
-                                onChange={(e) => setDefaultRoleId(e.target.value)}
-                                disabled={!canManage}
-                                className="px-3 py-1.5 text-xs font-bold bg-white border-2 border-black rounded-xl shadow-neo-xs disabled:opacity-60"
-                            >
-                                {roles
-                                    .filter((r) => r.slug !== "owner" && r.rank < 800)
-                                    .map((r) => (
-                                        <option key={r.id} value={r.id}>
-                                            {r.name} (Rank {r.rank})
-                                        </option>
-                                    ))}
-                            </select>
+                            <div className="w-full sm:w-64">
+                                <NeoSelect
+                                    value={defaultRoleId}
+                                    onChange={(val) => setDefaultRoleId(val)}
+                                    disabled={!canManage}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={roles
+                                        .filter((r) => r.slug !== "owner" && r.rank < 800)
+                                        .map((r) => ({
+                                            value: r.id,
+                                            label: `${r.name} (Rank ${r.rank})`,
+                                        }))}
+                                />
+                            </div>
                         </div>
 
                         <div className="flex items-center justify-between p-3.5 bg-[#FAF6EE] border-2 border-black rounded-xl">
@@ -303,12 +306,12 @@ export const WorkspaceSettingsView: React.FC<WorkspaceSettingsViewProps> = ({
                                     When disabled, only Department Leads, Managers, and Admins can create new channels.
                                 </p>
                             </div>
-                            <input
-                                type="checkbox"
+                            <NeoCheckbox
                                 checked={allowMemberChannelCreation}
-                                onChange={(e) => setAllowMemberChannelCreation(e.target.checked)}
+                                onCheckedChange={(checked) => setAllowMemberChannelCreation(checked)}
                                 disabled={!canManage}
-                                className="w-5 h-5 accent-[#A6FF70] border-2 border-black rounded cursor-pointer disabled:opacity-50"
+                                size="md"
+                                aria-label="Allow Members to Create Channels"
                             />
                         </div>
 
@@ -319,12 +322,12 @@ export const WorkspaceSettingsView: React.FC<WorkspaceSettingsViewProps> = ({
                                     Ensures that only authorized leads and coordinators can initiate new accountability tasks.
                                 </p>
                             </div>
-                            <input
-                                type="checkbox"
+                            <NeoCheckbox
                                 checked={restrictTaskCreationToLeads}
-                                onChange={(e) => setRestrictTaskCreationToLeads(e.target.checked)}
+                                onCheckedChange={(checked) => setRestrictTaskCreationToLeads(checked)}
                                 disabled={!canManage}
-                                className="w-5 h-5 accent-[#A6FF70] border-2 border-black rounded cursor-pointer disabled:opacity-50"
+                                size="md"
+                                aria-label="Restrict Task Creation to Department Leads"
                             />
                         </div>
                     </div>

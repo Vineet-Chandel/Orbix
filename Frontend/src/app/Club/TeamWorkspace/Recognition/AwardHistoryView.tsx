@@ -23,6 +23,7 @@ import type {
     WorkspaceMember,
 } from "../../../../types/workspace";
 import { ReverseAwardModal } from "./ReverseAwardModal";
+import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface AwardHistoryViewProps {
     clubId: string;
@@ -157,36 +158,34 @@ export const AwardHistoryView: React.FC<AwardHistoryViewProps> = ({
                 {/* Dropdowns */}
                 <div className="flex items-center gap-2 flex-wrap">
                     {/* Category Filter */}
-                    <div className="flex items-center gap-1.5 text-xs font-black">
-                        <Filter className="w-3.5 h-3.5 text-neutral-600" />
-                        <select
+                    <div className="flex items-center gap-1.5 text-xs font-black min-w-[170px]">
+                        <Filter className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
+                        <NeoSelect
                             value={selectedCategoryId}
-                            onChange={(e) => setSelectedCategoryId(e.target.value)}
-                            className="px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold focus:outline-none shadow-[1.5px_1.5px_0px_#000]"
-                        >
-                            <option value="all">All Categories</option>
-                            {categories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedCategoryId(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "all", label: "All Categories" },
+                                ...categories.map((c) => ({ value: c.id, label: c.name })),
+                            ]}
+                        />
                     </div>
 
                     {/* Issuer Filter */}
                     {uniqueIssuers.length > 0 && (
-                        <select
-                            value={selectedIssuerId}
-                            onChange={(e) => setSelectedIssuerId(e.target.value)}
-                            className="px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold focus:outline-none shadow-[1.5px_1.5px_0px_#000]"
-                        >
-                            <option value="all">All Issuers</option>
-                            {uniqueIssuers.map(([id, name]) => (
-                                <option key={id} value={id}>
-                                    {name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="min-w-[150px]">
+                            <NeoSelect
+                                value={selectedIssuerId}
+                                onChange={(val) => setSelectedIssuerId(val)}
+                                size="sm"
+                                triggerClassName="w-full text-xs font-bold"
+                                options={[
+                                    { value: "all", label: "All Issuers" },
+                                    ...uniqueIssuers.map(([id, name]) => ({ value: id, label: name })),
+                                ]}
+                            />
+                        </div>
                     )}
 
                     {/* Status Filter */}

@@ -5,6 +5,8 @@ import {
     Users,
     Sparkles,
     Trophy,
+    Medal,
+    Award,
     TrendingUp,
     Eye,
 } from "lucide-react";
@@ -221,16 +223,16 @@ export const DepartmentRecognitionView: React.FC<DepartmentRecognitionViewProps>
                                                 {/* Rank Badge */}
                                                 <td className="p-3 text-center">
                                                     {m.rank === 1 ? (
-                                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-300 border border-black font-black text-xs shadow-neo-xxs">
-                                                            🥇
+                                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-300 border border-black shadow-neo-xxs" title="1st Place">
+                                                            <Trophy className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                                         </span>
                                                     ) : m.rank === 2 ? (
-                                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 border border-black font-black text-xs shadow-neo-xxs">
-                                                            🥈
+                                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 border border-black shadow-neo-xxs" title="2nd Place">
+                                                            <Medal className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                                         </span>
                                                     ) : m.rank === 3 ? (
-                                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 border border-black font-black text-xs shadow-neo-xxs">
-                                                            🥉
+                                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 border border-black shadow-neo-xxs" title="3rd Place">
+                                                            <Award className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                                         </span>
                                                     ) : (
                                                         <span className="font-mono font-black text-neutral-500 text-xs">

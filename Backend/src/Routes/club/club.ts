@@ -35,7 +35,7 @@ import clubCertificateRouter from "./clubCertificateRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
 import { notifyClubAndCollegeUsers } from "../../services/club/clubEventNotificationService.js";
 import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
-import { sendGuardianConsentEmail } from "../../services/email/resendService.js";
+import { sendGuardianConsentEmail, OnboardingEmailService } from "../../services/email/resendService.js";
 import { ClubCredibilityService } from "../../services/club/clubCredibilityService.js";
 import { ClubCredibilityEngine } from "../../scoring/clubCredibilityEngine.js";
 
@@ -1444,6 +1444,33 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
         };
         await enrichUserWithClubData(safeNewUser, effectiveUserId);
 
+        // 1. Dispatch personalized club application acknowledgment email to applicant representative
+        OnboardingEmailService.sendClubApplicationReceivedEmailAsync({
+            to: validated.contactEmail,
+            contactPersonName: validated.contactPersonName,
+            clubName: validated.clubName,
+            collegeName: authoritativeCollegeName,
+            clubCategory: validated.clubCategory,
+            requestId: createdRequest.id,
+        });
+
+        // 2. Dispatch alert email to Orbix staff / reviewers regarding new club application
+        OnboardingEmailService.sendClubApplicationStaffAlertEmailAsync({
+            clubName: validated.clubName,
+            clubCategory: validated.clubCategory,
+            collegeName: authoritativeCollegeName,
+            collegeCity: authoritativeCollegeCity,
+            collegeState: authoritativeCollegeState,
+            contactPersonName: validated.contactPersonName,
+            contactPersonRole: validated.contactPersonRole,
+            contactEmail: validated.contactEmail,
+            contactPhone: validated.contactPhone,
+            collegeOfficialEmail: validated.collegeOfficialEmail,
+            clubWebsiteUrl: validated.clubWebsiteUrl,
+            submittedAt: createdRequest.submitted_at,
+            requestId: createdRequest.id,
+        });
+
         return res.status(201).json({
             success: true,
             message: "Club registration submitted for verification successfully.",
@@ -2087,6 +2114,27 @@ const handlePromoteClub = async (req: Request, res: Response) => {
         );
 
         await client.query("COMMIT");
+
+        // 1. Dispatch celebratory onboarding email to club representative
+        OnboardingEmailService.sendClubVerifiedEmailAsync({
+            to: app.contact_email,
+            contactPersonName: app.contact_person_name,
+            clubName: verifiedClub.name,
+            collegeName: verifiedClub.college_name,
+            slug: verifiedClub.slug,
+            clubId: verifiedClub.id,
+        });
+
+        // 2. Dispatch alert to Orbix staff / reviewers confirming live club activation
+        OnboardingEmailService.sendClubVerifiedStaffAlertEmailAsync({
+            clubName: verifiedClub.name,
+            collegeName: verifiedClub.college_name,
+            slug: verifiedClub.slug,
+            contactPersonName: app.contact_person_name,
+            contactEmail: app.contact_email,
+            reviewedBy: reviewerId,
+            verifiedAt: verifiedClub.verified_at,
+        });
 
         return res.status(200).json({
             success: true,

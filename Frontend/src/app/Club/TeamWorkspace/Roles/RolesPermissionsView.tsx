@@ -32,6 +32,7 @@ import type {
     WorkspacePermissionPreviewResult,
 } from "../../../../types/workspace";
 import { CreateEditRoleModal } from "./CreateEditRoleModal";
+import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface RolesPermissionsViewProps {
     clubId: string;
@@ -501,17 +502,18 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
 
                         <div className="flex items-center gap-3">
                             <label className="text-xs font-black uppercase text-black shrink-0">Simulate Role:</label>
-                            <select
-                                value={selectedRoleForPreview}
-                                onChange={(e) => setSelectedRoleForPreview(e.target.value)}
-                                className="px-3.5 py-2 text-xs font-black bg-[#FAF6EE] border-2 border-black rounded-xl shadow-neo-xs focus:outline-none focus:ring-2 focus:ring-[#FFE566]"
-                            >
-                                {sortedRoles.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.name} (Rank {r.rank}) {r.isSystem ? "[System]" : "[Custom]"}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="min-w-[240px]">
+                                <NeoSelect
+                                    value={selectedRoleForPreview}
+                                    onChange={(val) => setSelectedRoleForPreview(val)}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-black"
+                                    options={sortedRoles.map((r) => ({
+                                        value: r.id,
+                                        label: `${r.name} (Rank ${r.rank}) ${r.isSystem ? "[System]" : "[Custom]"}`,
+                                    }))}
+                                />
+                            </div>
                         </div>
                     </div>
 

@@ -21,6 +21,7 @@ import type {
     WorkspaceRecognitionPolicy,
     WorkspaceTask,
 } from "../../../../types/workspace";
+import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface AwardOrbitsModalProps {
     isOpen: boolean;
@@ -435,18 +436,16 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
                                     <label className="block text-xs font-black text-black uppercase tracking-wider">
                                         Department (Optional)
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={selectedDepartmentId}
-                                        onChange={(e) => setSelectedDepartmentId(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold focus:outline-none shadow-[2px_2px_0px_#000]"
-                                    >
-                                        <option value="">General Workspace</option>
-                                        {departments.map((d) => (
-                                            <option key={d.id} value={d.id}>
-                                                {d.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setSelectedDepartmentId(val)}
+                                        size="sm"
+                                        triggerClassName="w-full text-xs font-bold"
+                                        options={[
+                                            { value: "", label: "General Workspace" },
+                                            ...departments.map((d) => ({ value: d.id, label: d.name })),
+                                        ]}
+                                    />
                                 </div>
 
                                 {/* Category */}
@@ -454,20 +453,19 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
                                     <label className="block text-xs font-black text-black uppercase tracking-wider">
                                         Category <span className="text-red-500">*</span>
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={selectedCategorySlug}
-                                        onChange={(e) => setSelectedCategorySlug(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold focus:outline-none shadow-[2px_2px_0px_#000]"
-                                    >
-                                        <option value="">Select a Category...</option>
-                                        {categories
-                                            .filter((c) => c.isActive)
-                                            .map((c) => (
-                                                <option key={c.id} value={c.slug}>
-                                                    {c.name}
-                                                </option>
-                                            ))}
-                                    </select>
+                                        onChange={(val) => setSelectedCategorySlug(val)}
+                                        placeholder="Select a Category..."
+                                        size="sm"
+                                        triggerClassName="w-full text-xs font-bold"
+                                        options={[
+                                            { value: "", label: "Select a Category..." },
+                                            ...categories
+                                                .filter((c) => c.isActive)
+                                                .map((c) => ({ value: c.slug, label: c.name })),
+                                        ]}
+                                    />
                                 </div>
                             </div>
 
@@ -547,18 +545,20 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
                                         <Award className="w-3.5 h-3.5" />
                                         Related Task
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={linkedTaskId}
-                                        onChange={(e) => setLinkedTaskId(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold focus:outline-none shadow-[2px_2px_0px_#000]"
-                                    >
-                                        <option value="">None / Not linked</option>
-                                        {tasks.map((t) => (
-                                            <option key={t.id} value={t.id}>
-                                                {t.title} ({t.status})
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setLinkedTaskId(val)}
+                                        placeholder="None / Not linked"
+                                        size="sm"
+                                        triggerClassName="w-full text-xs font-bold"
+                                        options={[
+                                            { value: "", label: "None / Not linked" },
+                                            ...tasks.map((t) => ({
+                                                value: t.id,
+                                                label: `${t.title} (${t.status})`,
+                                            })),
+                                        ]}
+                                    />
                                 </div>
 
                                 {/* Evidence URL */}
