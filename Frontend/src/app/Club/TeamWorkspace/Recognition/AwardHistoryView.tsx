@@ -14,6 +14,8 @@ import {
     Wrench,
     GraduationCap,
     ClockCheck,
+    Lock,
+    ShieldAlert,
 } from "lucide-react";
 import type {
     WorkspaceRecognitionLedgerEntry,
@@ -344,9 +346,22 @@ export const AwardHistoryView: React.FC<AwardHistoryViewProps> = ({
                                                 High Impact Award
                                             </span>
                                         )}
+                                        {entry.visibility === "recipient_only" && (
+                                            <span className="px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-300 rounded text-[10px] font-black flex items-center gap-1">
+                                                <Lock className="w-2.5 h-2.5" />
+                                                Private Award
+                                            </span>
+                                        )}
+                                        {entry.referenceAwardId && (
+                                            <span className="px-2 py-0.5 bg-red-100 text-red-800 border border-red-300 rounded text-[10px] font-black flex items-center gap-1">
+                                                <RotateCcw className="w-2.5 h-2.5" />
+                                                Correction for #{entry.referenceAwardId.slice(0, 8)}
+                                            </span>
+                                        )}
                                         {entry.isReversed && (
-                                            <span className="px-2 py-0.5 bg-red-100 text-red-800 border border-red-300 rounded text-[10px] font-black">
-                                                Reversed
+                                            <span className="px-2 py-0.5 bg-red-100 text-red-800 border border-red-300 rounded text-[10px] font-black flex items-center gap-1">
+                                                <ShieldAlert className="w-2.5 h-2.5 text-red-600" />
+                                                Reversed ({entry.reversalReason || "Compensated"})
                                             </span>
                                         )}
                                     </div>

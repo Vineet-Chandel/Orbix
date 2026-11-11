@@ -10,6 +10,7 @@ import {
     UserX,
     Filter,
     Trash2,
+    Sparkles,
 } from "lucide-react";
 import { useToast } from "../../../../context/ToastContext";
 import { workspaceApi } from "../../../../api/workspaceApi";
@@ -21,6 +22,7 @@ import type {
 } from "../../../../types/workspace";
 import { ChangeRoleModal } from "./ChangeRoleModal";
 import { InviteMemberModal } from "./InviteMemberModal";
+import { MemberRecognitionProfileModal } from "../Recognition/MemberRecognitionProfileModal";
 import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface MemberDirectoryViewProps {
@@ -57,6 +59,7 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
     const [roleModalMember, setRoleModalMember] = useState<WorkspaceMember | null>(null);
     const [memberToRemove, setMemberToRemove] = useState<WorkspaceMember | null>(null);
     const [isRemoving, setIsRemoving] = useState(false);
+    const [recognitionUserId, setRecognitionUserId] = useState<string | null>(null);
 
     // Permission checks
     const actorRank = currentMember?.role?.rank ?? 0;
@@ -224,7 +227,7 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                             <th className="p-3">Departments</th>
                             <th className="p-3">Joined</th>
                             <th className="p-3">Status</th>
-                            {(canManageRoles || canSuspend) && <th className="p-3 text-right">Actions</th>}
+                            <th className="p-3 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y border-black font-medium bg-white">
@@ -338,53 +341,61 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                                         )}
                                     </td>
 
-                                    {(canManageRoles || canSuspend) && (
-                                        <td className="p-3 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
-                                                {canManageRoles && canModifyThisMember && (
-                                                    <button
-                                                        onClick={() => setRoleModalMember(m)}
-                                                        className="px-2 py-1 text-[11px] font-bold border border-black rounded bg-white hover:bg-neutral-100 shadow-neo-xs transition-all"
-                                                        title="Change workspace hierarchy role"
-                                                    >
-                                                        Change Role
-                                                    </button>
-                                                )}
+                                    <td className="p-3 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            {/* Recognition Profile Trigger */}
+                                            <button
+                                                onClick={() => setRecognitionUserId(m.userId)}
+                                                className="px-2 py-1 text-[11px] font-black border border-black rounded bg-[#FFE566] hover:bg-[#fedb33] shadow-neo-xxs transition-all flex items-center gap-1 active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="View member workspace recognition profile"
+                                            >
+                                                <Sparkles className="w-3 h-3 fill-black text-black" />
+                                                <span>Orbits</span>
+                                            </button>
 
-                                                {canSuspend && canModifyThisMember && (
-                                                    <button
-                                                        onClick={() => onToggleSuspension(m)}
-                                                        className={`px-2 py-1 text-[11px] font-bold border border-black rounded shadow-neo-xs transition-all ${
-                                                            m.isSuspended
-                                                                ? "bg-emerald-200 hover:bg-emerald-300 text-black"
-                                                                : "bg-amber-100 hover:bg-amber-200 text-black"
-                                                        }`}
-                                                        title={m.isSuspended ? "Restore access" : "Suspend workspace access"}
-                                                    >
-                                                        {m.isSuspended ? (
-                                                            <span className="flex items-center gap-1">
-                                                                <UserCheck className="w-3 h-3" /> Restore
-                                                            </span>
-                                                        ) : (
-                                                            <span className="flex items-center gap-1">
-                                                                <UserX className="w-3 h-3" /> Suspend
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                )}
+                                            {canManageRoles && canModifyThisMember && (
+                                                <button
+                                                    onClick={() => setRoleModalMember(m)}
+                                                    className="px-2 py-1 text-[11px] font-bold border border-black rounded bg-white hover:bg-neutral-100 shadow-neo-xs transition-all"
+                                                    title="Change workspace hierarchy role"
+                                                >
+                                                    Change Role
+                                                </button>
+                                            )}
 
-                                                {canModifyThisMember && (isOwner || isManager || actorRank >= 800) && (
-                                                    <button
-                                                        onClick={() => setMemberToRemove(m)}
-                                                        className="p-1 text-red-600 hover:text-red-800 border border-transparent hover:border-black rounded transition"
-                                                        title="Remove member from workspace"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    )}
+                                            {canSuspend && canModifyThisMember && (
+                                                <button
+                                                    onClick={() => onToggleSuspension(m)}
+                                                    className={`px-2 py-1 text-[11px] font-bold border border-black rounded shadow-neo-xs transition-all ${
+                                                        m.isSuspended
+                                                            ? "bg-emerald-200 hover:bg-emerald-300 text-black"
+                                                            : "bg-amber-100 hover:bg-amber-200 text-black"
+                                                    }`}
+                                                    title={m.isSuspended ? "Restore access" : "Suspend workspace access"}
+                                                >
+                                                    {m.isSuspended ? (
+                                                        <span className="flex items-center gap-1">
+                                                            <UserCheck className="w-3 h-3" /> Restore
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-1">
+                                                            <UserX className="w-3 h-3" /> Suspend
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {canModifyThisMember && (isOwner || isManager || actorRank >= 800) && (
+                                                <button
+                                                    onClick={() => setMemberToRemove(m)}
+                                                    className="p-1 text-red-600 hover:text-red-800 border border-transparent hover:border-black rounded transition"
+                                                    title="Remove member from workspace"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
                                 </tr>
                             );
                         })}
@@ -471,6 +482,14 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Member Recognition Profile Modal */}
+            <MemberRecognitionProfileModal
+                isOpen={!!recognitionUserId}
+                onClose={() => setRecognitionUserId(null)}
+                userId={recognitionUserId}
+                clubId={clubId}
+            />
         </div>
     );
 };

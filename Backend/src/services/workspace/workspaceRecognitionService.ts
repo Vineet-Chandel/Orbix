@@ -13,6 +13,8 @@ import type {
     AwardOrbitsDTO,
     ReverseAwardDTO,
     MemberRecognitionSummary,
+    LeaderboardPeriod,
+    ThreeLeaderboardsResponse,
 } from "../../types/workspaceTypes.js";
 
 export class WorkspaceRecognitionService {

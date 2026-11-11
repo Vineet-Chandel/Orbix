@@ -6799,6 +6799,13 @@ export class WorkspaceRepository {
                 require_evidence_link AS "requireEvidenceLink",
                 min_reason_length AS "minReasonLength",
                 is_workspace_visible AS "isWorkspaceVisible",
+                dpi_weight_approved_tasks AS "dpiWeightApprovedTasks",
+                dpi_weight_on_time AS "dpiWeightOnTime",
+                dpi_weight_participation AS "dpiWeightParticipation",
+                dpi_weight_recognition AS "dpiWeightRecognition",
+                dpi_recognition_cap_per_member AS "dpiRecognitionCapPerMember",
+                dpi_min_tasks_sample AS "dpiMinTasksSample",
+                dpi_formula_version AS "dpiFormulaVersion",
                 created_at AS "createdAt",
                 updated_at AS "updatedAt",
                 updated_by AS "updatedBy"
@@ -6842,6 +6849,13 @@ export class WorkspaceRepository {
                 require_evidence_link AS "requireEvidenceLink",
                 min_reason_length AS "minReasonLength",
                 is_workspace_visible AS "isWorkspaceVisible",
+                dpi_weight_approved_tasks AS "dpiWeightApprovedTasks",
+                dpi_weight_on_time AS "dpiWeightOnTime",
+                dpi_weight_participation AS "dpiWeightParticipation",
+                dpi_weight_recognition AS "dpiWeightRecognition",
+                dpi_recognition_cap_per_member AS "dpiRecognitionCapPerMember",
+                dpi_min_tasks_sample AS "dpiMinTasksSample",
+                dpi_formula_version AS "dpiFormulaVersion",
                 created_at AS "createdAt",
                 updated_at AS "updatedAt",
                 updated_by AS "updatedBy";`,
@@ -6873,6 +6887,13 @@ export class WorkspaceRepository {
         const reqEvidence = updates.requireEvidenceLink !== undefined ? updates.requireEvidenceLink : current.requireEvidenceLink;
         const minReasonLen = updates.minReasonLength ?? current.minReasonLength;
         const isVisible = updates.isWorkspaceVisible !== undefined ? updates.isWorkspaceVisible : current.isWorkspaceVisible;
+        const dpiApproved = updates.dpiWeightApprovedTasks ?? current.dpiWeightApprovedTasks ?? 35;
+        const dpiOnTime = updates.dpiWeightOnTime ?? current.dpiWeightOnTime ?? 35;
+        const dpiParticipation = updates.dpiWeightParticipation ?? current.dpiWeightParticipation ?? 20;
+        const dpiRecognition = updates.dpiWeightRecognition ?? current.dpiWeightRecognition ?? 10;
+        const dpiCap = updates.dpiRecognitionCapPerMember ?? current.dpiRecognitionCapPerMember ?? 50;
+        const dpiMinSample = updates.dpiMinTasksSample ?? current.dpiMinTasksSample ?? 1;
+        const dpiVersion = updates.dpiFormulaVersion ?? current.dpiFormulaVersion ?? 'v1.0';
 
         const res = await executor.query(
             `UPDATE public.workspace_recognition_policies
@@ -6888,6 +6909,13 @@ export class WorkspaceRepository {
                 require_evidence_link = $10,
                 min_reason_length = $11,
                 is_workspace_visible = $12,
+                dpi_weight_approved_tasks = $14,
+                dpi_weight_on_time = $15,
+                dpi_weight_participation = $16,
+                dpi_weight_recognition = $17,
+                dpi_recognition_cap_per_member = $18,
+                dpi_min_tasks_sample = $19,
+                dpi_formula_version = $20,
                 updated_by = $13,
                 updated_at = NOW()
              WHERE workspace_id = $1
@@ -6904,6 +6932,13 @@ export class WorkspaceRepository {
                 require_evidence_link AS "requireEvidenceLink",
                 min_reason_length AS "minReasonLength",
                 is_workspace_visible AS "isWorkspaceVisible",
+                dpi_weight_approved_tasks AS "dpiWeightApprovedTasks",
+                dpi_weight_on_time AS "dpiWeightOnTime",
+                dpi_weight_participation AS "dpiWeightParticipation",
+                dpi_weight_recognition AS "dpiWeightRecognition",
+                dpi_recognition_cap_per_member AS "dpiRecognitionCapPerMember",
+                dpi_min_tasks_sample AS "dpiMinTasksSample",
+                dpi_formula_version AS "dpiFormulaVersion",
                 created_at AS "createdAt",
                 updated_at AS "updatedAt",
                 updated_by AS "updatedBy";`,
@@ -6921,6 +6956,13 @@ export class WorkspaceRepository {
                 minReasonLen,
                 isVisible,
                 updatedByUserId,
+                dpiApproved,
+                dpiOnTime,
+                dpiParticipation,
+                dpiRecognition,
+                dpiCap,
+                dpiMinSample,
+                dpiVersion,
             ]
         );
         return res.rows[0];
@@ -8218,8 +8260,8 @@ export class WorkspaceRepository {
                AND wrl.workspace_id = $1
              WHERE wm.workspace_id = $1
                AND (wm.department_id = $2 OR EXISTS (
-                   SELECT 1 FROM public.workspace_member_departments wmd 
-                   WHERE wmd.member_id = wm.id AND wmd.department_id = $2
+                   SELECT 1 FROM public.workspace_department_members wdm 
+                   WHERE wdm.member_id = wm.id AND wdm.department_id = $2
                ))
                AND wm.is_suspended = false
                AND wm.membership_status = 'active'
@@ -8262,6 +8304,831 @@ export class WorkspaceRepository {
             memberRankings,
         };
     }
+
+    // =========================================================================
+    // 16. THREE LEADERBOARDS & DEPARTMENT PERFORMANCE INDEX (DPI)
+    // =========================================================================
+
+    /**
+     * Calculates the three separate leaderboards:
+     * 1. Contributor Leaderboard (eligible non-lead team members)
+     * 2. Department Lead Leaderboard (leads ranked by Department Performance Index)
+     * 3. Department Leaderboard (departments ranked by DPI v1.0 formula)
+     */
+    static async getThreeLeaderboards(
+        workspaceId: string,
+        options: {
+            period?: LeaderboardPeriod;
+            departmentId?: string;
+            currentUserId?: string;
+        } = {}
+    ): Promise<ThreeLeaderboardsResponse> {
+        const period: LeaderboardPeriod = options.period || "this_month";
+
+        // 1. Resolve period boundaries
+        const resolvePeriodBoundaries = (p: LeaderboardPeriod) => {
+            const now = new Date();
+            if (p === "all_time") {
+                return { start: null, end: null, prevStart: null, prevEnd: null };
+            }
+            if (p === "this_week") {
+                const d = new Date(now);
+                const day = d.getUTCDay();
+                const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+                const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0));
+                const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff + 6, 23, 59, 59, 999));
+                const prevStart = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
+                const prevEnd = new Date(start.getTime() - 1);
+                return { start, end, prevStart, prevEnd };
+            }
+            if (p === "this_month") {
+                const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+                const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+                const prevStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0));
+                const prevEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999));
+                return { start, end, prevStart, prevEnd };
+            }
+            if (p === "last_30_days") {
+                const end = now;
+                const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                const prevStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+                const prevEnd = start;
+                return { start, end, prevStart, prevEnd };
+            }
+            if (p === "last_90_days") {
+                const end = now;
+                const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                const prevStart = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+                const prevEnd = start;
+                return { start, end, prevStart, prevEnd };
+            }
+            return { start: null, end: null, prevStart: null, prevEnd: null };
+        };
+
+        const { start, end, prevStart, prevEnd } = resolvePeriodBoundaries(period);
+
+        // 2. Fetch recognition policy with DPI weights
+        const policy = await this.getRecognitionPolicy(workspaceId);
+        const formulaVersion = policy.dpiFormulaVersion || "v1.0";
+        const wApproved = Number(policy.dpiWeightApprovedTasks) || 35;
+        const wOnTime = Number(policy.dpiWeightOnTime) || 35;
+        const wParticipation = Number(policy.dpiWeightParticipation) || 20;
+        const wRecognition = Number(policy.dpiWeightRecognition) || 10;
+        const weights = {
+            approvedTasks: wApproved,
+            onTime: wOnTime,
+            participation: wParticipation,
+            recognition: wRecognition,
+        };
+        const capPerMember = policy.dpiRecognitionCapPerMember || 50;
+        const minTasksSample = policy.dpiMinTasksSample || 1;
+
+        // 3. Query Club Owner & Workspace Managers (to exclude from contributor leaderboard)
+        const wsMetaRes = await query(
+            `SELECT tw.id, tw.club_id, vc.auth_user_id AS "ownerId"
+             FROM public.team_workspaces tw
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
+             WHERE tw.id = $1;`,
+            [workspaceId]
+        );
+        const ownerId = wsMetaRes.rows[0]?.ownerId;
+
+        const managersRes = await query(
+            `SELECT wm.user_id
+             FROM public.workspace_members wm
+             JOIN public.workspace_roles r ON r.id = wm.role_id
+             WHERE wm.workspace_id = $1
+               AND (r.name IN ('Club Manager', 'Workspace Manager') OR r.slug IN ('club_manager', 'workspace_manager', 'owner', 'manager'));`,
+            [workspaceId]
+        );
+        const managerUserIds = new Set<string>(managersRes.rows.map((r: any) => r.user_id));
+        if (ownerId) managerUserIds.add(ownerId);
+
+        // 4. Query Departments & Structural Department Leads / Co-leads
+        const deptsRes = await query(
+            `SELECT 
+                wd.id, 
+                wd.name, 
+                wd.color, 
+                wd.lead_user_id AS "leadUserId",
+                COALESCE(wd.co_lead_user_ids, '[]'::jsonb) AS "coLeadUserIds",
+                wd.display_order AS "displayOrder"
+             FROM public.workspace_departments wd
+             WHERE wd.workspace_id = $1 AND wd.status = 'active'
+             ORDER BY wd.display_order ASC, wd.name ASC;`,
+            [workspaceId]
+        );
+
+        // Also query secondary junction leads
+        const junctionLeadsRes = await query(
+            `SELECT department_id AS "departmentId", user_id AS "userId", department_role AS "role"
+             FROM public.workspace_department_members
+             WHERE workspace_id = $1 AND department_role IN ('lead', 'co_lead');`,
+            [workspaceId]
+        );
+
+        const structuralLeadIds = new Set<string>();
+        // Map: deptId -> { leadUserId?: string, coLeadUserIds: Set<string> }
+        const deptLeadsMap = new Map<string, { leadUserId?: string; coLeadUserIds: Set<string> }>();
+
+        for (const dept of deptsRes.rows) {
+            const coLeadsSet = new Set<string>();
+            if (Array.isArray(dept.coLeadUserIds)) {
+                dept.coLeadUserIds.forEach((uid: string) => {
+                    coLeadsSet.add(uid);
+                    structuralLeadIds.add(uid);
+                });
+            }
+            if (dept.leadUserId) {
+                structuralLeadIds.add(dept.leadUserId);
+            }
+            deptLeadsMap.set(dept.id, {
+                leadUserId: dept.leadUserId || undefined,
+                coLeadUserIds: coLeadsSet,
+            });
+        }
+
+        for (const row of junctionLeadsRes.rows) {
+            structuralLeadIds.add(row.userId);
+            let entry = deptLeadsMap.get(row.departmentId);
+            if (!entry) {
+                entry = { coLeadUserIds: new Set() };
+                deptLeadsMap.set(row.departmentId, entry);
+            }
+            if (row.role === 'lead' && !entry.leadUserId) {
+                entry.leadUserId = row.userId;
+            } else {
+                entry.coLeadUserIds.add(row.userId);
+            }
+        }
+
+        // Set of all excluded user IDs from the Contributor Leaderboard:
+        // Excludes Club Manager, Workspace Manager, and all structural Department Leads/Co-leads!
+        const excludedFromContributor = new Set<string>([...managerUserIds, ...structuralLeadIds]);
+
+        // 5. Query Department Memberships (active, not suspended)
+        const activeMembersRes = await query(
+            `SELECT
+                wm.user_id AS "userId",
+                u.firstname,
+                u.lastname,
+                u.username,
+                u.avatar_url AS "avatarUrl",
+                r.name AS "roleName",
+                COALESCE(wdm.department_id, wm.department_id) AS "departmentId",
+                wd.name AS "departmentName",
+                wd.color AS "departmentColor"
+             FROM public.workspace_members wm
+             JOIN public.users u ON u.id = wm.user_id
+             JOIN public.workspace_roles r ON r.id = wm.role_id
+             LEFT JOIN public.workspace_department_members wdm ON wdm.member_id = wm.id
+             LEFT JOIN public.workspace_departments wd ON wd.id = COALESCE(wdm.department_id, wm.department_id)
+             WHERE wm.workspace_id = $1
+               AND wm.membership_status = 'active'
+               AND wm.is_suspended = false;`,
+            [workspaceId]
+        );
+
+        // Group active members by department: deptId -> array of userIds
+        const deptActiveMembersMap = new Map<string, Set<string>>();
+        const userMetaMap = new Map<string, any>();
+
+        for (const m of activeMembersRes.rows) {
+            userMetaMap.set(m.userId, {
+                userId: m.userId,
+                name: `${m.firstname || ''} ${m.lastname || ''}`.trim() || m.username,
+                username: m.username,
+                avatarUrl: m.avatarUrl || undefined,
+                roleName: m.roleName,
+                departmentId: m.departmentId || undefined,
+                departmentName: m.departmentName || undefined,
+                departmentColor: m.departmentColor || undefined,
+            });
+
+            if (m.departmentId) {
+                if (!deptActiveMembersMap.has(m.departmentId)) {
+                    deptActiveMembersMap.set(m.departmentId, new Set());
+                }
+                deptActiveMembersMap.get(m.departmentId)!.add(m.userId);
+            }
+        }
+
+        // 6. Query Recognition Ledger for Current & Previous Periods
+        // Period time filter helpers
+        let currentPeriodLedgerFilter = "";
+        const currentPeriodLedgerParams: any[] = [workspaceId];
+        if (start && end) {
+            currentPeriodLedgerParams.push(start.toISOString(), end.toISOString());
+            currentPeriodLedgerFilter = ` AND wrl.created_at >= $2 AND wrl.created_at <= $3`;
+        }
+
+        const currentLedgerRes = await query(
+            `SELECT
+                wrl.recipient_id AS "recipientId",
+                COALESCE(wrl.department_id, wm.department_id) AS "departmentId",
+                wrl.category_id AS "categoryId",
+                wrc.slug AS "categorySlug",
+                wrc.name AS "categoryName",
+                wrc.icon AS "categoryIcon",
+                SUM(wrl.points_delta)::integer AS "totalPoints",
+                COUNT(wrl.id)::integer AS "awardsCount",
+                MAX(wrl.created_at) AS "lastAwardAt"
+             FROM public.workspace_recognition_ledger wrl
+             JOIN public.workspace_recognition_categories wrc ON wrc.id = wrl.category_id
+             LEFT JOIN public.workspace_members wm ON wm.workspace_id = wrl.workspace_id AND wm.user_id = wrl.recipient_id
+             WHERE wrl.workspace_id = $1
+               AND wrl.is_reversed = false
+               AND wrl.transaction_type = 'award'
+               ${currentPeriodLedgerFilter}
+             GROUP BY wrl.recipient_id, COALESCE(wrl.department_id, wm.department_id), wrl.category_id, wrc.slug, wrc.name, wrc.icon;`,
+            currentPeriodLedgerParams
+        );
+
+        // Previous period ledger for trend
+        let prevPeriodLedgerFilter = "";
+        const prevPeriodLedgerParams: any[] = [workspaceId];
+        if (prevStart && prevEnd) {
+            prevPeriodLedgerParams.push(prevStart.toISOString(), prevEnd.toISOString());
+            prevPeriodLedgerFilter = ` AND wrl.created_at >= $2 AND wrl.created_at <= $3`;
+        }
+
+        let prevLedgerRows: any[] = [];
+        if (prevStart && prevEnd) {
+            const prevRes = await query(
+                `SELECT
+                    wrl.recipient_id AS "recipientId",
+                    SUM(wrl.points_delta)::integer AS "totalPoints"
+                 FROM public.workspace_recognition_ledger wrl
+                 WHERE wrl.workspace_id = $1
+                   AND wrl.is_reversed = false
+                   AND wrl.transaction_type = 'award'
+                   ${prevPeriodLedgerFilter}
+                 GROUP BY wrl.recipient_id;`,
+                prevPeriodLedgerParams
+            );
+            prevLedgerRows = prevRes.rows;
+        }
+
+        // Map previous period user points and ranks for contributors
+        const prevUserPointsMap = new Map<string, number>();
+        for (const row of prevLedgerRows) {
+            prevUserPointsMap.set(row.recipientId, parseInt(row.totalPoints, 10) || 0);
+        }
+
+        // Compute previous ranks for contributors
+        const prevEligibleContribs = Array.from(prevUserPointsMap.entries())
+            .filter(([uid]) => !excludedFromContributor.has(uid))
+            .sort((a, b) => b[1] - a[1]);
+        const prevUserRankMap = new Map<string, number>();
+        let prevRankCursor = 1;
+        for (let i = 0; i < prevEligibleContribs.length; i++) {
+            if (i > 0 && prevEligibleContribs[i][1] < prevEligibleContribs[i - 1][1]) {
+                prevRankCursor = i + 1;
+            }
+            prevUserRankMap.set(prevEligibleContribs[i][0], prevRankCursor);
+        }
+
+        // 7. BUILD CONTRIBUTOR LEADERBOARD
+        // Aggregate ledger data by recipient
+        interface ContribAgg {
+            userId: string;
+            orbitsEarned: number;
+            awardsCount: number;
+            lastAwardAt: string | null;
+            categoryBreakdown: Record<string, { name: string; count: number; points: number; icon: string }>;
+        }
+        const contribAggMap = new Map<string, ContribAgg>();
+
+        for (const row of currentLedgerRes.rows) {
+            const uid = row.recipientId;
+            if (excludedFromContributor.has(uid)) continue; // Must be strictly non-lead, non-manager
+
+            if (!contribAggMap.has(uid)) {
+                contribAggMap.set(uid, {
+                    userId: uid,
+                    orbitsEarned: 0,
+                    awardsCount: 0,
+                    lastAwardAt: null,
+                    categoryBreakdown: {},
+                });
+            }
+            const agg = contribAggMap.get(uid)!;
+            const pts = parseInt(row.totalPoints, 10) || 0;
+            const cnt = parseInt(row.awardsCount, 10) || 0;
+            agg.orbitsEarned += pts;
+            agg.awardsCount += cnt;
+            if (!agg.lastAwardAt || new Date(row.lastAwardAt) > new Date(agg.lastAwardAt)) {
+                agg.lastAwardAt = row.lastAwardAt;
+            }
+            agg.categoryBreakdown[row.categorySlug] = {
+                name: row.categoryName,
+                count: cnt,
+                points: pts,
+                icon: row.categoryIcon || "Award",
+            };
+        }
+
+        // Filter and sort contributors
+        let rawContributors: ContributorLeaderboardEntry[] = [];
+        for (const [uid, agg] of contribAggMap.entries()) {
+            const meta = userMetaMap.get(uid);
+            if (!meta) continue;
+
+            // Optional department filter
+            if (options.departmentId && meta.departmentId !== options.departmentId) {
+                continue;
+            }
+
+            // Trend
+            const prevPts = prevUserPointsMap.get(uid) ?? null;
+            const prevRnk = prevUserRankMap.get(uid) ?? null;
+            let rankChange: number | "new" = "new";
+            let pointsDelta = 0;
+            let direction: "up" | "down" | "same" | "new" = "new";
+
+            if (period === "all_time") {
+                rankChange = 0;
+                pointsDelta = 0;
+                direction = "same";
+            } else if (prevPts !== null) {
+                pointsDelta = agg.orbitsEarned - prevPts;
+                direction = pointsDelta > 0 ? "up" : pointsDelta < 0 ? "down" : "same";
+            }
+
+            rawContributors.push({
+                rank: 1,
+                userId: uid,
+                name: meta.name,
+                username: meta.username,
+                avatarUrl: meta.avatarUrl,
+                departmentId: meta.departmentId,
+                departmentName: meta.departmentName,
+                departmentColor: meta.departmentColor,
+                roleName: meta.roleName,
+                orbitsEarned: agg.orbitsEarned,
+                awardsCount: agg.awardsCount,
+                categoryBreakdown: agg.categoryBreakdown,
+                trend: {
+                    rankChange,
+                    pointsDelta,
+                    direction,
+                },
+            });
+        }
+
+        // Secondary deterministic sort: orbitsEarned DESC, lastAwardAt ASC, username ASC
+        rawContributors.sort((a, b) => {
+            if (b.orbitsEarned !== a.orbitsEarned) return b.orbitsEarned - a.orbitsEarned;
+            return a.username.localeCompare(b.username);
+        });
+
+        // Competition ranking: 1st, 1st, 3rd (shared ranks for ties)
+        let cRank = 1;
+        for (let i = 0; i < rawContributors.length; i++) {
+            if (i > 0 && rawContributors[i].orbitsEarned < rawContributors[i - 1].orbitsEarned) {
+                cRank = i + 1;
+            }
+            rawContributors[i].rank = cRank;
+            // Update rankChange now that current rank is assigned
+            if (period !== "all_time" && rawContributors[i].trend.rankChange !== "new") {
+                const prevRnk = prevUserRankMap.get(rawContributors[i].userId);
+                if (prevRnk !== undefined) {
+                    rawContributors[i].trend.rankChange = prevRnk - cRank;
+                }
+            }
+        }
+
+        // 8. DEPARTMENT LEADERBOARD & DEPARTMENT PERFORMANCE INDEX (DPI)
+        // Query tasks in workspace (excluding cancelled and archived tasks)
+        let tasksTimeFilter = "";
+        const tasksParams: any[] = [workspaceId];
+        if (start && end) {
+            tasksParams.push(start.toISOString(), end.toISOString());
+            tasksTimeFilter = ` AND (
+                (wt.due_date >= $2 AND wt.due_date <= $3) OR
+                (wt.completed_at >= $2 AND wt.completed_at <= $3) OR
+                (wt.created_at >= $2 AND wt.created_at <= $3)
+            )`;
+        }
+
+        const deptTasksRes = await query(
+            `SELECT
+                wt.id,
+                wt.department_id AS "departmentId",
+                wt.status,
+                wt.due_date AS "dueDate",
+                wt.completed_at AS "completedAt",
+                COALESCE((wt.custom_fields->>'is_blocked')::boolean, false) AS "isBlocked",
+                EXISTS (
+                    SELECT 1 FROM public.workspace_task_reviews wtr 
+                    WHERE wtr.task_id = wt.id AND wtr.decision = 'approved'
+                ) AS "hasApprovedReview",
+                EXISTS (
+                    SELECT 1 FROM public.workspace_task_submissions wts 
+                    WHERE wts.task_id = wt.id AND (wt.due_date IS NULL OR wts.created_at <= wt.due_date)
+                ) AS "hasOnTimeSubmission"
+             FROM public.workspace_tasks wt
+             WHERE wt.workspace_id = $1
+               AND wt.is_archived = false
+               AND wt.status != 'cancelled'
+               AND wt.department_id IS NOT NULL
+               ${tasksTimeFilter};`,
+            tasksParams
+        );
+
+        // Group tasks by departmentId
+        const deptTasksMap = new Map<string, any[]>();
+        for (const t of deptTasksRes.rows) {
+            if (!deptTasksMap.has(t.departmentId)) {
+                deptTasksMap.set(t.departmentId, []);
+            }
+            deptTasksMap.get(t.departmentId)!.push(t);
+        }
+
+        // Query active participation contributions per department in the period
+        // (submissions, reviews, comments, and received awards)
+        let participationTimeFilter = "";
+        const participationParams: any[] = [workspaceId];
+        if (start && end) {
+            participationParams.push(start.toISOString(), end.toISOString());
+            participationTimeFilter = ` AND created_at >= $2 AND created_at <= $3`;
+        }
+
+        const contribSubmissionsRes = await query(
+            `SELECT DISTINCT wt.department_id AS "departmentId", wts.submitted_by AS "userId"
+             FROM public.workspace_task_submissions wts
+             JOIN public.workspace_tasks wt ON wt.id = wts.task_id
+             WHERE wts.workspace_id = $1 ${participationTimeFilter};`,
+            participationParams
+        );
+
+        const contribReviewsRes = await query(
+            `SELECT DISTINCT wt.department_id AS "departmentId", wtr.reviewer_id AS "userId"
+             FROM public.workspace_task_reviews wtr
+             JOIN public.workspace_tasks wt ON wt.id = wtr.task_id
+             WHERE wtr.workspace_id = $1 ${participationTimeFilter};`,
+            participationParams
+        );
+
+        const contribCommentsRes = await query(
+            `SELECT DISTINCT wt.department_id AS "departmentId", wtc.author_id AS "userId"
+             FROM public.workspace_task_comments wtc
+             JOIN public.workspace_tasks wt ON wt.id = wtc.task_id
+             WHERE wtc.workspace_id = $1 ${participationTimeFilter};`,
+            participationParams
+        );
+
+        // Map departmentId -> Set of participating user IDs
+        const deptParticipatingUsersMap = new Map<string, Set<string>>();
+        const registerParticipant = (deptId: string, uid: string) => {
+            if (!deptId || !uid) return;
+            if (!deptParticipatingUsersMap.has(deptId)) {
+                deptParticipatingUsersMap.set(deptId, new Set());
+            }
+            deptParticipatingUsersMap.get(deptId)!.add(uid);
+        };
+
+        contribSubmissionsRes.rows.forEach((r: any) => registerParticipant(r.departmentId, r.userId));
+        contribReviewsRes.rows.forEach((r: any) => registerParticipant(r.departmentId, r.userId));
+        contribCommentsRes.rows.forEach((r: any) => registerParticipant(r.departmentId, r.userId));
+
+        // Also add awards received in this department as verified participation
+        for (const row of currentLedgerRes.rows) {
+            if (row.departmentId && row.recipientId) {
+                registerParticipant(row.departmentId, row.recipientId);
+            }
+        }
+
+        // Aggregate Department DPIs
+        const rawDeptEntries: DepartmentLeaderboardEntry[] = [];
+        const deptDpiMap = new Map<string, { dpi: number | null; hasSufficientData: boolean; deliveryStats: any }>();
+
+        for (const dept of deptsRes.rows) {
+            const deptId = dept.id;
+            const activeMemberIds = deptActiveMembersMap.get(deptId) || new Set<string>();
+            const activeMemberCount = activeMemberIds.size;
+
+            const tasks = deptTasksMap.get(deptId) || [];
+            const tasksDue = tasks.length;
+            const tasksBlocked = tasks.filter((t: any) => t.isBlocked).length;
+
+            const approvedTasks = tasks.filter((t: any) => t.status === 'completed' || t.hasApprovedReview);
+            const tasksApproved = approvedTasks.length;
+
+            const onTimeTasks = approvedTasks.filter((t: any) => {
+                if (!t.dueDate) return true;
+                if (t.completedAt && new Date(t.completedAt) <= new Date(t.dueDate)) return true;
+                return t.hasOnTimeSubmission;
+            });
+            const tasksOnTime = onTimeTasks.length;
+
+            // Participating members from active department members
+            const allDeptParticipants = deptParticipatingUsersMap.get(deptId) || new Set<string>();
+            let participatingCount = 0;
+            for (const uid of activeMemberIds) {
+                if (allDeptParticipants.has(uid)) {
+                    participatingCount++;
+                }
+            }
+
+            // Department Orbits in period
+            let totalDeptOrbits = 0;
+            for (const row of currentLedgerRes.rows) {
+                if (row.departmentId === deptId || activeMemberIds.has(row.recipientId)) {
+                    totalDeptOrbits += parseInt(row.totalPoints, 10) || 0;
+                }
+            }
+
+            const rawOrbitsPerMember = activeMemberCount > 0
+                ? Math.round((totalDeptOrbits / activeMemberCount) * 10) / 10
+                : 0;
+            const cappedOrbitsPerMember = Math.min(rawOrbitsPerMember, capPerMember);
+            const normalizedRecognitionScore = Math.min(
+                100,
+                Math.round((cappedOrbitsPerMember / capPerMember) * 1000) / 10
+            );
+
+            // Sufficient data safeguards
+            let hasSufficientData = true;
+            let insufficientDataReason: string | undefined = undefined;
+
+            if (tasksDue < minTasksSample && activeMemberCount === 0) {
+                hasSufficientData = false;
+                insufficientDataReason = "No tasks or active members in selected period";
+            } else if (tasksDue < minTasksSample) {
+                hasSufficientData = false;
+                insufficientDataReason = "Insufficient task activity in selected period";
+            }
+
+            let approvedTaskDeliveryRate = 0;
+            let onTimeDeliveryRate = 0;
+            let activeParticipationRate = 0;
+            let dpi: number | null = null;
+
+            if (hasSufficientData) {
+                approvedTaskDeliveryRate = Math.min(
+                    100,
+                    Math.round((tasksApproved / tasksDue) * 1000) / 10
+                );
+                onTimeDeliveryRate = tasksApproved > 0
+                    ? Math.min(100, Math.round((tasksOnTime / tasksApproved) * 1000) / 10)
+                    : 100;
+                activeParticipationRate = activeMemberCount > 0
+                    ? Math.min(100, Math.round((participatingCount / activeMemberCount) * 1000) / 10)
+                    : 0;
+
+                const totalWeight = wApproved + wOnTime + wParticipation + wRecognition;
+                dpi = Math.round(
+                    ((wApproved * approvedTaskDeliveryRate +
+                      wOnTime * onTimeDeliveryRate +
+                      wParticipation * activeParticipationRate +
+                      wRecognition * normalizedRecognitionScore) /
+                     totalWeight) * 10
+                ) / 10;
+            }
+
+            // Save stats for lead board
+            deptDpiMap.set(deptId, {
+                dpi,
+                hasSufficientData,
+                deliveryStats: {
+                    tasksDue,
+                    tasksApproved,
+                    approvedTaskDeliveryRate,
+                    tasksOnTime,
+                    onTimeDeliveryRate,
+                    totalActiveMembers: activeMemberCount,
+                    participatingMembers: participatingCount,
+                    participationRate: activeParticipationRate,
+                    rawOrbitsPerMember,
+                    normalizedRecognitionScore,
+                },
+            });
+
+            // Co-lead metadata
+            const leadsInfo = deptLeadsMap.get(deptId);
+            const leadUser = leadsInfo?.leadUserId ? userMetaMap.get(leadsInfo.leadUserId) : null;
+            const coLeadUsers = leadsInfo?.coLeadUserIds
+                ? Array.from(leadsInfo.coLeadUserIds).map(uid => userMetaMap.get(uid)).filter(Boolean)
+                : [];
+
+            rawDeptEntries.push({
+                rank: 1,
+                departmentId: dept.id,
+                departmentName: dept.name,
+                departmentColor: dept.color,
+                leadUser: leadUser ? {
+                    id: leadUser.userId,
+                    name: leadUser.name,
+                    username: leadUser.username,
+                    avatarUrl: leadUser.avatarUrl,
+                } : null,
+                coLeadUsers: coLeadUsers.map((cl: any) => ({
+                    id: cl.userId,
+                    name: cl.name,
+                    username: cl.username,
+                    avatarUrl: cl.avatarUrl,
+                })),
+                departmentPerformanceIndex: dpi,
+                hasSufficientData,
+                insufficientDataReason,
+                approvedTaskDeliveryRate,
+                onTimeDeliveryRate,
+                activeParticipationRate,
+                normalizedRecognitionScore,
+                metrics: {
+                    tasksDue,
+                    tasksApproved,
+                    tasksOnTime,
+                    tasksBlocked,
+                    activeMemberCount,
+                    participatingMemberCount: participatingCount,
+                    totalDepartmentOrbits: totalDeptOrbits,
+                    rawOrbitsPerMember,
+                    cappedOrbitsPerMember,
+                },
+                formulaVersion,
+                weightsUsed: weights,
+                trend: {
+                    rankChange: "new",
+                    dpiDelta: 0,
+                    direction: "same",
+                },
+            });
+        }
+
+        // Sort departments: sufficient data first by DPI DESC, then name ASC; insufficient data placed last
+        const sufficientDepts = rawDeptEntries.filter(d => d.hasSufficientData);
+        const insufficientDepts = rawDeptEntries.filter(d => !d.hasSufficientData);
+
+        sufficientDepts.sort((a, b) => {
+            if ((b.departmentPerformanceIndex ?? 0) !== (a.departmentPerformanceIndex ?? 0)) {
+                return (b.departmentPerformanceIndex ?? 0) - (a.departmentPerformanceIndex ?? 0);
+            }
+            if (b.metrics.tasksApproved !== a.metrics.tasksApproved) {
+                return b.metrics.tasksApproved - a.metrics.tasksApproved;
+            }
+            return a.departmentName.localeCompare(b.departmentName);
+        });
+
+        // Competition rank: 1st, 1st, 3rd
+        let dRank = 1;
+        for (let i = 0; i < sufficientDepts.length; i++) {
+            if (i > 0 && (sufficientDepts[i].departmentPerformanceIndex ?? 0) < (sufficientDepts[i - 1].departmentPerformanceIndex ?? 0)) {
+                dRank = i + 1;
+            }
+            sufficientDepts[i].rank = dRank;
+        }
+
+        // Insufficient data departments remain unranked (rank: 0) so they aren't humiliated
+        insufficientDepts.forEach(d => { d.rank = 0; });
+        const finalDepartments = [...sufficientDepts, ...insufficientDepts];
+
+        // 9. DEPARTMENT LEAD LEADERBOARD
+        // Rank leads by their department's Department Performance Index (DPI)
+        const rawLeads: DepartmentLeadLeaderboardEntry[] = [];
+
+        for (const dept of deptsRes.rows) {
+            const deptId = dept.id;
+            const dpiInfo = deptDpiMap.get(deptId);
+            const leadsInfo = deptLeadsMap.get(deptId);
+            if (!leadsInfo) continue;
+
+            const leadIdsInDept: Array<{ userId: string; isCoLead: boolean }> = [];
+            if (leadsInfo.leadUserId) {
+                leadIdsInDept.push({ userId: leadsInfo.leadUserId, isCoLead: false });
+            }
+            for (const coLeadId of leadsInfo.coLeadUserIds) {
+                if (coLeadId !== leadsInfo.leadUserId) {
+                    leadIdsInDept.push({ userId: coLeadId, isCoLead: true });
+                }
+            }
+
+            for (const { userId: leadUid, isCoLead } of leadIdsInDept) {
+                const meta = userMetaMap.get(leadUid);
+                if (!meta) continue;
+
+                // Lead's personally earned Orbits in period
+                let leadPersonalOrbits = 0;
+                for (const row of currentLedgerRes.rows) {
+                    if (row.recipientId === leadUid) {
+                        leadPersonalOrbits += parseInt(row.totalPoints, 10) || 0;
+                    }
+                }
+
+                // Identify other co-leads of the shared department
+                const otherCoLeads = leadIdsInDept
+                    .filter(l => l.userId !== leadUid)
+                    .map(l => {
+                        const m = userMetaMap.get(l.userId);
+                        return m ? { userId: m.userId, name: m.name, username: m.username } : null;
+                    })
+                    .filter(Boolean) as Array<{ userId: string; name: string; username: string }>;
+
+                rawLeads.push({
+                    rank: 1,
+                    userId: leadUid,
+                    name: meta.name,
+                    username: meta.username,
+                    avatarUrl: meta.avatarUrl,
+                    roleName: isCoLead ? "Co-Lead" : "Lead",
+                    isCoLead,
+                    coLeads: otherCoLeads.length > 0 ? otherCoLeads : undefined,
+                    departmentId: dept.id,
+                    departmentName: dept.name,
+                    departmentColor: dept.color,
+                    leadPersonalOrbits,
+                    departmentPerformanceIndex: dpiInfo?.dpi ?? null,
+                    hasSufficientData: dpiInfo?.hasSufficientData ?? false,
+                    insufficientDataReason: dpiInfo?.hasSufficientData ? undefined : "Insufficient department activity in selected period",
+                    deliveryStatistics: dpiInfo?.deliveryStats || {
+                        tasksDue: 0,
+                        tasksApproved: 0,
+                        approvedTaskDeliveryRate: 0,
+                        tasksOnTime: 0,
+                        onTimeDeliveryRate: 100,
+                        totalActiveMembers: 0,
+                        participatingMembers: 0,
+                        participationRate: 0,
+                        rawOrbitsPerMember: 0,
+                        normalizedRecognitionScore: 0,
+                    },
+                    trend: {
+                        rankChange: "new",
+                        dpiDelta: 0,
+                        direction: "same",
+                    },
+                });
+            }
+        }
+
+        // Sort leads: sufficient data first by departmentPerformanceIndex DESC, personal Orbits DESC, username ASC
+        const sufficientLeads = rawLeads.filter(l => l.hasSufficientData);
+        const insufficientLeads = rawLeads.filter(l => !l.hasSufficientData);
+
+        sufficientLeads.sort((a, b) => {
+            if ((b.departmentPerformanceIndex ?? 0) !== (a.departmentPerformanceIndex ?? 0)) {
+                return (b.departmentPerformanceIndex ?? 0) - (a.departmentPerformanceIndex ?? 0);
+            }
+            if (b.leadPersonalOrbits !== a.leadPersonalOrbits) {
+                return b.leadPersonalOrbits - a.leadPersonalOrbits;
+            }
+            return a.username.localeCompare(b.username);
+        });
+
+        // Competition rank for leads: 1st, 1st, 3rd
+        let lRank = 1;
+        for (let i = 0; i < sufficientLeads.length; i++) {
+            if (i > 0 && (sufficientLeads[i].departmentPerformanceIndex ?? 0) < (sufficientLeads[i - 1].departmentPerformanceIndex ?? 0)) {
+                lRank = i + 1;
+            }
+            sufficientLeads[i].rank = lRank;
+        }
+
+        insufficientLeads.forEach(l => { l.rank = 0; });
+        const finalLeads = [...sufficientLeads, ...insufficientLeads];
+
+        // 10. CURRENT MEMBER POSITION
+        let currentMemberPosition: ThreeLeaderboardsResponse["currentMemberPosition"] = undefined;
+        if (options.currentUserId) {
+            const currentUid = options.currentUserId;
+            if (managerUserIds.has(currentUid)) {
+                currentMemberPosition = { type: "excluded_manager" };
+            } else if (structuralLeadIds.has(currentUid)) {
+                const leadEntry = finalLeads.find(l => l.userId === currentUid);
+                if (leadEntry) {
+                    currentMemberPosition = {
+                        type: "lead",
+                        rank: leadEntry.rank,
+                        orbits: leadEntry.leadPersonalOrbits,
+                        departmentName: leadEntry.departmentName,
+                        dpi: leadEntry.departmentPerformanceIndex,
+                    };
+                }
+            } else {
+                const contribEntry = rawContributors.find(c => c.userId === currentUid);
+                if (contribEntry) {
+                    currentMemberPosition = {
+                        type: "contributor",
+                        rank: contribEntry.rank,
+                        orbits: contribEntry.orbitsEarned,
+                        departmentName: contribEntry.departmentName,
+                    };
+                }
+            }
+        }
+
+        return {
+            period,
+            periodStart: start ? start.toISOString() : null,
+            periodEnd: end ? end.toISOString() : null,
+            currentMemberPosition,
+            contributors: rawContributors,
+            leads: finalLeads,
+            departments: finalDepartments,
+            formulaVersion,
+            weights,
+        };
     }
 }
 

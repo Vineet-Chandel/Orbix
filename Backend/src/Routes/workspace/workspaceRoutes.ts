@@ -3570,9 +3570,59 @@ workspaceRouter.patch("/recognition/categories/:categoryId", authenticate, async
     return WorkspaceRecognitionController.updateCategory(req, res);
 });
 
+workspaceRouter.get("/recognition/awards/:awardId", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getAwardById(req, res);
+});
+
+workspaceRouter.get("/recognition/departments/:departmentId", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getDepartmentRecognition(req, res);
+});
+
+workspaceRouter.get("/recognition/members/:userId/profile", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getMemberProfile(req, res);
+});
+
+workspaceRouter.post("/recognition/awards/:awardId/notes", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.addAppreciationNote(req, res);
+});
+
+workspaceRouter.get("/recognition/awards/:awardId/notes", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getAwardNotes(req, res);
+});
+
 // Parameterized workspace recognition routes (e.g. /api/team-workspaces/:workspaceId/recognition/...)
 workspaceRouter.post("/:workspaceId/recognition/awards", authenticate, WorkspaceRecognitionController.awardOrbits);
 workspaceRouter.post("/:workspaceId/recognition/awards/:awardId/reverse", authenticate, WorkspaceRecognitionController.reverseAward);
+workspaceRouter.get("/:workspaceId/recognition/awards/:awardId", authenticate, WorkspaceRecognitionController.getAwardById);
+workspaceRouter.get("/:workspaceId/recognition/departments/:departmentId", authenticate, WorkspaceRecognitionController.getDepartmentRecognition);
+workspaceRouter.get("/:workspaceId/recognition/members/:userId/profile", authenticate, WorkspaceRecognitionController.getMemberProfile);
+workspaceRouter.post("/:workspaceId/recognition/awards/:awardId/notes", authenticate, WorkspaceRecognitionController.addAppreciationNote);
+workspaceRouter.get("/:workspaceId/recognition/awards/:awardId/notes", authenticate, WorkspaceRecognitionController.getAwardNotes);
 workspaceRouter.get("/:workspaceId/recognition/policy", authenticate, WorkspaceRecognitionController.getPolicy);
 workspaceRouter.patch("/:workspaceId/recognition/policy", authenticate, WorkspaceRecognitionController.updatePolicy);
 workspaceRouter.get("/:workspaceId/recognition/categories", authenticate, WorkspaceRecognitionController.getCategories);

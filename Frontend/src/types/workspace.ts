@@ -1066,6 +1066,13 @@ export interface WorkspaceRecognitionPolicy {
     requireEvidenceLink: boolean;
     minReasonLength: number;
     isWorkspaceVisible: boolean;
+    dpiWeightApprovedTasks?: number;
+    dpiWeightOnTime?: number;
+    dpiWeightParticipation?: number;
+    dpiWeightRecognition?: number;
+    dpiRecognitionCapPerMember?: number;
+    dpiMinTasksSample?: number;
+    dpiFormulaVersion?: string;
     createdAt?: string;
     updatedAt?: string;
     updatedBy?: string | null;
@@ -1116,6 +1123,7 @@ export interface WorkspaceRecognitionLedgerEntry {
     evidenceUrl?: string | null;
     referenceAwardId?: string | null;
     idempotencyKey?: string | null;
+    visibility: "workspace" | "recipient_only" | "private";
     status: RecognitionStatus;
     isReversed: boolean;
     reversalReason?: string | null;
@@ -1170,6 +1178,7 @@ export interface AwardOrbitsDTO {
     amount: number;
     categorySlugOrId: string;
     reason: string;
+    visibility?: "workspace" | "recipient_only" | "private";
     departmentId?: string | null;
     linkedTaskId?: string | null;
     linkedMilestoneId?: string | null;
@@ -1192,12 +1201,182 @@ export interface MemberRecognitionSummary {
     awardsReceivedCount: number;
     monthlyOrbitsEarned: number;
     monthlyAwardsReceived: number;
+    weeklyOrbitsEarned?: number;
+    contributorRank?: number | null;
     monthlyRemainingAllowance: number;
     allocatedBudget?: number;
     usedBudget?: number;
     remainingBudget?: number;
     canAward: boolean;
     recentAwards: WorkspaceRecognitionLedgerEntry[];
+}
+
+export interface DepartmentRecognitionSummary {
+    departmentId: string;
+    departmentName: string;
+    departmentColor?: string;
+    totalOrbits: number;
+    activeMemberCount: number;
+    averageOrbitsPerMember: number;
+    memberRankings: Array<{
+        userId: string;
+        name: string;
+        username: string;
+        avatarUrl?: string;
+        roleName: string;
+        isLead: boolean;
+        totalOrbits: number;
+        awardsCount: number;
+        rank: number;
+        recentAppreciation?: string;
+    }>;
+}
+
+export interface MemberRecognitionProfile {
+    userId: string;
+    name: string;
+    username: string;
+    avatarUrl?: string;
+    roleTitle: string;
+    department?: {
+        id: string;
+        name: string;
+        color?: string;
+    } | null;
+    totalOrbitsEarned: number;
+    contributorRank: number | null;
+    awardsReceivedCount: number;
+    recentAwards: WorkspaceRecognitionLedgerEntry[];
+}
+
+export type LeaderboardPeriod = "this_week" | "this_month" | "all_time" | "last_30_days" | "last_90_days";
+
+export interface ContributorLeaderboardEntry {
+    rank: number;
+    userId: string;
+    name: string;
+    username: string;
+    avatarUrl?: string;
+    departmentId?: string;
+    departmentName?: string;
+    departmentColor?: string;
+    roleName: string;
+    orbitsEarned: number;
+    awardsCount: number;
+    categoryBreakdown: Record<string, { name: string; count: number; points: number; icon: string; color?: string }>;
+    trend: {
+        rankChange: number | "new";
+        pointsDelta: number;
+        direction: "up" | "down" | "same" | "new";
+    };
+}
+
+export interface DepartmentLeadLeaderboardEntry {
+    rank: number;
+    userId: string;
+    name: string;
+    username: string;
+    avatarUrl?: string;
+    roleName: string;
+    isCoLead: boolean;
+    coLeads?: Array<{ userId: string; name: string; username: string }>;
+    departmentId: string;
+    departmentName: string;
+    departmentColor?: string;
+    leadPersonalOrbits: number;
+    departmentPerformanceIndex: number | null;
+    hasSufficientData: boolean;
+    insufficientDataReason?: string;
+    deliveryStatistics: {
+        tasksDue: number;
+        tasksApproved: number;
+        approvedTaskDeliveryRate: number;
+        tasksOnTime: number;
+        onTimeDeliveryRate: number;
+        totalActiveMembers: number;
+        participatingMembers: number;
+        participationRate: number;
+        rawOrbitsPerMember: number;
+        normalizedRecognitionScore: number;
+    };
+    trend: {
+        rankChange: number | "new";
+        dpiDelta: number;
+        direction: "up" | "down" | "same" | "new";
+    };
+}
+
+export interface DepartmentLeaderboardEntry {
+    rank: number;
+    departmentId: string;
+    departmentName: string;
+    departmentColor?: string;
+    leadUser?: {
+        id: string;
+        name: string;
+        username: string;
+        avatarUrl?: string;
+    } | null;
+    coLeadUsers?: Array<{
+        id: string;
+        name: string;
+        username: string;
+        avatarUrl?: string;
+    }>;
+    departmentPerformanceIndex: number | null;
+    hasSufficientData: boolean;
+    insufficientDataReason?: string;
+    approvedTaskDeliveryRate: number;
+    onTimeDeliveryRate: number;
+    activeParticipationRate: number;
+    normalizedRecognitionScore: number;
+    metrics: {
+        tasksDue: number;
+        tasksApproved: number;
+        tasksOnTime: number;
+        tasksBlocked: number;
+        activeMemberCount: number;
+        participatingMemberCount: number;
+        totalDepartmentOrbits: number;
+        rawOrbitsPerMember: number;
+        cappedOrbitsPerMember: number;
+    };
+    formulaVersion: string;
+    weightsUsed: {
+        approvedTasks: number;
+        onTime: number;
+        participation: number;
+        recognition: number;
+    };
+    trend: {
+        rankChange: number | "new";
+        dpiDelta: number;
+        direction: "up" | "down" | "same" | "new";
+    };
+}
+
+export interface ThreeLeaderboardsResponse {
+    period: LeaderboardPeriod;
+    periodStart: string | null;
+    periodEnd: string | null;
+    currentMemberPosition?: {
+        type: "contributor" | "lead" | "excluded_manager";
+        rank?: number;
+        orbits?: number;
+        departmentName?: string;
+        departmentRank?: number;
+        dpi?: number | null;
+    };
+    contributors: ContributorLeaderboardEntry[];
+    leads: DepartmentLeadLeaderboardEntry[];
+    departments: DepartmentLeaderboardEntry[];
+    formulaVersion: string;
+    weights: {
+        approvedTasks: number;
+        onTime: number;
+        participation: number;
+        recognition: number;
+    };
 }
 
 

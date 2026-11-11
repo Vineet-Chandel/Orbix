@@ -8,6 +8,10 @@ import {
     TrendingUp,
     Shield,
     RefreshCw,
+    Building2,
+    Trophy,
+    Award,
+    Quote,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type {
@@ -25,6 +29,7 @@ import { AwardHistoryView } from "./AwardHistoryView";
 import { AwardBudgetsView } from "./AwardBudgetsView";
 import { RecognitionPolicyView } from "./RecognitionPolicyView";
 import { AwardAnalyticsView } from "./AwardAnalyticsView";
+import { DepartmentRecognitionView } from "./DepartmentRecognitionView";
 
 interface RecognitionOverviewViewProps {
     clubId: string;
@@ -49,9 +54,9 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
     isAdmin: _isAdmin,
     isWorkspaceManager,
 }) => {
-    // Navigation Subtab: Overview | History | Budgets | Policy | Analytics
+    // Navigation Subtab: Overview | History | Department | Budgets | Policy | Analytics
     const [subTab, setSubTab] = useState<
-        "overview" | "history" | "budgets" | "policy" | "analytics"
+        "overview" | "history" | "department" | "budgets" | "policy" | "analytics"
     >("overview");
 
     // Data States
@@ -138,6 +143,18 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                     >
                         <History className="w-3.5 h-3.5 text-neutral-700" />
                         Award History
+                    </button>
+
+                    <button
+                        onClick={() => setSubTab("department")}
+                        className={`px-3.5 py-1.5 text-xs font-black rounded-xl border-2 border-black transition shadow-[2px_2px_0px_#000] flex items-center gap-1.5 active:translate-x-[1px] active:translate-y-[1px] ${
+                            subTab === "department"
+                                ? "bg-[#FFE566] text-black"
+                                : "bg-white hover:bg-neutral-50 text-neutral-800"
+                        }`}
+                    >
+                        <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                        Department
                     </button>
 
                     {(isOwner || isWorkspaceManager) && (
@@ -239,21 +256,106 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                         </div>
                     </div>
 
-                    {/* Stats Grid: Monthly allowance & Manager Budget */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Monthly Earned */}
-                        <div className="p-4 bg-white border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] space-y-1">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500">
-                                Earned This Month
+                    {/* Personal Recognition Summary: 5 Core Metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        {/* 1. Total Orbits Earned */}
+                        <div className="p-3.5 bg-white border-2 border-black rounded-2xl shadow-[3px_3px_0px_#000] space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                Total Orbits
                             </span>
-                            <div className="text-xl font-black text-black">
-                                +{summary?.monthlyOrbitsEarned ?? 0} Orbits
+                            <div className="text-2xl font-black text-black flex items-center gap-1">
+                                <Sparkles className="w-4 h-4 text-amber-500 fill-amber-400" />
+                                <span>{summary?.currentBalance ?? 0}</span>
                             </div>
-                            <p className="text-[10px] font-bold text-neutral-500">
-                                Across {summary?.monthlyAwardsReceived ?? 0} awards
-                            </p>
+                            <span className="text-[10px] font-bold text-neutral-400 block">All-time balance</span>
                         </div>
 
+                        {/* 2. Earned This Month */}
+                        <div className="p-3.5 bg-white border-2 border-black rounded-2xl shadow-[3px_3px_0px_#000] space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                This Month
+                            </span>
+                            <div className="text-2xl font-black text-black flex items-center gap-1">
+                                <span>+{summary?.monthlyOrbitsEarned ?? 0}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-neutral-400 block">
+                                {summary?.monthlyAwardsReceived ?? 0} awards
+                            </span>
+                        </div>
+
+                        {/* 3. Earned This Week */}
+                        <div className="p-3.5 bg-white border-2 border-black rounded-2xl shadow-[3px_3px_0px_#000] space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                This Week
+                            </span>
+                            <div className="text-2xl font-black text-emerald-700 flex items-center gap-1">
+                                <span>+{summary?.weeklyOrbitsEarned ?? 0}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-neutral-400 block">Past 7 days</span>
+                        </div>
+
+                        {/* 4. Contributor Rank */}
+                        <div className="p-3.5 bg-white border-2 border-black rounded-2xl shadow-[3px_3px_0px_#000] space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                Contributor Rank
+                            </span>
+                            <div className="text-2xl font-black text-black flex items-center gap-1">
+                                <Trophy className="w-4 h-4 text-amber-500" />
+                                <span>{summary?.contributorRank ? `#${summary.contributorRank}` : "—"}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-neutral-400 block">Workspace rank</span>
+                        </div>
+
+                        {/* 5. Recognitions Received */}
+                        <div className="p-3.5 bg-white border-2 border-black rounded-2xl shadow-[3px_3px_0px_#000] space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                Recognitions
+                            </span>
+                            <div className="text-2xl font-black text-black flex items-center gap-1">
+                                <Award className="w-4 h-4 text-blue-600" />
+                                <span>{summary?.awardsReceivedCount ?? 0}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-neutral-400 block">Honors received</span>
+                        </div>
+                    </div>
+
+                    {/* Recent Appreciation Spotlight Card */}
+                    {summary?.recentAwards && summary.recentAwards.length > 0 && (
+                        <div className="p-4 bg-gradient-to-r from-amber-50 to-[#FFE566]/20 border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-neo-xs mt-0.5">
+                                <Quote className="w-4 h-4 text-black fill-black" />
+                            </div>
+                            <div className="space-y-1 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">
+                                        Latest Appreciation Spotlight
+                                    </span>
+                                    <span className="px-2 py-0.2 text-[10px] font-black bg-[#FFE566] border border-black rounded-md">
+                                        +{summary.recentAwards[0].pointsDelta} Orbits
+                                    </span>
+                                    <span className="text-[10px] font-bold text-neutral-500">
+                                        • {summary.recentAwards[0].category?.name || "Appreciation"}
+                                    </span>
+                                </div>
+                                <p className="text-xs font-bold text-black italic">
+                                    "{summary.recentAwards[0].appreciationReason}"
+                                </p>
+                                <div className="text-[10px] font-bold text-neutral-600">
+                                    Given by{" "}
+                                    <span className="text-black font-black">
+                                        {summary.recentAwards[0].issuer?.name ||
+                                         `${summary.recentAwards[0].issuer?.firstName || ""} ${summary.recentAwards[0].issuer?.lastName || ""}`.trim() ||
+                                         summary.recentAwards[0].issuer?.username ||
+                                         "Workspace Leader"}
+                                    </span>{" "}
+                                    on {new Date(summary.recentAwards[0].createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Stats Grid: Monthly allowance & Manager Budget */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Remaining Inflow Allowance */}
                         <div className="p-4 bg-white border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] space-y-1">
                             <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500">
@@ -263,11 +365,11 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                                 {summary?.monthlyRemainingAllowance ?? policy?.recipientMonthlyCap ?? 150} Orbits
                             </div>
                             <p className="text-[10px] font-bold text-neutral-500">
-                                Cap: {policy?.recipientMonthlyCap ?? 150} Orbits / month
+                                Monthly receiving limit: {policy?.recipientMonthlyCap ?? 150} Orbits / month
                             </p>
                         </div>
 
-                        {/* Issuer Award Budget (if manager) */}
+                        {/* Issuer Award Budget (if manager) or Owner Authority */}
                         {!isOwner && isWorkspaceManager && (
                             <div className="p-4 bg-[#FFE566]/20 border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] space-y-1">
                                 <span className="text-[11px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1">
@@ -278,7 +380,7 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                                     {summary?.remainingBudget ?? 0} Orbits Left
                                 </div>
                                 <p className="text-[10px] font-bold text-neutral-600">
-                                    Used: {summary?.usedBudget ?? 0} / {summary?.allocatedBudget ?? 0} Orbits
+                                    Used: {summary?.usedBudget ?? 0} / {summary?.allocatedBudget ?? 0} Orbits this month
                                 </p>
                             </div>
                         )}
@@ -334,6 +436,17 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                     currentMember={currentMember}
                     isOwner={isOwner}
                     onReversalSuccess={() => loadAllRecognitionData(true)}
+                />
+            )}
+
+            {/* TAB 3: DEPARTMENT RECOGNITION */}
+            {subTab === "department" && (
+                <DepartmentRecognitionView
+                    clubId={clubId}
+                    departments={departments}
+                    currentMember={currentMember}
+                    isOwner={isOwner}
+                    isWorkspaceManager={isWorkspaceManager}
                 />
             )}
 

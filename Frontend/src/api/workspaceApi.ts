@@ -47,6 +47,8 @@ import type {
     AwardOrbitsDTO,
     ReverseAwardDTO,
     MemberRecognitionSummary,
+    DepartmentRecognitionSummary,
+    MemberRecognitionProfile,
 } from "../types/workspace";
 
 export const workspaceApi = {
@@ -1286,6 +1288,45 @@ export const workspaceApi = {
                 }>;
             };
         }>("/club/workspace/recognition/analytics", {
+            params: clubId ? { clubId } : undefined,
+        }),
+
+    getRecognitionAwardById: (awardId: string, clubId?: string) =>
+        apiClient.get<{
+            success: boolean;
+            award: WorkspaceRecognitionLedgerEntry;
+        }>(`/club/workspace/recognition/awards/${awardId}`, {
+            params: clubId ? { clubId } : undefined,
+        }),
+
+    getDepartmentRecognition: (departmentId: string, clubId?: string) =>
+        apiClient.get<{
+            success: boolean;
+            department: DepartmentRecognitionSummary;
+        }>(`/club/workspace/recognition/departments/${departmentId}`, {
+            params: clubId ? { clubId } : undefined,
+        }),
+
+    getMemberRecognitionProfile: (userId: string, clubId?: string) =>
+        apiClient.get<{
+            success: boolean;
+            profile: MemberRecognitionProfile;
+        }>(`/club/workspace/recognition/members/${userId}/profile`, {
+            params: clubId ? { clubId } : undefined,
+        }),
+
+    addAppreciationNote: (awardId: string, note: string, clubId?: string) =>
+        apiClient.post<{
+            success: boolean;
+            message: string;
+            note: { id: string; awardId: string; authorId: string; note: string; createdAt: string };
+        }>(`/club/workspace/recognition/awards/${awardId}/notes`, { note, clubId }),
+
+    getAwardNotes: (awardId: string, clubId?: string) =>
+        apiClient.get<{
+            success: boolean;
+            notes: Array<{ id: string; awardId: string; note: string; createdAt: string; author: any }>;
+        }>(`/club/workspace/recognition/awards/${awardId}/notes`, {
             params: clubId ? { clubId } : undefined,
         }),
 };

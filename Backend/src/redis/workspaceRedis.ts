@@ -741,6 +741,7 @@ export class WorkspaceRedisService {
         await Promise.allSettled([
             this.invalidateTaskAccountability(workspaceId),
             this.invalidateDashboardMetrics(workspaceId),
+            this.invalidateLeaderboards(workspaceId),
             this.bumpWorkspaceCacheVersion(workspaceId),
         ]);
     }
@@ -764,11 +765,58 @@ export class WorkspaceRedisService {
             this.invalidateDashboardMetrics(workspaceId),
             this.invalidateMemberDirectory(workspaceId),
             this.invalidateTaskAccountability(workspaceId),
+            this.invalidateLeaderboards(workspaceId),
             this.bumpWorkspaceCacheVersion(workspaceId),
         ];
         if (departmentId) {
             promises.push(this.invalidateDepartmentInsight(workspaceId, departmentId));
         }
         await Promise.allSettled(promises);
+    }
+
+    // =========================================================================
+    // 16. THREE LEADERBOARDS & DPI CACHE
+    // =========================================================================
+
+    static async getCachedLeaderboards(workspaceId: string, period: string, departmentId = "all"): Promise<any | null> {
+        try {
+            if (!redis || redis.status !== "ready") return null;
+            const key = this.buildKey("leaderboards", workspaceId, period, departmentId);
+            const raw = await redis.get(key);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Failed to read leaderboards cache:`, err.message);
+            return null;
+        }
+    }
+
+    static async setCachedLeaderboards(
+        workspaceId: string,
+        period: string,
+        departmentId = "all",
+        data: any,
+        ttl = 60
+    ): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const key = this.buildKey("leaderboards", workspaceId, period, departmentId);
+            await redis.setex(key, ttl, JSON.stringify(data));
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Failed to write leaderboards cache:`, err.message);
+        }
+    }
+
+    static async invalidateLeaderboards(workspaceId: string): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const pattern = this.buildKey("leaderboards", workspaceId, "*");
+            const keys = await redis.keys(pattern);
+            if (keys.length > 0) {
+                await redis.del(...keys);
+            }
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Failed to invalidate leaderboards cache:`, err.message);
+        }
     }
 }

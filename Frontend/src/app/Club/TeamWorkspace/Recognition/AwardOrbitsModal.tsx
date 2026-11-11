@@ -61,7 +61,7 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
     const [reason, setReason] = useState<string>("");
     const [linkedTaskId, setLinkedTaskId] = useState<string>("");
     const [evidenceUrl, setEvidenceUrl] = useState<string>("");
-    const [visibility, setVisibility] = useState<"workspace" | "department">("workspace");
+    const [visibility, setVisibility] = useState<"workspace" | "recipient_only">("workspace");
 
     // UI state
     const [recipientSearch, setRecipientSearch] = useState<string>("");
@@ -184,6 +184,7 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
                     amount,
                     categorySlugOrId: selectedCategorySlug,
                     reason: reason.trim(),
+                    visibility,
                     departmentId: selectedDepartmentId || undefined,
                     linkedTaskId: linkedTaskId || undefined,
                     evidenceUrl: evidenceUrl.trim() || undefined,
@@ -592,18 +593,18 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
                                                 : "bg-white hover:bg-neutral-50 shadow-neo-xxs text-neutral-600"
                                         }`}
                                     >
-                                        Workspace Public
+                                        Workspace Visible
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setVisibility("department")}
+                                        onClick={() => setVisibility("recipient_only")}
                                         className={`px-3 py-2 rounded-xl border-2 border-black text-xs font-black transition ${
-                                            visibility === "department"
+                                            visibility === "recipient_only"
                                                 ? "bg-[#FFE566] shadow-[2px_2px_0px_#000]"
                                                 : "bg-white hover:bg-neutral-50 shadow-neo-xxs text-neutral-600"
                                         }`}
                                     >
-                                        Department Only
+                                        Recipient Only (Private)
                                     </button>
                                 </div>
                             </div>
