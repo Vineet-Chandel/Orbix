@@ -1,5 +1,6 @@
 // Backend/src/services/workspace/workspaceCapabilityService.ts
 import { WorkspaceService } from "./workspaceService.js";
+import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import type {
     WorkspaceContext,
@@ -77,7 +78,10 @@ export class WorkspaceCapabilityService {
         const hasPerm = (perm: string) => hasWildcard || effectivePermissions.includes(perm);
 
         // Check workspace manager delegated permissions
-        const mgrPerms = (ctx.workspace.managerPermissions || {}) as Record<string, any>;
+        const rawMgrPerms = ctx.workspace.managerPermissions || {};
+        const mgrPerms: Record<string, any> = Array.isArray(rawMgrPerms)
+            ? rawMgrPerms.reduce((acc, p) => ({ ...acc, [p]: true }), {} as Record<string, boolean>)
+            : (rawMgrPerms as Record<string, any>);
         const isMgr = ctx.isWorkspaceManager;
 
         // 4. Compute Capabilities per Module
@@ -187,7 +191,8 @@ export class WorkspaceCapabilityService {
             hasWildcard ||
             ctx.isAdmin ||
             hasPerm("audit:view") ||
-            hasPerm("audit:read");
+            hasPerm("audit:read") ||
+            (isMgr && !!mgrPerms.can_view_audit_logs);
 
         const capabilities: WorkspaceModuleCapabilities = {
             workspace: {
@@ -268,20 +273,28 @@ export class WorkspaceCapabilityService {
         if (canViewAllTasksNav) allowedTabs.push("all-tasks");
 
         allowedTabs.push("my-tasks");
+
+        const canViewResources = capabilities.assets.view;
+        if (canViewResources) allowedTabs.push("resources");
+
         allowedTabs.push("activity");
 
         if (canViewAuditLogs) allowedTabs.push("audit");
         if (canManageSettings) allowedTabs.push("settings");
+
+        const canViewRoles = canManageRoles || canCreateRoles || ctx.isAdmin || ctx.isOwner || hasPerm("roles:view");
+        if (canViewRoles) allowedTabs.push("roles");
 
         const navigation: WorkspaceNavigationCapabilities = {
             canViewOverview: true,
             canViewDepartments,
             canViewMembers: true,
             canViewInvitations,
-            canViewRoles: canManageRoles || canCreateRoles,
+            canViewRoles,
             canViewChannels: true,
             canViewAllTasks: canViewAllTasksNav,
             canViewMyTasks: true,
+            canViewResources,
             canViewActivity: true,
             canViewAuditLogs,
             canViewSettings: canManageSettings,
@@ -343,6 +356,160 @@ export class WorkspaceCapabilityService {
         }
 
         return true;
+    }
+
+    /**
+     * Read-only simulation of capabilities for a given role or member.
+     * Guaranteed to never impersonate users or mutate session state.
+     */
+    static async previewCapabilities(
+        workspaceId: string,
+        actorUserId: string,
+        options: { roleId?: string; targetUserId?: string }
+    ): Promise<MemberCapabilityResolution & { isPreview: true; simulatedTarget: string }> {
+        // 1. Authorize actor: actor must have roles:view, roles:manage, or be Admin / Owner
+        const actorCtx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!actorCtx || (!actorCtx.isAdmin && !actorCtx.isOwner && !actorCtx.permissions.includes("roles:view") && !actorCtx.permissions.includes("roles:manage"))) {
+            throw new Error("Unauthorized to access permission preview.");
+        }
+
+        // 2. If targetUserId is provided, simulate their effective capabilities
+        if (options.targetUserId) {
+            const resolved = await this.resolveMemberCapabilities(workspaceId, options.targetUserId);
+            return {
+                ...resolved,
+                isPreview: true,
+                simulatedTarget: `Member: ${options.targetUserId}`,
+            };
+        }
+
+        // 3. If roleId is provided, simulate a hypothetical member with this role
+        if (!options.roleId) {
+            throw new Error("Either roleId or targetUserId must be provided for preview.");
+        }
+
+        const role = await WorkspaceRepository.findRoleById(workspaceId, options.roleId);
+        if (!role) {
+            throw new Error("Role not found in this workspace.");
+        }
+
+        const effectiveRole = {
+            id: role.id,
+            name: role.name,
+            slug: role.slug,
+            rank: role.rank,
+            isSystem: role.isSystem ?? true,
+            color: role.color || "#475569",
+        };
+
+        const highestRank = role.rank;
+        const isOwnerRole = role.slug === "owner" || role.rank === 1000;
+        const isAdminRole = role.slug === "admin" || role.rank === 800;
+        const highestManageableRank = isOwnerRole ? 1000 : Math.max(0, highestRank - 1);
+
+        const effectivePermissions = role.permissions || [];
+        const hasWildcard = isOwnerRole || effectivePermissions.includes("*");
+        const hasPerm = (perm: string) => hasWildcard || effectivePermissions.includes(perm);
+
+        const canManageSettings = hasWildcard || hasPerm("workspace:manage_settings");
+        const canManageAllDepts = hasWildcard || isAdminRole || hasPerm("departments:manage");
+        const canCreateDepts = hasWildcard || isAdminRole || hasPerm("departments:create");
+        const canManageDeptMembers = canManageAllDepts || hasPerm("departments:manage_members");
+
+        const canInviteMembers = hasWildcard || isAdminRole || hasPerm("members:invite");
+        const canManageMembers = hasWildcard || isAdminRole || hasPerm("members:remove") || hasPerm("members:assign_role");
+        const canAssignRole = hasWildcard || isAdminRole || hasPerm("members:assign_role");
+
+        const canCreateRoles = hasWildcard || isAdminRole || hasPerm("roles:create");
+        const canManageRoles = hasWildcard || isAdminRole || hasPerm("roles:manage");
+
+        const canCreateChannels = hasWildcard || isAdminRole || hasPerm("channels:create");
+        const canManageChannels = hasWildcard || isAdminRole || hasPerm("channels:manage");
+        const canSendMessages = hasWildcard || hasPerm("messages:send");
+        const canModerate = hasWildcard || isAdminRole || hasPerm("messages:moderate") || hasPerm("messages:delete_any");
+
+        const canViewAllTasks = hasWildcard || isAdminRole || hasPerm("tasks:edit_all");
+        const canCreateTasks = hasWildcard || hasPerm("tasks:create");
+        const canAssignTasks = hasWildcard || isAdminRole || hasPerm("tasks:assign");
+        const canReviewTasks = hasWildcard || isAdminRole || hasPerm("tasks:review");
+        const canDeleteTasks = hasWildcard || isAdminRole || hasPerm("tasks:delete");
+
+        const canManageFiles = hasWildcard || isAdminRole || hasPerm("files:manage");
+        const canViewAuditLogs = hasWildcard || isAdminRole || hasPerm("audit:view") || hasPerm("audit:read");
+
+        const capabilities: WorkspaceModuleCapabilities = {
+            workspace: { view: true, manageSettings: canManageSettings, manageRoles: canManageRoles, viewAuditLogs: canViewAuditLogs },
+            departments: {
+                viewAll: canManageAllDepts || isAdminRole,
+                viewAssigned: true,
+                create: canCreateDepts,
+                manageAll: canManageAllDepts,
+                manageAssigned: canManageAllDepts,
+                manageMembers: canManageDeptMembers,
+                manageableDepartmentIds: canManageAllDepts ? ["*"] : [],
+                memberDepartmentIds: [],
+            },
+            members: { view: true, invite: canInviteMembers, manage: canManageMembers, assignRole: canAssignRole, highestManageableRank },
+            roles: { view: true, create: canCreateRoles, manage: canManageRoles, assign: canAssignRole },
+            channels: { view: true, create: canCreateChannels, manage: canManageChannels, managePermissions: canManageChannels, sendMessages: canSendMessages, moderate: canModerate },
+            tasks: {
+                viewAll: canViewAllTasks,
+                viewAssigned: true,
+                create: canCreateTasks,
+                assign: canAssignTasks,
+                review: canReviewTasks,
+                approve: canReviewTasks,
+                delete: canDeleteTasks,
+                manageableDepartmentIds: canViewAllTasks ? ["*"] : [],
+            },
+            assets: { view: true, upload: hasWildcard || hasPerm("files:upload"), download: true, manage: canManageFiles },
+            audit: { view: canViewAuditLogs },
+        };
+
+        const allowedTabs: string[] = ["overview"];
+        if (capabilities.departments.viewAll || capabilities.departments.viewAssigned) allowedTabs.push("departments");
+        allowedTabs.push("roster");
+        if (canInviteMembers) allowedTabs.push("invitations");
+        allowedTabs.push("channels");
+        if (canViewAllTasks) allowedTabs.push("all-tasks");
+        allowedTabs.push("my-tasks");
+        allowedTabs.push("activity");
+        if (canViewAuditLogs) allowedTabs.push("audit");
+        if (canManageSettings) allowedTabs.push("settings");
+        if (canManageRoles || canCreateRoles) allowedTabs.push("roles");
+
+        const navigation: WorkspaceNavigationCapabilities = {
+            canViewOverview: true,
+            canViewDepartments: capabilities.departments.viewAll,
+            canViewMembers: true,
+            canViewInvitations: canInviteMembers,
+            canViewRoles: canManageRoles || canCreateRoles,
+            canViewChannels: true,
+            canViewAllTasks,
+            canViewMyTasks: true,
+            canViewActivity: true,
+            canViewAuditLogs,
+            canViewSettings: canManageSettings,
+            allowedTabs,
+        };
+
+        return {
+            workspaceId,
+            userId: "simulated-role-holder",
+            effectiveRole,
+            highestRank,
+            highestManageableRank,
+            isOwner: isOwnerRole,
+            isAdmin: isAdminRole,
+            isWorkspaceManager: false,
+            leadDepartmentIds: [],
+            memberDepartmentIds: [],
+            effectivePermissions,
+            capabilities,
+            navigation,
+            isPreview: true,
+            simulatedTarget: `Role: ${role.name}`,
+        };
     }
 
     /**

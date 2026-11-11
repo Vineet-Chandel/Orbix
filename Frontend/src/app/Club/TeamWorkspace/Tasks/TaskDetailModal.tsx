@@ -18,11 +18,15 @@ import {
     Loader2,
     Lock,
     FolderKanban,
+    Edit3,
+    Save,
+    Eye,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type {
     WorkspaceTask,
     WorkspaceTaskStatus,
+    WorkspaceTaskPriority,
     WorkspaceTaskComment,
     WorkspaceTaskActivity,
     WorkspaceMember,
@@ -115,6 +119,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [isReassigning, setIsReassigning] = useState(false);
     const [reassignUserIds, setReassignUserIds] = useState<string[]>([]);
 
+    // Edit details (Priority & Schedule) state
+    const [isEditingDetails, setIsEditingDetails] = useState(false);
+    const [editPriority, setEditPriority] = useState<WorkspaceTaskPriority>("medium");
+    const [editStartDate, setEditStartDate] = useState("");
+    const [editDueDate, setEditDueDate] = useState("");
+    const [savingDetails, setSavingDetails] = useState(false);
+
     const isOwner = currentMember?.role?.slug === "owner" || (currentMember?.role?.rank || 0) >= 1000;
 
     const loadTask = useCallback(async () => {
@@ -124,6 +135,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             if (res.success && res.task) {
                 setTask(res.task);
                 setReassignUserIds((res.task.currentAssignees || []).map((a) => a.userId));
+                setEditPriority(res.task.priority);
+                setEditStartDate(res.task.startDate ? res.task.startDate.substring(0, 10) : "");
+                setEditDueDate(res.task.dueDate ? res.task.dueDate.substring(0, 10) : "");
             }
 
             // Load attachments for this task
@@ -256,6 +270,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     content: submissionContent.trim(),
                     attachments,
                     expectedVersion: task.version,
+                    fileIds: submissionFiles.map((f) => f.id),
                 },
                 clubId
             );
@@ -274,6 +289,35 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             toast.error(err.response?.data?.message || err.message || "Failed to submit work.");
         } finally {
             setSubmittingDeliverable(false);
+        }
+    };
+
+    // Save details (Priority & Schedule) handler
+    const handleSaveDetails = async () => {
+        if (!task) return;
+        try {
+            setSavingDetails(true);
+            const res = await workspaceApi.updateTask(
+                task.id,
+                {
+                    priority: editPriority,
+                    startDate: editStartDate ? new Date(editStartDate).toISOString() : null,
+                    dueDate: editDueDate ? new Date(editDueDate).toISOString() : null,
+                    expectedVersion: task.version,
+                },
+                clubId
+            );
+            if (res.success) {
+                toast.success("Task details updated successfully!");
+                setTask(res.task);
+                setIsEditingDetails(false);
+                onTaskUpdated();
+                loadActivity();
+            }
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || err.message || "Failed to update task details.");
+        } finally {
+            setSavingDetails(false);
         }
     };
 
@@ -766,42 +810,112 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 {/* TAB 2: DELIVERABLE & REVIEWS */}
                                 {activeTab === "submission" && (
                                     <div className="space-y-4">
-                                        {/* Latest Submission Card (if exists) */}
-                                        {task.latestSubmission ? (
-                                            <div className="p-4 bg-white border-2 border-black rounded-xl shadow-neo-xs space-y-3">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <CheckCircle2 className="w-4 h-4 text-purple-600" />
-                                                        <h4 className="text-xs font-black uppercase text-black">
-                                                            Submitted Work Deliverable
-                                                        </h4>
-                                                    </div>
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-black bg-purple-100 text-purple-900">
-                                                        Status: {task.latestSubmission.status}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-black font-medium leading-relaxed bg-neutral-50 p-3 rounded-lg border border-neutral-200">
-                                                    {task.latestSubmission.content}
-                                                </p>
-                                                {task.latestSubmission.attachments &&
-                                                    task.latestSubmission.attachments.length > 0 && (
-                                                        <div className="space-y-1">
-                                                            <span className="text-[10px] font-black uppercase text-neutral-500">
-                                                                Attached Files:
+                                        {/* Historical Submissions & Deliverables Stream */}
+                                        {((task.submissions && task.submissions.length > 0) || task.latestSubmission) ? (
+                                            <div className="space-y-3">
+                                                <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                                                    <CheckCircle2 className="w-4 h-4 text-purple-600" /> Deliverables & Review History ({task.submissions?.length || 1})
+                                                </h4>
+                                                {(task.submissions && task.submissions.length > 0
+                                                    ? task.submissions
+                                                    : task.latestSubmission
+                                                    ? [task.latestSubmission]
+                                                    : []
+                                                ).map((sub, idx, arr) => (
+                                                    <div
+                                                        key={sub.id}
+                                                        className="p-4 bg-white border-2 border-black rounded-xl shadow-neo-xs space-y-3"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-900 border border-black text-[10px] font-black flex items-center justify-center">
+                                                                    #{arr.length - idx}
+                                                                </span>
+                                                                <h5 className="text-xs font-black uppercase text-black">
+                                                                    {idx === 0 && arr.length > 1 ? "Latest Submission" : idx === arr.length - 1 ? "Initial Deliverable" : `Revision #${arr.length - idx}`}
+                                                                </h5>
+                                                                <span className="text-[10px] text-neutral-500 font-medium">
+                                                                    {new Date(sub.createdAt).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                            <span
+                                                                className={`text-[10px] font-black px-2 py-0.5 rounded border border-black ${
+                                                                    sub.status === "approved"
+                                                                        ? "bg-teal-100 text-teal-900 border-teal-400"
+                                                                        : sub.status === "changes_requested"
+                                                                        ? "bg-orange-100 text-orange-900 border-orange-400"
+                                                                        : "bg-purple-100 text-purple-900 border-purple-400"
+                                                                }`}
+                                                            >
+                                                                {sub.status.replace("_", " ").toUpperCase()}
                                                             </span>
-                                                            {task.latestSubmission.attachments.map((att, i) => (
-                                                                <a
-                                                                    key={i}
-                                                                    href={att.url}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="block text-xs font-bold text-blue-600 hover:underline"
-                                                                >
-                                                                    📎 {att.name || att.url}
-                                                                </a>
-                                                            ))}
                                                         </div>
-                                                    )}
+
+                                                        {sub.submitter && (
+                                                            <div className="flex items-center gap-1.5 text-xs text-neutral-600">
+                                                                <span className="font-bold text-black">Submitted by:</span>
+                                                                <span>
+                                                                    {sub.submitter.firstName} {sub.submitter.lastName} (@{sub.submitter.username})
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        <p className="text-xs text-black font-medium leading-relaxed bg-neutral-50 p-3 rounded-lg border border-neutral-200 whitespace-pre-wrap">
+                                                            {sub.content}
+                                                        </p>
+
+                                                        {sub.attachments && sub.attachments.length > 0 && (
+                                                            <div className="space-y-1">
+                                                                <span className="text-[10px] font-black uppercase text-neutral-500">
+                                                                    Deliverable Files & Links ({sub.attachments.length}):
+                                                                </span>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                                    {sub.attachments.map((att, i) => (
+                                                                        <a
+                                                                            key={i}
+                                                                            href={att.url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="flex items-center gap-1.5 p-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold text-blue-600 hover:border-black hover:underline truncate"
+                                                                        >
+                                                                            <span>📎</span>
+                                                                            <span className="truncate">{att.name || att.url}</span>
+                                                                        </a>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Attached Review (if reviewed) */}
+                                                        {sub.review && (
+                                                            <div
+                                                                className={`p-3 rounded-lg border-2 border-black space-y-1.5 mt-2 ${
+                                                                    sub.review.decision === "approved"
+                                                                        ? "bg-teal-50 border-teal-500"
+                                                                        : "bg-orange-50 border-orange-500"
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[11px] font-black uppercase tracking-wider text-black flex items-center gap-1">
+                                                                        <Shield className="w-3.5 h-3.5" />
+                                                                        Review Decision: {sub.review.decision === "approved" ? "Approved" : "Changes Requested"}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-neutral-500">
+                                                                        {new Date(sub.review.createdAt).toLocaleString()}
+                                                                    </span>
+                                                                </div>
+                                                                {sub.review.reviewer && (
+                                                                    <p className="text-[11px] font-bold text-neutral-700">
+                                                                        Reviewed by {sub.review.reviewer.firstName} {sub.review.reviewer.lastName}
+                                                                    </p>
+                                                                )}
+                                                                <p className="text-xs text-neutral-800 font-medium">
+                                                                    {sub.review.comments}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
                                         ) : (
                                             <p className="text-xs text-neutral-500 italic p-3 text-center bg-white border border-neutral-200 rounded-xl">
@@ -984,37 +1098,138 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <div className="p-6 space-y-5 bg-[#FAF6EE]">
                             {/* Priority & Dates Card */}
                             <div className="bg-white border-2 border-black rounded-xl p-4 shadow-neo-xs space-y-3">
-                                <div>
-                                    <span className="text-[10px] font-black uppercase text-neutral-500 block mb-1">
-                                        Priority
-                                    </span>
-                                    <span
-                                        className={`px-2.5 py-1 rounded text-xs font-black uppercase border border-black ${
-                                            task.priority === "urgent"
-                                                ? "bg-rose-200 text-rose-900"
-                                                : task.priority === "high"
-                                                ? "bg-amber-100 text-amber-900"
-                                                : "bg-blue-100 text-blue-900"
-                                        }`}
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                                        <Calendar className="w-4 h-4 text-amber-600" /> Priority & Schedule
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditingDetails(!isEditingDetails)}
+                                        className="text-[10px] font-black uppercase text-indigo-600 hover:underline flex items-center gap-1"
                                     >
-                                        {task.priority}
-                                    </span>
+                                        <Edit3 className="w-3 h-3" />
+                                        {isEditingDetails ? "Cancel" : "Edit"}
+                                    </button>
                                 </div>
 
-                                <div>
-                                    <span className="text-[10px] font-black uppercase text-neutral-500 block mb-1">
-                                        Timeline
-                                    </span>
-                                    <div className="text-xs font-bold text-black space-y-0.5">
-                                        <p>
-                                            <Calendar className="w-3.5 h-3.5 inline mr-1 text-neutral-500" />
-                                            Start: {task.startDate ? new Date(task.startDate).toLocaleDateString() : "Not set"}
-                                        </p>
-                                        <p>
-                                            <Calendar className="w-3.5 h-3.5 inline mr-1 text-red-600" />
-                                            Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No deadline"}
-                                        </p>
+                                {!isEditingDetails ? (
+                                    <>
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase text-neutral-500 block mb-1">
+                                                Priority
+                                            </span>
+                                            <span
+                                                className={`px-2.5 py-1 rounded text-xs font-black uppercase border border-black ${
+                                                    task.priority === "urgent"
+                                                        ? "bg-rose-200 text-rose-900"
+                                                        : task.priority === "high"
+                                                        ? "bg-amber-100 text-amber-900"
+                                                        : "bg-blue-100 text-blue-900"
+                                                }`}
+                                            >
+                                                {task.priority}
+                                            </span>
+                                        </div>
+
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase text-neutral-500 block mb-1">
+                                                Timeline
+                                            </span>
+                                            <div className="text-xs font-bold text-black space-y-0.5">
+                                                <p>
+                                                    <Calendar className="w-3.5 h-3.5 inline mr-1 text-neutral-500" />
+                                                    Start: {task.startDate ? new Date(task.startDate).toLocaleDateString() : "Not set"}
+                                                </p>
+                                                <p>
+                                                    <Calendar className="w-3.5 h-3.5 inline mr-1 text-red-600" />
+                                                    Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No deadline"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="space-y-3 pt-1">
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">
+                                                Priority
+                                            </label>
+                                            <select
+                                                value={editPriority}
+                                                onChange={(e) => setEditPriority(e.target.value as WorkspaceTaskPriority)}
+                                                className="w-full p-2 bg-neutral-50 border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="high">High</option>
+                                                <option value="urgent">Urgent</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">
+                                                Start Date
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={editStartDate}
+                                                onChange={(e) => setEditStartDate(e.target.value)}
+                                                className="w-full p-2 bg-neutral-50 border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">
+                                                Due Date
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={editDueDate}
+                                                onChange={(e) => setEditDueDate(e.target.value)}
+                                                className="w-full p-2 bg-neutral-50 border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
+                                            />
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveDetails}
+                                            disabled={savingDetails}
+                                            className="w-full py-2 bg-[#A6FF70] border border-black rounded-lg text-xs font-black text-black hover:bg-[#92ec5d] transition shadow-neo-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                        >
+                                            {savingDetails ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                            Save Changes
+                                        </button>
                                     </div>
+                                )}
+                            </div>
+
+                            {/* Active Watchers Card */}
+                            <div className="bg-white border-2 border-black rounded-xl p-4 shadow-neo-xs space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                                        <Eye className="w-4 h-4 text-amber-600" /> Watchers ({task.watchers?.length || 0})
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={handleToggleWatcher}
+                                        className="text-[10px] font-black uppercase text-amber-700 hover:underline"
+                                    >
+                                        {task.isWatching ? "Unwatch" : "Watch"}
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(task.watchers || []).length > 0 ? (
+                                        task.watchers?.map((w) => (
+                                            <span
+                                                key={w.id}
+                                                title={w.user?.username}
+                                                className="px-2 py-0.5 rounded-full bg-neutral-100 border border-black text-[10px] font-bold text-black"
+                                            >
+                                                @{w.user?.username || "user"}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <p className="text-xs text-neutral-400 italic">No watchers subscribed</p>
+                                    )}
                                 </div>
                             </div>
 

@@ -17,6 +17,8 @@ import {
     Search,
     ShieldAlert,
     Menu,
+    FolderArchive,
+    Sparkles,
 } from "lucide-react";
 import { workspaceApi } from "../../../api/workspaceApi";
 import { useToast } from "../../../context/ToastContext";
@@ -40,6 +42,7 @@ import { WorkspaceSidebar } from "./Sidebar/WorkspaceSidebar";
 import { ChannelView } from "./Channels/ChannelView";
 import { ThreadSidebar } from "./Threads/ThreadSidebar";
 import { CreateCategoryModal } from "./Modals/CreateCategoryModal";
+import { EditCategoryModal } from "./Modals/EditCategoryModal";
 import { CreateChannelModal } from "./Modals/CreateChannelModal";
 import { ChannelSettingsModal } from "./Modals/ChannelSettingsModal";
 import { TasksBoardView } from "./Tasks/TasksBoardView";
@@ -49,6 +52,10 @@ import { WorkspaceOverviewView } from "./Dashboard/WorkspaceOverviewView";
 import { ActivityFeedView } from "./Activity/ActivityFeedView";
 import { AuditLogView } from "./Audit/AuditLogView";
 import { WorkspaceSearchModal } from "./Search/WorkspaceSearchModal";
+import { RolesPermissionsView } from "./Roles/RolesPermissionsView";
+import { WorkspaceSettingsView } from "./Settings/WorkspaceSettingsView";
+import { ResourceLibraryView } from "./Files/ResourceLibraryView";
+import { RecognitionOverviewView } from "./Recognition/RecognitionOverviewView";
 
 interface WorkspaceShellProps {
     club: {
@@ -83,7 +90,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
 
     // Active Navigation Sub-tab
     const [activeSection, setActiveSection] = useState<
-        "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "activity" | "audit"
+        "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "resources" | "recognition" | "activity" | "audit" | "roles" | "settings"
     >(() => (initialSection as any) || "overview");
 
     useEffect(() => {
@@ -103,6 +110,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
 
     // Modals
     const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
+    const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
+    const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<WorkspaceChannelCategory | null>(null);
     const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
     const [selectedCategoryForChannel, setSelectedCategoryForChannel] = useState<string | null>(null);
     const [isChannelSettingsOpen, setIsChannelSettingsOpen] = useState(false);
@@ -159,20 +168,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 }
                 setRoles(res.roles || []);
 
-                // Load members, departments, and channels concurrently
-                const [memRes, deptRes] = await Promise.all([
-                    workspaceApi.getMembers({ clubId: club.id }),
-                    workspaceApi.getDepartments(club.id, true),
+                // Release shell loading immediately so sidebar and active view are interactive
+                setLoading(false);
+
+                // Load members, departments, and channels asynchronously in background
+                Promise.allSettled([
+                    workspaceApi.getMembers({ clubId: club.id }).then((memRes) => {
+                        if (memRes.success) setMembers(memRes.members || []);
+                    }),
+                    workspaceApi.getDepartments(club.id, true).then((deptRes) => {
+                        if (deptRes.success) setDepartments(deptRes.departments || []);
+                    }),
+                    loadCategories(),
                 ]);
-
-                if (memRes.success) {
-                    setMembers(memRes.members || []);
-                }
-                if (deptRes.success) {
-                    setDepartments(deptRes.departments || []);
-                }
-
-                await loadCategories();
 
                 if (res.isNew) {
                     toast.success("Team Workspace successfully provisioned for your chapter!");
@@ -191,6 +199,34 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         loadWorkspace();
     }, [loadWorkspace]);
 
+    const handleReorderCategories = useCallback(
+        async (direction: "up" | "down", categoryId: string) => {
+            const index = categories.findIndex((c) => c.id === categoryId);
+            if (index === -1) return;
+            if (direction === "up" && index === 0) return;
+            if (direction === "down" && index === categories.length - 1) return;
+
+            const targetIndex = direction === "up" ? index - 1 : index + 1;
+            const reordered = [...categories];
+            const [moved] = reordered.splice(index, 1);
+            reordered.splice(targetIndex, 0, moved);
+
+            setCategories(reordered);
+            try {
+                const res = await workspaceApi.reorderCategories(
+                    reordered.map((c) => c.id),
+                    club.id
+                );
+                if (!res.success) {
+                    loadCategories();
+                }
+            } catch (err) {
+                loadCategories();
+            }
+        },
+        [categories, club.id, loadCategories]
+    );
+
     // Realtime SSE event stream setup
     useEffect(() => {
         if (!workspace?.id) return;
@@ -206,6 +242,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
             eventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
+                    // Dispatch custom event to broadcast live updates to ChannelView and ThreadSidebar
+                    window.dispatchEvent(new CustomEvent("workspace:realtime", { detail: data }));
+
                     if (data.event === "message:new") {
                         // Refresh unread counts
                         workspaceApi.getUnreadCounts(club.id).then((res) => {
@@ -215,6 +254,18 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                         });
                     } else if (data.event?.startsWith("channel:") || data.event?.startsWith("category:")) {
                         loadCategories();
+                    } else if (data.event?.startsWith("member:") || data.event === "role:updated" || data.event === "roles:reordered") {
+                        // Refresh member roster and capabilities asynchronously
+                        workspaceApi.getMembers({ clubId: club.id }).then((m) => {
+                            if (m.success && m.members) setMembers(m.members);
+                        });
+                        workspaceApi.getWorkspace(club.id).then((w) => {
+                            if (w.success && w.capabilities) setCapabilities(w.capabilities);
+                        });
+                    } else if (data.event?.startsWith("department:")) {
+                        workspaceApi.getDepartments(club.id, true).then((d) => {
+                            if (d.success && d.departments) setDepartments(d.departments);
+                        });
                     }
                 } catch (e) {
                     // Ignore heartbeat parse errors
@@ -538,6 +589,32 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                         My Tasks
                     </button>
 
+                    {(capabilities ? (capabilities.navigation.canViewResources ?? true) : true) && (
+                        <button
+                            onClick={() => setActiveSection("resources")}
+                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                                activeSection === "resources"
+                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                            }`}
+                        >
+                            <FolderArchive className="w-3.5 h-3.5" />
+                            Files & Resources
+                        </button>
+                    )}
+
+                    <button
+                        onClick={() => setActiveSection("recognition")}
+                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                            activeSection === "recognition"
+                                ? "bg-[#FFE566] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                        }`}
+                    >
+                        <Sparkles className="w-3.5 h-3.5 fill-black" />
+                        Recognition
+                    </button>
+
                     <button
                         onClick={() => setActiveSection("activity")}
                         className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
@@ -561,6 +638,34 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                         >
                             <Shield className="w-3.5 h-3.5" />
                             Audit Trail
+                        </button>
+                    )}
+
+                    {(capabilities ? (capabilities.navigation.canViewRoles || capabilities.capabilities.roles.view) : true) && (
+                        <button
+                            onClick={() => setActiveSection("roles")}
+                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                                activeSection === "roles"
+                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                            }`}
+                        >
+                            <ShieldAlert className="w-3.5 h-3.5" />
+                            Roles & Permissions
+                        </button>
+                    )}
+
+                    {(capabilities ? capabilities.navigation.canViewSettings : isAdmin) && (
+                        <button
+                            onClick={() => setActiveSection("settings")}
+                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                                activeSection === "settings"
+                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                            }`}
+                        >
+                            <UserCog className="w-3.5 h-3.5" />
+                            Settings
                         </button>
                     )}
                 </div>
@@ -622,6 +727,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     clubId={club.id}
                     onRefresh={() => loadWorkspace(true)}
                     onToggleSuspension={(m) => setSuspendingMember(m)}
+                    onNavigateToRoles={() => setActiveSection("roles")}
                 />
             )}
 
@@ -641,6 +747,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     {/* Left Channels Sidebar */}
                     <WorkspaceSidebar
                         categories={categories}
+                        clubId={club.id}
                         activeChannelId={activeChannel?.id || null}
                         activeNavSection={activeSection}
                         unreadCounts={unreadCounts}
@@ -653,7 +760,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             setActiveSection("channels");
                         }}
                         onSelectNavSection={(sec) => {
-                            if (sec === "overview") setActiveSection("overview");
+                            if (sec === "recognition") setActiveSection("recognition");
+                            else if (sec === "overview") setActiveSection("overview");
                             else if (sec === "members") setActiveSection("roster");
                             else if (sec === "all-tasks") setActiveSection("all-tasks");
                             else if (sec === "my-tasks") setActiveSection("my-tasks");
@@ -664,6 +772,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             }
                         }}
                         onOpenCreateCategory={() => setIsCreateCategoryOpen(true)}
+                        onOpenEditCategory={(cat) => {
+                            setSelectedCategoryForEdit(cat);
+                            setIsEditCategoryOpen(true);
+                        }}
+                        onReorderCategories={handleReorderCategories}
                         onOpenCreateChannel={(catId) => {
                             setSelectedCategoryForChannel(catId || null);
                             setIsCreateChannelOpen(true);
@@ -683,6 +796,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             clubId={club.id}
                             currentMember={currentMember}
                             canManageChannels={canManageChannels}
+                            members={members}
+                            roles={roles}
                             onOpenThread={(th) => setActiveThread(th)}
                             onChannelUpdated={(updated) => {
                                 setActiveChannel(updated);
@@ -733,6 +848,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                         roles={roles}
                         currentMember={currentMember}
                         canCreateTasks={canManageChannels || isOwner || Boolean(currentMember?.role?.permissions.includes("tasks:create"))}
+                        canViewAllTasks={capabilities ? capabilities.navigation.canViewAllTasks : true}
                     />
                 </div>
             )}
@@ -750,12 +866,39 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 </div>
             )}
 
+            {/* SECTION 7.5: SHARED RESOURCES & FILES (PHASE 06) */}
+            {activeSection === "resources" && (
+                <ResourceLibraryView
+                    clubId={club.id}
+                    workspaceId={workspace.id}
+                    departments={departments}
+                    capabilities={capabilities}
+                    isAdmin={isAdmin}
+                />
+            )}
+
+            {/* SECTION 7.6: ORBIX RECOGNITION (PHASE 02/03) */}
+            {activeSection === "recognition" && (
+                <RecognitionOverviewView
+                    clubId={club.id}
+                    workspaceId={workspace.id}
+                    currentMember={currentMember}
+                    members={members}
+                    departments={departments}
+                    tasks={[]}
+                    isOwner={isOwner}
+                    isAdmin={isAdmin}
+                    isWorkspaceManager={isWorkspaceManager}
+                />
+            )}
+
             {/* SECTION 8: ACTIVITY FEED (PHASE 08) */}
             {activeSection === "activity" && (
                 <ActivityFeedView
                     clubId={club.id}
                     departments={departments}
                     members={members}
+                    currentMember={currentMember}
                     onNavigate={(url) => {
                         window.location.href = url;
                     }}
@@ -766,7 +909,35 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
             {activeSection === "audit" && (
                 <AuditLogView
                     clubId={club.id}
+                    isAdmin={capabilities ? capabilities.navigation.canViewAuditLogs : isAdmin}
+                />
+            )}
+
+            {/* SECTION 10: ROLES & PERMISSIONS (PHASE 07) */}
+            {activeSection === "roles" && (
+                <RolesPermissionsView
+                    clubId={club.id}
+                    roles={roles}
+                    members={members}
+                    departments={departments}
+                    currentMember={currentMember}
+                    capabilities={capabilities}
                     isAdmin={isAdmin}
+                    onRefresh={() => loadWorkspace(true)}
+                />
+            )}
+
+            {/* SECTION 11: WORKSPACE SETTINGS (PHASE 07) */}
+            {activeSection === "settings" && (
+                <WorkspaceSettingsView
+                    clubId={club.id}
+                    workspace={workspace}
+                    members={members}
+                    roles={roles}
+                    currentMember={currentMember}
+                    capabilities={capabilities}
+                    isAdmin={isAdmin}
+                    onRefresh={() => loadWorkspace(true)}
                 />
             )}
             </>
@@ -783,6 +954,21 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 onCategoryCreated={() => {
                     loadCategories();
                 }}
+            />
+
+            <EditCategoryModal
+                isOpen={isEditCategoryOpen}
+                onClose={() => {
+                    setIsEditCategoryOpen(false);
+                    setSelectedCategoryForEdit(null);
+                }}
+                clubId={club.id}
+                category={selectedCategoryForEdit}
+                allCategories={categories}
+                departments={departments}
+                onCategoryUpdated={() => loadCategories()}
+                onCategoryDeleted={() => loadCategories()}
+                onCategoriesReordered={(newCats) => setCategories(newCats)}
             />
 
             <CreateChannelModal

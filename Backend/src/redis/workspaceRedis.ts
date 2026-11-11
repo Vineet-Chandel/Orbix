@@ -9,22 +9,55 @@ import type {
 
 const DEFAULT_NAMESPACE = "orbix:team-workspace:";
 const NAMESPACE = process.env.WORKSPACE_REDIS_NAMESPACE || DEFAULT_NAMESPACE;
+const CACHE_VERSION = "v1";
 
 // Standard Cache Time-To-Live (in seconds)
-const WORKSPACE_META_TTL = 900; // 15 minutes
-const PERMISSIONS_TTL = 600;    // 10 minutes
-const MEMBER_STATE_TTL = 600;   // 10 minutes
+const WORKSPACE_META_TTL = 900;       // 15 minutes
+const PERMISSIONS_TTL = 600;          // 10 minutes
+const MEMBER_STATE_TTL = 600;         // 10 minutes
+const MEMBER_DIRECTORY_TTL = 120;     // 2 minutes
+const DASHBOARD_METRICS_TTL = 300;    // 5 minutes
+const TASK_ACCOUNTABILITY_TTL = 180;  // 3 minutes
+const UNREAD_COUNTS_TTL = 60;         // 1 minute
 
 export class WorkspaceRedisService {
     private static namespace = NAMESPACE;
+    private static version = CACHE_VERSION;
     private static inFlight = new Map<string, Promise<any>>();
 
     /**
-     * Builds namespaced key: orbix:team-workspace:<domain>:<segments>
+     * Builds namespaced, versioned key: orbix:team-workspace:<version>:<domain>:<segments>
      */
     static buildKey(domain: string, ...segments: string[]): string {
         const cleaned = segments.filter(Boolean).map((s) => String(s).trim().toLowerCase());
-        return `${this.namespace}${domain}:${cleaned.join(":")}`;
+        return `${this.namespace}${this.version}:${domain}:${cleaned.join(":")}`;
+    }
+
+    /**
+     * Retrieves current dynamic workspace generation counter for instant invalidation
+     */
+    static async getWorkspaceCacheVersion(workspaceId: string): Promise<number> {
+        try {
+            if (!redis || redis.status !== "ready") return 1;
+            const key = `${this.namespace}ws_ver:${workspaceId.toLowerCase()}`;
+            const ver = await redis.get(key);
+            return ver ? parseInt(ver, 10) : 1;
+        } catch {
+            return 1;
+        }
+    }
+
+    /**
+     * Bumps workspace generation counter to invalidate all generation-dependent caches
+     */
+    static async bumpWorkspaceCacheVersion(workspaceId: string): Promise<number> {
+        try {
+            if (!redis || redis.status !== "ready") return 1;
+            const key = `${this.namespace}ws_ver:${workspaceId.toLowerCase()}`;
+            return await redis.incr(key);
+        } catch {
+            return 1;
+        }
     }
 
     /**
@@ -475,5 +508,267 @@ export class WorkspaceRedisService {
         } catch (err: any) {
             console.warn(`[WorkspaceRedis] Dept insight cache invalidation error:`, err.message);
         }
+    }
+
+    // =========================================================================
+    // 5. MEMBER DIRECTORY CACHE (PHASE 09)
+    // =========================================================================
+
+    /**
+     * Retrieves cached member directory page
+     */
+    static async getCachedMemberDirectory(workspaceId: string, pageKey: string): Promise<any | null> {
+        try {
+            if (!redis || redis.status !== "ready") return null;
+            const key = this.buildKey("members", workspaceId, pageKey);
+            const raw = await redis.get(key);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Member directory cache read error:`, err.message);
+            return null;
+        }
+    }
+
+    /**
+     * Caches member directory page (TTL: 2 minutes)
+     */
+    static async setCachedMemberDirectory(
+        workspaceId: string,
+        pageKey: string,
+        data: any,
+        ttl = MEMBER_DIRECTORY_TTL
+    ): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const key = this.buildKey("members", workspaceId, pageKey);
+            await redis.setex(key, ttl, JSON.stringify(data));
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Member directory cache write error:`, err.message);
+        }
+    }
+
+    /**
+     * Evicts cached member directory pages for a workspace
+     */
+    static async invalidateMemberDirectory(workspaceId: string): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const pattern = this.buildKey("members", workspaceId, "*");
+            const stream = redis.scanStream({ match: pattern, count: 50 });
+            await new Promise<void>((resolve) => {
+                stream.on("data", async (keys: string[]) => {
+                    if (keys.length > 0) {
+                        try {
+                            await redis.del(...keys);
+                        } catch {}
+                    }
+                });
+                stream.on("end", () => resolve());
+                stream.on("error", () => resolve());
+            });
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Member directory cache invalidation error:`, err.message);
+        }
+    }
+
+    // =========================================================================
+    // 6. TASK ACCOUNTABILITY & WORKLOAD CACHE (PHASE 09)
+    // =========================================================================
+
+    /**
+     * Retrieves cached task accountability overview
+     */
+    static async getCachedTaskAccountability(workspaceId: string, scopeKey: string): Promise<any | null> {
+        try {
+            if (!redis || redis.status !== "ready") return null;
+            const key = this.buildKey("taskcounts", workspaceId, scopeKey);
+            const raw = await redis.get(key);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Task accountability cache read error:`, err.message);
+            return null;
+        }
+    }
+
+    /**
+     * Caches task accountability metrics (TTL: 3 minutes)
+     */
+    static async setCachedTaskAccountability(
+        workspaceId: string,
+        scopeKey: string,
+        data: any,
+        ttl = TASK_ACCOUNTABILITY_TTL
+    ): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const key = this.buildKey("taskcounts", workspaceId, scopeKey);
+            await redis.setex(key, ttl, JSON.stringify(data));
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Task accountability cache write error:`, err.message);
+        }
+    }
+
+    /**
+     * Evicts cached task accountability metrics
+     */
+    static async invalidateTaskAccountability(workspaceId: string): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const pattern = this.buildKey("taskcounts", workspaceId, "*");
+            const stream = redis.scanStream({ match: pattern, count: 50 });
+            await new Promise<void>((resolve) => {
+                stream.on("data", async (keys: string[]) => {
+                    if (keys.length > 0) {
+                        try {
+                            await redis.del(...keys);
+                        } catch {}
+                    }
+                });
+                stream.on("end", () => resolve());
+                stream.on("error", () => resolve());
+            });
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Task accountability cache invalidation error:`, err.message);
+        }
+    }
+
+    // =========================================================================
+    // 7. UNREAD COUNTS CACHE (PHASE 09)
+    // =========================================================================
+
+    /**
+     * Retrieves cached unread counts for a user
+     */
+    static async getCachedUnreadCounts(workspaceId: string, userId: string): Promise<Record<string, number> | null> {
+        try {
+            if (!redis || redis.status !== "ready") return null;
+            const key = this.buildKey("unread", workspaceId, userId);
+            const raw = await redis.get(key);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Unread counts cache read error:`, err.message);
+            return null;
+        }
+    }
+
+    /**
+     * Caches channel unread counts (TTL: 1 minute)
+     */
+    static async setCachedUnreadCounts(
+        workspaceId: string,
+        userId: string,
+        counts: Record<string, number>,
+        ttl = UNREAD_COUNTS_TTL
+    ): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const key = this.buildKey("unread", workspaceId, userId);
+            await redis.setex(key, ttl, JSON.stringify(counts));
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Unread counts cache write error:`, err.message);
+        }
+    }
+
+    /**
+     * Evicts cached unread counts for a specific user or all users in workspace
+     */
+    static async invalidateUnreadCounts(workspaceId: string, userId?: string): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            if (userId) {
+                const key = this.buildKey("unread", workspaceId, userId);
+                await redis.del(key);
+            } else {
+                const pattern = this.buildKey("unread", workspaceId, "*");
+                const stream = redis.scanStream({ match: pattern, count: 50 });
+                await new Promise<void>((resolve) => {
+                    stream.on("data", async (keys: string[]) => {
+                        if (keys.length > 0) {
+                            try {
+                                await redis.del(...keys);
+                            } catch {}
+                        }
+                    });
+                    stream.on("end", () => resolve());
+                    stream.on("error", () => resolve());
+                });
+            }
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Unread counts cache invalidation error:`, err.message);
+        }
+    }
+
+    // =========================================================================
+    // 8. MASTER COMPOSITE INVALIDATORS (PHASE 09)
+    // =========================================================================
+
+    /**
+     * Comprehensive cache invalidation after security-sensitive changes
+     * Invalidate appropriate cached data after:
+     * - Role assignments / updates / permission changes
+     * - Member suspension / removal
+     * - Department transfers
+     * - Channel access changes
+     */
+    static async invalidateOnSecurityChange(workspaceId: string, targetUserId?: string): Promise<void> {
+        const promises: Promise<any>[] = [
+            this.invalidateMemberDirectory(workspaceId),
+            this.invalidateDashboardMetrics(workspaceId),
+            this.invalidateTaskAccountability(workspaceId),
+            this.bumpWorkspaceCacheVersion(workspaceId),
+        ];
+
+        if (targetUserId) {
+            promises.push(this.invalidateMemberPermissions(workspaceId, targetUserId));
+            promises.push(this.invalidateMemberCapabilities(workspaceId, targetUserId));
+            promises.push(this.invalidateUnreadCounts(workspaceId, targetUserId));
+        } else {
+            promises.push(this.invalidateAllWorkspacePermissions(workspaceId));
+            promises.push(this.invalidateAllWorkspaceCapabilities(workspaceId));
+            promises.push(this.invalidateUnreadCounts(workspaceId));
+        }
+
+        await Promise.allSettled(promises);
+    }
+
+    /**
+     * Cache invalidation triggered by task lifecycle events
+     */
+    static async invalidateOnTaskChange(workspaceId: string, taskId?: string): Promise<void> {
+        await Promise.allSettled([
+            this.invalidateTaskAccountability(workspaceId),
+            this.invalidateDashboardMetrics(workspaceId),
+            this.bumpWorkspaceCacheVersion(workspaceId),
+        ]);
+    }
+
+    /**
+     * Cache invalidation triggered by channel / category changes
+     */
+    static async invalidateOnChannelChange(workspaceId: string, channelId?: string): Promise<void> {
+        await Promise.allSettled([
+            this.invalidateUnreadCounts(workspaceId),
+            this.invalidateDashboardMetrics(workspaceId),
+            this.bumpWorkspaceCacheVersion(workspaceId),
+        ]);
+    }
+
+    /**
+     * Cache invalidation triggered by department changes
+     */
+    static async invalidateOnDepartmentChange(workspaceId: string, departmentId?: string): Promise<void> {
+        const promises: Promise<any>[] = [
+            this.invalidateDashboardMetrics(workspaceId),
+            this.invalidateMemberDirectory(workspaceId),
+            this.invalidateTaskAccountability(workspaceId),
+            this.bumpWorkspaceCacheVersion(workspaceId),
+        ];
+        if (departmentId) {
+            promises.push(this.invalidateDepartmentInsight(workspaceId, departmentId));
+        }
+        await Promise.allSettled(promises);
     }
 }

@@ -1,18 +1,15 @@
 // Backend/scripts/test_team_workspace_phase_04.ts
-import crypto from "crypto";
-import { query } from "../src/database/client.js";
+import { pool, query } from "../src/database/client.js";
 import { WorkspaceRepository } from "../src/repositories/workspaceRepository.js";
 import { WorkspaceService } from "../src/services/workspace/workspaceService.js";
+import { WorkspaceChannelService } from "../src/services/workspace/workspaceChannelService.js";
 import { WorkspaceDepartmentService } from "../src/services/workspace/workspaceDepartmentService.js";
 import { WorkspaceMemberService } from "../src/services/workspace/workspaceMemberService.js";
-import { WorkspaceChannelService, workspaceEventBus } from "../src/services/workspace/workspaceChannelService.js";
-import redis from "../src/redis/client.js";
 
 async function runPhase04Tests() {
-    console.log("=================================================================");
-    console.log("ORBIX TEAM WORKSPACE — PHASE 04 ACCEPTANCE & VERIFICATION SUITE");
-    console.log("CHANNELS, CATEGORIES, MESSAGING, THREADS & PERMISSIONS");
-    console.log("=================================================================\n");
+    console.log("===============================================================================");
+    console.log("ORBIX TEAM WORKSPACE — PHASE 04 CHANNELS & REALTIME COLLABORATION TEST SUITE");
+    console.log("===============================================================================\n");
 
     let passed = 0;
     let failed = 0;
@@ -28,597 +25,392 @@ async function runPhase04Tests() {
     }
 
     try {
-        // ---------------------------------------------------------------------
-        // TEST SETUP: Retrieve Test Club & Ensure Workspace Exists
-        // ---------------------------------------------------------------------
-        console.log("SETUP: Identifying Club and Provisioning Root Workspace...");
-        const clubRes = await query(`
+        // 1. SETUP
+        const clubsQuery = await query(`
             SELECT id, auth_user_id, name, slug 
             FROM public.verified_clubs 
             ORDER BY created_at ASC 
             LIMIT 1;
         `);
 
-        if (clubRes.rows.length === 0) {
-            throw new Error("No verified club found for test execution.");
+        if (clubsQuery.rows.length === 0) {
+            throw new Error("No verified club available in database for testing.");
         }
 
-        const club = clubRes.rows[0];
-        console.log(`  Using Club: "${club.name}" (ID: ${club.id}) Owner: ${club.auth_user_id}\n`);
+        const club = clubsQuery.rows[0];
+        console.log(`Target Club: "${club.name}" (Club ID: ${club.id}, Owner User ID: ${club.auth_user_id})\n`);
 
-        const { workspace, member: ownerMember } = await WorkspaceService.getOrCreateWorkspaceForClub(
+        const { workspace } = await WorkspaceService.getOrCreateWorkspaceForClub(
             club.id,
             club.auth_user_id
         );
         const workspaceId = workspace.id;
 
-        // Clean previous test channels/categories/messages for a pristine run
-        await query(`DELETE FROM public.workspace_messages WHERE workspace_id = $1;`, [workspaceId]);
-        await query(`DELETE FROM public.workspace_threads WHERE workspace_id = $1;`, [workspaceId]);
-        await query(`DELETE FROM public.workspace_channel_overrides WHERE workspace_id = $1;`, [workspaceId]);
-        await query(`DELETE FROM public.workspace_channels WHERE workspace_id = $1;`, [workspaceId]);
-        await query(`DELETE FROM public.workspace_channel_categories WHERE workspace_id = $1;`, [workspaceId]);
-
-        // Create 2 test users for permission & isolation testing
-        const suffix = Date.now().toString().slice(-6);
-        const testUsers: Array<{ id: string; email: string; username: string }> = [];
-
-        for (let i = 1; i <= 3; i++) {
-            const uid = crypto.randomUUID();
-            const email = `phase04_u${i}_${suffix}@orbix.dev`;
-            const username = `p4user${i}_${suffix}`;
-
-            await query(
-                `INSERT INTO public.users (id, email, username, firstname, lastname, password, account_type, is_public, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, 'dummy_hash', 'personal', true, NOW(), NOW())
-                 ON CONFLICT (id) DO NOTHING;`,
-                [uid, email, username, `Test${i}`, `Phase4_${suffix}`]
-            );
-
-            testUsers.push({ id: uid, email, username });
-        }
-
         const roles = await WorkspaceRepository.listRoles(workspaceId);
-        const adminRole = roles.find((r) => r.slug === "admin")!;
+        const deptLeadRole = roles.find((r) => r.slug === "dept_lead")!;
         const memberRole = roles.find((r) => r.slug === "member")!;
 
-        // Add User 1 as Admin, User 2 as normal Member
-        const adminMember = await WorkspaceRepository.createMember(null, {
-            workspaceId,
-            userId: testUsers[0].id,
-            roleId: adminRole.id,
-            roleTitle: "System Admin",
-        });
-
-        const normalMember = await WorkspaceRepository.createMember(null, {
-            workspaceId,
-            userId: testUsers[1].id,
-            roleId: memberRole.id,
-            roleTitle: "Staff Member",
-        });
-
-        // Seed 1 department for department-associated categories
-        const depts = await WorkspaceDepartmentService.seedSuggestedDepartments(workspaceId, club.auth_user_id);
-        const techDept = depts.find((d) => d.slug === "technical-development") || depts[0];
-
-        console.log(`  Initialized test workspace members: Owner, Admin (${adminMember.id}), Member (${normalMember.id})\n`);
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 1: Categories & Department Association
-        // ---------------------------------------------------------------------
-        console.log("TEST SUITE 1: Distinguish Departments & Channel Categories");
-
-        // 1. Workspace-wide category (department_id IS NULL)
-        const clubWideCat = await WorkspaceChannelService.createCategory(
-            workspaceId,
-            club.auth_user_id,
-            { name: "CLUB-WIDE", departmentId: null, isPrivate: false }
-        );
-        assert("Created workspace-wide channel category", clubWideCat.name === "CLUB-WIDE" && clubWideCat.departmentId === null);
-
-        // 2. Department-associated category (department_id IS NOT NULL)
-        const techCat = await WorkspaceChannelService.createCategory(
-            workspaceId,
-            club.auth_user_id,
-            { name: "TECHNICAL & DEVELOPMENT", departmentId: techDept.id, isPrivate: false }
-        );
-        assert("Created department-associated channel category", techCat.name === "TECHNICAL & DEVELOPMENT" && techCat.departmentId === techDept.id);
-
-        // 3. Update category name
-        const updatedCat = await WorkspaceChannelService.updateCategory(
-            workspaceId,
-            club.auth_user_id,
-            clubWideCat.id,
-            { name: "GENERAL CLUB-WIDE" }
-        );
-        assert("Updated category name successfully", updatedCat.name === "GENERAL CLUB-WIDE");
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 2: Channel Types Validation
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 2: Channel Types Architecture (Text, Announcement, Forum, Task Thread)");
-
-        // 1. Text channel
-        const textChannel = await WorkspaceChannelService.createChannel(
-            workspaceId,
-            club.auth_user_id,
-            {
-                categoryId: clubWideCat.id,
-                name: "general",
-                channelType: "text",
-                topic: "General club conversation",
-                isPrivate: false,
-            }
-        );
-        assert("Created Text Channel (#general)", textChannel.channelType === "text" && textChannel.name === "general");
-
-        // 2. Announcement channel
-        const announceChannel = await WorkspaceChannelService.createChannel(
-            workspaceId,
-            club.auth_user_id,
-            {
-                categoryId: clubWideCat.id,
-                name: "announcements",
-                channelType: "announcement",
-                topic: "Official broadcasts only",
-                isPrivate: false,
-            }
-        );
-        assert("Created Announcement Channel (#announcements)", announceChannel.channelType === "announcement");
-
-        // 3. Forum channel
-        const forumChannel = await WorkspaceChannelService.createChannel(
-            workspaceId,
-            club.auth_user_id,
-            {
-                categoryId: techCat.id,
-                departmentId: techDept.id,
-                name: "technical-discussions",
-                channelType: "forum",
-                topic: "Architecture RFCs and discussions",
-                isPrivate: false,
-            }
-        );
-        assert("Created Forum Channel (#technical-discussions)", forumChannel.channelType === "forum");
-
-        // 4. Task Discussion channel
-        const taskChannel = await WorkspaceChannelService.createChannel(
-            workspaceId,
-            club.auth_user_id,
-            {
-                categoryId: techCat.id,
-                departmentId: techDept.id,
-                name: "sprint-deliverables",
-                channelType: "task_discussion",
-                topic: "Task progress threads",
-                isPrivate: false,
-            }
-        );
-        assert("Created Task Discussion Channel (#sprint-deliverables)", taskChannel.channelType === "task_discussion");
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 3: Discord-Inspired Category Permission Synchronization
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 3: Category Permission Synchronization (Synced, Unsynced, Sync Now, Revert)");
-
-        // By default, textChannel was created with isCategorySynced: true
-        assert("Channel created with isCategorySynced: true", textChannel.isCategorySynced === true);
-
-        // Setting a channel-level override flips isCategorySynced to false
-        await WorkspaceChannelService.setChannelOverride(
-            workspaceId,
-            club.auth_user_id,
-            textChannel.id,
-            {
-                roleId: memberRole.id,
-                allowPermissions: ["view_channel"],
-                denyPermissions: ["send_messages"],
-            }
-        );
-
-        const unsyncedChannel = await WorkspaceRepository.findChannelById(workspaceId, textChannel.id);
-        assert("Channel-level override flips isCategorySynced to false", unsyncedChannel?.isCategorySynced === false);
-
-        // Sync Now / Revert to Category Permissions
-        await WorkspaceChannelService.syncChannelWithCategory(
-            workspaceId,
-            club.auth_user_id,
-            textChannel.id
-        );
-
-        const resyncedChannel = await WorkspaceRepository.findChannelById(workspaceId, textChannel.id);
-        assert("syncChannelWithCategory restores isCategorySynced: true", resyncedChannel?.isCategorySynced === true);
-
-        // Channel move with syncWithNewCategory
-        const movedChannel = await WorkspaceChannelService.updateChannel(
-            workspaceId,
-            club.auth_user_id,
-            textChannel.id,
-            {
-                categoryId: techCat.id,
-                syncWithNewCategory: true,
-            }
-        );
-        assert("Moving channel with syncWithNewCategory maintains synced status", movedChannel.categoryId === techCat.id && movedChannel.isCategorySynced === true);
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 4: Strict Private Channel Access Control (ACCEPTANCE CRITERIA)
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 4: Strict Private Channel Security & Anti-Leakage (Acceptance Criteria)");
-
-        // Create Private Category and Channel
-        const privateCat = await WorkspaceChannelService.createCategory(
-            workspaceId,
-            club.auth_user_id,
-            { name: "EXECUTIVE SUITE", isPrivate: true }
-        );
-
-        const privateChannel = await WorkspaceChannelService.createChannel(
-            workspaceId,
-            club.auth_user_id,
-            {
-                categoryId: privateCat.id,
-                name: "leadership-confidential",
-                channelType: "text",
-                topic: "Strictly confidential leadership discussions",
-                isPrivate: true,
-            }
-        );
-
-        // Grant access ONLY to adminRole
-        await WorkspaceChannelService.setChannelOverride(
-            workspaceId,
-            club.auth_user_id,
-            privateChannel.id,
-            {
-                roleId: adminRole.id,
-                allowPermissions: ["view_channel", "send_messages"],
-            }
-        );
-
-        // Seed a confidential message in private channel
-        const secretMsg = await WorkspaceChannelService.sendMessage(
-            workspaceId,
-            club.auth_user_id,
-            privateChannel.id,
-            { content: "CONFIDENTIAL_FINANCIAL_BUDGET_2026_SECRET_TOKEN" }
-        );
-
-        // Seed a thread in private channel
-        const secretThread = await WorkspaceChannelService.createThread(
-            workspaceId,
-            club.auth_user_id,
-            privateChannel.id,
-            secretMsg.id,
-            "Confidential Budget Thread"
-        );
-
-        // ACCEPTANCE CRITERION 1: Unauthorized user cannot view channel details
-        let leakView = false;
-        try {
-            await WorkspaceChannelService.getChannelDetails(workspaceId, testUsers[1].id, privateChannel.id);
-            leakView = true;
-        } catch (err: any) {
-            leakView = false;
-        }
-        assert("AC1: Unauthorized user cannot retrieve private channel metadata (404/denied)", !leakView);
-
-        // ACCEPTANCE CRITERION 2: Unauthorized user cannot list messages even if channel ID is known
-        let leakMessages = false;
-        try {
-            await WorkspaceChannelService.listMessages(workspaceId, testUsers[1].id, privateChannel.id);
-            leakMessages = true;
-        } catch (err: any) {
-            leakMessages = false;
-        }
-        assert("AC2: Unauthorized user cannot retrieve private channel messages", !leakMessages);
-
-        // ACCEPTANCE CRITERION 3: Unauthorized user cannot post in private channel
-        let leakPost = false;
-        try {
-            await WorkspaceChannelService.sendMessage(workspaceId, testUsers[1].id, privateChannel.id, {
-                content: "Hacker injection",
-            });
-            leakPost = true;
-        } catch (err: any) {
-            leakPost = false;
-        }
-        assert("AC3: Unauthorized user cannot post in private channel", !leakPost);
-
-        // ACCEPTANCE CRITERION 4: Unauthorized user cannot retrieve or create threads in private channel
-        let leakThread = false;
-        try {
-            await WorkspaceChannelService.getThread(workspaceId, testUsers[1].id, secretThread.id);
-            leakThread = true;
-        } catch (err: any) {
-            leakThread = false;
-        }
-        assert("AC4: Unauthorized user cannot retrieve private thread even with thread ID", !leakThread);
-
-        // ACCEPTANCE CRITERION 5: Channel listing excludes private channels for unauthorized user
-        const memberVisibleCategories = await WorkspaceChannelService.listCategoriesWithChannels(
-            workspaceId,
-            testUsers[1].id
-        );
-        const memberVisibleChannels = memberVisibleCategories.flatMap((c) => c.channels || []);
-        const foundPrivateInList = memberVisibleChannels.some((ch) => ch.id === privateChannel.id);
-        assert("AC5: Private channel is absent from unauthorized user's categories/channels listing", !foundPrivateInList);
-
-        // ACCEPTANCE CRITERION 6: Message search does not leak private channel messages
-        const searchResults = await WorkspaceChannelService.searchMessages(
-            workspaceId,
-            testUsers[1].id,
-            "CONFIDENTIAL_FINANCIAL_BUDGET"
-        );
-        assert("AC6: Message search excludes messages from private channels for unauthorized user", searchResults.length === 0);
-
-        // Authorized user (admin) CAN access private channel
-        const adminCanView = await WorkspaceChannelService.canViewChannel(workspaceId, privateChannel.id, testUsers[0].id);
-        assert("Authorized user (Admin) can view private channel", adminCanView === true);
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 5: Messaging, Mentions, Pinned Messages & Reactions
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 5: Messaging Operations, Mentions, Pinned Messages & Emoji Reactions");
-
-        // 1. Create message with mentions in #general
-        const generalMsg = await WorkspaceChannelService.sendMessage(
-            workspaceId,
-            club.auth_user_id,
-            textChannel.id,
-            {
-                content: "Hello @everyone! Welcome to our developer workspace. Please review the docs.",
-                messageType: "text",
-            }
-        );
-        assert("Created message with @everyone mention", generalMsg.mentions?.everyone === true);
-
-        // 2. Edit own message
-        const editedMsg = await WorkspaceChannelService.editMessage(
-            workspaceId,
-            club.auth_user_id,
-            generalMsg.id,
-            "Hello @everyone! Welcome to our developer workspace. (Updated with new guidelines)"
-        );
-        assert("Edited own message successfully", editedMsg.isEdited === true && editedMsg.content.includes("(Updated with new guidelines)"));
-
-        // 3. Unauthorized edit attempt (User 2 attempts to edit User 1's message)
-        let unauthorizedEdit = false;
-        try {
-            await WorkspaceChannelService.editMessage(
-                workspaceId,
-                testUsers[1].id,
-                generalMsg.id,
-                "Malicious edit attempt"
+        // Generate isolated test personas
+        const randKey = Math.random().toString(36).slice(2, 7);
+        const makeUser = async (roleName: string) => {
+            const uRes = await query(
+                `INSERT INTO public.users (email, username, firstname, lastname)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING id, email, username, firstname, lastname;`,
+                [
+                    `p4_${roleName}_${randKey}@test.orbix.club`,
+                    `p4_${roleName}_${randKey}`,
+                    `P4${roleName}`,
+                    `Test`,
+                ]
             );
-            unauthorizedEdit = true;
-        } catch {
-            unauthorizedEdit = false;
-        }
-        assert("Unauthorized user cannot edit another member's message", !unauthorizedEdit);
-
-        // 4. Pin / Unpin message
-        const pinned = await WorkspaceChannelService.togglePinMessage(
-            workspaceId,
-            club.auth_user_id,
-            generalMsg.id,
-            true
-        );
-        assert("Pinned message successfully", pinned === true);
-
-        // Member without pin permission cannot pin
-        let memberCanPin = false;
-        try {
-            await WorkspaceChannelService.togglePinMessage(
-                workspaceId,
-                testUsers[1].id,
-                generalMsg.id,
-                false
-            );
-            memberCanPin = true;
-        } catch {
-            memberCanPin = false;
-        }
-        assert("Normal member without pin permissions cannot unpin message", !memberCanPin);
-
-        // 5. Emoji Reactions
-        // Add reaction 🔥 by User 1
-        const rx1 = await WorkspaceChannelService.toggleReaction(
-            workspaceId,
-            club.auth_user_id,
-            generalMsg.id,
-            "🔥"
-        );
-        assert("Added emoji reaction (🔥)", rx1 === true);
-
-        // Add reaction 🔥 by User 2
-        const rx2 = await WorkspaceChannelService.toggleReaction(
-            workspaceId,
-            testUsers[1].id,
-            generalMsg.id,
-            "🔥"
-        );
-        assert("Second member added same emoji reaction", rx2 === true);
-
-        // Toggle off reaction by User 1
-        const rx3 = await WorkspaceChannelService.toggleReaction(
-            workspaceId,
-            club.auth_user_id,
-            generalMsg.id,
-            "🔥"
-        );
-        assert("Toggling reaction again removes user's reaction", rx3 === false);
-
-        // 6. Announcement Channel Protection
-        let memberPostAnnouncement = false;
-        try {
-            await WorkspaceChannelService.sendMessage(
-                workspaceId,
-                testUsers[1].id,
-                announceChannel.id,
-                { content: "Member posting in announcement channel" }
-            );
-            memberPostAnnouncement = true;
-        } catch {
-            memberPostAnnouncement = false;
-        }
-        assert("Non-lead member cannot post in announcement channel", !memberPostAnnouncement);
-
-        // Admin/Owner CAN post in announcement channel
-        const adminAnnounce = await WorkspaceChannelService.sendMessage(
-            workspaceId,
-            club.auth_user_id,
-            announceChannel.id,
-            { content: "Official chapter announcement broadcast" }
-        );
-        assert("Owner/Admin successfully posts in announcement channel", !!adminAnnounce.id);
-
-        // 7. Delete message: author deletes own message
-        const tempMsg = await WorkspaceChannelService.sendMessage(
-            workspaceId,
-            testUsers[1].id,
-            textChannel.id,
-            { content: "Temp message to delete" }
-        );
-        const deletedOwn = await WorkspaceChannelService.deleteMessage(
-            workspaceId,
-            testUsers[1].id,
-            tempMsg.id
-        );
-        assert("Author can delete their own message", deletedOwn === true);
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 6: Threads Lifecycle
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 6: Threads Creation, Locking, Archiving & Replies");
-
-        // 1. Create thread from message
-        const thread = await WorkspaceChannelService.createThread(
-            workspaceId,
-            club.auth_user_id,
-            textChannel.id,
-            generalMsg.id,
-            "Q1 Architecture Discussion"
-        );
-        assert("Created thread linked to parent message", thread.parentMessageId === generalMsg.id && thread.name === "Q1 Architecture Discussion");
-
-        // 2. Post reply in thread
-        const reply1 = await WorkspaceChannelService.sendMessage(
-            workspaceId,
-            testUsers[1].id,
-            textChannel.id,
-            {
-                content: "I propose we use PostgreSQL for permanent storage and Redis for caching.",
-                threadId: thread.id,
-            }
-        );
-        assert("Posted reply in thread", reply1.threadId === thread.id);
-
-        // 3. Lock thread
-        const lockedThread = await WorkspaceChannelService.updateThread(
-            workspaceId,
-            club.auth_user_id,
-            thread.id,
-            { isLocked: true }
-        );
-        assert("Locked thread successfully", lockedThread.isLocked === true);
-
-        // 4. Posting in locked thread must fail
-        let postInLocked = false;
-        try {
-            await WorkspaceChannelService.sendMessage(
-                workspaceId,
-                testUsers[1].id,
-                textChannel.id,
-                { content: "Trying to reply to locked thread", threadId: thread.id }
-            );
-            postInLocked = true;
-        } catch {
-            postInLocked = false;
-        }
-        assert("Posting in locked thread is blocked", !postInLocked);
-
-        // 5. Unlock & Archive thread
-        const unlockedThread = await WorkspaceChannelService.updateThread(
-            workspaceId,
-            club.auth_user_id,
-            thread.id,
-            { isLocked: false, isArchived: true }
-        );
-        assert("Unlocked & archived thread", unlockedThread.isLocked === false && unlockedThread.isArchived === true);
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 7: Read Receipts & Unread Tracking
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 7: Read Receipts & Unread Message Counts");
-
-        // New message sent by Owner in #general
-        await WorkspaceChannelService.sendMessage(
-            workspaceId,
-            club.auth_user_id,
-            textChannel.id,
-            { content: "Unread message check for members" }
-        );
-
-        const unreadMapBefore = await WorkspaceChannelService.getUnreadCounts(workspaceId, testUsers[1].id);
-        assert("Unread message count is tracked for member", (unreadMapBefore[textChannel.id] || 0) > 0);
-
-        // Mark channel as read
-        await WorkspaceChannelService.markChannelRead(workspaceId, testUsers[1].id, textChannel.id);
-        const unreadMapAfter = await WorkspaceChannelService.getUnreadCounts(workspaceId, testUsers[1].id);
-        assert("Marking channel as read resets unread count to 0", (unreadMapAfter[textChannel.id] || 0) === 0);
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 8: Audit Logging & Real-time Event Bus
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 8: Audit Logging & Real-time Event Bus Emission");
-
-        // Check audit logs
-        const auditLogs = await query(
-            `SELECT action, target_type, target_id FROM public.workspace_audit_logs
-             WHERE workspace_id = $1 AND action IN ('channel_category_created', 'channel_created', 'channel_synced_with_category', 'thread_created')
-             ORDER BY created_at DESC;`,
-            [workspaceId]
-        );
-        const loggedActions = auditLogs.rows.map((r: any) => r.action);
-        assert("Audit log recorded 'channel_category_created'", loggedActions.includes("channel_category_created"));
-        assert("Audit log recorded 'channel_created'", loggedActions.includes("channel_created"));
-        assert("Audit log recorded 'channel_synced_with_category'", loggedActions.includes("channel_synced_with_category"));
-        assert("Audit log recorded 'thread_created'", loggedActions.includes("thread_created"));
-
-        // Event Bus listener test
-        let receivedRealtimeEvent = false;
-        const testHandler = (data: any) => {
-            if (data.event === "message:new") {
-                receivedRealtimeEvent = true;
-            }
+            return uRes.rows[0];
         };
-        workspaceEventBus.once(`workspace:${workspaceId}`, testHandler);
 
-        await WorkspaceChannelService.sendMessage(
+        const leadUser = await makeUser("lead");
+        const memberA = await makeUser("mem_a");
+        const memberB = await makeUser("mem_b");
+
+        // Create 2 test departments
+        const dept1 = await WorkspaceDepartmentService.createDepartment(
             workspaceId,
             club.auth_user_id,
-            textChannel.id,
-            { content: "Realtime SSE broadcast verification" }
+            { name: `Engineering P4 ${randKey}`, color: "#4F46E5" }
         );
-        assert("Realtime workspaceEventBus emitted message:new event", receivedRealtimeEvent === true);
+        const dept2 = await WorkspaceDepartmentService.createDepartment(
+            workspaceId,
+            club.auth_user_id,
+            { name: `Design P4 ${randKey}`, color: "#EC4899" }
+        );
 
-        // ---------------------------------------------------------------------
-        // FINAL SUMMARY
-        // ---------------------------------------------------------------------
-        console.log("\n=================================================================");
-        console.log(`PHASE 04 TEST RESULTS: ${passed} PASSED | ${failed} FAILED`);
-        console.log("=================================================================\n");
+        const addMemberRecord = async (userId: string, roleId: string) => {
+            const res = await query(
+                `INSERT INTO public.workspace_members (workspace_id, user_id, role_id, role_title)
+                 VALUES ($1, $2, $3, 'Test Member')
+                 ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = $3
+                 RETURNING id;`,
+                [workspaceId, userId, roleId]
+            );
+            return res.rows[0];
+        };
 
-        if (failed > 0) {
-            process.exit(1);
-        } else {
-            console.log("🌟 ALL PHASE 04 ACCEPTANCE CRITERIA SUCCESSFULLY VERIFIED!");
-            process.exit(0);
+        // Add leadUser to Dept1 as lead
+        const leadMember = await addMemberRecord(leadUser.id, deptLeadRole.id);
+        await WorkspaceDepartmentService.addMemberToDepartment(
+            workspaceId,
+            club.auth_user_id,
+            dept1.id,
+            leadMember.id,
+            "lead",
+            "Tech Lead"
+        );
+
+        // Add memberA to Dept1 as member
+        const memAMember = await addMemberRecord(memberA.id, memberRole.id);
+        await WorkspaceDepartmentService.addMemberToDepartment(
+            workspaceId,
+            club.auth_user_id,
+            dept1.id,
+            memAMember.id,
+            "member"
+        );
+
+        // Add memberB to Dept2 as member
+        const memBMember = await addMemberRecord(memberB.id, memberRole.id);
+        await WorkspaceDepartmentService.addMemberToDepartment(
+            workspaceId,
+            club.auth_user_id,
+            dept2.id,
+            memBMember.id,
+            "member"
+        );
+
+        // =====================================================================
+        // PART 1: CHANNEL CATEGORIES MANAGEMENT & REORDERING
+        // =====================================================================
+        console.log("PART 1: Channel Categories Management & Reordering");
+
+        // Lead can create category for assigned department
+        const cat1 = await WorkspaceChannelService.createCategory(workspaceId, leadUser.id, {
+            name: `TECH TEAM ${randKey}`,
+            departmentId: dept1.id,
+        });
+        assert("Department Lead can create category for their assigned department", !!cat1 && cat1.name === `TECH TEAM ${randKey}`);
+
+        // Lead cannot create category for another department
+        let leadOtherCatError = false;
+        try {
+            await WorkspaceChannelService.createCategory(workspaceId, leadUser.id, {
+                name: `DESIGN TEAM ${randKey}`,
+                departmentId: dept2.id,
+            });
+        } catch (e) {
+            leadOtherCatError = true;
         }
+        assert("Department Lead CANNOT create category for another department", leadOtherCatError);
+
+        // Manager creates second category
+        const cat2 = await WorkspaceChannelService.createCategory(workspaceId, club.auth_user_id, {
+            name: `GENERAL CHAT ${randKey}`,
+        });
+        assert("Workspace Manager can create chapter-wide category", !!cat2);
+
+        // Reorder categories
+        const reorderSuccess = await WorkspaceChannelService.reorderCategories(workspaceId, club.auth_user_id, [
+            cat2.id,
+            cat1.id,
+        ]);
+        assert("Authorized user can reorder categories", reorderSuccess);
+
+        const categoriesPostReorder = await WorkspaceRepository.listCategories(workspaceId);
+        const cat2FromDb = categoriesPostReorder.find((c) => c.id === cat2.id);
+        const cat1FromDb = categoriesPostReorder.find((c) => c.id === cat1.id);
+        assert(
+            "Category 2 has lower display_order than Category 1 after reorder",
+            !!cat2FromDb && !!cat1FromDb && (cat2FromDb.displayOrder ?? 0) < (cat1FromDb.displayOrder ?? 0)
+        );
+
+        // Update category
+        const updatedCat = await WorkspaceChannelService.updateCategory(workspaceId, leadUser.id, cat1.id, {
+            name: `TECH CORE ${randKey}`,
+        });
+        assert("Department Lead can update their department category name", updatedCat.name === `TECH CORE ${randKey}`);
+
+        // =====================================================================
+        // PART 2: CHANNELS OF ALL TYPES & REORDERING
+        // =====================================================================
+        console.log("\nPART 2: Channels of All Types & Operations");
+
+        // Text channel
+        const chText = await WorkspaceChannelService.createChannel(workspaceId, leadUser.id, {
+            name: `code-talk-${randKey}`,
+            channelType: "text",
+            categoryId: cat1.id,
+            departmentId: dept1.id,
+        });
+        assert("Created text channel", !!chText && chText.channelType === "text");
+
+        // Announcement channel
+        const chAnnounce = await WorkspaceChannelService.createChannel(workspaceId, leadUser.id, {
+            name: `eng-broadcasts-${randKey}`,
+            channelType: "announcement",
+            categoryId: cat1.id,
+            departmentId: dept1.id,
+        });
+        assert("Created announcement channel", !!chAnnounce && chAnnounce.channelType === "announcement");
+
+        // Forum channel
+        const chForum = await WorkspaceChannelService.createChannel(workspaceId, club.auth_user_id, {
+            name: `ideas-forum-${randKey}`,
+            channelType: "forum",
+            categoryId: cat2.id,
+        });
+        assert("Created forum channel", !!chForum && chForum.channelType === "forum");
+
+        // Task discussion channel
+        const chTaskDisc = await WorkspaceChannelService.createChannel(workspaceId, club.auth_user_id, {
+            name: `sprint-sync-${randKey}`,
+            channelType: "task_discussion",
+            categoryId: cat2.id,
+        });
+        assert("Created task_discussion channel", !!chTaskDisc && chTaskDisc.channelType === "task_discussion");
+
+        // Reorder channels
+        const chanReorderSuccess = await WorkspaceChannelService.reorderChannels(workspaceId, club.auth_user_id, [
+            chAnnounce.id,
+            chText.id,
+        ]);
+        assert("Authorized user can reorder channels", chanReorderSuccess);
+
+        // Update channel topic & slowmode
+        const updatedChan = await WorkspaceChannelService.updateChannel(workspaceId, leadUser.id, chText.id, {
+            topic: "Architecture reviews and code snippets",
+            defaultSlowmodeSeconds: 10,
+        });
+        assert("Updated channel topic and slowmode", updatedChan.topic === "Architecture reviews and code snippets" && updatedChan.defaultSlowmodeSeconds === 10);
+
+        // =====================================================================
+        // PART 3: PRIVATE CHANNEL SECURITY & ANTI-LEAKAGE
+        // =====================================================================
+        console.log("\nPART 3: Private Channel Security & Anti-Leakage");
+
+        const chPrivate = await WorkspaceChannelService.createChannel(workspaceId, club.auth_user_id, {
+            name: `secret-leads-${randKey}`,
+            channelType: "private",
+            isPrivate: true,
+            allowedRoleIds: [deptLeadRole.id],
+        });
+        assert("Created private channel", !!chPrivate && chPrivate.isPrivate === true);
+
+        // Lead has deptLeadRole -> can view
+        const leadCanView = await WorkspaceChannelService.canViewChannel(workspaceId, chPrivate.id, leadUser.id);
+        assert("Lead with authorized role CAN view private channel", leadCanView === true);
+
+        // MemberA and MemberB lack authorized role -> CANNOT view
+        const memACanView = await WorkspaceChannelService.canViewChannel(workspaceId, chPrivate.id, memberA.id);
+        assert("Unauthorized MemberA CANNOT view private channel", memACanView === false);
+
+        // Unauthorized user getChannelDetails throws
+        let getDetailsDenied = false;
+        try {
+            await WorkspaceChannelService.getChannelDetails(workspaceId, memberA.id, chPrivate.id);
+        } catch (e) {
+            getDetailsDenied = true;
+        }
+        assert("Unauthorized user receives 404/Error when requesting channel details directly", getDetailsDenied);
+
+        // Unauthorized user listMessages throws
+        let listMessagesDenied = false;
+        try {
+            await WorkspaceChannelService.listMessages(workspaceId, memberA.id, chPrivate.id);
+        } catch (e) {
+            listMessagesDenied = true;
+        }
+        assert("Unauthorized user receives 404/Error when requesting channel messages", listMessagesDenied);
+
+        // Post message in private channel
+        await WorkspaceChannelService.sendMessage(workspaceId, leadUser.id, chPrivate.id, {
+            content: `CONFIDENTIAL: Project Apollo roadmap v${randKey}`,
+        });
+
+        // Search messages by unauthorized user must NOT reveal confidential message
+        const searchResults = await WorkspaceChannelService.searchMessages(workspaceId, memberA.id, `Project Apollo roadmap v${randKey}`);
+        assert("Message search does NOT leak confidential private channel messages", searchResults.length === 0);
+
+        // listCategories for MemberA does NOT include private channel
+        const catsForMemberA = await WorkspaceChannelService.listCategories(workspaceId, memberA.id);
+        const allChansForA = catsForMemberA.flatMap((c) => c.channels || []);
+        assert("Private channel is excluded from unauthorized user category channel list", !allChansForA.some((c) => c.id === chPrivate.id));
+
+        // =====================================================================
+        // PART 4: CHANNEL PERMISSION OVERRIDES (ROLE & MEMBER)
+        // =====================================================================
+        console.log("\nPART 4: Channel Permission Overrides");
+
+        // Explicit member override: Grant MemberA access to private channel
+        const memOverride = await WorkspaceChannelService.setChannelOverride(workspaceId, club.auth_user_id, chPrivate.id, {
+            memberId: memAMember.id,
+            allowPermissions: ["view_channel", "send_messages"],
+        });
+        assert("Configured explicit member allow override", !!memOverride);
+
+        const memACanViewNow = await WorkspaceChannelService.canViewChannel(workspaceId, chPrivate.id, memberA.id);
+        assert("MemberA CAN view private channel after explicit override grant", memACanViewNow === true);
+
+        // Delete override
+        const overrideDeleted = await WorkspaceChannelService.deleteOverride(workspaceId, club.auth_user_id, chPrivate.id, memOverride.id);
+        assert("Deleted channel override", overrideDeleted === true);
+
+        const memACanViewAfterDelete = await WorkspaceChannelService.canViewChannel(workspaceId, chPrivate.id, memberA.id);
+        assert("MemberA access revoked after override deletion", memACanViewAfterDelete === false);
+
+        // =====================================================================
+        // PART 5: MESSAGING, MENTIONS, EDIT, DELETE & PINNING
+        // =====================================================================
+        console.log("\nPART 5: Messaging, Mentions, Pinned, and Reactions");
+
+        // Send message with mentions
+        const msg1 = await WorkspaceChannelService.sendMessage(workspaceId, leadUser.id, chText.id, {
+            content: `Hey @${memberA.username} and @dept-lead please check the build!`,
+        });
+        assert("Sent message with @mentions", !!msg1);
+        assert("Mentions parsed correctly", (msg1.mentions?.users || []).includes(memberA.username.toLowerCase()));
+
+        // Edit own message
+        const editedMsg = await WorkspaceChannelService.editMessage(workspaceId, leadUser.id, msg1.id, "Hey team, build is live!");
+        assert("Author can edit own message", editedMsg.content === "Hey team, build is live!" && editedMsg.isEdited === true);
+
+        // Other user cannot edit message
+        let otherEditFailed = false;
+        try {
+            await WorkspaceChannelService.editMessage(workspaceId, memberA.id, msg1.id, "Malicious edit");
+        } catch (e) {
+            otherEditFailed = true;
+        }
+        assert("Non-author CANNOT edit someone else's message", otherEditFailed);
+
+        // Non-moderator cannot delete another's message
+        let otherDeleteFailed = false;
+        try {
+            await WorkspaceChannelService.deleteMessage(workspaceId, memberA.id, msg1.id);
+        } catch (e) {
+            otherDeleteFailed = true;
+        }
+        assert("Regular member CANNOT delete someone else's message", otherDeleteFailed);
+
+        // Pin message
+        const pinnedSuccess = await WorkspaceChannelService.togglePinMessage(workspaceId, leadUser.id, msg1.id, true);
+        assert("Authorized user can pin message", pinnedSuccess === true);
+
+        // Emoji reaction
+        const reactionAdded = await WorkspaceChannelService.toggleReaction(workspaceId, memberA.id, msg1.id, "🚀");
+        assert("Member can add emoji reaction", reactionAdded === true);
+
+        const reactionRemoved = await WorkspaceChannelService.toggleReaction(workspaceId, memberA.id, msg1.id, "🚀");
+        assert("Toggling same emoji reaction removes it", reactionRemoved === false);
+
+        // =====================================================================
+        // PART 6: THREADS & MODERATION
+        // =====================================================================
+        console.log("\nPART 6: Threads & Moderation");
+
+        // Create thread
+        const thread = await WorkspaceChannelService.createThread(workspaceId, leadUser.id, chText.id, msg1.id, "Apollo Release Thread");
+        assert("Created thread from parent message", !!thread && thread.name === "Apollo Release Thread");
+
+        // Reply in thread
+        const threadReply = await WorkspaceChannelService.sendMessage(workspaceId, memberA.id, chText.id, {
+            content: "Deployed successfully to staging cluster.",
+            threadId: thread.id,
+        });
+        assert("Posted reply in thread", !!threadReply && threadReply.threadId === thread.id);
+
+        const fetchedThread = await WorkspaceChannelService.getThread(workspaceId, leadUser.id, thread.id);
+        assert("Thread message count updated", fetchedThread.messageCount >= 1);
+
+        // Lock thread
+        const lockedThread = await WorkspaceChannelService.updateThread(workspaceId, leadUser.id, thread.id, {
+            isLocked: true,
+        });
+        assert("Lead can lock thread", lockedThread.isLocked === true);
+
+        // Regular member cannot post in locked thread
+        let lockedPostFailed = false;
+        try {
+            await WorkspaceChannelService.sendMessage(workspaceId, memberA.id, chText.id, {
+                content: "Attempting to post in locked thread",
+                threadId: thread.id,
+            });
+        } catch (e) {
+            lockedPostFailed = true;
+        }
+        assert("Regular member CANNOT post in locked thread", lockedPostFailed);
+
+        // Archive thread
+        const archivedThread = await WorkspaceChannelService.updateThread(workspaceId, leadUser.id, thread.id, {
+            isArchived: true,
+        });
+        assert("Lead can archive thread", archivedThread.isArchived === true);
+
+        // Cleanup test data
+        await query(`DELETE FROM public.workspace_threads WHERE channel_id IN ($1, $2, $3, $4, $5);`, [chText.id, chAnnounce.id, chForum.id, chTaskDisc.id, chPrivate.id]);
+        await query(`DELETE FROM public.workspace_messages WHERE channel_id IN ($1, $2, $3, $4, $5);`, [chText.id, chAnnounce.id, chForum.id, chTaskDisc.id, chPrivate.id]);
+        await query(`DELETE FROM public.workspace_channels WHERE id IN ($1, $2, $3, $4, $5);`, [chText.id, chAnnounce.id, chForum.id, chTaskDisc.id, chPrivate.id]);
+        await query(`DELETE FROM public.workspace_channel_categories WHERE id IN ($1, $2);`, [cat1.id, cat2.id]);
+        await query(`DELETE FROM public.workspace_department_members WHERE department_id IN ($1, $2);`, [dept1.id, dept2.id]);
+        await query(`DELETE FROM public.workspace_departments WHERE id IN ($1, $2);`, [dept1.id, dept2.id]);
+        await query(`DELETE FROM public.workspace_members WHERE user_id IN ($1, $2, $3);`, [leadUser.id, memberA.id, memberB.id]);
+        await query(`DELETE FROM public.users WHERE id IN ($1, $2, $3);`, [leadUser.id, memberA.id, memberB.id]);
+
     } catch (err: any) {
-        console.error("FATAL ERROR IN PHASE 04 TEST SUITE:", err);
-        process.exit(1);
+        console.error("FATAL SUITE ERROR:", err);
+        failed++;
+    } finally {
+        console.log("\n===============================================================================");
+        console.log(`PHASE 04 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
+        console.log("===============================================================================\n");
+        await pool.end();
+        process.exit(failed > 0 ? 1 : 0);
     }
 }
 

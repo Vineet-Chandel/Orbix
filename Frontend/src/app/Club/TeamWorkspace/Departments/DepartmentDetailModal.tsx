@@ -11,7 +11,6 @@ import {
     RotateCcw,
     Edit3,
     UserCheck,
-    Check,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -175,6 +174,58 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
         }
     };
 
+    const handleSaveDetails = async () => {
+        if (!editName.trim()) return toast.error("Department name cannot be empty.");
+        try {
+            setSavingDetails(true);
+            const res = await workspaceApi.updateDepartment(
+                departmentId,
+                {
+                    name: editName.trim(),
+                    description: editDesc.trim(),
+                    color: editColor,
+                },
+                clubId
+            );
+            if (res.success) {
+                toast.success("Department details updated.");
+                setIsEditingDetails(false);
+                await loadDetails();
+                onUpdated();
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to update department.");
+        } finally {
+            setSavingDetails(false);
+        }
+    };
+
+    const handleSaveScopedRole = async () => {
+        if (!editingRoleMember) return;
+        try {
+            setSavingScopedRole(true);
+            const res = await workspaceApi.updateDepartmentMemberRole(
+                departmentId,
+                editingRoleMember.memberId,
+                {
+                    departmentRole: scopedRole,
+                    roleTitle: scopedTitle.trim() || undefined,
+                },
+                clubId
+            );
+            if (res.success) {
+                toast.success("Scoped department role updated.");
+                setEditingRoleMember(null);
+                await loadDetails();
+                onUpdated();
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to update department role.");
+        } finally {
+            setSavingScopedRole(false);
+        }
+    };
+
     const handleToggleArchive = async () => {
         if (!department) return;
         try {
@@ -223,7 +274,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                             {department.name.charAt(0)}
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <h2 className="text-xl font-black text-black">{department.name}</h2>
                                 <span
                                     className={`px-2 py-0.5 text-[10px] font-black border border-black rounded ${
@@ -234,6 +285,20 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                                 >
                                     {department.status.toUpperCase()}
                                 </span>
+                                {canManage && !isEditingDetails && (
+                                    <button
+                                        onClick={() => {
+                                            setEditName(department.name);
+                                            setEditDesc(department.description || "");
+                                            setEditColor(department.color || "#4F46E5");
+                                            setIsEditingDetails(true);
+                                        }}
+                                        className="px-2 py-0.5 text-[11px] font-bold bg-neutral-100 hover:bg-neutral-200 border border-black rounded flex items-center gap-1 shadow-neo-xxs"
+                                        title="Edit department name, description, and color"
+                                    >
+                                        <Edit3 className="w-3 h-3" /> Edit Details
+                                    </button>
+                                )}
                             </div>
                             <p className="text-xs text-neutral-600 mt-0.5 font-medium">
                                 {department.description || "No department description provided."}
@@ -248,29 +313,107 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                     </button>
                 </div>
 
-                {/* Primary Lead Card */}
-                <div className="mt-5 p-4 bg-neutral-50 border-2 border-black rounded-xl shadow-neo-xs flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 border-2 border-black rounded-lg">
-                            <Shield className="w-5 h-5 text-blue-700" />
+                {/* Edit Department Details Inline Box */}
+                {isEditingDetails && (
+                    <div className="mt-4 p-4 bg-yellow-50 border-2 border-black rounded-xl space-y-3 shadow-neo-xs animate-in fade-in">
+                        <div className="font-black text-xs uppercase text-neutral-800">Edit Department Details</div>
+                        <div>
+                            <label className="text-[11px] font-bold text-neutral-700 block mb-1">Department Name</label>
+                            <input
+                                type="text"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                className="w-full px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white"
+                                placeholder="e.g. Technical Department"
+                            />
                         </div>
                         <div>
-                            <div className="text-[10px] font-black uppercase text-neutral-500">Designated Primary Lead</div>
-                            <div className="font-bold text-sm text-black">
-                                {department.leadUser
-                                    ? `${department.leadUser.firstName} ${department.leadUser.lastName} (@${department.leadUser.username})`
-                                    : "No Lead Assigned"}
+                            <label className="text-[11px] font-bold text-neutral-700 block mb-1">Description</label>
+                            <textarea
+                                value={editDesc}
+                                onChange={(e) => setEditDesc(e.target.value)}
+                                rows={2}
+                                className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white"
+                                placeholder="Operational scope and core responsibilities..."
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-bold text-neutral-700 block mb-1">Theme Color</label>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {["#2563eb", "#7c3aed", "#059669", "#dc2626", "#d97706", "#db2777", "#0891b2", "#111827"].map((c) => (
+                                    <button
+                                        key={c}
+                                        type="button"
+                                        onClick={() => setEditColor(c)}
+                                        className={`w-6 h-6 rounded-md border-2 border-black transition ${editColor === c ? "scale-125 ring-2 ring-black" : ""}`}
+                                        style={{ backgroundColor: c }}
+                                    />
+                                ))}
                             </div>
                         </div>
+                        <div className="flex items-center gap-2 pt-2">
+                            <button
+                                onClick={handleSaveDetails}
+                                disabled={savingDetails}
+                                className="px-4 py-1.5 bg-[#A6FF70] hover:bg-[#92ec5d] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-xs transition"
+                            >
+                                {savingDetails ? "Saving..." : "Save Changes"}
+                            </button>
+                            <button
+                                onClick={() => setIsEditingDetails(false)}
+                                className="px-3 py-1.5 bg-white hover:bg-neutral-100 text-neutral-800 font-bold text-xs border border-black rounded-xl"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Designated Leads Card */}
+                <div className="mt-5 p-4 bg-neutral-50 border-2 border-black rounded-xl shadow-neo-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 border-2 border-black rounded-lg">
+                                <Shield className="w-5 h-5 text-blue-700" />
+                            </div>
+                            <div>
+                                <div className="text-[10px] font-black uppercase text-neutral-500">Designated Primary Lead</div>
+                                <div className="font-bold text-sm text-black">
+                                    {department.leadUser
+                                        ? `${department.leadUser.firstName} ${department.leadUser.lastName} (@${department.leadUser.username})`
+                                        : "No Lead Assigned"}
+                                </div>
+                            </div>
+                        </div>
+
+                        {isAdmin && (
+                            <button
+                                onClick={() => setIsChangingLead(!isChangingLead)}
+                                className="px-3 py-1 text-xs font-bold bg-white hover:bg-neutral-100 border border-black rounded-lg transition"
+                            >
+                                {isChangingLead ? "Cancel" : "Change Lead"}
+                            </button>
+                        )}
                     </div>
 
-                    {isAdmin && (
-                        <button
-                            onClick={() => setIsChangingLead(!isChangingLead)}
-                            className="px-3 py-1 text-xs font-bold bg-white hover:bg-neutral-100 border border-black rounded-lg transition"
-                        >
-                            {isChangingLead ? "Cancel" : "Change Lead"}
-                        </button>
+                    {/* Co-Leads Display */}
+                    {department.coLeadUserIds && department.coLeadUserIds.length > 0 && (
+                        <div className="pt-2 border-t border-neutral-200">
+                            <div className="text-[10px] font-black uppercase text-neutral-500 mb-1">Designated Co-Leads</div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {allMembers
+                                    .filter((m) => department.coLeadUserIds?.includes(m.userId))
+                                    .map((m) => (
+                                        <span
+                                            key={m.userId}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-900 border border-black rounded-md"
+                                        >
+                                            <UserCheck className="w-3 h-3 text-amber-700" />
+                                            {m.user?.firstName || m.user?.username} (@{m.user?.username})
+                                        </span>
+                                    ))}
+                            </div>
+                        </div>
                     )}
                 </div>
 
@@ -374,9 +517,22 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                                             </td>
 
                                             <td className="p-2.5">
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border border-black bg-neutral-100">
-                                                    {m.roleTitle}
-                                                </span>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border border-black ${
+                                                        m.departmentRole === "lead"
+                                                            ? "bg-blue-100 text-blue-900"
+                                                            : m.departmentRole === "co_lead"
+                                                            ? "bg-amber-100 text-amber-900"
+                                                            : "bg-neutral-100 text-neutral-800"
+                                                    }`}>
+                                                        {m.departmentRole === "lead" ? "Lead" : m.departmentRole === "co_lead" ? "Co-Lead" : "Member"}
+                                                    </span>
+                                                    {m.roleTitle && m.roleTitle !== "Department Member" && (
+                                                        <span className="text-[10px] font-bold text-neutral-600">
+                                                            ({m.roleTitle})
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
 
                                             <td className="p-2.5 text-neutral-600">
@@ -389,6 +545,17 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                                             {canManage && (
                                                 <td className="p-2.5 text-right">
                                                     <div className="flex items-center justify-end gap-1.5">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingRoleMember(m);
+                                                                setScopedRole(m.departmentRole as any || "member");
+                                                                setScopedTitle(m.roleTitle || "");
+                                                            }}
+                                                            className="px-2 py-1 text-[10px] font-bold bg-neutral-100 hover:bg-neutral-200 border border-black rounded shadow-neo-xs flex items-center gap-1"
+                                                            title="Assign department-scoped role & title"
+                                                        >
+                                                            <Shield className="w-3 h-3 text-neutral-600" /> Role
+                                                        </button>
                                                         {allDepartments.length > 1 && (
                                                             <button
                                                                 onClick={() => setTransferringMember(m)}
@@ -463,7 +630,55 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                     </div>
                 )}
 
-                {/* Footer Controls */}
+                {/* Scoped Role Assignment Sub-dialog */}
+                {editingRoleMember && (
+                    <div className="mt-4 p-4 bg-blue-50 border-2 border-black rounded-xl space-y-3 shadow-neo-xs animate-in fade-in">
+                        <div className="text-xs font-black text-black">
+                            Assign Department Role: @{editingRoleMember.user?.username}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">Hierarchy Position</label>
+                                <NeoSelect
+                                    value={scopedRole}
+                                    onChange={(val) => setScopedRole(val as any)}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={[
+                                        { value: "member", label: "Department Member" },
+                                        { value: "co_lead", label: "Department Co-Lead" },
+                                        { value: "lead", label: "Department Lead" },
+                                    ]}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-neutral-600 block mb-1">Custom Role Title</label>
+                                <input
+                                    type="text"
+                                    value={scopedTitle}
+                                    onChange={(e) => setScopedTitle(e.target.value)}
+                                    placeholder="e.g. Lead Engineer, Senior Designer"
+                                    className="w-full px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1">
+                            <button
+                                onClick={handleSaveScopedRole}
+                                disabled={savingScopedRole}
+                                className="px-3 py-1.5 bg-[#A6FF70] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-xs hover:bg-[#92ec5d] transition"
+                            >
+                                {savingScopedRole ? "Saving..." : "Save Scoped Role"}
+                            </button>
+                            <button
+                                onClick={() => setEditingRoleMember(null)}
+                                className="px-2 py-1.5 text-xs font-bold text-neutral-600 hover:text-black"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div className="mt-6 pt-4 border-t-2 border-black flex items-center justify-between">
                     {isAdmin && (
                         <button

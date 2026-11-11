@@ -4,6 +4,7 @@ import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { WorkspaceNotificationService } from "./workspaceNotificationService.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import { workspaceEventBus } from "./workspaceChannelService.js";
 import type {
     WorkspaceDepartment,
     WorkspaceDepartmentMember,
@@ -415,8 +416,15 @@ export class WorkspaceDepartmentService {
             userAgent: reqMeta.userAgent || null,
         });
 
-        // Invalidate capabilities cache for target member
-        await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetMember.user_id);
+        // Invalidate capabilities and directory caches for target member
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, targetMember.user_id);
+        await WorkspaceRedisService.invalidateOnDepartmentChange(workspaceId, departmentId);
+
+        workspaceEventBus.emit(`workspace:${workspaceId}`, {
+            event: "department:member_added",
+            payload: { departmentId, memberId: targetMember.id, userId: targetMember.user_id, role },
+            timestamp: new Date().toISOString(),
+        });
 
         // Notify member of department assignment
         const actor = await WorkspaceRepository.findMemberByUserId(workspaceId, actorUserId);
@@ -476,8 +484,15 @@ export class WorkspaceDepartmentService {
             );
             const targetUserId = targetMemberRes.rows[0]?.user_id;
             if (targetUserId) {
-                // Invalidate capabilities cache for removed member
-                await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetUserId);
+                // Invalidate capabilities, security, and department caches
+                await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, targetUserId);
+                await WorkspaceRedisService.invalidateOnDepartmentChange(workspaceId, departmentId);
+
+                workspaceEventBus.emit(`workspace:${workspaceId}`, {
+                    event: "department:member_removed",
+                    payload: { departmentId, memberId, userId: targetUserId },
+                    timestamp: new Date().toISOString(),
+                });
 
                 const actor = await WorkspaceRepository.findMemberByUserId(workspaceId, actorUserId);
                 const actorName = actor?.user ? `${actor.user.firstName || ""} ${actor.user.lastName || actor.user.username}`.trim() : "Workspace Lead";
@@ -610,9 +625,16 @@ export class WorkspaceDepartmentService {
                 userAgent: reqMeta.userAgent || null,
             });
 
-            // 3. Dynamic cache invalidation
-            await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, member.user_id);
-            await WorkspaceRedisService.invalidateDashboardMetrics(workspaceId);
+            // 3. Dynamic cache invalidation across both departments
+            await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, member.user_id);
+            await WorkspaceRedisService.invalidateOnDepartmentChange(workspaceId, fromDeptId);
+            await WorkspaceRedisService.invalidateOnDepartmentChange(workspaceId, toDeptId);
+
+            workspaceEventBus.emit(`workspace:${workspaceId}`, {
+                event: "department:member_transferred",
+                payload: { memberId, fromDepartmentId: fromDeptId, toDepartmentId: toDeptId, userId: member.user_id },
+                timestamp: new Date().toISOString(),
+            });
         }
 
         return success;
@@ -643,5 +665,31 @@ export class WorkspaceDepartmentService {
 
         const members = await WorkspaceRepository.listDepartmentMembers(workspaceId, departmentId);
         return { department: dept, members };
+    }
+
+    /**
+     * Determines whether a user can access department-scoped confidential data/events
+     */
+    static async canUserAccessDepartment(
+        workspaceId: string,
+        departmentId: string,
+        userId: string
+    ): Promise<boolean> {
+        try {
+            const context = await WorkspaceService.resolveContext(workspaceId, userId);
+            if (!context || (!context.member && !context.isOwner)) return false;
+            if (context.isOwner || context.isAdmin || context.isWorkspaceManager) return true;
+
+            if (context.member?.departmentId === departmentId) return true;
+            if (context.leadDepartmentIds?.includes(departmentId)) return true;
+
+            if (context.member?.id) {
+                const extraDepts = await WorkspaceRepository.listMemberDepartments(workspaceId, context.member.id);
+                return extraDepts.some((d) => d.id === departmentId);
+            }
+            return false;
+        } catch {
+            return false;
+        }
     }
 }

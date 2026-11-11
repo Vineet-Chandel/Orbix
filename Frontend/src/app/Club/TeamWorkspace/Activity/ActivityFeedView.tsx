@@ -23,6 +23,7 @@ interface ActivityFeedViewProps {
     clubId: string;
     departments: WorkspaceDepartment[];
     members: WorkspaceMember[];
+    currentMember?: WorkspaceMember | null;
     onNavigate?: (url: string) => void;
 }
 
@@ -39,12 +40,16 @@ export const ActivityFeedView: React.FC<ActivityFeedViewProps> = ({
     clubId,
     departments,
     members,
+    currentMember,
 }) => {
     const toast = useToast();
     const [events, setEvents] = useState<WorkspaceActivityEvent[]>([]);
     const [total, setTotal] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
     const [refreshing, setRefreshing] = useState<boolean>(false);
+
+    // Primary Scope: Workspace vs Department vs Personal
+    const [activityScope, setActivityScope] = useState<"workspace" | "department" | "personal">("workspace");
 
     // Filters
     const [selectedDeptId, setSelectedDeptId] = useState<string>("");
@@ -243,6 +248,61 @@ export const ActivityFeedView: React.FC<ActivityFeedViewProps> = ({
                         <span>Refresh</span>
                     </button>
                 </div>
+            </div>
+
+            {/* Scope Navigation Tabs (Workspace, Department, Personal) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                    onClick={() => {
+                        setActivityScope("workspace");
+                        setSelectedDeptId("");
+                        setSelectedActorId("");
+                    }}
+                    className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                        activityScope === "workspace"
+                            ? "bg-[#FFE566] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                            : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                    }`}
+                >
+                    <Activity className="w-3.5 h-3.5" />
+                    Workspace Activity
+                </button>
+
+                <button
+                    onClick={() => {
+                        setActivityScope("department");
+                        setSelectedActorId("");
+                        if (!selectedDeptId && (currentMember?.departmentId || departments[0]?.id)) {
+                            setSelectedDeptId(currentMember?.departmentId || departments[0]?.id || "");
+                        }
+                    }}
+                    className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                        activityScope === "department"
+                            ? "bg-[#FFE566] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                            : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                    }`}
+                >
+                    <Users className="w-3.5 h-3.5" />
+                    Department Activity
+                </button>
+
+                <button
+                    onClick={() => {
+                        setActivityScope("personal");
+                        setSelectedDeptId("");
+                        if (currentMember?.userId) {
+                            setSelectedActorId(currentMember.userId);
+                        }
+                    }}
+                    className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                        activityScope === "personal"
+                            ? "bg-[#FFE566] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                            : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                    }`}
+                >
+                    <Clock className="w-3.5 h-3.5" />
+                    Personal Activity
+                </button>
             </div>
 
             {/* Filter Bar */}

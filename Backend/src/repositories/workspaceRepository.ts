@@ -47,6 +47,12 @@ import type {
     WorkspaceSearchResultItem,
     WorkspaceSearchResultType,
     WorkspaceSearchResponse,
+    WorkspaceRecognitionPolicy,
+    WorkspaceRecognitionCategory,
+    WorkspaceRecognitionBudget,
+    WorkspaceRecognitionLedgerEntry,
+    WorkspaceRecognitionPeriodAggregate,
+    MemberRecognitionSummary,
 } from "../types/workspaceTypes.js";
 
 export class WorkspaceRepository {
@@ -917,6 +923,36 @@ export class WorkspaceRepository {
         }
     }
 
+    /**
+     * Updates ranks for custom roles in a single transaction.
+     */
+    static async reorderRoles(
+        workspaceId: string,
+        roleRankUpdates: { id: string; rank: number }[]
+    ): Promise<WorkspaceRole[]> {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN;");
+
+            for (const item of roleRankUpdates) {
+                await client.query(
+                    `UPDATE public.workspace_roles
+                     SET rank = $3, updated_at = NOW()
+                     WHERE workspace_id = $1 AND id = $2 AND is_system = false;`,
+                    [workspaceId, item.id, item.rank]
+                );
+            }
+
+            await client.query("COMMIT;");
+            return await this.listRoles(workspaceId);
+        } catch (err) {
+            await client.query("ROLLBACK;");
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+
     // =========================================================================
     // 5. WORKSPACE MEMBERSHIP (WITH MULTI-DEPARTMENT AGGREGATION)
     // =========================================================================
@@ -1635,6 +1671,21 @@ export class WorkspaceRepository {
         return (res.rowCount ?? 0) > 0;
     }
 
+    static async reorderCategories(
+        workspaceId: string,
+        categoryIds: string[]
+    ): Promise<boolean> {
+        for (let i = 0; i < categoryIds.length; i++) {
+            await query(
+                `UPDATE public.workspace_channel_categories
+                 SET display_order = $1, updated_at = NOW()
+                 WHERE workspace_id = $2 AND id = $3;`,
+                [i, workspaceId, categoryIds[i]]
+            );
+        }
+        return true;
+    }
+
     // =========================================================================
 
     static async createChannel(
@@ -1926,6 +1977,21 @@ export class WorkspaceRepository {
             [workspaceId, channelId]
         );
         return (res.rowCount ?? 0) > 0;
+    }
+
+    static async reorderChannels(
+        workspaceId: string,
+        channelIds: string[]
+    ): Promise<boolean> {
+        for (let i = 0; i < channelIds.length; i++) {
+            await query(
+                `UPDATE public.workspace_channels
+                 SET position = $1, updated_at = NOW()
+                 WHERE workspace_id = $2 AND id = $3;`,
+                [i, workspaceId, channelIds[i]]
+            );
+        }
+        return true;
     }
 
     // =========================================================================
@@ -3149,6 +3215,75 @@ export class WorkspaceRepository {
                     JOIN public.users au ON au.id = wta.user_id
                     WHERE wta.task_id = wt.id
                 ), '[]'::json) AS "reassignmentHistory",
+                COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'id', sub.id,
+                            'workspaceId', sub.workspace_id,
+                            'taskId', sub.task_id,
+                            'submittedBy', sub.submitted_by,
+                            'content', sub.content,
+                            'attachments', sub.attachments,
+                            'status', sub.status,
+                            'createdAt', sub.created_at,
+                            'updatedAt', sub.updated_at,
+                            'submitter', json_build_object(
+                                'id', su.id,
+                                'username', su.username,
+                                'firstName', su.firstname,
+                                'lastName', su.lastname,
+                                'avatarUrl', su.avatar_url
+                            ),
+                            'review', (
+                                SELECT json_build_object(
+                                    'id', rev.id,
+                                    'decision', rev.decision,
+                                    'comments', rev.comments,
+                                    'createdAt', rev.created_at,
+                                    'reviewer', json_build_object(
+                                        'id', ru.id,
+                                        'username', ru.username,
+                                        'firstName', ru.firstname,
+                                        'lastName', ru.lastname,
+                                        'avatarUrl', ru.avatar_url
+                                    )
+                                )
+                                FROM public.workspace_task_reviews rev
+                                JOIN public.users ru ON ru.id = rev.reviewer_id
+                                WHERE rev.submission_id = sub.id
+                                ORDER BY rev.created_at DESC
+                                LIMIT 1
+                            )
+                        ) ORDER BY sub.created_at DESC
+                    )
+                    FROM public.workspace_task_submissions sub
+                    JOIN public.users su ON su.id = sub.submitted_by
+                    WHERE sub.task_id = wt.id
+                ), '[]'::json) AS "submissions",
+                COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'id', rev.id,
+                            'workspaceId', rev.workspace_id,
+                            'taskId', rev.task_id,
+                            'submissionId', rev.submission_id,
+                            'reviewerId', rev.reviewer_id,
+                            'decision', rev.decision,
+                            'comments', rev.comments,
+                            'createdAt', rev.created_at,
+                            'reviewer', json_build_object(
+                                'id', ru.id,
+                                'username', ru.username,
+                                'firstName', ru.firstname,
+                                'lastName', ru.lastname,
+                                'avatarUrl', ru.avatar_url
+                            )
+                        ) ORDER BY rev.created_at DESC
+                    )
+                    FROM public.workspace_task_reviews rev
+                    JOIN public.users ru ON ru.id = rev.reviewer_id
+                    WHERE rev.task_id = wt.id
+                ), '[]'::json) AS "reviews",
                 (
                     SELECT json_build_object(
                         'id', sub.id,
@@ -3248,12 +3383,13 @@ export class WorkspaceRepository {
             priority?: WorkspaceTaskPriority;
             assigneeUserId?: string;
             creatorId?: string;
+            assignedByUserId?: string;
             search?: string;
             isArchived?: boolean;
             allowedDepartmentIds?: string[];
             isRestrictedIsolation?: boolean;
             actorUserId?: string;
-            sortBy?: "created_at" | "due_date" | "priority" | "display_order";
+            sortBy?: "created_at" | "due_date" | "priority" | "display_order" | "title";
             sortDir?: "asc" | "desc";
             limit?: number;
             offset?: number;
@@ -3309,6 +3445,15 @@ export class WorkspaceRepository {
             params.push(options.assigneeUserId);
         }
 
+        // Assigned by filter
+        if (options.assignedByUserId) {
+            where += ` AND EXISTS (
+                SELECT 1 FROM public.workspace_task_assignments wta_by
+                WHERE wta_by.task_id = wt.id AND wta_by.assigned_by = $${idx++} AND wta_by.is_active = true
+            )`;
+            params.push(options.assignedByUserId);
+        }
+
         // Search (title or description)
         if (options.search) {
             where += ` AND (wt.title ILIKE $${idx} OR wt.description ILIKE $${idx})`;
@@ -3343,6 +3488,8 @@ export class WorkspaceRepository {
             ? "wt.due_date" 
             : options.sortBy === "priority"
             ? "CASE wt.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END"
+            : options.sortBy === "title"
+            ? "wt.title"
             : options.sortBy === "display_order"
             ? "wt.display_order"
             : "wt.created_at";
@@ -3454,16 +3601,17 @@ export class WorkspaceRepository {
     static async getMyTasks(
         workspaceId: string,
         userId: string,
-        tab: "assigned_to_me" | "created_by_me" | "due_soon" | "overdue" | "completed" | "awaiting_review",
+        tab: "assigned_to_me" | "created_by_me" | "assigned_by_me" | "department_tasks" | "due_soon" | "overdue" | "completed" | "awaiting_review" | "archived",
         options: {
             allowedDepartmentIds?: string[];
             isReviewer?: boolean;
         } = {}
     ): Promise<WorkspaceTask[]> {
         let condition = "";
-        const params: any[] = [workspaceId, userId];
+        const params: any[] = [workspaceId];
 
         if (tab === "assigned_to_me") {
+            params.push(userId);
             condition = `
                 EXISTS (
                     SELECT 1 FROM public.workspace_task_assignments a 
@@ -3473,11 +3621,30 @@ export class WorkspaceRepository {
                 AND wt.status NOT IN ('completed', 'cancelled')
             `;
         } else if (tab === "created_by_me") {
+            params.push(userId);
             condition = `
                 wt.creator_id = $2
                 AND wt.is_archived = false
             `;
+        } else if (tab === "assigned_by_me") {
+            params.push(userId);
+            condition = `
+                EXISTS (
+                    SELECT 1 FROM public.workspace_task_assignments a 
+                    WHERE a.task_id = wt.id AND a.assigned_by = $2 AND a.is_active = true
+                )
+                AND wt.is_archived = false
+            `;
+        } else if (tab === "department_tasks") {
+            const allowedDepts = options.allowedDepartmentIds || [];
+            params.push(allowedDepts);
+            condition = `
+                wt.department_id IS NOT NULL 
+                AND wt.department_id = ANY($2)
+                AND wt.is_archived = false
+            `;
         } else if (tab === "due_soon") {
+            params.push(userId);
             condition = `
                 wt.due_date IS NOT NULL
                 AND wt.due_date >= NOW()
@@ -3493,6 +3660,7 @@ export class WorkspaceRepository {
                 )
             `;
         } else if (tab === "overdue") {
+            params.push(userId);
             condition = `
                 wt.due_date IS NOT NULL
                 AND wt.due_date < NOW()
@@ -3507,6 +3675,7 @@ export class WorkspaceRepository {
                 )
             `;
         } else if (tab === "completed") {
+            params.push(userId);
             condition = `
                 wt.status IN ('completed', 'approved')
                 AND wt.is_archived = false
@@ -3519,7 +3688,9 @@ export class WorkspaceRepository {
                 )
             `;
         } else if (tab === "awaiting_review") {
+            params.push(userId);
             const allowedDepts = options.allowedDepartmentIds || [];
+            params.push(allowedDepts);
             condition = `
                 wt.status = 'submitted'
                 AND wt.is_archived = false
@@ -3529,7 +3700,22 @@ export class WorkspaceRepository {
                     ${options.isReviewer ? "OR wt.department_id IS NULL" : ""}
                 )
             `;
+        } else if (tab === "archived") {
+            params.push(userId);
+            const allowedDepts = options.allowedDepartmentIds || [];
             params.push(allowedDepts);
+            condition = `
+                wt.is_archived = true
+                AND (
+                    wt.creator_id = $2
+                    OR EXISTS (
+                        SELECT 1 FROM public.workspace_task_assignments a
+                        WHERE a.task_id = wt.id AND a.user_id = $2
+                    )
+                    OR (wt.department_id IS NOT NULL AND wt.department_id = ANY($3))
+                    ${options.isReviewer ? "OR wt.department_id IS NULL" : ""}
+                )
+            `;
         }
 
         const res = await query(
@@ -5125,6 +5311,118 @@ export class WorkspaceRepository {
         };
     }
 
+    static async updateWorkspaceFile(
+        workspaceId: string,
+        fileId: string,
+        updates: {
+            fileName?: string;
+            fileSizeBytes?: number;
+            mimeType?: string;
+            cloudinaryPublicId?: string;
+            cloudinaryAssetId?: string | null;
+            cloudinaryUrl?: string;
+            cloudinarySecureUrl?: string;
+            resourceType?: string;
+            format?: string | null;
+            checksum?: string | null;
+            purpose?: string;
+            departmentId?: string | null;
+        },
+        clientOrNull?: any
+    ): Promise<WorkspaceFile | null> {
+        const executor = clientOrNull || { query };
+        const setClauses: string[] = ["updated_at = NOW()"];
+        const values: any[] = [workspaceId, fileId];
+        let idx = 3;
+
+        if (updates.fileName !== undefined) {
+            setClauses.push(`file_name = $${idx++}`);
+            values.push(updates.fileName);
+        }
+        if (updates.fileSizeBytes !== undefined) {
+            setClauses.push(`file_size_bytes = $${idx++}`);
+            values.push(updates.fileSizeBytes);
+        }
+        if (updates.mimeType !== undefined) {
+            setClauses.push(`mime_type = $${idx++}`);
+            values.push(updates.mimeType);
+        }
+        if (updates.cloudinaryPublicId !== undefined) {
+            setClauses.push(`cloudinary_public_id = $${idx++}`);
+            values.push(updates.cloudinaryPublicId);
+        }
+        if (updates.cloudinaryAssetId !== undefined) {
+            setClauses.push(`cloudinary_asset_id = $${idx++}`);
+            values.push(updates.cloudinaryAssetId);
+        }
+        if (updates.cloudinaryUrl !== undefined) {
+            setClauses.push(`cloudinary_url = $${idx++}`);
+            values.push(updates.cloudinaryUrl);
+        }
+        if (updates.cloudinarySecureUrl !== undefined) {
+            setClauses.push(`cloudinary_secure_url = $${idx++}`);
+            values.push(updates.cloudinarySecureUrl);
+        }
+        if (updates.resourceType !== undefined) {
+            setClauses.push(`resource_type = $${idx++}`);
+            values.push(updates.resourceType);
+        }
+        if (updates.format !== undefined) {
+            setClauses.push(`format = $${idx++}`);
+            values.push(updates.format);
+        }
+        if (updates.checksum !== undefined) {
+            setClauses.push(`checksum = $${idx++}`);
+            values.push(updates.checksum);
+        }
+        if (updates.purpose !== undefined) {
+            setClauses.push(`purpose = $${idx++}`);
+            values.push(updates.purpose);
+        }
+        if (updates.departmentId !== undefined) {
+            setClauses.push(`department_id = $${idx++}`);
+            values.push(updates.departmentId);
+        }
+
+        const res = await executor.query(
+            `UPDATE public.workspace_files
+             SET ${setClauses.join(", ")}
+             WHERE workspace_id = $1 AND id = $2 AND deleted_at IS NULL
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                uploader_id AS "uploaderId",
+                channel_id AS "channelId",
+                message_id AS "messageId",
+                task_id AS "taskId",
+                department_id AS "departmentId",
+                submission_id AS "submissionId",
+                file_name AS "fileName",
+                file_size_bytes AS "fileSizeBytes",
+                mime_type AS "mimeType",
+                cloudinary_public_id AS "cloudinaryPublicId",
+                cloudinary_asset_id AS "cloudinaryAssetId",
+                cloudinary_url AS "cloudinaryUrl",
+                cloudinary_secure_url AS "cloudinarySecureUrl",
+                resource_type AS "resourceType",
+                delivery_type AS "deliveryType",
+                format,
+                checksum,
+                purpose,
+                parent_resource_type AS "parentResourceType",
+                parent_resource_id AS "parentResourceId",
+                asset_status AS "assetStatus",
+                is_archived AS "isArchived",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt",
+                deleted_at AS "deletedAt";`,
+            values
+        );
+
+        if (!res.rows[0]) return null;
+        return this.mapWorkspaceFileRow(res.rows[0]);
+    }
+
     static async softDeleteWorkspaceFile(
         workspaceId: string,
         fileId: string,
@@ -6168,6 +6466,7 @@ export class WorkspaceRepository {
             department: 0,
             task: 0,
             file: 0,
+            discussion: 0,
         };
 
         // 1. Search Channels (Only public channels OR private channels caller is permitted to access)
@@ -6360,6 +6659,33 @@ export class WorkspaceRepository {
             results.push(...fileRes.rows);
         }
 
+        // 7. Search Discussions / Threads (Only in accessible channels)
+        if (typeFilter === "all" || typeFilter === "discussion") {
+            const threadRes = await query(
+                `SELECT
+                    th.id,
+                    'discussion'::text AS type,
+                    th.name AS title,
+                    'Thread in #' || c.name || ' • ' || th.message_count || ' replies' AS snippet,
+                    '/club/' || w.club_id || '/workspace/channels/' || c.id || '?thread=' || th.id AS "destinationUrl",
+                    c.department_id AS "departmentId",
+                    d.name AS "departmentName",
+                    th.created_at AS "createdAt"
+                 FROM public.workspace_threads th
+                 JOIN public.workspace_channels c ON c.id = th.channel_id
+                 JOIN public.team_workspaces w ON w.id = th.workspace_id
+                 LEFT JOIN public.workspace_departments d ON d.id = c.department_id
+                 WHERE th.workspace_id = $1 AND th.is_archived = false
+                   AND th.name ILIKE $2
+                   AND (c.is_private = false OR c.id = ANY($3::uuid[]))
+                 ORDER BY th.created_at DESC
+                 LIMIT 20;`,
+                [workspaceId, searchPattern, allowedPrivateChannelIds]
+            );
+            countsByType.discussion = threadRes.rows.length;
+            results.push(...threadRes.rows);
+        }
+
         // Sort combined results by createdAt descending and slice to limit
         results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         const paginatedResults = results.slice(0, limit);
@@ -6446,5 +6772,1497 @@ export class WorkspaceRepository {
         );
         return res.rows;
     }
+
+    // =========================================================================
+    // 15. ORBIX RECOGNITION, IMMUTABLE LEDGER & ORBITS ENGINE
+    // =========================================================================
+
+    /**
+     * Retrieves or lazily initializes the recognition policy for a workspace.
+     */
+    static async getRecognitionPolicy(
+        workspaceId: string,
+        clientOrQuery: any = null
+    ): Promise<WorkspaceRecognitionPolicy> {
+        const executor = clientOrQuery || { query };
+        const res = await executor.query(
+            `SELECT
+                workspace_id AS "workspaceId",
+                is_enabled AS "isEnabled",
+                point_unit_name AS "pointUnitName",
+                min_points_per_award AS "minPointsPerAward",
+                max_points_per_award AS "maxPointsPerAward",
+                manager_monthly_budget AS "managerMonthlyBudget",
+                recipient_monthly_cap AS "recipientMonthlyCap",
+                daily_award_limit_per_issuer AS "dailyAwardLimitPerIssuer",
+                require_task_link AS "requireTaskLink",
+                require_evidence_link AS "requireEvidenceLink",
+                min_reason_length AS "minReasonLength",
+                is_workspace_visible AS "isWorkspaceVisible",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt",
+                updated_by AS "updatedBy"
+             FROM public.workspace_recognition_policies
+             WHERE workspace_id = $1
+             LIMIT 1;`,
+            [workspaceId]
+        );
+
+        if (res.rows[0]) {
+            return res.rows[0];
+        }
+
+        // Lazy auto-provision default policy
+        const insertRes = await executor.query(
+            `INSERT INTO public.workspace_recognition_policies (
+                workspace_id,
+                is_enabled,
+                point_unit_name,
+                min_points_per_award,
+                max_points_per_award,
+                manager_monthly_budget,
+                recipient_monthly_cap,
+                daily_award_limit_per_issuer,
+                require_task_link,
+                require_evidence_link,
+                min_reason_length,
+                is_workspace_visible
+             ) VALUES ($1, true, 'Orbits', 5, 50, 500, 150, 5, false, false, 15, true)
+             ON CONFLICT (workspace_id) DO UPDATE SET updated_at = NOW()
+             RETURNING
+                workspace_id AS "workspaceId",
+                is_enabled AS "isEnabled",
+                point_unit_name AS "pointUnitName",
+                min_points_per_award AS "minPointsPerAward",
+                max_points_per_award AS "maxPointsPerAward",
+                manager_monthly_budget AS "managerMonthlyBudget",
+                recipient_monthly_cap AS "recipientMonthlyCap",
+                daily_award_limit_per_issuer AS "dailyAwardLimitPerIssuer",
+                require_task_link AS "requireTaskLink",
+                require_evidence_link AS "requireEvidenceLink",
+                min_reason_length AS "minReasonLength",
+                is_workspace_visible AS "isWorkspaceVisible",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt",
+                updated_by AS "updatedBy";`,
+            [workspaceId]
+        );
+        return insertRes.rows[0];
+    }
+
+    /**
+     * Updates recognition policy configurations for a workspace.
+     */
+    static async updateRecognitionPolicy(
+        clientOrQuery: any,
+        workspaceId: string,
+        updates: Partial<WorkspaceRecognitionPolicy>,
+        updatedByUserId: string
+    ): Promise<WorkspaceRecognitionPolicy> {
+        const executor = clientOrQuery || { query };
+        const current = await this.getRecognitionPolicy(workspaceId, executor);
+
+        const isEnabled = updates.isEnabled !== undefined ? updates.isEnabled : current.isEnabled;
+        const pointUnitName = updates.pointUnitName || current.pointUnitName || "Orbits";
+        const minPoints = updates.minPointsPerAward ?? current.minPointsPerAward;
+        const maxPoints = updates.maxPointsPerAward ?? current.maxPointsPerAward;
+        const managerBudget = updates.managerMonthlyBudget ?? current.managerMonthlyBudget;
+        const recipientCap = updates.recipientMonthlyCap ?? current.recipientMonthlyCap;
+        const dailyLimit = updates.dailyAwardLimitPerIssuer ?? current.dailyAwardLimitPerIssuer;
+        const reqTask = updates.requireTaskLink !== undefined ? updates.requireTaskLink : current.requireTaskLink;
+        const reqEvidence = updates.requireEvidenceLink !== undefined ? updates.requireEvidenceLink : current.requireEvidenceLink;
+        const minReasonLen = updates.minReasonLength ?? current.minReasonLength;
+        const isVisible = updates.isWorkspaceVisible !== undefined ? updates.isWorkspaceVisible : current.isWorkspaceVisible;
+
+        const res = await executor.query(
+            `UPDATE public.workspace_recognition_policies
+             SET
+                is_enabled = $2,
+                point_unit_name = $3,
+                min_points_per_award = $4,
+                max_points_per_award = $5,
+                manager_monthly_budget = $6,
+                recipient_monthly_cap = $7,
+                daily_award_limit_per_issuer = $8,
+                require_task_link = $9,
+                require_evidence_link = $10,
+                min_reason_length = $11,
+                is_workspace_visible = $12,
+                updated_by = $13,
+                updated_at = NOW()
+             WHERE workspace_id = $1
+             RETURNING
+                workspace_id AS "workspaceId",
+                is_enabled AS "isEnabled",
+                point_unit_name AS "pointUnitName",
+                min_points_per_award AS "minPointsPerAward",
+                max_points_per_award AS "maxPointsPerAward",
+                manager_monthly_budget AS "managerMonthlyBudget",
+                recipient_monthly_cap AS "recipientMonthlyCap",
+                daily_award_limit_per_issuer AS "dailyAwardLimitPerIssuer",
+                require_task_link AS "requireTaskLink",
+                require_evidence_link AS "requireEvidenceLink",
+                min_reason_length AS "minReasonLength",
+                is_workspace_visible AS "isWorkspaceVisible",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt",
+                updated_by AS "updatedBy";`,
+            [
+                workspaceId,
+                isEnabled,
+                pointUnitName,
+                minPoints,
+                maxPoints,
+                managerBudget,
+                recipientCap,
+                dailyLimit,
+                reqTask,
+                reqEvidence,
+                minReasonLen,
+                isVisible,
+                updatedByUserId,
+            ]
+        );
+        return res.rows[0];
+    }
+
+    /**
+     * Seeds the standard 9 default categories if none exist in the workspace.
+     */
+    static async seedDefaultRecognitionCategories(
+        clientOrQuery: any,
+        workspaceId: string
+    ): Promise<WorkspaceRecognitionCategory[]> {
+        const executor = clientOrQuery || { query };
+        const defaults = [
+            { name: "Outstanding Work", slug: "outstanding_work", description: "Exceptional quality and delivery.", icon: "Award", displayOrder: 1 },
+            { name: "Teamwork", slug: "teamwork", description: "Collaboration and assisting teammates.", icon: "Users", displayOrder: 2 },
+            { name: "Initiative", slug: "initiative", description: "Independently identifying and solving problems.", icon: "Zap", displayOrder: 3 },
+            { name: "Reliability", slug: "reliability", description: "Consistency, punctuality, and ownership.", icon: "ClockCheck", displayOrder: 4 },
+            { name: "Leadership", slug: "leadership", description: "Coordinating and motivating others.", icon: "Compass", displayOrder: 5 },
+            { name: "Creativity", slug: "creativity", description: "Original ideas and innovative approaches.", icon: "Sparkles", displayOrder: 6 },
+            { name: "Problem Solving", slug: "problem_solving", description: "Resolving difficult technical or operational challenges.", icon: "Wrench", displayOrder: 7 },
+            { name: "Mentorship", slug: "mentorship", description: "Helping others improve their skills and grow.", icon: "GraduationCap", displayOrder: 8 },
+            { name: "Impact", slug: "impact", description: "Meaningful contribution to the club and campus.", icon: "Flame", displayOrder: 9 },
+        ];
+
+        for (const cat of defaults) {
+            await executor.query(
+                `INSERT INTO public.workspace_recognition_categories (
+                    workspace_id, name, slug, description, icon, is_system, is_active, display_order
+                ) VALUES ($1, $2, $3, $4, $5, true, true, $6)
+                ON CONFLICT (workspace_id, slug) DO UPDATE SET
+                    description = EXCLUDED.description,
+                    icon = EXCLUDED.icon;`,
+                [workspaceId, cat.name, cat.slug, cat.description, cat.icon, cat.displayOrder]
+            );
+        }
+
+        return this.listRecognitionCategories(workspaceId, false, executor);
+    }
+
+    /**
+     * Lists recognition categories in a workspace.
+     */
+    static async listRecognitionCategories(
+        workspaceId: string,
+        activeOnly = true,
+        clientOrQuery: any = null
+    ): Promise<WorkspaceRecognitionCategory[]> {
+        const executor = clientOrQuery || { query };
+        let sql = `
+            SELECT
+                id,
+                workspace_id AS "workspaceId",
+                name,
+                slug,
+                description,
+                icon,
+                is_system AS "isSystem",
+                is_active AS "isActive",
+                display_order AS "displayOrder",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt"
+            FROM public.workspace_recognition_categories
+            WHERE workspace_id = $1`;
+        
+        if (activeOnly) {
+            sql += ` AND is_active = true`;
+        }
+        sql += ` ORDER BY display_order ASC, name ASC;`;
+
+        const res = await executor.query(sql, [workspaceId]);
+        if (res.rows.length === 0) {
+            return this.seedDefaultRecognitionCategories(executor, workspaceId);
+        }
+        return res.rows;
+    }
+
+    /**
+     * Finds a recognition category by slug or UUID.
+     */
+    static async findRecognitionCategoryBySlugOrId(
+        workspaceId: string,
+        slugOrId: string,
+        clientOrQuery: any = null
+    ): Promise<WorkspaceRecognitionCategory | null> {
+        const executor = clientOrQuery || { query };
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slugOrId);
+        const res = await executor.query(
+            `SELECT
+                id,
+                workspace_id AS "workspaceId",
+                name,
+                slug,
+                description,
+                icon,
+                is_system AS "isSystem",
+                is_active AS "isActive",
+                display_order AS "displayOrder",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt"
+             FROM public.workspace_recognition_categories
+             WHERE workspace_id = $1
+               AND (${isUuid ? `id = $2 OR slug = $2` : `slug = $2`})
+             LIMIT 1;`,
+            [workspaceId, slugOrId]
+        );
+        return res.rows[0] || null;
+    }
+
+    /**
+     * Updates an existing recognition category (toggle active, change description/icon).
+     */
+    static async updateRecognitionCategory(
+        workspaceId: string,
+        categoryId: string,
+        updates: { isActive?: boolean; name?: string; description?: string; icon?: string }
+    ): Promise<WorkspaceRecognitionCategory> {
+        const fields: string[] = [];
+        const values: any[] = [workspaceId, categoryId];
+        let idx = 3;
+
+        if (updates.isActive !== undefined) {
+            fields.push(`is_active = $${idx++}`);
+            values.push(updates.isActive);
+        }
+        if (updates.name !== undefined) {
+            fields.push(`name = $${idx++}`);
+            values.push(updates.name);
+        }
+        if (updates.description !== undefined) {
+            fields.push(`description = $${idx++}`);
+            values.push(updates.description);
+        }
+        if (updates.icon !== undefined) {
+            fields.push(`icon = $${idx++}`);
+            values.push(updates.icon);
+        }
+        fields.push("updated_at = NOW()");
+
+        const res = await query(
+            `UPDATE public.workspace_recognition_categories
+             SET ${fields.join(", ")}
+             WHERE workspace_id = $1 AND id = $2
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                name,
+                slug,
+                description,
+                icon,
+                is_system AS "isSystem",
+                is_active AS "isActive",
+                display_order AS "displayOrder",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt";`,
+            values
+        );
+        return res.rows[0];
+    }
+
+    /**
+     * Lists all manager budgets for a workspace in the specified month.
+     */
+    static async listRecognitionBudgets(
+        workspaceId: string,
+        yearMonth: string = new Date().toISOString().slice(0, 7)
+    ): Promise<Array<WorkspaceRecognitionBudget & { user: any }>> {
+        const ws = await this.findById(workspaceId);
+        const managersRes = await query(
+            `SELECT DISTINCT wm.user_id, u.username, u.firstname, u.lastname, u.avatar_url, wm.role_title, wr.rank
+             FROM public.workspace_members wm
+             JOIN public.users u ON u.id = wm.user_id
+             JOIN public.workspace_roles wr ON wr.id = wm.role_id
+             WHERE wm.workspace_id = $1
+               AND wm.membership_status = 'active'
+               AND (wr.rank >= 800 OR wm.user_id = $2)
+               AND wr.rank < 1000;`,
+            [workspaceId, ws?.managerUserId || null]
+        );
+
+        const budgets: any[] = [];
+        for (const mgr of managersRes.rows) {
+            const b = await this.getOrCreateRecognitionBudget(null, workspaceId, mgr.user_id, yearMonth);
+            budgets.push({
+                ...b,
+                user: {
+                    id: mgr.user_id,
+                    username: mgr.username,
+                    firstName: mgr.firstname,
+                    lastName: mgr.lastname,
+                    avatarUrl: mgr.avatar_url,
+                    roleTitle: mgr.role_title,
+                },
+            });
+        }
+        return budgets;
+    }
+
+    /**
+     * Generates analytical aggregates for workspace recognition.
+     */
+    static async getRecognitionAnalytics(
+        workspaceId: string,
+        yearMonth: string = new Date().toISOString().slice(0, 7)
+    ): Promise<{
+        totalOrbitsAwarded: number;
+        totalAwardsCount: number;
+        monthlyOrbitsAwarded: number;
+        monthlyAwardsCount: number;
+        activeCategoriesCount: number;
+        categoryBreakdown: Array<{
+            categoryId: string;
+            categoryName: string;
+            categorySlug: string;
+            icon: string;
+            totalPoints: number;
+            awardCount: number;
+        }>;
+        topRecipients: Array<{
+            userId: string;
+            name: string;
+            username: string;
+            avatarUrl?: string;
+            totalPoints: number;
+            awardCount: number;
+        }>;
+        topIssuers: Array<{
+            userId: string;
+            name: string;
+            username: string;
+            avatarUrl?: string;
+            totalPoints: number;
+            awardCount: number;
+        }>;
+    }> {
+        // Overall & Monthly Totals
+        const totalsRes = await query(
+            `SELECT
+                COALESCE(SUM(points_delta) FILTER (WHERE points_delta > 0), 0)::integer AS "totalAwarded",
+                COUNT(*) FILTER (WHERE transaction_type = 'award')::integer AS "totalCount",
+                COALESCE(SUM(points_delta) FILTER (WHERE points_delta > 0 AND TO_CHAR(created_at, 'YYYY-MM') = $2), 0)::integer AS "monthlyAwarded",
+                COUNT(*) FILTER (WHERE transaction_type = 'award' AND TO_CHAR(created_at, 'YYYY-MM') = $2)::integer AS "monthlyCount"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1 AND is_reversed = false;`,
+            [workspaceId, yearMonth]
+        );
+
+        // Categories Count & Breakdown
+        const catRes = await query(
+            `SELECT
+                rc.id AS "categoryId",
+                rc.name AS "categoryName",
+                rc.slug AS "categorySlug",
+                rc.icon AS "icon",
+                COALESCE(SUM(wrl.points_delta), 0)::integer AS "totalPoints",
+                COUNT(wrl.id)::integer AS "awardCount"
+             FROM public.workspace_recognition_categories rc
+             LEFT JOIN public.workspace_recognition_ledger wrl 
+                ON wrl.category_id = rc.id 
+               AND wrl.workspace_id = $1 
+               AND wrl.transaction_type = 'award' 
+               AND wrl.is_reversed = false
+             WHERE rc.workspace_id = $1 AND rc.is_active = true
+             GROUP BY rc.id, rc.name, rc.slug, rc.icon, rc.display_order
+             ORDER BY "totalPoints" DESC, rc.display_order ASC;`,
+            [workspaceId]
+        );
+
+        // Top Recipients
+        const topRecipRes = await query(
+            `SELECT
+                u.id AS "userId",
+                TRIM(CONCAT(u.firstname, ' ', u.lastname)) AS "name",
+                u.username,
+                u.avatar_url AS "avatarUrl",
+                COALESCE(SUM(wrl.points_delta), 0)::integer AS "totalPoints",
+                COUNT(wrl.id)::integer AS "awardCount"
+             FROM public.workspace_recognition_ledger wrl
+             JOIN public.users u ON u.id = wrl.recipient_id
+             WHERE wrl.workspace_id = $1 AND wrl.transaction_type = 'award' AND wrl.is_reversed = false
+             GROUP BY u.id, u.firstname, u.lastname, u.username, u.avatar_url
+             ORDER BY "totalPoints" DESC
+             LIMIT 5;`,
+            [workspaceId]
+        );
+
+        // Top Issuers
+        const topIssuersRes = await query(
+            `SELECT
+                u.id AS "userId",
+                TRIM(CONCAT(u.firstname, ' ', u.lastname)) AS "name",
+                u.username,
+                u.avatar_url AS "avatarUrl",
+                COALESCE(SUM(wrl.points_delta), 0)::integer AS "totalPoints",
+                COUNT(wrl.id)::integer AS "awardCount"
+             FROM public.workspace_recognition_ledger wrl
+             JOIN public.users u ON u.id = wrl.issuer_id
+             WHERE wrl.workspace_id = $1 AND wrl.transaction_type = 'award' AND wrl.is_reversed = false
+             GROUP BY u.id, u.firstname, u.lastname, u.username, u.avatar_url
+             ORDER BY "totalPoints" DESC
+             LIMIT 5;`,
+            [workspaceId]
+        );
+
+        const totals = totalsRes.rows[0] || {};
+        return {
+            totalOrbitsAwarded: parseInt(totals.totalAwarded, 10) || 0,
+            totalAwardsCount: parseInt(totals.totalCount, 10) || 0,
+            monthlyOrbitsAwarded: parseInt(totals.monthlyAwarded, 10) || 0,
+            monthlyAwardsCount: parseInt(totals.monthlyCount, 10) || 0,
+            activeCategoriesCount: catRes.rows.length,
+            categoryBreakdown: catRes.rows,
+            topRecipients: topRecipRes.rows,
+            topIssuers: topIssuersRes.rows,
+        };
+    }
+
+    /**
+     * Retrieves or initializes the monthly budget record for an issuer with row locking.
+     */
+    static async getOrCreateRecognitionBudget(
+        clientOrQuery: any,
+        workspaceId: string,
+        userId: string,
+        yearMonth: string,
+        defaultAllocated = 500
+    ): Promise<WorkspaceRecognitionBudget> {
+        const executor = clientOrQuery || { query };
+        const res = await executor.query(
+            `INSERT INTO public.workspace_recognition_budgets (
+                workspace_id, user_id, year_month, allocated_budget, used_budget
+             ) VALUES ($1, $2, $3, $4, 0)
+             ON CONFLICT (workspace_id, user_id, year_month) DO UPDATE SET
+                updated_at = NOW()
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                user_id AS "userId",
+                year_month AS "yearMonth",
+                allocated_budget AS "allocatedBudget",
+                used_budget AS "usedBudget",
+                (allocated_budget - used_budget) AS "remainingBudget",
+                allocated_by AS "allocatedBy",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt";`,
+            [workspaceId, userId, yearMonth, defaultAllocated]
+        );
+        return res.rows[0];
+    }
+
+    /**
+     * Atomically consumes recognition budget with row-level locking.
+     */
+    static async consumeRecognitionBudget(
+        client: any,
+        workspaceId: string,
+        userId: string,
+        yearMonth: string,
+        amount: number
+    ): Promise<WorkspaceRecognitionBudget> {
+        // Lock budget row for update
+        const lockRes = await client.query(
+            `SELECT id, allocated_budget, used_budget 
+             FROM public.workspace_recognition_budgets
+             WHERE workspace_id = $1 AND user_id = $2 AND year_month = $3
+             FOR UPDATE;`,
+            [workspaceId, userId, yearMonth]
+        );
+
+        let row = lockRes.rows[0];
+        if (!row) {
+            // Provision first
+            await this.getOrCreateRecognitionBudget(client, workspaceId, userId, yearMonth);
+            const refetch = await client.query(
+                `SELECT id, allocated_budget, used_budget 
+                 FROM public.workspace_recognition_budgets
+                 WHERE workspace_id = $1 AND user_id = $2 AND year_month = $3
+                 FOR UPDATE;`,
+                [workspaceId, userId, yearMonth]
+            );
+            row = refetch.rows[0];
+        }
+
+        if (row.used_budget + amount > row.allocated_budget) {
+            throw new Error(`Insufficient recognition award budget. Available: ${row.allocated_budget - row.used_budget} Orbits, Requested: ${amount} Orbits.`);
+        }
+
+        const updateRes = await client.query(
+            `UPDATE public.workspace_recognition_budgets
+             SET used_budget = used_budget + $1, updated_at = NOW()
+             WHERE id = $2
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                user_id AS "userId",
+                year_month AS "yearMonth",
+                allocated_budget AS "allocatedBudget",
+                used_budget AS "usedBudget",
+                (allocated_budget - used_budget) AS "remainingBudget",
+                allocated_by AS "allocatedBy",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt";`,
+            [amount, row.id]
+        );
+        return updateRes.rows[0];
+    }
+
+    /**
+     * Credits back consumed budget on award reversal.
+     */
+    static async creditRecognitionBudget(
+        client: any,
+        workspaceId: string,
+        userId: string,
+        yearMonth: string,
+        amount: number
+    ): Promise<void> {
+        await client.query(
+            `UPDATE public.workspace_recognition_budgets
+             SET used_budget = GREATEST(0, used_budget - $1), updated_at = NOW()
+             WHERE workspace_id = $2 AND user_id = $3 AND year_month = $4;`,
+            [amount, workspaceId, userId, yearMonth]
+        );
+    }
+
+    /**
+     * Computes recipient's total inflow of Orbits within a calendar month.
+     */
+    static async getRecipientMonthlyInflow(
+        clientOrQuery: any,
+        workspaceId: string,
+        recipientId: string,
+        yearMonth: string
+    ): Promise<number> {
+        const executor = clientOrQuery || { query };
+        const res = await executor.query(
+            `SELECT COALESCE(SUM(points_delta), 0)::integer AS total
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1
+               AND recipient_id = $2
+               AND transaction_type = 'award'
+               AND is_reversed = false
+               AND TO_CHAR(created_at, 'YYYY-MM') = $3;`,
+            [workspaceId, recipientId, yearMonth]
+        );
+        return parseInt(res.rows[0].total, 10) || 0;
+    }
+
+    /**
+     * Computes issuer's daily award count.
+     */
+    static async getIssuerDailyAwardCount(
+        clientOrQuery: any,
+        workspaceId: string,
+        issuerId: string,
+        dateStr: string
+    ): Promise<number> {
+        const executor = clientOrQuery || { query };
+        const res = await executor.query(
+            `SELECT COUNT(*)::integer AS count
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1
+               AND issuer_id = $2
+               AND transaction_type = 'award'
+               AND is_reversed = false
+               AND TO_CHAR(created_at, 'YYYY-MM-DD') = $3;`,
+            [workspaceId, issuerId, dateStr]
+        );
+        return parseInt(res.rows[0].count, 10) || 0;
+    }
+
+    /**
+     * Inserts an immutable award transaction into the ledger.
+     */
+    static async insertRecognitionLedgerEntry(
+        client: any,
+        entry: {
+            workspaceId: string;
+            recipientId: string;
+            issuerId: string;
+            departmentId?: string | null;
+            transactionType: RecognitionTransactionType;
+            pointsDelta: number;
+            categoryId: string;
+            appreciationReason: string;
+            linkedTaskId?: string | null;
+            linkedMilestoneId?: string | null;
+            evidenceUrl?: string | null;
+            referenceAwardId?: string | null;
+            idempotencyKey?: string | null;
+            visibility?: "workspace" | "recipient_only" | "private";
+            status?: RecognitionStatus;
+            ipAddress?: string | null;
+            userAgent?: string | null;
+        }
+    ): Promise<WorkspaceRecognitionLedgerEntry> {
+        const insertRes = await client.query(
+            `INSERT INTO public.workspace_recognition_ledger (
+                workspace_id,
+                recipient_id,
+                issuer_id,
+                department_id,
+                transaction_type,
+                points_delta,
+                category_id,
+                appreciation_reason,
+                linked_task_id,
+                linked_milestone_id,
+                evidence_url,
+                reference_award_id,
+                idempotency_key,
+                visibility,
+                status,
+                ip_address,
+                user_agent,
+                created_at
+             ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE($14, 'workspace'), COALESCE($15, 'completed'), $16, $17, NOW()
+             )
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                recipient_id AS "recipientId",
+                issuer_id AS "issuerId",
+                department_id AS "departmentId",
+                transaction_type AS "transactionType",
+                points_delta AS "pointsDelta",
+                category_id AS "categoryId",
+                appreciation_reason AS "appreciationReason",
+                linked_task_id AS "linkedTaskId",
+                linked_milestone_id AS "linkedMilestoneId",
+                evidence_url AS "evidenceUrl",
+                reference_award_id AS "referenceAwardId",
+                idempotency_key AS "idempotencyKey",
+                visibility,
+                status,
+                is_reversed AS "isReversed",
+                reversal_reason AS "reversalReason",
+                reversed_at AS "reversedAt",
+                reversed_by AS "reversedBy",
+                ip_address AS "ipAddress",
+                user_agent AS "userAgent",
+                created_at AS "createdAt";`,
+            [
+                entry.workspaceId,
+                entry.recipientId,
+                entry.issuerId,
+                entry.departmentId || null,
+                entry.transactionType,
+                entry.pointsDelta,
+                entry.categoryId,
+                entry.appreciationReason.trim(),
+                entry.linkedTaskId || null,
+                entry.linkedMilestoneId || null,
+                entry.evidenceUrl || null,
+                entry.referenceAwardId || null,
+                entry.idempotencyKey || null,
+                entry.visibility || "workspace",
+                entry.status || "completed",
+                entry.ipAddress || null,
+                entry.userAgent || null,
+            ]
+        );
+        return insertRes.rows[0];
+    }
+
+    /**
+     * Finds an entry by idempotency key within workspace.
+     */
+    static async findRecognitionByIdempotencyKey(
+        workspaceId: string,
+        idempotencyKey: string,
+        clientOrQuery: any = null
+    ): Promise<WorkspaceRecognitionLedgerEntry | null> {
+        const executor = clientOrQuery || { query };
+        const res = await executor.query(
+            `SELECT
+                id,
+                workspace_id AS "workspaceId",
+                recipient_id AS "recipientId",
+                issuer_id AS "issuerId",
+                department_id AS "departmentId",
+                transaction_type AS "transactionType",
+                points_delta AS "pointsDelta",
+                category_id AS "categoryId",
+                appreciation_reason AS "appreciationReason",
+                linked_task_id AS "linkedTaskId",
+                linked_milestone_id AS "linkedMilestoneId",
+                evidence_url AS "evidenceUrl",
+                reference_award_id AS "referenceAwardId",
+                idempotency_key AS "idempotencyKey",
+                status,
+                is_reversed AS "isReversed",
+                reversal_reason AS "reversalReason",
+                reversed_at AS "reversedAt",
+                reversed_by AS "reversedBy",
+                ip_address AS "ipAddress",
+                user_agent AS "userAgent",
+                created_at AS "createdAt"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1 AND idempotency_key = $2
+             LIMIT 1;`,
+            [workspaceId, idempotencyKey]
+        );
+        return res.rows[0] || null;
+    }
+
+    /**
+     * Finds a recognition ledger entry by ID with relation joins.
+     */
+    static async findRecognitionLedgerEntryById(
+        workspaceId: string,
+        entryId: string,
+        clientOrQuery: any = null
+    ): Promise<WorkspaceRecognitionLedgerEntry | null> {
+        const executor = clientOrQuery || { query };
+        const res = await executor.query(
+            `SELECT
+                wrl.id,
+                wrl.workspace_id AS "workspaceId",
+                wrl.recipient_id AS "recipientId",
+                wrl.issuer_id AS "issuerId",
+                wrl.department_id AS "departmentId",
+                wrl.transaction_type AS "transactionType",
+                wrl.points_delta AS "pointsDelta",
+                wrl.category_id AS "categoryId",
+                wrl.appreciation_reason AS "appreciationReason",
+                wrl.linked_task_id AS "linkedTaskId",
+                wrl.linked_milestone_id AS "linkedMilestoneId",
+                wrl.evidence_url AS "evidenceUrl",
+                wrl.reference_award_id AS "referenceAwardId",
+                wrl.idempotency_key AS "idempotencyKey",
+                wrl.status,
+                wrl.is_reversed AS "isReversed",
+                wrl.reversal_reason AS "reversalReason",
+                wrl.reversed_at AS "reversedAt",
+                wrl.reversed_by AS "reversedBy",
+                wrl.ip_address AS "ipAddress",
+                wrl.user_agent AS "userAgent",
+                wrl.created_at AS "createdAt",
+                json_build_object(
+                    'id', ru.id,
+                    'username', ru.username,
+                    'firstName', ru.firstname,
+                    'lastName', ru.lastname,
+                    'avatarUrl', ru.avatar_url
+                ) AS "recipient",
+                json_build_object(
+                    'id', iu.id,
+                    'username', iu.username,
+                    'firstName', iu.firstname,
+                    'lastName', iu.lastname,
+                    'avatarUrl', iu.avatar_url
+                ) AS "issuer",
+                json_build_object(
+                    'id', rc.id,
+                    'name', rc.name,
+                    'slug', rc.slug,
+                    'icon', rc.icon
+                ) AS "category",
+                CASE WHEN wd.id IS NOT NULL THEN
+                    json_build_object('id', wd.id, 'name', wd.name, 'slug', wd.slug, 'color', wd.color)
+                ELSE NULL END AS "department",
+                CASE WHEN wt.id IS NOT NULL THEN
+                    json_build_object('id', wt.id, 'title', wt.title, 'status', wt.status)
+                ELSE NULL END AS "linkedTask"
+             FROM public.workspace_recognition_ledger wrl
+             JOIN public.users ru ON ru.id = wrl.recipient_id
+             JOIN public.users iu ON iu.id = wrl.issuer_id
+             JOIN public.workspace_recognition_categories rc ON rc.id = wrl.category_id
+             LEFT JOIN public.workspace_departments wd ON wd.id = wrl.department_id
+             LEFT JOIN public.workspace_tasks wt ON wt.id = wrl.linked_task_id
+             WHERE wrl.workspace_id = $1 AND wrl.id = $2
+             LIMIT 1;`,
+            [workspaceId, entryId]
+        );
+        return res.rows[0] || null;
+    }
+
+    /**
+     * Marks an original award reversed and records compensating reversal ledger entry.
+     */
+    static async reverseRecognitionAward(
+        client: any,
+        workspaceId: string,
+        originalAwardId: string,
+        reversedByUserId: string,
+        reversalReason: string,
+        idempotencyKey?: string | null,
+        ipAddress?: string | null,
+        userAgent?: string | null
+    ): Promise<{ reversalEntry: WorkspaceRecognitionLedgerEntry; originalEntry: WorkspaceRecognitionLedgerEntry }> {
+        // Lock original award row for update
+        const lockRes = await client.query(
+            `SELECT
+                id,
+                workspace_id AS "workspaceId",
+                recipient_id AS "recipientId",
+                issuer_id AS "issuerId",
+                department_id AS "departmentId",
+                transaction_type AS "transactionType",
+                points_delta AS "pointsDelta",
+                category_id AS "categoryId",
+                appreciation_reason AS "appreciationReason",
+                is_reversed AS "isReversed",
+                created_at AS "createdAt"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1 AND id = $2
+             FOR UPDATE;`,
+            [workspaceId, originalAwardId]
+        );
+
+        const original = lockRes.rows[0];
+        if (!original) {
+            throw new Error("Recognition award not found.");
+        }
+        if (original.transactionType !== "award") {
+            throw new Error("Cannot reverse a reversal transaction.");
+        }
+        if (original.isReversed) {
+            throw new Error("This recognition award has already been reversed.");
+        }
+
+        // 1. Insert compensating reversal row in ledger
+        const reversalRes = await client.query(
+            `INSERT INTO public.workspace_recognition_ledger (
+                workspace_id,
+                recipient_id,
+                issuer_id,
+                department_id,
+                transaction_type,
+                points_delta,
+                category_id,
+                appreciation_reason,
+                reference_award_id,
+                idempotency_key,
+                status,
+                is_reversed,
+                ip_address,
+                user_agent,
+                created_at
+             ) VALUES (
+                $1, $2, $3, $4, 'reversal', $5, $6, $7, $8, $9, 'completed', false, $10, $11, NOW()
+             )
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                recipient_id AS "recipientId",
+                issuer_id AS "issuerId",
+                department_id AS "departmentId",
+                transaction_type AS "transactionType",
+                points_delta AS "pointsDelta",
+                category_id AS "categoryId",
+                appreciation_reason AS "appreciationReason",
+                reference_award_id AS "referenceAwardId",
+                idempotency_key AS "idempotencyKey",
+                status,
+                is_reversed AS "isReversed",
+                created_at AS "createdAt";`,
+            [
+                workspaceId,
+                original.recipientId,
+                reversedByUserId,
+                original.departmentId,
+                -original.pointsDelta, // Compensating negative delta
+                original.categoryId,
+                `Correction Reversal: ${reversalReason.trim()}`,
+                original.id,
+                idempotencyKey || null,
+                ipAddress || null,
+                userAgent || null,
+            ]
+        );
+        const reversalEntry = reversalRes.rows[0];
+
+        // 2. Mark original award as reversed
+        const updateOrigRes = await client.query(
+            `UPDATE public.workspace_recognition_ledger
+             SET
+                is_reversed = true,
+                status = 'reversed',
+                reversed_at = NOW(),
+                reversed_by = $1,
+                reversal_reason = $2
+             WHERE id = $3
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                recipient_id AS "recipientId",
+                issuer_id AS "issuerId",
+                points_delta AS "pointsDelta",
+                status,
+                is_reversed AS "isReversed",
+                reversed_at AS "reversedAt",
+                reversed_by AS "reversedBy",
+                reversal_reason AS "reversalReason";`,
+            [reversedByUserId, reversalReason.trim(), original.id]
+        );
+        const originalEntry = updateOrigRes.rows[0];
+
+        // 3. Update Period Aggregates for recipient
+        await this.adjustRecognitionAggregates(
+            client,
+            workspaceId,
+            original.recipientId,
+            -original.pointsDelta,
+            true // isReversal
+        );
+
+        // 4. If award was made in current month, credit issuer budget
+        const awardMonth = new Date(original.createdAt).toISOString().slice(0, 7);
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        if (awardMonth === currentMonth) {
+            await this.creditRecognitionBudget(client, workspaceId, original.issuerId, awardMonth, original.pointsDelta);
+        }
+
+        // 5. Emit outbox event
+        await this.createOutboxEvent(
+            {
+                workspaceId,
+                eventType: "recognition:reversed",
+                payload: {
+                    originalAwardId: original.id,
+                    reversalId: reversalEntry.id,
+                    recipientId: original.recipientId,
+                    pointsDelta: -original.pointsDelta,
+                    reversedBy: reversedByUserId,
+                    reversalReason,
+                },
+            },
+            client
+        );
+
+        return { reversalEntry, originalEntry };
+    }
+
+    /**
+     * Adjusts weekly, monthly, and all-time period aggregates.
+     */
+    static async adjustRecognitionAggregates(
+        client: any,
+        workspaceId: string,
+        userId: string,
+        pointsDelta: number,
+        isReversal = false
+    ): Promise<void> {
+        const now = new Date();
+        const yearMonth = now.toISOString().slice(0, 7);
+        const periods = [
+            { type: "all_time", key: "all_time" },
+            { type: "monthly", key: yearMonth },
+        ];
+
+        for (const p of periods) {
+            await client.query(
+                `INSERT INTO public.workspace_recognition_period_aggregates (
+                    workspace_id, user_id, period_type, period_key,
+                    total_orbits_received, awards_count, last_award_at, updated_at
+                 ) VALUES (
+                    $1, $2, $3, $4, GREATEST(0, $5), $6, NOW(), NOW()
+                 )
+                 ON CONFLICT (workspace_id, user_id, period_type, period_key) DO UPDATE SET
+                    total_orbits_received = GREATEST(0, public.workspace_recognition_period_aggregates.total_orbits_received + $5),
+                    awards_count = GREATEST(0, public.workspace_recognition_period_aggregates.awards_count + $7),
+                    last_award_at = CASE WHEN $5 > 0 THEN NOW() ELSE public.workspace_recognition_period_aggregates.last_award_at END,
+                    updated_at = NOW();`,
+                [
+                    workspaceId,
+                    userId,
+                    p.type,
+                    p.key,
+                    pointsDelta,
+                    isReversal ? 0 : 1,
+                    isReversal ? -1 : 1,
+                ]
+            );
+        }
+    }
+
+    /**
+     * Lists recognition ledger history with comprehensive filters, visibility awareness, and pagination.
+     */
+    static async listRecognitionLedger(
+        workspaceId: string,
+        options: {
+            recipientId?: string;
+            issuerId?: string;
+            departmentId?: string;
+            categoryId?: string;
+            activeOnly?: boolean;
+            viewerUserId?: string;
+            canViewAllPrivate?: boolean;
+            isWorkspaceVisible?: boolean;
+            limit?: number;
+            offset?: number;
+        } = {}
+    ): Promise<{ entries: WorkspaceRecognitionLedgerEntry[]; total: number }> {
+        const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+        const offset = Math.max(options.offset ?? 0, 0);
+
+        let whereClause = `WHERE wrl.workspace_id = $1`;
+        const params: any[] = [workspaceId];
+        let idx = 2;
+
+        if (options.recipientId) {
+            whereClause += ` AND wrl.recipient_id = $${idx++}`;
+            params.push(options.recipientId);
+        }
+        if (options.issuerId) {
+            whereClause += ` AND wrl.issuer_id = $${idx++}`;
+            params.push(options.issuerId);
+        }
+        if (options.departmentId) {
+            whereClause += ` AND wrl.department_id = $${idx++}`;
+            params.push(options.departmentId);
+        }
+        if (options.categoryId) {
+            whereClause += ` AND wrl.category_id = $${idx++}`;
+            params.push(options.categoryId);
+        }
+        if (options.activeOnly) {
+            whereClause += ` AND wrl.is_reversed = false`;
+        }
+
+        // Visibility Filtering
+        if (options.viewerUserId && !options.canViewAllPrivate) {
+            if (options.isWorkspaceVisible === false) {
+                // Workspace visibility is turned off in policy: only see awards where actor is recipient or issuer
+                whereClause += ` AND (wrl.recipient_id = $${idx} OR wrl.issuer_id = $${idx})`;
+                params.push(options.viewerUserId);
+                idx++;
+            } else {
+                // Workspace visibility is on: can see 'workspace' visibility awards OR own awards
+                whereClause += ` AND (wrl.visibility = 'workspace' OR wrl.recipient_id = $${idx} OR wrl.issuer_id = $${idx})`;
+                params.push(options.viewerUserId);
+                idx++;
+            }
+        }
+
+        const countRes = await query(
+            `SELECT COUNT(*)::integer AS total 
+             FROM public.workspace_recognition_ledger wrl 
+             ${whereClause};`,
+            params
+        );
+        const total = parseInt(countRes.rows[0].total, 10) || 0;
+
+        const dataRes = await query(
+            `SELECT
+                wrl.id,
+                wrl.workspace_id AS "workspaceId",
+                wrl.recipient_id AS "recipientId",
+                wrl.issuer_id AS "issuerId",
+                wrl.department_id AS "departmentId",
+                wrl.transaction_type AS "transactionType",
+                wrl.points_delta AS "pointsDelta",
+                wrl.category_id AS "categoryId",
+                wrl.appreciation_reason AS "appreciationReason",
+                wrl.linked_task_id AS "linkedTaskId",
+                wrl.linked_milestone_id AS "linkedMilestoneId",
+                wrl.evidence_url AS "evidenceUrl",
+                wrl.reference_award_id AS "referenceAwardId",
+                wrl.idempotency_key AS "idempotencyKey",
+                wrl.visibility,
+                wrl.status,
+                wrl.is_reversed AS "isReversed",
+                wrl.reversal_reason AS "reversalReason",
+                wrl.reversed_at AS "reversedAt",
+                wrl.reversed_by AS "reversedBy",
+                wrl.created_at AS "createdAt",
+                json_build_object(
+                    'id', ru.id,
+                    'username', ru.username,
+                    'firstName', ru.firstname,
+                    'lastName', ru.lastname,
+                    'avatarUrl', ru.avatar_url
+                ) AS "recipient",
+                json_build_object(
+                    'id', iu.id,
+                    'username', iu.username,
+                    'firstName', iu.firstname,
+                    'lastName', iu.lastname,
+                    'avatarUrl', iu.avatar_url
+                ) AS "issuer",
+                json_build_object(
+                    'id', rc.id,
+                    'name', rc.name,
+                    'slug', rc.slug,
+                    'icon', rc.icon
+                ) AS "category",
+                CASE WHEN wd.id IS NOT NULL THEN
+                    json_build_object('id', wd.id, 'name', wd.name, 'slug', wd.slug, 'color', wd.color)
+                ELSE NULL END AS "department",
+                CASE WHEN wt.id IS NOT NULL THEN
+                    json_build_object('id', wt.id, 'title', wt.title, 'status', wt.status)
+                ELSE NULL END AS "linkedTask"
+             FROM public.workspace_recognition_ledger wrl
+             JOIN public.users ru ON ru.id = wrl.recipient_id
+             JOIN public.users iu ON iu.id = wrl.issuer_id
+             JOIN public.workspace_recognition_categories rc ON rc.id = wrl.category_id
+             LEFT JOIN public.workspace_departments wd ON wd.id = wrl.department_id
+             LEFT JOIN public.workspace_tasks wt ON wt.id = wrl.linked_task_id
+             ${whereClause}
+             ORDER BY wrl.created_at DESC
+             LIMIT $${idx++} OFFSET $${idx++};`,
+            [...params, limit, offset]
+        );
+
+        return { entries: dataRes.rows, total };
+    }
+
+    /**
+     * Finds a single recognition award by ID with complete entity relations.
+     */
+    static async getRecognitionAwardById(
+        workspaceId: string,
+        awardId: string
+    ): Promise<WorkspaceRecognitionLedgerEntry | null> {
+        const res = await query(
+            `SELECT
+                wrl.id,
+                wrl.workspace_id AS "workspaceId",
+                wrl.recipient_id AS "recipientId",
+                wrl.issuer_id AS "issuerId",
+                wrl.department_id AS "departmentId",
+                wrl.transaction_type AS "transactionType",
+                wrl.points_delta AS "pointsDelta",
+                wrl.category_id AS "categoryId",
+                wrl.appreciation_reason AS "appreciationReason",
+                wrl.linked_task_id AS "linkedTaskId",
+                wrl.linked_milestone_id AS "linkedMilestoneId",
+                wrl.evidence_url AS "evidenceUrl",
+                wrl.reference_award_id AS "referenceAwardId",
+                wrl.idempotency_key AS "idempotencyKey",
+                wrl.visibility,
+                wrl.status,
+                wrl.is_reversed AS "isReversed",
+                wrl.reversal_reason AS "reversalReason",
+                wrl.reversed_at AS "reversedAt",
+                wrl.reversed_by AS "reversedBy",
+                wrl.created_at AS "createdAt",
+                json_build_object(
+                    'id', ru.id,
+                    'username', ru.username,
+                    'firstName', ru.firstname,
+                    'lastName', ru.lastname,
+                    'avatarUrl', ru.avatar_url
+                ) AS "recipient",
+                json_build_object(
+                    'id', iu.id,
+                    'username', iu.username,
+                    'firstName', iu.firstname,
+                    'lastName', iu.lastname,
+                    'avatarUrl', iu.avatar_url
+                ) AS "issuer",
+                json_build_object(
+                    'id', rc.id,
+                    'name', rc.name,
+                    'slug', rc.slug,
+                    'icon', rc.icon
+                ) AS "category",
+                CASE WHEN wd.id IS NOT NULL THEN
+                    json_build_object('id', wd.id, 'name', wd.name, 'slug', wd.slug, 'color', wd.color)
+                ELSE NULL END AS "department",
+                CASE WHEN wt.id IS NOT NULL THEN
+                    json_build_object('id', wt.id, 'title', wt.title, 'status', wt.status)
+                ELSE NULL END AS "linkedTask"
+             FROM public.workspace_recognition_ledger wrl
+             JOIN public.users ru ON ru.id = wrl.recipient_id
+             JOIN public.users iu ON iu.id = wrl.issuer_id
+             JOIN public.workspace_recognition_categories rc ON rc.id = wrl.category_id
+             LEFT JOIN public.workspace_departments wd ON wd.id = wrl.department_id
+             LEFT JOIN public.workspace_tasks wt ON wt.id = wrl.linked_task_id
+             WHERE wrl.workspace_id = $1 AND wrl.id = $2;`,
+            [workspaceId, awardId]
+        );
+        return res.rows[0] || null;
+    }
+
+    /**
+     * Appends an appreciation note to a recognition award.
+     */
+    static async addRecognitionNote(
+        workspaceId: string,
+        awardId: string,
+        authorId: string,
+        note: string
+    ): Promise<{ id: string; awardId: string; authorId: string; note: string; createdAt: Date }> {
+        const res = await query(
+            `INSERT INTO public.workspace_recognition_notes (workspace_id, award_id, author_id, note)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, workspace_id AS "workspaceId", award_id AS "awardId", author_id AS "authorId", note, created_at AS "createdAt";`,
+            [workspaceId, awardId, authorId, note.trim()]
+        );
+        return res.rows[0];
+    }
+
+    /**
+     * Retrieves all appreciation notes for a specific award.
+     */
+    static async listRecognitionNotes(
+        workspaceId: string,
+        awardId: string
+    ): Promise<Array<{ id: string; awardId: string; note: string; createdAt: Date; author: any }>> {
+        const res = await query(
+            `SELECT
+                wn.id,
+                wn.award_id AS "awardId",
+                wn.note,
+                wn.created_at AS "createdAt",
+                json_build_object(
+                    'id', u.id,
+                    'username', u.username,
+                    'firstName', u.firstname,
+                    'lastName', u.lastname,
+                    'avatarUrl', u.avatar_url
+                ) AS "author"
+             FROM public.workspace_recognition_notes wn
+             JOIN public.users u ON u.id = wn.author_id
+             WHERE wn.workspace_id = $1 AND wn.award_id = $2
+             ORDER BY wn.created_at ASC;`,
+            [workspaceId, awardId]
+        );
+        return res.rows;
+    }
+
+    /**
+     * Computes recognition balance summary for a member with weekly and rank metrics.
+     */
+    static async getMemberRecognitionSummary(
+        workspaceId: string,
+        userId: string,
+        yearMonth: string = new Date().toISOString().slice(0, 7)
+    ): Promise<MemberRecognitionSummary> {
+        // 1. Authoritative all-time balance from ledger
+        const allTimeRes = await query(
+            `SELECT
+                COALESCE(SUM(points_delta), 0)::integer AS "totalOrbits",
+                COUNT(*) FILTER (WHERE transaction_type = 'award' AND is_reversed = false)::integer AS "awardsCount"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1 AND recipient_id = $2;`,
+            [workspaceId, userId]
+        );
+        const totalOrbitsEarned = Math.max(0, parseInt(allTimeRes.rows[0].totalOrbits, 10) || 0);
+        const totalAwardsReceived = parseInt(allTimeRes.rows[0].awardsCount, 10) || 0;
+
+        // 2. Monthly balance from ledger
+        const monthlyRes = await query(
+            `SELECT
+                COALESCE(SUM(points_delta), 0)::integer AS "monthlyOrbits",
+                COUNT(*) FILTER (WHERE transaction_type = 'award' AND is_reversed = false)::integer AS "monthlyAwards"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1
+               AND recipient_id = $2
+               AND TO_CHAR(created_at, 'YYYY-MM') = $3;`,
+            [workspaceId, userId, yearMonth]
+        );
+        const monthlyOrbitsEarned = Math.max(0, parseInt(monthlyRes.rows[0].monthlyOrbits, 10) || 0);
+        const monthlyAwardsReceived = parseInt(monthlyRes.rows[0].monthlyAwards, 10) || 0;
+
+        // 3. Weekly balance from ledger (earned this week)
+        const weeklyRes = await query(
+            `SELECT
+                COALESCE(SUM(points_delta), 0)::integer AS "weeklyOrbits"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1
+               AND recipient_id = $2
+               AND created_at >= DATE_TRUNC('week', NOW())
+               AND points_delta > 0
+               AND is_reversed = false;`,
+            [workspaceId, userId]
+        );
+        const weeklyOrbitsEarned = Math.max(0, parseInt(weeklyRes.rows[0].weeklyOrbits, 10) || 0);
+
+        // 4. Current Contributor Rank in Workspace
+        const rankRes = await query(
+            `WITH user_points AS (
+                SELECT recipient_id, SUM(points_delta) as balance,
+                       DENSE_RANK() OVER (ORDER BY SUM(points_delta) DESC) as rnk
+                FROM public.workspace_recognition_ledger
+                WHERE workspace_id = $1 AND is_reversed = false
+                GROUP BY recipient_id
+                HAVING SUM(points_delta) > 0
+            )
+            SELECT rnk FROM user_points WHERE recipient_id = $2;`,
+            [workspaceId, userId]
+        );
+        const contributorRank = rankRes.rows.length > 0 ? parseInt(rankRes.rows[0].rnk, 10) : null;
+
+        // 5. Policy & Inflow Allowance
+        const policy = await this.getRecognitionPolicy(workspaceId);
+        const monthlyRemainingAllowance = Math.max(0, policy.recipientMonthlyCap - monthlyOrbitsEarned);
+
+        // 6. Issuer Budget (if user has budget allocated)
+        const budgetRes = await query(
+            `SELECT allocated_budget, used_budget 
+             FROM public.workspace_recognition_budgets
+             WHERE workspace_id = $1 AND user_id = $2 AND year_month = $3;`,
+            [workspaceId, userId, yearMonth]
+        );
+        const budget = budgetRes.rows[0];
+
+        // 7. Recent Awards (last 5)
+        const recent = await this.listRecognitionLedger(workspaceId, {
+            recipientId: userId,
+            activeOnly: true,
+            limit: 5,
+        });
+
+        return {
+            workspaceId,
+            userId,
+            totalOrbitsEarned,
+            currentBalance: totalOrbitsEarned,
+            allTimePoints: totalOrbitsEarned,
+            totalAwardsReceived,
+            awardsReceivedCount: totalAwardsReceived,
+            monthlyOrbitsEarned,
+            monthlyAwardsReceived,
+            weeklyOrbitsEarned,
+            contributorRank,
+            monthlyRemainingAllowance,
+            allocatedBudget: budget?.allocated_budget,
+            usedBudget: budget?.used_budget,
+            remainingBudget: budget ? Math.max(0, budget.allocated_budget - budget.used_budget) : undefined,
+            canAward: false, // Resolved by CapabilityService
+            recentAwards: recent.entries,
+        };
+    }
+
+    /**
+     * Computes department recognition analytics, totals, and member rankings.
+     */
+    static async getDepartmentRecognitionSummary(
+        workspaceId: string,
+        departmentId: string
+    ): Promise<{
+        departmentId: string;
+        departmentName: string;
+        departmentColor?: string;
+        totalOrbits: number;
+        activeMemberCount: number;
+        averageOrbitsPerMember: number;
+        memberRankings: Array<{
+            userId: string;
+            name: string;
+            username: string;
+            avatarUrl?: string;
+            roleName: string;
+            isLead: boolean;
+            totalOrbits: number;
+            awardsCount: number;
+            rank: number;
+            recentAppreciation?: string;
+        }>;
+    }> {
+        // 1. Department info
+        const deptRes = await query(
+            `SELECT id, name, color, lead_user_id AS "leadUserId"
+             FROM public.workspace_departments
+             WHERE workspace_id = $1 AND id = $2;`,
+            [workspaceId, departmentId]
+        );
+        if (deptRes.rows.length === 0) {
+            throw new Error("Department not found in workspace.");
+        }
+        const dept = deptRes.rows[0];
+
+        // 2. Department active members and their Orbits balance
+        const membersRes = await query(
+            `SELECT
+                u.id AS "userId",
+                TRIM(CONCAT(u.firstname, ' ', u.lastname)) AS "name",
+                u.username,
+                u.avatar_url AS "avatarUrl",
+                r.name AS "roleName",
+                (u.id = $3) AS "isLead",
+                COALESCE(SUM(wrl.points_delta) FILTER (WHERE wrl.is_reversed = false), 0)::integer AS "totalOrbits",
+                COUNT(wrl.id) FILTER (WHERE wrl.transaction_type = 'award' AND wrl.is_reversed = false)::integer AS "awardsCount",
+                (
+                    SELECT wrl2.appreciation_reason 
+                    FROM public.workspace_recognition_ledger wrl2 
+                    WHERE wrl2.workspace_id = $1 
+                      AND wrl2.recipient_id = u.id 
+                      AND wrl2.transaction_type = 'award' 
+                      AND wrl2.is_reversed = false
+                    ORDER BY wrl2.created_at DESC 
+                    LIMIT 1
+                ) AS "recentAppreciation"
+             FROM public.workspace_members wm
+             JOIN public.users u ON u.id = wm.user_id
+             JOIN public.workspace_roles r ON r.id = wm.role_id
+             LEFT JOIN public.workspace_recognition_ledger wrl 
+                ON wrl.recipient_id = u.id 
+               AND wrl.workspace_id = $1
+             WHERE wm.workspace_id = $1
+               AND (wm.department_id = $2 OR EXISTS (
+                   SELECT 1 FROM public.workspace_member_departments wmd 
+                   WHERE wmd.member_id = wm.id AND wmd.department_id = $2
+               ))
+               AND wm.is_suspended = false
+               AND wm.membership_status = 'active'
+             GROUP BY u.id, u.firstname, u.lastname, u.username, u.avatar_url, r.name
+             ORDER BY "totalOrbits" DESC, "name" ASC;`,
+            [workspaceId, departmentId, dept.leadUserId]
+        );
+
+        const rows = membersRes.rows;
+        let currentRank = 1;
+        const memberRankings = rows.map((row: any, idx: number) => {
+            if (idx > 0 && row.totalOrbits < rows[idx - 1].totalOrbits) {
+                currentRank = idx + 1;
+            }
+            return {
+                userId: row.userId,
+                name: row.name || row.username,
+                username: row.username,
+                avatarUrl: row.avatarUrl || undefined,
+                roleName: row.roleName,
+                isLead: row.isLead,
+                totalOrbits: parseInt(row.totalOrbits, 10) || 0,
+                awardsCount: parseInt(row.awardsCount, 10) || 0,
+                rank: currentRank,
+                recentAppreciation: row.recentAppreciation || undefined,
+            };
+        });
+
+        const activeMemberCount = memberRankings.length;
+        const totalOrbits = memberRankings.reduce((sum, m) => sum + m.totalOrbits, 0);
+        const averageOrbitsPerMember = activeMemberCount > 0 ? Math.round((totalOrbits / activeMemberCount) * 10) / 10 : 0;
+
+        return {
+            departmentId: dept.id,
+            departmentName: dept.name,
+            departmentColor: dept.color,
+            totalOrbits,
+            activeMemberCount,
+            averageOrbitsPerMember,
+            memberRankings,
+        };
+    }
+    }
 }
+
 

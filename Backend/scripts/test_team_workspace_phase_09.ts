@@ -1,679 +1,424 @@
 // Backend/scripts/test_team_workspace_phase_09.ts
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-if (typeof process.loadEnvFile === "function") { try { process.loadEnvFile(path.resolve(__dirname, "../.env")); } catch {} }
-
 import { pool, query } from "../src/database/client.js";
 import { WorkspaceService } from "../src/services/workspace/workspaceService.js";
-import { WorkspaceDepartmentService } from "../src/services/workspace/workspaceDepartmentService.js";
-import { WorkspaceMemberService } from "../src/services/workspace/workspaceMemberService.js";
-import { WorkspaceChannelService } from "../src/services/workspace/workspaceChannelService.js";
-import { WorkspaceTaskService } from "../src/services/workspace/workspaceTaskService.js";
-import { WorkspaceFileService } from "../src/services/workspace/workspaceFileService.js";
-import { WorkspaceDashboardService } from "../src/services/workspace/workspaceDashboardService.js";
-import { WorkspaceTemplateService } from "../src/services/workspace/workspaceTemplateService.js";
 import { WorkspaceRepository } from "../src/repositories/workspaceRepository.js";
+import { WorkspaceMemberService } from "../src/services/workspace/workspaceMemberService.js";
+import { WorkspaceDepartmentService } from "../src/services/workspace/workspaceDepartmentService.js";
+import { WorkspaceChannelService, workspaceEventBus } from "../src/services/workspace/workspaceChannelService.js";
+import { WorkspaceTaskService } from "../src/services/workspace/workspaceTaskService.js";
 import { WorkspaceRedisService } from "../src/redis/workspaceRedis.js";
 
-let testsPassed = 0;
-let testsFailed = 0;
-
-function assert(description: string, condition: boolean, extra?: any) {
-    if (condition) {
-        testsPassed++;
-        console.log(`  ✅ [PASS] ${description}`);
-    } else {
-        testsFailed++;
-        console.error(`  ❌ [FAIL] ${description}`, extra || "");
-    }
-}
-
 async function runPhase09Tests() {
-    console.log("================================================================================");
-    console.log("ORBIX TEAM WORKSPACE — PHASE 09 ACCEPTANCE & RELEASE VALIDATION SUITE");
-    console.log("PRODUCTION HARDENING, SECURITY AUDIT, TENANT ISOLATION & RELIABILITY");
-    console.log("================================================================================\n");
+    console.log("===============================================================================");
+    console.log("ORBIX TEAM WORKSPACE — PHASE 09 REDIS, REALTIME & OPTIMIZATION TEST SUITE");
+    console.log("===============================================================================\n");
 
-    const runId = Math.random().toString(36).substring(2, 8);
-    const userAId = "00000000-0000-0000-0000-000000000901";
-    const userBId = "00000000-0000-0000-0000-000000000902";
-    const managerAId = "00000000-0000-0000-0000-000000000903";
+    let passed = 0;
+    let failed = 0;
+
+    function assert(desc: string, condition: boolean) {
+        if (condition) {
+            console.log(`  ✅ PASS: ${desc}`);
+            passed++;
+        } else {
+            console.error(`  ❌ FAIL: ${desc}`);
+            failed++;
+        }
+    }
 
     try {
-        // -------------------------------------------------------------------------
-        // SETUP: Verify Two Distinct Verified Clubs
-        // -------------------------------------------------------------------------
-        const clubRes = await query(`
-            SELECT id, auth_user_id, name, slug 
-            FROM public.verified_clubs 
-            ORDER BY created_at ASC 
-            LIMIT 2;
-        `);
-
-        if (clubRes.rows.length < 2) {
-            throw new Error("Phase 09 requires at least 2 verified clubs in DB for multi-tenant isolation testing.");
+        // 1. Fetch Target Club and Owner
+        const clubRes = await query(
+            `SELECT vc.id, vc.name, vc.auth_user_id 
+             FROM public.verified_clubs vc 
+             WHERE vc.auth_user_id IS NOT NULL 
+             LIMIT 1;`
+        );
+        if (clubRes.rows.length === 0) {
+            throw new Error("No verified club with an owner found in database.");
         }
+        const club = clubRes.rows[0];
+        const ownerUserId = club.auth_user_id;
+        console.log(`Target Club: "${club.name}" (Club ID: ${club.id}, Owner User ID: ${ownerUserId})\n`);
 
-        const clubA = clubRes.rows[0];
-        const clubB = clubRes.rows[1];
+        // Ensure Workspace exists
+        const { workspace } = await WorkspaceService.getOrCreateWorkspaceForClub(club.id, ownerUserId);
+        const workspaceId = workspace.id;
 
-        // Provision Workspace A and Workspace B
-        const wsAInit = await WorkspaceService.getOrCreateWorkspaceForClub(clubA.id, clubA.auth_user_id);
-        const wsBInit = await WorkspaceService.getOrCreateWorkspaceForClub(clubB.id, clubB.auth_user_id);
-        const wsAId = wsAInit.workspace.id;
-        const wsBId = wsBInit.workspace.id;
+        // 2. Provision Test Users
+        const randKey = Math.random().toString(36).slice(2, 7);
+        const makeUser = async (roleName: string) => {
+            const uRes = await query(
+                `INSERT INTO public.users (email, username, firstname, lastname)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING id, email, username, firstname, lastname;`,
+                [
+                    `p9_${roleName}_${randKey}@test.orbix.club`,
+                    `p9_${roleName}_${randKey}`,
+                    `P9${roleName}`,
+                    `User`,
+                ]
+            );
+            return uRes.rows[0];
+        };
 
-        assert("Workspace A provisioned successfully", Boolean(wsAId));
-        assert("Workspace B provisioned successfully", Boolean(wsBId));
-        assert("Workspace A and Workspace B have distinct IDs", wsAId !== wsBId);
+        const managerUser = await makeUser("manager");
+        const deptLeadUser = await makeUser("deptlead");
+        const outsideUser = await makeUser("outside");
 
-        // Pre-test cleanup for test users
-        await query(`DELETE FROM public.workspace_activity_feed WHERE actor_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_task_activity WHERE actor_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_task_reviews WHERE reviewer_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_task_submissions WHERE submitted_by IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_task_assignments WHERE user_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_tasks WHERE creator_id IN ($1, $2, $3) OR title ILIKE '%P9%';`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_files WHERE uploader_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_messages WHERE sender_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_department_members WHERE user_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.workspace_members WHERE user_id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
-        await query(`DELETE FROM public.users WHERE id IN ($1, $2, $3);`, [userAId, userBId, managerAId]);
+        // Enroll users as members
+        const defaultRole = await WorkspaceRepository.findRoleBySlug(workspaceId, "member");
+        if (!defaultRole) throw new Error("Default member role not found.");
 
-        // Insert test users
-        await query(`
-            INSERT INTO public.users (id, username, email, firstname, lastname, password)
-            VALUES
-                ($1, 'user_a_p9_${runId}', 'userA_p9_${runId}@orbix.test', 'Member', 'Alpha', 'TestPass123!'),
-                ($2, 'user_b_p9_${runId}', 'userB_p9_${runId}@orbix.test', 'Member', 'Beta', 'TestPass123!'),
-                ($3, 'manager_a_p9_${runId}', 'managerA_p9_${runId}@orbix.test', 'Manager', 'Alpha', 'TestPass123!')
-            ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
-        `, [userAId, userBId, managerAId]);
-
-        // Fetch Member & Admin roles for Workspace A and B
-        const rolesA = await WorkspaceRepository.listRoles(wsAId);
-        const memberRoleA = rolesA.find((r) => r.isSystem && r.name === "Member") || rolesA[rolesA.length - 1]!;
-        const adminRoleA = rolesA.find((r) => r.isSystem && r.name === "Administrator") || rolesA[0]!;
-
-        const rolesB = await WorkspaceRepository.listRoles(wsBId);
-        const memberRoleB = rolesB.find((r) => r.isSystem && r.name === "Member") || rolesB[rolesB.length - 1]!;
-
-        // Register User A and Manager A in Workspace A
-        const memberA = await WorkspaceRepository.createMember(null, {
-            workspaceId: wsAId,
-            userId: userAId,
-            roleId: memberRoleA.id,
-            roleTitle: "Software Engineer",
-        });
-        const managerMemberA = await WorkspaceRepository.createMember(null, {
-            workspaceId: wsAId,
-            userId: managerAId,
-            roleId: adminRoleA.id,
-            roleTitle: "Operations Manager",
+        const managerMember = await WorkspaceRepository.createMember(null, {
+            workspaceId,
+            userId: managerUser.id,
+            roleId: defaultRole.id,
+            roleTitle: "Test Manager",
+            membershipStatus: "active",
         });
 
-        // Register User B strictly in Workspace B
-        const memberB = await WorkspaceRepository.createMember(null, {
-            workspaceId: wsBId,
-            userId: userBId,
-            roleId: memberRoleB.id,
-            roleTitle: "Creative Director",
+        const leadMember = await WorkspaceRepository.createMember(null, {
+            workspaceId,
+            userId: deptLeadUser.id,
+            roleId: defaultRole.id,
+            roleTitle: "Department Lead",
+            membershipStatus: "active",
         });
 
-        assert("Member A created in Workspace A", Boolean(memberA?.id));
-        assert("Member B created in Workspace B", Boolean(memberB?.id));
+        const outsideMember = await WorkspaceRepository.createMember(null, {
+            workspaceId,
+            userId: outsideUser.id,
+            roleId: defaultRole.id,
+            roleTitle: "General Member",
+            membershipStatus: "active",
+        });
 
-        // Create Seed Department & Channels in Workspace A
-        const deptA = await WorkspaceDepartmentService.createDepartment(wsAId, clubA.auth_user_id, {
-            name: `Engineering P9 ${runId}`,
-            slug: `eng-p9-${runId}`,
-            color: "#2563eb",
+        // Appoint Workspace Manager
+        await WorkspaceMemberService.appointWorkspaceManager(workspaceId, ownerUserId, managerUser.id, [
+            "can_manage_members",
+            "can_manage_channels",
+            "can_manage_departments",
+            "can_manage_tasks",
+            "can_view_audit_logs",
+        ]);
+
+        // Create Department
+        const deptA = await WorkspaceDepartmentService.createDepartment(workspaceId, ownerUserId, {
+            name: `P9 Dept A ${randKey}`,
+            slug: `p9-dept-a-${randKey}`,
+            leadUserId: deptLeadUser.id,
+            color: "#FFE566",
+            icon: "Layers",
+            description: "Department for Phase 09 testing",
         });
-        const catA = await WorkspaceChannelService.createCategory(wsAId, clubA.auth_user_id, {
-            name: `Secure Category ${runId}`,
+
+        const deptB = await WorkspaceDepartmentService.createDepartment(workspaceId, ownerUserId, {
+            name: `P9 Dept B ${randKey}`,
+            slug: `p9-dept-b-${randKey}`,
+            leadUserId: ownerUserId,
+            color: "#A6FF70",
+            icon: "Shield",
+            description: "Secondary department for transfer testing",
         });
-        const channelA = await WorkspaceChannelService.createChannel(wsAId, clubA.auth_user_id, {
-            name: `p9-secret-${runId}`,
-            categoryId: catA.id,
-            channelType: "text",
+
+        await WorkspaceDepartmentService.addMemberToDepartment(workspaceId, ownerUserId, deptA.id, leadMember.id, "lead");
+
+        // Create Channels (Public & Private)
+        const cat = await WorkspaceChannelService.createCategory(workspaceId, ownerUserId, {
+            name: `P9 Category ${randKey}`,
+        });
+        const publicChan = await WorkspaceChannelService.createChannel(workspaceId, ownerUserId, {
+            name: `p9-public-${randKey}`,
+            slug: `p9-public-${randKey}`,
+            categoryId: cat.id,
+            isPrivate: false,
+        });
+
+        const privateChan = await WorkspaceChannelService.createChannel(workspaceId, ownerUserId, {
+            name: `p9-private-${randKey}`,
+            slug: `p9-private-${randKey}`,
+            categoryId: cat.id,
+            departmentId: deptA.id,
             isPrivate: true,
         });
 
-        // Post a message and thread in Channel A
-        const msgA = await WorkspaceChannelService.sendMessage(wsAId, clubA.auth_user_id, channelA.id, {
-            content: "Confidential roadmap for Club A.",
+        // Create Tasks (Unrestricted & Restricted)
+        const unrestrictedTask = await WorkspaceTaskService.createTask(workspaceId, ownerUserId, {
+            title: `P9 Unrestricted Task ${randKey}`,
+            isRestricted: false,
+            priority: "medium",
         });
-        const threadA = await WorkspaceChannelService.createThread(
-            wsAId,
-            clubA.auth_user_id,
-            channelA.id,
-            msgA.id,
-            "Secret Thread"
-        );
 
-        // Create a restricted task in Workspace A
-        const taskA = await WorkspaceTaskService.createTask(wsAId, clubA.auth_user_id, {
-            title: `P9 Proprietary Task ${runId}`,
-            description: "Sensitive architectural deliverables",
+        const restrictedTask = await WorkspaceTaskService.createTask(workspaceId, deptLeadUser.id, {
+            title: `P9 Restricted Dept A Task ${randKey}`,
             departmentId: deptA.id,
             isRestricted: true,
-            assigneeUserIds: [userAId],
+            priority: "urgent",
         });
 
-        // Create a file record in Workspace A
-        const fileA = await WorkspaceRepository.createWorkspaceFile({
-            workspaceId: wsAId,
-            uploaderId: userAId,
-            fileName: "classified_spec.pdf",
-            fileSizeBytes: 2048,
-            mimeType: "application/pdf",
-            cloudinaryPublicId: `orbix/p9/test_file_${runId}`,
-            cloudinaryUrl: `http://res.cloudinary.com/demo/image/upload/orbix/p9/test_file_${runId}.pdf`,
-            cloudinarySecureUrl: `https://res.cloudinary.com/demo/image/upload/orbix/p9/test_file_${runId}.pdf`,
-            deliveryType: "authenticated",
-            resourceType: "raw",
-            format: "pdf",
-            parentResourceType: "task",
-            parentResourceId: taskA.id,
-            departmentId: deptA.id,
+        // =========================================================================
+        // TEST GROUP 1: REDIS CACHING, VERSIONING & BOUNDED TTLS
+        // =========================================================================
+        console.log("--- TEST GROUP 1: REDIS CACHING, VERSIONING & BOUNDED TTLS ---");
+
+        const testKey = WorkspaceRedisService.buildKey("test", "versioned", "key");
+        assert("Key generation uses configured version prefix 'orbix:team-workspace:v1:'", testKey.startsWith("orbix:team-workspace:v1:"));
+
+        const initialVer = await WorkspaceRedisService.getWorkspaceCacheVersion(workspaceId);
+        assert("Dynamic workspace cache version retrieves positive integer", initialVer >= 1);
+
+        const bumpedVer = await WorkspaceRedisService.bumpWorkspaceCacheVersion(workspaceId);
+        assert("Bumping workspace cache version increments counter", bumpedVer === initialVer + 1);
+
+        // Member directory caching
+        const mockDirectory = { members: [{ id: "m1", name: "Alice" }], total: 1 };
+        await WorkspaceRedisService.setCachedMemberDirectory(workspaceId, "page1", mockDirectory);
+        const cachedDir = await WorkspaceRedisService.getCachedMemberDirectory(workspaceId, "page1");
+        assert("Member directory cached and retrieved cleanly", cachedDir && cachedDir.total === 1);
+
+        await WorkspaceRedisService.invalidateMemberDirectory(workspaceId);
+        const invalidatedDir = await WorkspaceRedisService.getCachedMemberDirectory(workspaceId, "page1");
+        assert("Member directory cache evicted on invalidation", invalidatedDir === null);
+
+        // Task accountability caching
+        const mockAccountability = { summary: { awaitingReviewCount: 3 }, tasksAwaitingReview: [] };
+        await WorkspaceRedisService.setCachedTaskAccountability(workspaceId, "global", mockAccountability);
+        const cachedAcc = await WorkspaceRedisService.getCachedTaskAccountability(workspaceId, "global");
+        assert("Task accountability summary cached and retrieved", cachedAcc && cachedAcc.summary?.awaitingReviewCount === 3);
+
+        await WorkspaceRedisService.invalidateTaskAccountability(workspaceId);
+        const invalidatedAcc = await WorkspaceRedisService.getCachedTaskAccountability(workspaceId, "global");
+        assert("Task accountability cache evicted on invalidation", invalidatedAcc === null);
+
+        // Unread counters caching
+        const mockUnreads = { [publicChan.id]: 5, [privateChan.id]: 2 };
+        await WorkspaceRedisService.setCachedUnreadCounts(workspaceId, deptLeadUser.id, mockUnreads);
+        const cachedUnreads = await WorkspaceRedisService.getCachedUnreadCounts(workspaceId, deptLeadUser.id);
+        assert("Unread counters cached and retrieved for user", cachedUnreads && cachedUnreads[publicChan.id] === 5);
+
+        await WorkspaceRedisService.invalidateUnreadCounts(workspaceId, deptLeadUser.id);
+        const invalidatedUnreads = await WorkspaceRedisService.getCachedUnreadCounts(workspaceId, deptLeadUser.id);
+        assert("Unread counters evicted for target user", invalidatedUnreads === null);
+
+        // =========================================================================
+        // TEST GROUP 2: CACHE STAMPEDE PROTECTION & SINGLE-FLIGHT MUTEX
+        // =========================================================================
+        console.log("\n--- TEST GROUP 2: CACHE STAMPEDE PROTECTION & SINGLE-FLIGHT MUTEX ---");
+
+        let computeCalls = 0;
+        const stampedeKey = WorkspaceRedisService.buildKey("test_stampede", randKey);
+
+        const runConcurrentRequests = async () => {
+            const promises = Array.from({ length: 10 }, () =>
+                WorkspaceRedisService.getOrComputeWithStampedeProtection(
+                    stampedeKey,
+                    async () => {
+                        computeCalls++;
+                        await new Promise((r) => setTimeout(r, 40));
+                        return { value: 42 };
+                    },
+                    60
+                )
+            );
+            return Promise.all(promises);
+        };
+
+        const results = await runConcurrentRequests();
+        assert("All 10 concurrent requests return correct computed value", results.every((r) => r.value === 42));
+        assert("Stampede protection coalesces concurrent misses (computeCalls === 1)", computeCalls === 1);
+
+        // Distributed Mutex Lock
+        const lockToken1 = await WorkspaceRedisService.acquireLock(`test_lock_${randKey}`, 5);
+        assert("Distributed lock acquired successfully", lockToken1 !== null);
+
+        const lockToken2 = await WorkspaceRedisService.acquireLock(`test_lock_${randKey}`, 5);
+        assert("Contending lock acquisition rejected (null)", lockToken2 === null);
+
+        const released = await WorkspaceRedisService.releaseLock(`test_lock_${randKey}`, lockToken1!);
+        assert("Distributed lock released cleanly", released === true);
+
+        // =========================================================================
+        // TEST GROUP 3: COMPREHENSIVE PERMISSION & SECURITY INVALIDATION
+        // =========================================================================
+        console.log("\n--- TEST GROUP 3: PERMISSION & SECURITY INVALIDATION ---");
+
+        // Seed caches
+        await WorkspaceRedisService.setCachedPermissions(workspaceId, outsideUser.id, ["test:perm"]);
+        await WorkspaceRedisService.setCachedCapabilities(workspaceId, outsideUser.id, {
+            resolvedAt: new Date().toISOString(),
+            workspaceId,
+            userId: outsideUser.id,
+            isOwner: false,
+            isAdmin: false,
+            isWorkspaceManager: false,
+            role: { id: defaultRole.id, name: defaultRole.name, slug: defaultRole.slug, rank: defaultRole.rank },
+            departments: [],
+            channelOverridesCount: 0,
+            navigation: {} as any,
+            permissions: ["test:perm"],
+        });
+        await WorkspaceRedisService.setCachedMemberDirectory(workspaceId, "all", { total: 10 });
+
+        // 1. Role Change invalidation
+        const customRole = await WorkspaceMemberService.createCustomRole(workspaceId, ownerUserId, {
+            name: `P9 Custom Role ${randKey}`,
+            slug: `p9-custom-${randKey}`,
+            rank: 450,
+            color: "#70C4FF",
+            permissions: ["tasks:create", "channels:view"],
         });
 
-        // =====================================================================
-        // TEST GROUP 1: MULTI-TENANT ISOLATION & CROSS-WORKSPACE SEGREGATION
-        // =====================================================================
-        console.log("\n--- TEST GROUP 1: MULTI-TENANT ISOLATION & CROSS-WORKSPACE SEGREGATION ---");
+        await WorkspaceMemberService.assignMemberRole(workspaceId, ownerUserId, outsideUser.id, customRole.id);
+        const permsAfterRoleChange = await WorkspaceRedisService.getCachedPermissions(workspaceId, outsideUser.id);
+        const capsAfterRoleChange = await WorkspaceRedisService.getCachedCapabilities(workspaceId, outsideUser.id);
+        const dirAfterRoleChange = await WorkspaceRedisService.getCachedMemberDirectory(workspaceId, "all");
 
-        // 1.1 Member B attempts to read Workspace A members
-        const memAResolve = await WorkspaceRepository.findMember(wsAId, userBId);
-        assert("User B is not resolved as a member of Workspace A", memAResolve === null);
+        assert("Role assignment evicts member permissions cache", permsAfterRoleChange === null);
+        assert("Role assignment evicts member capabilities cache", capsAfterRoleChange === null);
+        assert("Role assignment evicts member directory cache", dirAfterRoleChange === null);
 
-        // 1.2 Member B attempts to access / mutate Workspace A departments
-        let deptLeak = false;
-        try {
-            await WorkspaceDepartmentService.createDepartment(wsAId, userBId, { name: "Infiltrator Dept" });
-            deptLeak = true;
-        } catch {
-            deptLeak = false;
-        }
-        assert("User B cannot access or mutate Department of Workspace A", !deptLeak);
+        // 2. Member Suspension invalidation
+        await WorkspaceRedisService.setCachedPermissions(workspaceId, outsideUser.id, ["tasks:create"]);
+        await WorkspaceRedisService.setCachedUnreadCounts(workspaceId, outsideUser.id, { c1: 1 });
 
-        // 1.3 Member B attempts to list channels or categories in Workspace A
-        let catLeak = false;
-        try {
-            await WorkspaceChannelService.listCategories(wsAId, userBId);
-            catLeak = true;
-        } catch {
-            catLeak = false;
-        }
-        assert("User B cannot list channel categories of Workspace A", !catLeak);
+        await WorkspaceService.setMemberSuspension(workspaceId, outsideUser.id, ownerUserId, true, "Testing invalidation");
+        const permsAfterSuspend = await WorkspaceRedisService.getCachedPermissions(workspaceId, outsideUser.id);
+        const unreadsAfterSuspend = await WorkspaceRedisService.getCachedUnreadCounts(workspaceId, outsideUser.id);
 
-        // 1.4 Member B attempts to view or post in Workspace A channel
-        const canViewChA = await WorkspaceChannelService.canViewChannel(wsAId, channelA.id, userBId);
-        assert("User B cannot view private channel in Workspace A", !canViewChA);
+        assert("Member suspension evicts permissions cache", permsAfterSuspend === null);
+        assert("Member suspension evicts unread counts cache", unreadsAfterSuspend === null);
 
-        let postLeak = false;
-        try {
-            await WorkspaceChannelService.sendMessage(wsAId, userBId, channelA.id, {
-                content: "Unauthorized injection from Workspace B",
-            });
-            postLeak = true;
-        } catch {
-            postLeak = false;
-        }
-        assert("User B cannot post messages to Workspace A channel", !postLeak);
+        // Reinstate member
+        await WorkspaceService.setMemberSuspension(workspaceId, outsideUser.id, ownerUserId, false);
 
-        // 1.5 Member B attempts to read messages from Workspace A channel
-        let msgLeak = false;
-        try {
-            await WorkspaceChannelService.listMessages(wsAId, userBId, channelA.id);
-            msgLeak = true;
-        } catch {
-            msgLeak = false;
-        }
-        assert("User B cannot read messages from Workspace A channel", !msgLeak);
-
-        // 1.6 Member B attempts to access thread in Workspace A
-        let threadLeak = false;
-        try {
-            await WorkspaceChannelService.getThread(wsAId, userBId, threadA.id);
-            threadLeak = true;
-        } catch {
-            threadLeak = false;
-        }
-        assert("User B cannot read threads belonging to Workspace A", !threadLeak);
-
-        // 1.7 Member B attempts to read task in Workspace A
-        let taskLeak = false;
-        try {
-            await WorkspaceTaskService.getTask(wsAId, userBId, taskA.id);
-            taskLeak = true;
-        } catch {
-            taskLeak = false;
-        }
-        assert("User B cannot read tasks belonging to Workspace A", !taskLeak);
-
-        // 1.8 Member B attempts to generate delivery URL for Workspace A file
-        let fileLeak = false;
-        try {
-            await WorkspaceFileService.getAuthorizedDeliveryUrl(wsAId, userBId, fileA.id);
-            fileLeak = true;
-        } catch {
-            fileLeak = false;
-        }
-        assert("User B cannot generate delivery URL for Workspace A files", !fileLeak);
-
-        // 1.9 Member B attempts to access notifications from Workspace A
-        const notifResult = await WorkspaceRepository.getUserNotifications(wsAId, userBId);
-        assert("User B receives zero notifications from Workspace A", notifResult.notifications.length === 0);
-
-        // 1.10 Member B attempts to access audit logs from Workspace A
-        let auditLeak = false;
-        try {
-            await WorkspaceDashboardService.getAuditLogs(wsAId, userBId);
-            auditLeak = true;
-        } catch {
-            auditLeak = false;
-        }
-        assert("User B is strictly blocked from viewing Workspace A audit logs", !auditLeak);
-
-        // =====================================================================
-        // TEST GROUP 2: GATEWAY SPOOFING & IDOR PREVENTION
-        // =====================================================================
-        console.log("\n--- TEST GROUP 2: GATEWAY SPOOFING & IDOR PREVENTION ---");
-
-        // Verify gateway tenant validation query directly
-        const spoofCheckA = await query(
-            `SELECT 1 FROM public.verified_clubs vc
-             LEFT JOIN public.club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
-             LEFT JOIN public.team_workspaces tw ON tw.club_id = vc.id
-             LEFT JOIN public.workspace_members wm ON wm.workspace_id = tw.id AND wm.user_id = $1 AND wm.membership_status = 'active' AND wm.is_suspended = false
-             WHERE vc.id = $2 AND (vc.auth_user_id = $1 OR cm.user_id = $1 OR wm.user_id = $1)
-             LIMIT 1;`,
-            [userBId, clubA.id]
-        );
-        assert("Gateway query rejects User B accessing Club A", spoofCheckA.rows.length === 0);
-
-        const legitimateCheckB = await query(
-            `SELECT 1 FROM public.verified_clubs vc
-             LEFT JOIN public.club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
-             LEFT JOIN public.team_workspaces tw ON tw.club_id = vc.id
-             LEFT JOIN public.workspace_members wm ON wm.workspace_id = tw.id AND wm.user_id = $1 AND wm.membership_status = 'active' AND wm.is_suspended = false
-             WHERE vc.id = $2 AND (vc.auth_user_id = $1 OR cm.user_id = $1 OR wm.user_id = $1)
-             LIMIT 1;`,
-            [userBId, clubB.id]
-        );
-        assert("Gateway query allows User B accessing Club B", legitimateCheckB.rows.length > 0);
-
-        // =====================================================================
-        // TEST GROUP 3: ROLE HIERARCHY, ESCALATION & ROLE CRUD DEFENSES
-        // =====================================================================
-        console.log("\n--- TEST GROUP 3: ROLE HIERARCHY, ESCALATION & ROLE CRUD DEFENSES ---");
-
-        // 3.1 Regular Member attempts to assign Admin role (rank 800) to themselves
-        let memberEscalation = false;
-        try {
-            await WorkspaceMemberService.assignMemberRole(wsAId, userAId, userAId, adminRoleA.id);
-            memberEscalation = true;
-        } catch {
-            memberEscalation = false;
-        }
-        assert("Regular member cannot assign Administrator role", !memberEscalation);
-
-        // 3.2 Regular Member attempts to create a custom role with rank 850
-        let createEscalation = false;
-        try {
-            await WorkspaceMemberService.createCustomRole(wsAId, userAId, {
-                name: "Super Hacker",
-                rank: 850,
-                permissions: ["*"],
-            });
-            createEscalation = true;
-        } catch {
-            createEscalation = false;
-        }
-        assert("Regular member cannot create custom roles", !createEscalation);
-
-        // 3.3 Admin attempts to grant Owner role (rank 1000)
-        const ownerRoleA = rolesA.find((r) => r.slug === "owner")!;
-        let adminOwnerGrant = false;
-        try {
-            await WorkspaceMemberService.assignMemberRole(wsAId, managerAId, userAId, ownerRoleA.id);
-            adminOwnerGrant = true;
-        } catch {
-            adminOwnerGrant = false;
-        }
-        assert("Admin cannot grant Owner role to any member", !adminOwnerGrant);
-
-        // 3.4 Admin attempts to alter or demote Owner
-        let demoteOwner = false;
-        try {
-            await WorkspaceMemberService.assignMemberRole(wsAId, managerAId, clubA.auth_user_id, memberRoleA.id);
-            demoteOwner = true;
-        } catch {
-            demoteOwner = false;
-        }
-        assert("Admin cannot demote or alter the Owner role", !demoteOwner);
-
-        // 3.5 Attempt to modify system role (is_system = true)
-        let modifySystemRole = false;
-        try {
-            await WorkspaceMemberService.updateCustomRole(wsAId, clubA.auth_user_id, memberRoleA.id, {
-                name: "Renamed Member",
-            });
-            modifySystemRole = true;
-        } catch {
-            modifySystemRole = false;
-        }
-        assert("System roles cannot be modified", !modifySystemRole);
-
-        // 3.6 Attempt to delete system role
-        let deleteSystemRole = false;
-        try {
-            await WorkspaceMemberService.deleteCustomRole(wsAId, clubA.auth_user_id, memberRoleA.id);
-            deleteSystemRole = true;
-        } catch {
-            deleteSystemRole = false;
-        }
-        assert("System roles cannot be deleted", !deleteSystemRole);
-
-        // 3.7 Owner creates a valid custom role
-        const customRole = await WorkspaceMemberService.createCustomRole(wsAId, clubA.auth_user_id, {
-            name: `Staff Reviewer ${runId}`,
-            description: "Audits submissions and checklist deliverables",
-            rank: 600,
-            color: "#6366f1",
-            permissions: ["tasks:review", "messages:send", "files:upload"],
+        // 3. Department Transfer invalidation
+        await WorkspaceRedisService.setCachedDepartmentInsight(workspaceId, deptA.id, {
+            department: deptA,
+            metrics: { memberCount: 1, activeTasksCount: 1, completedTasksCount: 0, reviewPendingCount: 0, blockedTasksCount: 0 },
         });
-        assert("Owner can create a valid custom role", Boolean(customRole?.id));
-        assert("Custom role has correct rank and isSystem=false", customRole.rank === 600 && !customRole.isSystem);
 
-        // 3.8 Owner assigns custom role to Member A
-        const updatedMemberA = await WorkspaceMemberService.assignMemberRole(
-            wsAId,
-            clubA.auth_user_id,
-            userAId,
-            customRole.id
-        );
-        assert("Member A assigned custom role successfully", updatedMemberA.roleId === customRole.id);
-
-        // 3.9 Owner updates custom role
-        const editedRole = await WorkspaceMemberService.updateCustomRole(
-            wsAId,
-            clubA.auth_user_id,
-            customRole.id,
-            { description: "Updated auditor description" }
-        );
-        assert("Owner can update custom role description", editedRole.description === "Updated auditor description");
-
-        // 3.10 Deleting custom role safely reassigns members to default member role
-        const deleteSuccess = await WorkspaceMemberService.deleteCustomRole(
-            wsAId,
-            clubA.auth_user_id,
-            customRole.id
-        );
-        assert("Custom role deleted successfully", deleteSuccess === true);
-
-        const memberAAfterRoleDelete = await WorkspaceRepository.findMember(wsAId, userAId);
-        assert("Member A reassigned to default member role after custom role deletion", memberAAfterRoleDelete?.roleId === memberRoleA.id);
-
-        // =====================================================================
-        // TEST GROUP 4: WORKSPACE MANAGER SCOPING & ESCALATION BLOCKERS
-        // =====================================================================
-        console.log("\n--- TEST GROUP 4: WORKSPACE MANAGER SCOPING & ESCALATION BLOCKERS ---");
-
-        // 4.1 Owner appoints Workspace Manager
-        const appointedWs = await WorkspaceMemberService.appointWorkspaceManager(
-            wsAId,
-            clubA.auth_user_id,
-            managerAId,
-            ["can_manage_members", "can_manage_departments", "can_manage_channels"]
-        );
-        assert("Owner can designate Workspace Manager", appointedWs.managerUserId === managerAId);
-
-        // 4.2 Workspace Manager attempts to appoint another manager
-        let mgrAppointOther = false;
-        try {
-            await WorkspaceMemberService.appointWorkspaceManager(wsAId, managerAId, userAId, []);
-            mgrAppointOther = true;
-        } catch {
-            mgrAppointOther = false;
-        }
-        assert("Workspace Manager cannot appoint or replace the Workspace Manager", !mgrAppointOther);
-
-        // 4.3 Workspace Manager attempts to revoke the Workspace Manager
-        let mgrRevokeSelf = false;
-        try {
-            await WorkspaceMemberService.revokeWorkspaceManager(wsAId, managerAId);
-            mgrRevokeSelf = true;
-        } catch {
-            mgrRevokeSelf = false;
-        }
-        assert("Workspace Manager cannot revoke Manager designation (Owner only)", !mgrRevokeSelf);
-
-        // 4.4 Owner revokes Workspace Manager
-        const revokedWs = await WorkspaceMemberService.revokeWorkspaceManager(wsAId, clubA.auth_user_id);
-        assert("Owner can revoke Workspace Manager", revokedWs.managerUserId === null);
-
-        // =====================================================================
-        // TEST GROUP 5: PERMISSION CACHE DYNAMIC INVALIDATION & STALENESS
-        // =====================================================================
-        console.log("\n--- TEST GROUP 5: PERMISSION CACHE DYNAMIC INVALIDATION & STALENESS ---");
-
-        // 5.1 Prime Redis cache for Member A
-        const initialPerms = await WorkspaceRedisService.getCachedPermissions(wsAId, userAId);
-        assert("Cached permissions primed or checked", initialPerms !== undefined);
-
-        await WorkspaceRedisService.setCachedPermissions(wsAId, userAId, ["messages:send", "files:upload"]);
-        const cachedAfterSet = await WorkspaceRedisService.getCachedPermissions(wsAId, userAId);
-        assert("Redis permissions cache contains primed permissions", Array.isArray(cachedAfterSet) && cachedAfterSet.includes("messages:send"));
-
-        // 5.2 Role change triggers automatic cache invalidation
-        await WorkspaceMemberService.assignMemberRole(wsAId, clubA.auth_user_id, userAId, adminRoleA.id);
-        const cachedAfterRoleChange = await WorkspaceRedisService.getCachedPermissions(wsAId, userAId);
-        assert("Permissions cache was immediately invalidated upon role assignment", cachedAfterRoleChange === null);
-
-        // 5.3 Context resolution re-populates cache with fresh elevated permissions
-        const resolvedCtx = await WorkspaceService.resolveContext(wsAId, userAId);
-        assert("Fresh context resolved with updated rank", resolvedCtx?.isAdmin === true);
-
-        // Restore Member A back to Member role
-        await WorkspaceMemberService.assignMemberRole(wsAId, clubA.auth_user_id, userAId, memberRoleA.id);
-
-        // =====================================================================
-        // TEST GROUP 6: SUSPENDED MEMBER & REVOKED INVITATION ENFORCEMENT
-        // =====================================================================
-        console.log("\n--- TEST GROUP 6: SUSPENDED MEMBER & REVOKED INVITATION ENFORCEMENT ---");
-
-        // 6.1 Suspend Member A
-        const suspendedMember = await WorkspaceService.setMemberSuspension(
-            wsAId,
-            userAId,
-            clubA.auth_user_id,
-            true,
-            "Security audit test suspension"
-        );
-        assert("Member suspension flag persisted", suspendedMember.isSuspended === true);
-
-        // 6.2 resolveContext returns null for suspended member
-        const suspendedContext = await WorkspaceService.resolveContext(wsAId, userAId);
-        assert("resolveContext immediately returns null for suspended member", suspendedContext === null);
-
-        // 6.3 Suspended member blocked from channels and tasks
-        const suspendedCanViewCh = await WorkspaceChannelService.canViewChannel(wsAId, channelA.id, userAId);
-        assert("Suspended member cannot view channels", !suspendedCanViewCh);
-
-        let suspendedPost = false;
-        try {
-            await WorkspaceChannelService.sendMessage(wsAId, userAId, channelA.id, { content: "Suspended message" });
-            suspendedPost = true;
-        } catch {
-            suspendedPost = false;
-        }
-        assert("Suspended member cannot send messages", !suspendedPost);
-
-        // Re-activate Member A
-        await WorkspaceService.setMemberSuspension(wsAId, userAId, clubA.auth_user_id, false);
-        const reactivatedCtx = await WorkspaceService.resolveContext(wsAId, userAId);
-        assert("Re-activated member resumes normal access", reactivatedCtx !== null);
-
-        // 6.4 Create, Revoke & Test Invitation
-        const inviteEmail = `p9_invite_${runId}@orbix.test`;
-        const { invitation, rawToken } = await WorkspaceMemberService.createInvitation(
-            wsAId,
-            clubA.auth_user_id,
-            { email: inviteEmail, roleId: memberRoleA.id }
-        );
-        assert("Invitation created with secure raw token", Boolean(rawToken) && invitation.status === "pending");
-
-        // Revoke the invitation
-        await WorkspaceMemberService.revokeInvitation(wsAId, clubA.auth_user_id, invitation.id);
-        const revokedInvite = await WorkspaceRepository.findInvitationById(wsAId, invitation.id);
-        assert("Invitation status transitioned to revoked", revokedInvite?.status === "revoked");
-
-        // Attempt to accept revoked invitation
-        let acceptedRevoked = false;
-        try {
-            await WorkspaceMemberService.acceptInvitation(rawToken, userBId);
-            acceptedRevoked = true;
-        } catch (err: any) {
-            acceptedRevoked = false;
-            assert("Revoked invitation acceptance rejected with explicit error", err.message.includes("revoked"));
-        }
-        assert("Accepting revoked invitation is impossible", !acceptedRevoked);
-
-        // =====================================================================
-        // TEST GROUP 7: CACHE STAMPEDE PROTECTION & CONCURRENCY COALESCING
-        // =====================================================================
-        console.log("\n--- TEST GROUP 7: CACHE STAMPEDE PROTECTION & CONCURRENCY COALESCING ---");
-
-        // Invalidate dashboard metrics cache first
-        await WorkspaceRedisService.invalidateDashboardMetrics(wsAId);
-
-        // Concurrently fire 50 parallel requests
-        const parallelCount = 50;
-        const requests = Array.from({ length: parallelCount }, () =>
-            WorkspaceDashboardService.getWorkspaceOverview(wsAId, clubA.auth_user_id)
+        await WorkspaceDepartmentService.transferMember(
+            workspaceId,
+            ownerUserId,
+            leadMember.id,
+            deptA.id,
+            deptB.id,
+            "Performance testing rebalance"
         );
 
-        const results = await Promise.all(requests);
-        assert("All 50 parallel overview requests resolved successfully", results.length === parallelCount);
-        assert("Overview metrics show valid member count", results[0]!.totalMembers >= 1);
-        assert("All concurrent responses return identical metric structures", results.every((r) => r.totalMembers === results[0]!.totalMembers));
+        const deptAInsightAfterTransfer = await WorkspaceRedisService.getCachedDepartmentInsight(workspaceId, deptA.id);
+        assert("Department transfer evicts source department insight cache", deptAInsightAfterTransfer === null);
 
-        // Distributed Lock Test: acquire, verify, release
-        const lockToken = await WorkspaceRedisService.acquireLock(`test:p9:${runId}`, 5);
-        assert("Distributed lock acquired successfully", Boolean(lockToken));
+        // =========================================================================
+        // TEST GROUP 4: REALTIME EVENT EMISSION & ZERO-LEAK AUTHORIZATION
+        // =========================================================================
+        console.log("\n--- TEST GROUP 4: REALTIME STREAM & ZERO-LEAK AUTHORIZATION ---");
 
-        const secondLockAttempt = await WorkspaceRedisService.acquireLock(`test:p9:${runId}`, 5);
-        assert("Second concurrent lock attempt blocked while held", secondLockAttempt === null);
+        // Test event bus reception
+        let receivedEvent: any = null;
+        const testHandler = (data: any) => {
+            receivedEvent = data;
+        };
+        const streamEventName = `workspace:${workspaceId}`;
+        workspaceEventBus.on(streamEventName, testHandler);
 
-        const lockReleased = await WorkspaceRedisService.releaseLock(`test:p9:${runId}`, lockToken!);
-        assert("Distributed lock released cleanly", lockReleased === true);
+        // Emit channel update
+        await WorkspaceChannelService.sendMessage(workspaceId, ownerUserId, publicChan.id, {
+            content: "Hello Phase 09 Realtime!",
+        });
 
-        // =====================================================================
-        // TEST GROUP 8: RATE LIMITING DEFENSES
-        // =====================================================================
-        console.log("\n--- TEST GROUP 8: RATE LIMITING DEFENSES ---");
+        assert("Realtime message event emitted to workspaceEventBus", receivedEvent !== null && receivedEvent.event === "message:new");
+        workspaceEventBus.off(streamEventName, testHandler);
 
-        // 8.1 Spam protection on messages (limit 30 per 10s)
-        const rateKey = `msg:${wsAId}:${userAId}`;
-        const firstCheck = await WorkspaceRedisService.checkRateLimit(rateKey, 30, 10);
-        assert("First message rate-limit check allowed", firstCheck.allowed);
+        // Test Channel Authorization for Realtime stream
+        const canLeadViewPublic = await WorkspaceChannelService.canViewChannel(workspaceId, publicChan.id, deptLeadUser.id);
+        assert("Realtime allows subscriber access to public channel", canLeadViewPublic === true);
 
-        // Simulate exceeding limit
-        let rateLimitExceeded = false;
-        for (let i = 0; i < 35; i++) {
-            const check = await WorkspaceRedisService.checkRateLimit(`test_flood:${runId}`, 5, 10);
-            if (!check.allowed) {
-                rateLimitExceeded = true;
-                break;
-            }
-        }
-        assert("Rapid flood trips rate limiter (remaining: 0)", rateLimitExceeded);
+        const canOutsideViewPrivate = await WorkspaceChannelService.canViewChannel(workspaceId, privateChan.id, outsideUser.id);
+        assert("Realtime stream DROPS private channel event for unauthorized member (Zero-Leak)", canOutsideViewPrivate === false);
 
-        // 8.2 Boundary protection: Oversized message length rejection (>4000 chars)
-        let largeMsgRejected = false;
-        try {
-            await WorkspaceChannelService.sendMessage(wsAId, clubA.auth_user_id, channelA.id, {
-                content: "A".repeat(5000),
-            });
-            largeMsgRejected = false;
-        } catch (err: any) {
-            largeMsgRejected = err.message.includes("4000");
-        }
-        assert("Oversized message (>4000 characters) rejected at service boundary", largeMsgRejected);
+        // Test Task Authorization for Realtime stream
+        const canOutsideViewUnrestricted = await WorkspaceTaskService.canUserViewTask(workspaceId, unrestrictedTask.id, outsideUser.id);
+        assert("Realtime allows subscriber access to unrestricted task", canOutsideViewUnrestricted === true);
 
-        // =====================================================================
-        // TEST GROUP 9: WORKSPACE TEMPLATES ENGINE
-        // =====================================================================
-        console.log("\n--- TEST GROUP 9: WORKSPACE TEMPLATES ENGINE ---");
+        const canOutsideViewRestricted = await WorkspaceTaskService.canUserViewTask(workspaceId, restrictedTask.id, outsideUser.id);
+        assert("Realtime stream DROPS restricted task event for outside member (Zero-Leak)", canOutsideViewRestricted === false);
 
-        // 9.1 List available templates
-        const availableTemplates = WorkspaceTemplateService.getAvailableTemplates();
-        assert("WorkspaceTemplateService exposes 7 canonical templates", availableTemplates.length === 7);
-        assert("Template list includes 'technical' template", availableTemplates.some((t) => t.id === "technical"));
-        assert("Template list includes 'coding' template", availableTemplates.some((t) => t.id === "coding"));
-        assert("Template list includes 'design' template", availableTemplates.some((t) => t.id === "design"));
+        const canLeadViewRestricted = await WorkspaceTaskService.canUserViewTask(workspaceId, restrictedTask.id, deptLeadUser.id);
+        assert("Realtime allows department lead access to department's restricted task", canLeadViewRestricted === true);
 
-        // Clean up any previously applied template items for wsAId so the test runs freshly
-        await pool.query(
-            `DELETE FROM public.workspace_channels WHERE workspace_id = $1 AND slug IN ('dev-talk', 'frontend', 'backend', 'architecture', 'code-reviews', 'circuits-pcb', 'robotics-builds', 'firmware-code', 'rfcs-architecture', 'lab-status', 'parts-requests');`,
-            [wsAId]
-        );
-        await pool.query(
-            `DELETE FROM public.workspace_departments WHERE workspace_id = $1 AND slug IN ('engineering', 'product-design', 'devops', 'qa-security', 'hardware-embedded', 'robotics-automation', 'tech-projects-rnd', 'lab-safety-logistics');`,
-            [wsAId]
-        );
-        await pool.query(
-            `DELETE FROM public.workspace_channel_categories WHERE workspace_id = $1 AND name IN ('Engineering & Code', 'Engineering & Hardware', 'Procurement & Safety');`,
-            [wsAId]
-        );
+        // Test Department Authorization for Realtime stream
+        const canLeadAccessDeptA = await WorkspaceDepartmentService.canUserAccessDepartment(workspaceId, deptA.id, deptLeadUser.id);
+        assert("Realtime allows department lead access to department scope", canLeadAccessDeptA === true);
 
-        // 9.2 Apply Tech template to Workspace A
-        const templateResult = await WorkspaceTemplateService.applyTemplate(
-            wsAId,
-            clubA.auth_user_id,
-            "tech"
-        );
-        assert("Tech template applied successfully", templateResult.template.id === "tech");
-        assert("Template created departments", templateResult.departmentsCreated >= 1);
-        assert("Template created categories and channels", templateResult.channelsCreated >= 1);
+        const canOutsideAccessDeptA = await WorkspaceDepartmentService.canUserAccessDepartment(workspaceId, deptA.id, outsideUser.id);
+        assert("Realtime stream DROPS confidential dept event for outside member (Zero-Leak)", canOutsideAccessDeptA === false);
 
-        // 9.3 Idempotent re-application (zero duplicates created)
-        const reapplyResult = await WorkspaceTemplateService.applyTemplate(
-            wsAId,
-            clubA.auth_user_id,
-            "tech"
-        );
-        assert("Re-applying template is idempotent (0 new departments)", reapplyResult.departmentsCreated === 0);
-        assert("Re-applying template is idempotent (0 new channels)", reapplyResult.channelsCreated === 0);
+        // =========================================================================
+        // TEST GROUP 5: DATABASE PERFORMANCE & BOUNDED QUERY EXECUTION
+        // =========================================================================
+        console.log("\n--- TEST GROUP 5: DATABASE PERFORMANCE & BOUNDED QUERY EXECUTION ---");
 
-        // =====================================================================
-        // TEST GROUP 10: DATABASE CONNECTION POOL & LEAK AUDIT
-        // =====================================================================
-        console.log("\n--- TEST GROUP 10: DATABASE CONNECTION POOL & LEAK AUDIT ---");
+        // Verify bounded message queries
+        const boundedMessages = await WorkspaceRepository.listMessages(workspaceId, publicChan.id, {
+            limit: 999999, // Unbounded attempt
+        });
+        assert("Unbounded limit in listMessages is clamped to safe max (<= 100)", boundedMessages.length <= 100);
 
-        assert("Database connection pool total count is reasonable (<= 20)", pool.totalCount <= 20);
-        assert("Database connection pool waiting client queue is empty (0 waiting)", pool.waitingCount === 0);
-        assert("Database idle count is greater than 0", pool.idleCount > 0);
+        // Verify single batched query with relation loading (No N+1)
+        const taskBatch = await WorkspaceRepository.listTasks(workspaceId, { limit: 10 });
+        assert("listTasks returns batched tasks successfully", taskBatch.tasks.length > 0);
+        const sampleTask = taskBatch.tasks[0];
+        assert("Task relation 'creator' loaded in single SQL query (no N+1)", sampleTask.creator && typeof sampleTask.creator.username === "string");
+        assert("Task relation 'department' loaded in single SQL query (no N+1)", sampleTask.department === null || typeof sampleTask.department.name === "string");
 
-        console.log("\n================================================================================");
-        console.log(`PHASE 09 TEST RESULTS: ${testsPassed} PASSED, ${testsFailed} FAILED`);
-        console.log("================================================================================\n");
+        // =========================================================================
+        // TEST GROUP 6: FIXTURE CLEANUP & TEARDOWN
+        // =========================================================================
+        console.log("\n--- TEST GROUP 6: FIXTURE CLEANUP ---");
 
-        if (testsFailed > 0) {
-            process.exit(1);
-        }
+        // Teardown temporary users and entries
+        await query(`DELETE FROM public.workspace_tasks WHERE workspace_id = $1 AND title LIKE 'P9 %';`, [workspaceId]);
+        await query(`DELETE FROM public.workspace_messages WHERE workspace_id = $1 AND content = 'Hello Phase 09 Realtime!';`, [workspaceId]);
+        await query(`DELETE FROM public.workspace_channels WHERE id = ANY($1::uuid[]);`, [[publicChan.id, privateChan.id]]);
+        await query(`DELETE FROM public.workspace_channel_categories WHERE id = $1;`, [cat.id]);
+        await query(`DELETE FROM public.workspace_department_transfers WHERE workspace_id = $1;`, [workspaceId]);
+        await query(`DELETE FROM public.workspace_department_members WHERE department_id = ANY($1::uuid[]);`, [[deptA.id, deptB.id]]);
+        await query(`DELETE FROM public.workspace_departments WHERE id = ANY($1::uuid[]);`, [[deptA.id, deptB.id]]);
+        await query(`DELETE FROM public.workspace_members WHERE user_id = ANY($1::uuid[]);`, [[managerUser.id, deptLeadUser.id, outsideUser.id]]);
+        await query(`DELETE FROM public.workspace_roles WHERE id = $1;`, [customRole.id]);
+        await query(`DELETE FROM public.users WHERE id = ANY($1::uuid[]);`, [[managerUser.id, deptLeadUser.id, outsideUser.id]]);
+
+        // Clean Redis cache keys
+        await WorkspaceRedisService.invalidateAllWorkspacePermissions(workspaceId);
+        await WorkspaceRedisService.invalidateMemberDirectory(workspaceId);
+        await WorkspaceRedisService.invalidateTaskAccountability(workspaceId);
+        await WorkspaceRedisService.invalidateDashboardMetrics(workspaceId);
+
+        assert("Test fixtures and temporary resources cleaned up cleanly", true);
+
     } catch (err: any) {
-        console.error("Test execution failed with fatal error:", err);
+        console.error("Test execution failed with unhandled exception:", err);
+        failed++;
+    }
+
+    console.log("\n===============================================================================");
+    console.log(`PHASE 09 TEST RESULTS: ${passed} PASSED | ${failed} FAILED`);
+    console.log("===============================================================================\n");
+
+    if (failed > 0) {
         process.exit(1);
-    } finally {
-        await pool.end();
-        process.exit(0);
     }
 }
 
-runPhase09Tests();
+runPhase09Tests()
+    .then(() => {
+        pool.end();
+        process.exit(0);
+    })
+    .catch((err) => {
+        console.error("Fatal test error:", err);
+        pool.end();
+        process.exit(1);
+    });

@@ -1,11 +1,12 @@
 // Frontend/src/app/Club/TeamWorkspace/Threads/ThreadSidebar.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
     X,
     Lock,
     Archive,
     Send,
     MessageCircle,
+    Users,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -40,6 +41,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     const [replyContent, setReplyContent] = useState("");
     const [sending, setSending] = useState(false);
     const [updatingThread, setUpdatingThread] = useState(false);
+    const [showParticipants, setShowParticipants] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const isCreator = currentMember?.userId === thread.creatorId;
@@ -74,6 +76,40 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // Live real-time updates for replies
+    useEffect(() => {
+        const handleRealtime = (e: any) => {
+            const data = e.detail;
+            if (data.event === "message:new" && data.payload?.message?.threadId === thread.id) {
+                setMessages((prev) => {
+                    if (prev.some((m) => m.id === data.payload.message.id)) return prev;
+                    return [...prev, data.payload.message];
+                });
+            } else if (data.event === "thread:updated" && data.payload?.thread?.id === thread.id) {
+                onThreadUpdated(data.payload.thread);
+            }
+        };
+
+        window.addEventListener("workspace:realtime", handleRealtime);
+        return () => window.removeEventListener("workspace:realtime", handleRealtime);
+    }, [thread.id, onThreadUpdated]);
+
+    // Extract distinct participants
+    const participants = useMemo(() => {
+        const map = new Map<string, { id: string; name: string; username: string; initial: string }>();
+        messages.forEach((m) => {
+            if (m.sender && !map.has(m.senderId)) {
+                map.set(m.senderId, {
+                    id: m.senderId,
+                    name: `${m.sender.firstName || ""} ${m.sender.lastName || ""}`.trim() || "User",
+                    username: m.sender.username || "user",
+                    initial: (m.sender.firstName?.[0] || "U").toUpperCase(),
+                });
+            }
+        });
+        return Array.from(map.values());
+    }, [messages]);
+
     const handleSendReply = async (e: React.FormEvent) => {
         e.preventDefault();
         const trimmed = replyContent.trim();
@@ -97,7 +133,10 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
 
             if (res.success && res.message) {
                 setReplyContent("");
-                setMessages((prev) => [...prev, res.message]);
+                setMessages((prev) => {
+                    if (prev.some((m) => m.id === res.message.id)) return prev;
+                    return [...prev, res.message];
+                });
             }
         } catch (err: any) {
             toast.error(err.response?.data?.message || err.message || "Failed to reply in thread.");
@@ -175,6 +214,18 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                    {/* View Participants toggle */}
+                    <button
+                        onClick={() => setShowParticipants((prev) => !prev)}
+                        title={`View Participants (${participants.length})`}
+                        className={`p-1.5 rounded-lg border-2 border-black shadow-[1.5px_1.5px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition flex items-center gap-1 text-xs font-black ${
+                            showParticipants ? "bg-[#A6FF70]" : "bg-white hover:bg-neutral-100"
+                        }`}
+                    >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>{participants.length}</span>
+                    </button>
+
                     {canModify && (
                         <>
                             <button
@@ -212,6 +263,43 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 </div>
             </div>
 
+            {/* Participants Drawer (Toggleable) */}
+            {showParticipants && (
+                <div className="p-3 bg-amber-50 border-b-2 border-black animate-in fade-in space-y-2">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-black flex items-center justify-between">
+                        <span>Thread Participants ({participants.length})</span>
+                        <button
+                            onClick={() => setShowParticipants(false)}
+                            className="text-neutral-500 hover:text-black"
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    </div>
+                    {participants.length === 0 ? (
+                        <p className="text-xs text-neutral-500 font-bold">No participants yet.</p>
+                    ) : (
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                            {participants.map((p) => (
+                                <div
+                                    key={p.id}
+                                    className="flex items-center gap-2 p-1.5 rounded-lg bg-white border border-black text-xs shadow-neo-xxs"
+                                >
+                                    <div className="w-5 h-5 rounded-full bg-[#FFE566] border border-black flex items-center justify-center font-black text-[9px] text-black">
+                                        {p.initial}
+                                    </div>
+                                    <div className="min-w-0 flex-1 truncate font-bold text-black">
+                                        {p.name}
+                                    </div>
+                                    <div className="text-[10px] text-neutral-500 font-medium">
+                                        @{p.username}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Messages Feed */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FAF6EE]">
                 {loading ? (
@@ -240,7 +328,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                                         })}
                                     </span>
                                 </div>
-                                <div className="text-neutral-900 font-semibold leading-relaxed mt-0.5 whitespace-pre-wrap">
+                                <div className="p-2.5 mt-1 rounded-xl bg-white border-2 border-black font-medium text-black shadow-[1px_1px_0px_#000] whitespace-pre-wrap leading-relaxed">
                                     {msg.content}
                                 </div>
                             </div>
@@ -250,11 +338,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Composer */}
+            {/* Reply Input */}
             <div className="p-3 border-t-2 border-black bg-white">
                 {thread.isLocked ? (
                     <div className="py-2 px-3 rounded-xl bg-[#FFE566] border-2 border-black text-center text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
-                        This thread has been locked. New replies are disabled.
+                        🔒 This thread has been locked by a moderator.
                     </div>
                 ) : (
                     <form onSubmit={handleSendReply} className="flex items-center gap-2">
@@ -262,13 +350,13 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                             type="text"
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
-                            placeholder="Reply in thread..."
+                            placeholder={`Reply to #${thread.name}...`}
                             disabled={sending}
                             className="flex-1 px-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-semibold text-black placeholder-neutral-500 focus:outline-none shadow-[1.5px_1.5px_0px_#000]"
                         />
                         <button
                             type="submit"
-                            disabled={sending || !replyContent.trim()}
+                            disabled={!replyContent.trim() || sending}
                             className="p-2 rounded-xl bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black font-black disabled:opacity-40 transition shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
                         >
                             <Send className="w-3.5 h-3.5" />

@@ -787,6 +787,295 @@ export class WorkspaceFileService {
     }
 
     // =========================================================================
+    // 5.1 ASSET RENAMING, REPLACEMENT & SHARING
+    // =========================================================================
+
+    /**
+     * Renames an asset's display file name with authorization check.
+     */
+    static async renameFile(
+        workspaceId: string,
+        actorUserId: string,
+        fileId: string,
+        newFileName: string
+    ): Promise<WorkspaceFile> {
+        const context = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!context) {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const file = await WorkspaceRepository.findFileById(workspaceId, fileId);
+        if (!file || file.deletedAt || file.assetStatus !== "active") {
+            throw new Error("File not found or has been deleted.");
+        }
+
+        // Authorization Guard: Uploader, Workspace Manager, Admin/Owner, or Department Lead
+        const isUploader = file.uploaderId === actorUserId;
+        const isWorkspaceLead = context.isOwner || context.isAdmin || context.isWorkspaceManager;
+        const isDeptLead = file.departmentId ? context.leadDepartmentIds.includes(file.departmentId) : false;
+        const hasManagePerm = context.permissions.includes("files:manage") || context.permissions.includes("workspace:manage");
+
+        if (!isUploader && !isWorkspaceLead && !isDeptLead && !hasManagePerm) {
+            throw new Error("Forbidden: You do not have permission to rename this file.");
+        }
+
+        const trimmed = (newFileName || "").trim();
+        if (!trimmed) {
+            throw new Error("File name cannot be empty.");
+        }
+        if (trimmed.length > 255) {
+            throw new Error("File name cannot exceed 255 characters.");
+        }
+
+        // Preserve original extension if user didn't include one
+        const originalExt = file.fileName.includes(".") ? file.fileName.split(".").pop() : "";
+        let finalName = trimmed;
+        if (originalExt && !trimmed.toLowerCase().endsWith(`.${originalExt.toLowerCase()}`)) {
+            finalName = `${trimmed}.${originalExt}`;
+        }
+
+        const updated = await WorkspaceRepository.updateWorkspaceFile(workspaceId, fileId, {
+            fileName: finalName,
+        });
+
+        if (!updated) {
+            throw new Error("Failed to update file name.");
+        }
+
+        // Audit log
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "file_renamed",
+            targetType: "workspace_file",
+            targetId: fileId,
+            details: { oldFileName: file.fileName, newFileName: finalName },
+            ipAddress: "127.0.0.1",
+            userAgent: "Orbix API",
+        });
+
+        return this.enrichFileWithDeliveryUrls(updated);
+    }
+
+    /**
+     * Replaces an asset's binary payload in Cloudinary while keeping the same file slot and references.
+     */
+    static async replaceFile(
+        workspaceId: string,
+        actorUserId: string,
+        fileId: string,
+        fileBuffer: Buffer,
+        metadata: {
+            originalFilename: string;
+            mimeType: string;
+        }
+    ): Promise<WorkspaceFile> {
+        assertCloudinaryConfigured();
+        const context = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!context) {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const file = await WorkspaceRepository.findFileById(workspaceId, fileId);
+        if (!file || file.deletedAt || file.assetStatus !== "active") {
+            throw new Error("File not found or has been deleted.");
+        }
+
+        // Authorization Guard: Uploader, Workspace Manager, Admin/Owner, or Department Lead
+        const isUploader = file.uploaderId === actorUserId;
+        const isWorkspaceLead = context.isOwner || context.isAdmin || context.isWorkspaceManager;
+        const isDeptLead = file.departmentId ? context.leadDepartmentIds.includes(file.departmentId) : false;
+        const hasManagePerm = context.permissions.includes("files:manage") || context.permissions.includes("workspace:manage");
+
+        if (!isUploader && !isWorkspaceLead && !isDeptLead && !hasManagePerm) {
+            throw new Error("Forbidden: You do not have permission to replace this file.");
+        }
+
+        // 1. Validate magic numbers & stored XSS prevention
+        const validation = validateBufferMagicBytes(
+            fileBuffer,
+            metadata.originalFilename,
+            metadata.mimeType
+        );
+        if (!validation.isValid) {
+            throw new Error(validation.error || "Replacement file failed security validation.");
+        }
+
+        // 2. Storage quota check (net difference)
+        const sizeDelta = fileBuffer.length - file.fileSizeBytes;
+        if (sizeDelta > 0) {
+            const quota = await WorkspaceRepository.getWorkspaceStorageUsage(workspaceId);
+            if (quota.usedBytes + sizeDelta > quota.quotaBytes) {
+                throw new Error("Workspace storage quota exceeded with this replacement file.");
+            }
+        }
+
+        // 3. Compute Checksum
+        const checksum = computeSha256(fileBuffer);
+
+        // 4. Overwrite in Cloudinary with the same publicId (or upload stream with overwrite: true)
+        const uploadResult = await new Promise<any>((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    public_id: file.cloudinaryPublicId,
+                    resource_type: validation.resourceType || (file.resourceType as any) || "auto",
+                    type: file.deliveryType,
+                    overwrite: true,
+                    invalidate: true,
+                },
+                (err, result) => {
+                    if (err) return reject(err);
+                    resolve(result);
+                }
+            );
+
+            const readable = new Readable();
+            readable.push(fileBuffer);
+            readable.push(null);
+            readable.pipe(uploadStream);
+        });
+
+        // 5. Update database record
+        const updated = await WorkspaceRepository.updateWorkspaceFile(workspaceId, fileId, {
+            fileName: metadata.originalFilename,
+            fileSizeBytes: fileBuffer.length,
+            mimeType: validation.normalizedMimeType || metadata.mimeType,
+            cloudinaryUrl: uploadResult.url,
+            cloudinarySecureUrl: uploadResult.secure_url,
+            resourceType: uploadResult.resource_type || validation.resourceType || file.resourceType,
+            format: uploadResult.format || validation.normalizedExtension || file.format,
+            checksum,
+        });
+
+        if (!updated) {
+            throw new Error("Failed to persist file replacement.");
+        }
+
+        // 6. Log task activity if attached to task
+        if (file.taskId) {
+            await query(
+                `INSERT INTO public.workspace_task_activity (
+                    workspace_id,
+                    task_id,
+                    actor_id,
+                    action,
+                    details
+                ) VALUES ($1, $2, $3, 'attachment_replaced', $4::jsonb);`,
+                [
+                    workspaceId,
+                    file.taskId,
+                    actorUserId,
+                    JSON.stringify({
+                        fileId: file.id,
+                        oldFileName: file.fileName,
+                        newFileName: metadata.originalFilename,
+                    }),
+                ]
+            );
+        }
+
+        // 7. Audit log
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "file_replaced",
+            targetType: "workspace_file",
+            targetId: fileId,
+            details: {
+                previousFileName: file.fileName,
+                previousSizeBytes: file.fileSizeBytes,
+                newFileName: metadata.originalFilename,
+                newSizeBytes: fileBuffer.length,
+            },
+            ipAddress: "127.0.0.1",
+            userAgent: "Orbix API",
+        });
+
+        return this.enrichFileWithDeliveryUrls(updated);
+    }
+
+    /**
+     * Generates a signed share delivery URL with configurable expiration (up to 7 days).
+     */
+    static async generateShareUrl(
+        workspaceId: string,
+        actorUserId: string,
+        fileId: string,
+        expiresInSeconds: number = 86400
+    ): Promise<{ shareUrl: string; expiresAt: string; fileName: string }> {
+        assertCloudinaryConfigured();
+        const context = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!context) {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const file = await WorkspaceRepository.findFileById(workspaceId, fileId);
+        if (!file || file.deletedAt || file.assetStatus !== "active") {
+            throw new Error("File not found or has been deleted.");
+        }
+
+        // Verify resource privacy access
+        await this.verifyResourceAccess(
+            context,
+            file.parentResourceType,
+            file.parentResourceId,
+            file.departmentId
+        );
+
+        // Cap TTL between 60 seconds and 7 days (604,800s)
+        const ttl = Math.min(Math.max(expiresInSeconds, 60), 7 * 24 * 3600);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const expiresAtSec = timestamp + ttl;
+        const expiresAtIso = new Date(expiresAtSec * 1000).toISOString();
+
+        let shareUrl: string;
+        const isPdf = file.mimeType === "application/pdf" || file.format === "pdf";
+
+        if (file.resourceType === "image" && !isPdf) {
+            shareUrl = cloudinary.url(file.cloudinaryPublicId, {
+                sign_url: true,
+                type: file.deliveryType,
+                resource_type: "image",
+                expires_at: expiresAtSec,
+                secure: true,
+            });
+        } else if (file.resourceType === "video") {
+            shareUrl = cloudinary.url(file.cloudinaryPublicId, {
+                sign_url: true,
+                type: file.deliveryType,
+                resource_type: "video",
+                expires_at: expiresAtSec,
+                secure: true,
+            });
+        } else if (isPdf) {
+            shareUrl = cloudinary.url(file.cloudinaryPublicId, {
+                sign_url: true,
+                type: file.deliveryType,
+                resource_type: file.resourceType as any,
+                format: "pdf",
+                expires_at: expiresAtSec,
+                secure: true,
+            });
+        } else {
+            shareUrl = cloudinary.utils.private_download_url(
+                file.cloudinaryPublicId,
+                file.format || "raw",
+                {
+                    resource_type: file.resourceType as any,
+                    type: file.deliveryType,
+                    expires_at: expiresAtSec,
+                }
+            );
+        }
+
+        return {
+            shareUrl,
+            expiresAt: expiresAtIso,
+            fileName: file.fileName,
+        };
+    }
+
+    // =========================================================================
     // 6. LISTING & STORAGE QUOTA
     // =========================================================================
 

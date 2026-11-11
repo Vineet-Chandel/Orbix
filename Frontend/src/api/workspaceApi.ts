@@ -38,6 +38,15 @@ import type {
     WorkspaceTemplateDefinition,
     MemberCapabilityResolution,
     UserClubWorkspaceSummary,
+    WorkspaceSettingsData,
+    WorkspacePermissionPreviewResult,
+    WorkspaceRecognitionPolicy,
+    WorkspaceRecognitionCategory,
+    WorkspaceRecognitionBudget,
+    WorkspaceRecognitionLedgerEntry,
+    AwardOrbitsDTO,
+    ReverseAwardDTO,
+    MemberRecognitionSummary,
 } from "../types/workspace";
 
 export const workspaceApi = {
@@ -324,6 +333,12 @@ export const workspaceApi = {
             { params: clubId ? { clubId } : undefined }
         ),
 
+    reorderCategories: (categoryIds: string[], clubId?: string) =>
+        apiClient.put<{ success: boolean; message: string }>(
+            "/club/workspace/categories/reorder",
+            { categoryIds, clubId }
+        ),
+
     setCategoryOverride: (
         categoryId: string,
         data: {
@@ -384,6 +399,12 @@ export const workspaceApi = {
             { params: clubId ? { clubId } : undefined }
         ),
 
+    reorderChannels: (channelIds: string[], clubId?: string) =>
+        apiClient.put<{ success: boolean; message: string }>(
+            "/club/workspace/channels/reorder",
+            { channelIds, clubId }
+        ),
+
     syncChannelWithCategory: (channelId: string, clubId?: string) =>
         apiClient.post<{ success: boolean; message: string }>(
             `/club/workspace/channels/${channelId}/sync`,
@@ -403,6 +424,12 @@ export const workspaceApi = {
         apiClient.post<{ success: boolean; override: WorkspaceChannelOverride }>(
             `/club/workspace/channels/${channelId}/overrides`,
             { ...data, clubId }
+        ),
+
+    deleteChannelOverride: (channelId: string, overrideId: string, clubId?: string) =>
+        apiClient.delete<{ success: boolean; message: string }>(
+            `/club/workspace/channels/${channelId}/overrides/${overrideId}`,
+            { params: clubId ? { clubId } : undefined }
         ),
 
     // =========================================================================
@@ -580,6 +607,7 @@ export const workspaceApi = {
             referenceLinks?: WorkspaceTaskReferenceLink[];
             isRestricted?: boolean;
             assigneeUserIds?: string[];
+            fileIds?: string[];
         },
         clubId?: string
     ) =>
@@ -595,10 +623,11 @@ export const workspaceApi = {
             status?: string;
             priority?: WorkspaceTaskPriority;
             assigneeUserId?: string;
+            assignedByUserId?: string;
             creatorId?: string;
             search?: string;
             isArchived?: boolean;
-            sortBy?: "created_at" | "due_date" | "priority" | "display_order";
+            sortBy?: "created_at" | "due_date" | "priority" | "display_order" | "title";
             sortDir?: "asc" | "desc";
             limit?: number;
             offset?: number;
@@ -610,7 +639,7 @@ export const workspaceApi = {
         ),
 
     getMyTasks: (
-        tab: "assigned_to_me" | "created_by_me" | "due_soon" | "overdue" | "completed" | "awaiting_review",
+        tab: "assigned_to_me" | "created_by_me" | "assigned_by_me" | "department_tasks" | "due_soon" | "overdue" | "completed" | "awaiting_review" | "archived",
         clubId?: string
     ) =>
         apiClient.get<{ success: boolean; tab: string; tasks: WorkspaceTask[] }>(
@@ -677,6 +706,7 @@ export const workspaceApi = {
             content: string;
             attachments?: Array<{ name: string; url: string; sizeBytes?: number; mimeType?: string }>;
             expectedVersion?: number;
+            fileIds?: string[];
         },
         clubId?: string
     ) =>
@@ -833,6 +863,43 @@ export const workspaceApi = {
         apiClient.delete<{ success: boolean; message: string }>(
             `/club/workspace/files/${fileId}`,
             { params: clubId ? { clubId } : undefined }
+        ),
+
+    /**
+     * Renames an asset's display name
+     */
+    renameFile: (fileId: string, newFileName: string, clubId?: string) =>
+        apiClient.patch<{ success: boolean; file: WorkspaceFile }>(
+            `/club/workspace/files/${fileId}/rename`,
+            { newFileName },
+            { params: clubId ? { clubId } : undefined }
+        ),
+
+    /**
+     * Replaces an asset's binary payload in Cloudinary
+     */
+    replaceFile: (fileId: string, formData: FormData, clubId?: string) =>
+        apiClient.post<{ success: boolean; file: WorkspaceFile }>(
+            `/club/workspace/files/${fileId}/replace`,
+            formData,
+            {
+                params: clubId ? { clubId } : undefined,
+                headers: { "Content-Type": "multipart/form-data" },
+            }
+        ),
+
+    /**
+     * Generates an authorized signed share link with customizable expiry
+     */
+    getShareUrl: (fileId: string, expiresIn?: number, clubId?: string) =>
+        apiClient.get<{ success: boolean; shareUrl: string; expiresAt: string; fileName: string }>(
+            `/club/workspace/files/${fileId}/share-url`,
+            {
+                params: {
+                    expiresIn,
+                    clubId,
+                },
+            }
         ),
 
     /**
@@ -995,6 +1062,55 @@ export const workspaceApi = {
             { params: clubId ? { clubId } : undefined }
         ),
 
+    /**
+     * Phase 07: Reorders custom role hierarchy ranks
+     */
+    reorderRoles: (
+        roleOrder: Array<{ id: string; rank?: number }> | string[],
+        clubId?: string
+    ) =>
+        apiClient.put<{ success: boolean; roles: WorkspaceRole[]; message: string }>(
+            "/club/workspace/roles/reorder",
+            { roleOrder, clubId }
+        ),
+
+    /**
+     * Phase 07: Read-only capability simulation preview for role or member
+     */
+    previewPermissions: (
+        params: { roleId?: string; targetUserId?: string },
+        clubId?: string
+    ) =>
+        apiClient.get<{ success: boolean; preview: WorkspacePermissionPreviewResult }>(
+            "/club/workspace/permissions/preview",
+            { params: { ...params, clubId } }
+        ),
+
+    /**
+     * Phase 07: Retrieves workspace settings & delegated management configuration
+     */
+    getSettings: (clubId?: string) =>
+        apiClient.get<{ success: boolean; settings: WorkspaceSettingsData }>(
+            "/club/workspace/settings",
+            { params: clubId ? { clubId } : undefined }
+        ),
+
+    /**
+     * Phase 07: Updates workspace configuration, name, description, and settings
+     */
+    updateSettings: (
+        data: {
+            name?: string;
+            description?: string;
+            customSettings?: Record<string, any>;
+        },
+        clubId?: string
+    ) =>
+        apiClient.patch<{ success: boolean; workspace: any; message: string }>(
+            "/club/workspace/settings",
+            { ...data, clubId }
+        ),
+
     getTemplates: (clubId?: string) =>
         apiClient.get<{ success: boolean; templates: WorkspaceTemplateDefinition[] }>(
             "/club/workspace/templates",
@@ -1042,6 +1158,136 @@ export const workspaceApi = {
             `/club/workspace/members/${targetUserId}/custom-permissions`,
             { clubId, customPermissions }
         ),
+
+    // =========================================================================
+    // PHASE 02/03: ORBIX RECOGNITION & ORBITS ENGINE
+    // =========================================================================
+
+    awardOrbits: (data: AwardOrbitsDTO, clubId?: string) =>
+        apiClient.post<{
+            success: boolean;
+            message: string;
+            award: WorkspaceRecognitionLedgerEntry;
+        }>("/club/workspace/recognition/awards", { ...data, clubId }),
+
+    reverseAward: (awardId: string, data: ReverseAwardDTO, clubId?: string) =>
+        apiClient.post<{
+            success: boolean;
+            message: string;
+            reversal: WorkspaceRecognitionLedgerEntry;
+            original: WorkspaceRecognitionLedgerEntry;
+        }>(`/club/workspace/recognition/awards/${awardId}/reverse`, { ...data, clubId }),
+
+    getRecognitionSummary: (userId?: string, clubId?: string) =>
+        apiClient.get<{ success: boolean; summary: MemberRecognitionSummary }>(
+            "/club/workspace/recognition/summary",
+            { params: { userId, clubId } }
+        ),
+
+    getRecognitionHistory: (
+        params?: {
+            recipientId?: string;
+            issuerId?: string;
+            departmentId?: string;
+            categoryId?: string;
+            limit?: number;
+            offset?: number;
+        },
+        clubId?: string
+    ) =>
+        apiClient.get<{
+            success: boolean;
+            entries: WorkspaceRecognitionLedgerEntry[];
+            total: number;
+        }>("/club/workspace/recognition/history", {
+            params: { ...params, clubId },
+        }),
+
+    getRecognitionPolicy: (clubId?: string) =>
+        apiClient.get<{ success: boolean; policy: WorkspaceRecognitionPolicy }>(
+            "/club/workspace/recognition/policy",
+            { params: clubId ? { clubId } : undefined }
+        ),
+
+    updateRecognitionPolicy: (data: Partial<WorkspaceRecognitionPolicy>, clubId?: string) =>
+        apiClient.patch<{
+            success: boolean;
+            policy: WorkspaceRecognitionPolicy;
+            message: string;
+        }>("/club/workspace/recognition/policy", { ...data, clubId }),
+
+    getRecognitionCategories: (clubId?: string) =>
+        apiClient.get<{ success: boolean; categories: WorkspaceRecognitionCategory[] }>(
+            "/club/workspace/recognition/categories",
+            { params: clubId ? { clubId } : undefined }
+        ),
+
+    updateRecognitionCategory: (
+        categoryId: string,
+        data: { isActive?: boolean; name?: string; description?: string; icon?: string },
+        clubId?: string
+    ) =>
+        apiClient.patch<{
+            success: boolean;
+            category: WorkspaceRecognitionCategory;
+            message: string;
+        }>(`/club/workspace/recognition/categories/${categoryId}`, { ...data, clubId }),
+
+    allocateRecognitionBudget: (
+        data: { managerUserId: string; allocatedBudget: number; yearMonth?: string },
+        clubId?: string
+    ) =>
+        apiClient.post<{
+            success: boolean;
+            budget: WorkspaceRecognitionBudget;
+            message: string;
+        }>("/club/workspace/recognition/budget", { ...data, clubId }),
+
+    getRecognitionBudgets: (yearMonth?: string, clubId?: string) =>
+        apiClient.get<{
+            success: boolean;
+            budgets: Array<WorkspaceRecognitionBudget & { user: any }>;
+        }>("/club/workspace/recognition/budgets", {
+            params: { yearMonth, clubId },
+        }),
+
+    getRecognitionAnalytics: (clubId?: string) =>
+        apiClient.get<{
+            success: boolean;
+            analytics: {
+                totalOrbitsAwarded: number;
+                totalAwardsCount: number;
+                monthlyOrbitsAwarded: number;
+                monthlyAwardsCount: number;
+                activeCategoriesCount: number;
+                categoryBreakdown: Array<{
+                    categoryId: string;
+                    categoryName: string;
+                    categorySlug: string;
+                    icon: string;
+                    totalPoints: number;
+                    awardCount: number;
+                }>;
+                topRecipients: Array<{
+                    userId: string;
+                    name: string;
+                    username: string;
+                    avatarUrl?: string;
+                    totalPoints: number;
+                    awardCount: number;
+                }>;
+                topIssuers: Array<{
+                    userId: string;
+                    name: string;
+                    username: string;
+                    avatarUrl?: string;
+                    totalPoints: number;
+                    awardCount: number;
+                }>;
+            };
+        }>("/club/workspace/recognition/analytics", {
+            params: clubId ? { clubId } : undefined,
+        }),
 };
 
 export default workspaceApi;

@@ -9,7 +9,10 @@ import {
     UserCheck,
     UserX,
     Filter,
+    Trash2,
 } from "lucide-react";
+import { useToast } from "../../../../context/ToastContext";
+import { workspaceApi } from "../../../../api/workspaceApi";
 import type {
     WorkspaceMember,
     WorkspaceRole,
@@ -29,6 +32,7 @@ interface MemberDirectoryViewProps {
     clubId: string;
     onRefresh: () => void;
     onToggleSuspension: (member: WorkspaceMember) => void;
+    onNavigateToRoles?: () => void;
 }
 
 export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
@@ -40,7 +44,9 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
     clubId,
     onRefresh,
     onToggleSuspension,
+    onNavigateToRoles,
 }) => {
+    const toast = useToast();
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -49,11 +55,14 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
     // Modal states
     const [isInviteOpen, setIsInviteOpen] = useState(false);
     const [roleModalMember, setRoleModalMember] = useState<WorkspaceMember | null>(null);
+    const [memberToRemove, setMemberToRemove] = useState<WorkspaceMember | null>(null);
+    const [isRemoving, setIsRemoving] = useState(false);
 
     // Permission checks
     const actorRank = currentMember?.role?.rank ?? 0;
     const isOwner = currentMember?.role?.slug === "owner" || actorRank === 1000;
     const isManager = currentMember?.userId === workspace.managerUserId;
+    const canSeePrivate = isOwner || isManager || actorRank >= 800;
     const mgrPerms = Array.isArray(workspace.managerPermissions)
         ? workspace.managerPermissions.reduce((acc: any, p: string) => ({ ...acc, [p]: true }), {})
         : ((workspace.managerPermissions as Record<string, any>) || {});
@@ -118,15 +127,27 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                     </p>
                 </div>
 
-                {canInvite && (
-                    <button
-                        onClick={() => setIsInviteOpen(true)}
-                        className="px-4 py-2 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 self-start sm:self-auto"
-                    >
-                        <UserPlus className="w-4 h-4" />
-                        Invite Team Member
-                    </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                    {onNavigateToRoles && (
+                        <button
+                            onClick={onNavigateToRoles}
+                            className="px-3.5 py-2 bg-white hover:bg-neutral-50 text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-xs transition flex items-center gap-1.5"
+                        >
+                            <Shield className="w-3.5 h-3.5 text-neutral-700" />
+                            Manage Roles
+                        </button>
+                    )}
+
+                    {canInvite && (
+                        <button
+                            onClick={() => setIsInviteOpen(true)}
+                            className="px-4 py-2 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2"
+                        >
+                            <UserPlus className="w-4 h-4" />
+                            Invite Team Member
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Filter Controls Bar */}
@@ -250,7 +271,10 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                                                     )}
                                                 </div>
                                                 <div className="text-[11px] text-neutral-500 font-mono">
-                                                    @{m.user?.username} • {m.user?.email}
+                                                    @{m.user?.username}
+                                                    {canSeePrivate && m.user?.email && (
+                                                        <span className="text-neutral-400"> • {m.user.email}</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -348,6 +372,16 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                                                         )}
                                                     </button>
                                                 )}
+
+                                                {canModifyThisMember && (isOwner || isManager || actorRank >= 800) && (
+                                                    <button
+                                                        onClick={() => setMemberToRemove(m)}
+                                                        className="p-1 text-red-600 hover:text-red-800 border border-transparent hover:border-black rounded transition"
+                                                        title="Remove member from workspace"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     )}
@@ -393,6 +427,50 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                     onRefresh();
                 }}
             />
+
+            {/* Remove Member Confirmation Modal */}
+            {memberToRemove && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+                    <div className="bg-white border-2 border-black rounded-2xl p-6 max-w-sm w-full shadow-neo text-center animate-in fade-in">
+                        <div className="w-12 h-12 bg-red-100 border-2 border-black rounded-xl flex items-center justify-center mx-auto mb-3 shadow-neo-xs">
+                            <Trash2 className="w-6 h-6 text-red-600" />
+                        </div>
+                        <h4 className="text-base font-black text-black">Remove from Workspace?</h4>
+                        <p className="text-xs text-neutral-600 mt-2 font-medium">
+                            Are you sure you want to remove <strong>@{memberToRemove.user?.username}</strong> from this workspace? They will lose access to all channels, tasks, and departments.
+                        </p>
+                        <div className="flex items-center justify-center gap-2 mt-5">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        setIsRemoving(true);
+                                        const res = await workspaceApi.removeMember(memberToRemove.userId, clubId);
+                                        if (res.success) {
+                                            toast.success(res.message);
+                                            setMemberToRemove(null);
+                                            onRefresh();
+                                        }
+                                    } catch (err: any) {
+                                        toast.error(err.message || "Failed to remove member.");
+                                    } finally {
+                                        setIsRemoving(false);
+                                    }
+                                }}
+                                disabled={isRemoving}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs border-2 border-black rounded-xl shadow-neo-xs transition disabled:opacity-50"
+                            >
+                                {isRemoving ? "Removing..." : "Yes, Remove"}
+                            </button>
+                            <button
+                                onClick={() => setMemberToRemove(null)}
+                                className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs border border-black rounded-xl"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

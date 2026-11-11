@@ -17,6 +17,10 @@ import {
     Check,
     AlertCircle,
     X,
+    CornerUpLeft,
+    Clock,
+    User,
+    Shield,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -24,6 +28,7 @@ import type {
     WorkspaceChannel,
     WorkspaceMessage,
     WorkspaceMember,
+    WorkspaceRole,
     WorkspaceThread,
     WorkspaceFile,
 } from "../../../../types/workspace";
@@ -35,6 +40,8 @@ interface ChannelViewProps {
     clubId: string;
     currentMember: WorkspaceMember | null;
     canManageChannels: boolean;
+    members?: WorkspaceMember[];
+    roles?: WorkspaceRole[];
     onOpenThread: (thread: WorkspaceThread) => void;
     onChannelUpdated?: (channel: WorkspaceChannel) => void;
 }
@@ -46,6 +53,8 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     clubId,
     currentMember,
     canManageChannels,
+    members = [],
+    roles = [],
     onOpenThread,
     onChannelUpdated,
 }) => {
@@ -58,6 +67,15 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     const [sending, setSending] = useState(false);
     const [showAttachmentZone, setShowAttachmentZone] = useState(false);
     const [pendingAttachments, setPendingAttachments] = useState<WorkspaceFile[]>([]);
+
+    // In-channel Quote / Reply state
+    const [replyingTo, setReplyingTo] = useState<WorkspaceMessage | null>(null);
+
+    // Mention autocomplete state
+    const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+
+    // Slowmode cooldown countdown (in seconds)
+    const [slowmodeTimer, setSlowmodeTimer] = useState<number>(0);
 
     // Editing message
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -84,6 +102,64 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Slowmode timer countdown
+    useEffect(() => {
+        if (slowmodeTimer <= 0) return;
+        const interval = setInterval(() => {
+            setSlowmodeTimer((prev) => Math.max(0, prev - 1));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [slowmodeTimer]);
+
+    // Live Real-Time Message and Reaction Sync
+    useEffect(() => {
+        const handleRealtime = (e: any) => {
+            const data = e.detail;
+            if (!data || !data.payload) return;
+
+            const targetChannelId = data.payload.channelId || data.payload.channel?.id;
+            if (targetChannelId !== channel.id) return;
+
+            if (data.event === "message:new") {
+                const newMsg = data.payload.message;
+                if (newMsg && !newMsg.threadId) {
+                    setMessages((prev) => {
+                        if (prev.some((m) => m.id === newMsg.id)) return prev;
+                        return [...prev, newMsg];
+                    });
+                }
+            } else if (data.event === "message:updated") {
+                const updatedMsg = data.payload.message;
+                if (updatedMsg) {
+                    setMessages((prev) =>
+                        prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m))
+                    );
+                }
+            } else if (data.event === "message:deleted") {
+                const deletedId = data.payload.messageId;
+                if (deletedId) {
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === deletedId
+                                ? { ...m, isDeleted: true, content: "This message was deleted." }
+                                : m
+                        )
+                    );
+                }
+            } else if (data.event === "message:pinned") {
+                const { messageId, isPinned } = data.payload;
+                setMessages((prev) =>
+                    prev.map((m) => (m.id === messageId ? { ...m, isPinned } : m))
+                );
+            } else if (data.event === "reaction:added" || data.event === "reaction:removed") {
+                fetchMessages();
+            }
+        };
+
+        window.addEventListener("workspace:realtime", handleRealtime);
+        return () => window.removeEventListener("workspace:realtime", handleRealtime);
+    }, [channel.id]);
 
     // Fetch messages
     const fetchMessages = useCallback(async () => {
@@ -116,19 +192,143 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages.length]);
 
+    // Filter matching mentions for autocomplete
+    const matchingMentions = React.useMemo(() => {
+        if (mentionQuery === null) return [];
+        const q = mentionQuery.toLowerCase();
+        const results: Array<{
+            type: "member" | "role";
+            tag: string;
+            label: string;
+            sub?: string;
+        }> = [];
+
+        // Roles
+        (roles || []).forEach((r) => {
+            if (r.name.toLowerCase().includes(q)) {
+                results.push({
+                    type: "role",
+                    tag: r.name.toLowerCase().replace(/\s+/g, "-"),
+                    label: r.name,
+                    sub: "Role Mention",
+                });
+            }
+        });
+
+        // Members
+        (members || []).forEach((m) => {
+            const u = m.user;
+            if (!u) return;
+            const full = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+            if (
+                u.username.toLowerCase().includes(q) ||
+                full.toLowerCase().includes(q)
+            ) {
+                results.push({
+                    type: "member",
+                    tag: u.username,
+                    label: full || u.username,
+                    sub: `@${u.username}`,
+                });
+            }
+        });
+
+        return results.slice(0, 5);
+    }, [mentionQuery, members, roles]);
+
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setContent(val);
+        const cursor = e.target.selectionStart;
+        const textBefore = val.slice(0, cursor);
+        const match = textBefore.match(/@([a-zA-Z0-9_]*)$/);
+        if (match) {
+            setMentionQuery(match[1]);
+        } else {
+            setMentionQuery(null);
+        }
+    };
+
+    const handleApplyMention = (tag: string) => {
+        if (!textareaRef.current) return;
+        const cursor = textareaRef.current.selectionStart;
+        const textBefore = content.slice(0, cursor);
+        const textAfter = content.slice(cursor);
+        const replaced = textBefore.replace(/@([a-zA-Z0-9_]*)$/, `@${tag} `);
+        setContent(replaced + textAfter);
+        setMentionQuery(null);
+        setTimeout(() => textareaRef.current?.focus(), 50);
+    };
+
+    // Render formatted content (quotes, mentions)
+    const renderFormattedContent = (rawText: string) => {
+        if (!rawText) return null;
+        if (rawText.startsWith("> ")) {
+            const lines = rawText.split("\n");
+            const quoteLines: string[] = [];
+            const normalLines: string[] = [];
+            let inQuote = true;
+            for (const l of lines) {
+                if (inQuote && l.startsWith("> ")) {
+                    quoteLines.push(l.slice(2));
+                } else {
+                    inQuote = false;
+                    normalLines.push(l);
+                }
+            }
+            return (
+                <div>
+                    <div className="border-l-4 border-black pl-2.5 py-1 text-xs text-neutral-700 bg-black/5 rounded-r mb-1.5 italic font-medium">
+                        {quoteLines.join("\n")}
+                    </div>
+                    <div>{renderFormattedContent(normalLines.join("\n"))}</div>
+                </div>
+            );
+        }
+
+        const parts = rawText.split(/(@[a-zA-Z0-9_-]+)/g);
+        return parts.map((part, idx) => {
+            if (part.startsWith("@")) {
+                return (
+                    <span
+                        key={idx}
+                        className="inline-block px-1.5 py-0.2 mx-0.5 text-xs font-black bg-[#FFE566] text-black border border-black rounded shadow-neo-xxs"
+                    >
+                        {part}
+                    </span>
+                );
+            }
+            return part;
+        });
+    };
+
     // Send message
     const handleSendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if (slowmodeTimer > 0 && !canManageChannels) {
+            toast.error(`Slowmode is active. Wait ${slowmodeTimer}s before sending again.`);
+            return;
+        }
+
         const trimmed = content.trim();
         if ((!trimmed && pendingAttachments.length === 0) || sending) return;
 
         try {
             setSending(true);
+
+            let finalContent = trimmed;
+            if (replyingTo) {
+                const quoteSnippet = replyingTo.content.slice(0, 80).replace(/\n/g, " ");
+                const senderName = replyingTo.sender?.username || "user";
+                finalContent = `> @${senderName}: ${quoteSnippet}\n\n${trimmed}`;
+            }
+
             const res = await workspaceApi.sendMessage(
                 channel.id,
                 {
-                    content: trimmed || (pendingAttachments.length > 0 ? "Shared attachment(s)" : ""),
+                    content: finalContent || (pendingAttachments.length > 0 ? "Shared attachment(s)" : ""),
                     messageType: channel.channelType === "announcement" ? "announcement" : "text",
+                    parentMessageId: replyingTo ? replyingTo.id : null,
                     attachments: pendingAttachments.map((f) => ({
                         fileName: f.fileName,
                         fileSizeBytes: f.fileSizeBytes,
@@ -143,13 +343,22 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
             if (res.success && res.message) {
                 setContent("");
+                setReplyingTo(null);
                 setPendingAttachments([]);
                 setShowAttachmentZone(false);
-                setMessages((prev) => [...prev, res.message]);
+                setMessages((prev) => {
+                    if (prev.some((m) => m.id === res.message.id)) return prev;
+                    return [...prev, res.message];
+                });
+
+                // Apply slowmode cooldown if configured
+                if (channel.defaultSlowmodeSeconds && channel.defaultSlowmodeSeconds > 0 && !canManageChannels) {
+                    setSlowmodeTimer(channel.defaultSlowmodeSeconds);
+                }
             }
         } catch (err: any) {
             console.error("Failed to send message:", err);
-            toast.error(err.message || "Failed to send message.");
+            toast.error(err.response?.data?.message || err.message || "Failed to send message.");
         } finally {
             setSending(false);
         }
@@ -613,7 +822,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                                 msg.isDeleted ? "text-neutral-400 italic font-normal" : ""
                                             }`}
                                         >
-                                            {msg.content}
+                                            {msg.isDeleted ? msg.content : renderFormattedContent(msg.content)}
                                         </div>
                                     )}
 
@@ -692,6 +901,18 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                             )}
                                         </div>
 
+                                        {/* Quote / In-channel Reply */}
+                                        <button
+                                            onClick={() => {
+                                                setReplyingTo(msg);
+                                                textareaRef.current?.focus();
+                                            }}
+                                            className="p-1.5 text-black hover:bg-[#FAF6EE] rounded-lg transition"
+                                            title="Quote / Reply in Channel"
+                                        >
+                                            <CornerUpLeft className="w-3.5 h-3.5" />
+                                        </button>
+
                                         {/* Reply / Start Thread */}
                                         <button
                                             onClick={() => {
@@ -760,6 +981,53 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                     </div>
                 ) : (
                     <form onSubmit={handleSendMessage} className="space-y-2">
+                        {/* Replying To Banner */}
+                        {replyingTo && (
+                            <div className="flex items-center justify-between px-3 py-1.5 bg-[#FFE566] border-2 border-black rounded-xl text-xs font-black shadow-neo-xxs animate-in fade-in">
+                                <span className="flex items-center gap-1.5 truncate">
+                                    <CornerUpLeft className="w-3.5 h-3.5 shrink-0 text-black" />
+                                    <span>Replying to @{replyingTo.sender?.username || "user"}:</span>
+                                    <span className="font-medium text-neutral-800 truncate">
+                                        "{replyingTo.content.slice(0, 50)}..."
+                                    </span>
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setReplyingTo(null)}
+                                    className="p-0.5 hover:bg-black/10 rounded text-black shrink-0"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Matching Mentions Autocomplete Popover */}
+                        {matchingMentions.length > 0 && (
+                            <div className="p-2 bg-white border-2 border-black rounded-xl shadow-neo space-y-1 animate-in fade-in max-h-44 overflow-y-auto">
+                                <div className="text-[10px] font-black uppercase text-neutral-500 px-2 py-0.5">
+                                    Mention Member or Role
+                                </div>
+                                {matchingMentions.map((item) => (
+                                    <button
+                                        key={item.tag}
+                                        type="button"
+                                        onClick={() => handleApplyMention(item.tag)}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-black hover:bg-[#FFE566] text-left transition"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            {item.type === "role" ? (
+                                                <Shield className="w-3.5 h-3.5 text-black" />
+                                            ) : (
+                                                <User className="w-3.5 h-3.5 text-black" />
+                                            )}
+                                            <span>{item.label}</span>
+                                        </span>
+                                        <span className="text-[10px] font-bold text-neutral-500">{item.sub}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
                         {/* Expandable Attachment Zone */}
                         {showAttachmentZone && (
                             <div className="mb-3 p-3 bg-white border-2 border-black rounded-2xl space-y-2 shadow-neo">
@@ -801,7 +1069,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                             <textarea
                                 ref={textareaRef}
                                 value={content}
-                                onChange={(e) => setContent(e.target.value)}
+                                onChange={handleTextareaChange}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter" && !e.shiftKey) {
                                         e.preventDefault();
@@ -840,10 +1108,15 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 </button>
                             </div>
 
-                            <div className="absolute right-3 bottom-2.5">
+                            <div className="absolute right-3 bottom-2.5 flex items-center gap-2">
+                                {slowmodeTimer > 0 && (
+                                    <span className="px-2 py-1 text-[11px] font-black bg-[#FFE566] text-black border border-black rounded-lg flex items-center gap-1 shadow-neo-xxs animate-pulse">
+                                        <Clock className="w-3 h-3" /> {slowmodeTimer}s
+                                    </span>
+                                )}
                                 <button
                                     type="submit"
-                                    disabled={sending || !content.trim()}
+                                    disabled={sending || (!content.trim() && pendingAttachments.length === 0) || slowmodeTimer > 0}
                                     className="p-2 rounded-xl bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black font-black disabled:opacity-40 transition shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
                                 >
                                     <Send className="w-4 h-4" />

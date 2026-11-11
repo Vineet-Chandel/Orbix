@@ -2,6 +2,7 @@
 import { pool, query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import { workspaceEventBus } from "./workspaceChannelService.js";
 import type {
     TeamWorkspace,
     WorkspaceMember,
@@ -398,8 +399,18 @@ export class WorkspaceService {
             throw new Error("Failed to update member suspension status.");
         }
 
-        // Invalidate Redis permissions
-        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, targetUserId);
+        // Invalidate Redis permissions, capabilities, unread, and directory caches
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, targetUserId);
+
+        workspaceEventBus.emit(`workspace:${workspaceId}`, {
+            event: suspend ? "member:suspended" : "member:unsuspended",
+            payload: {
+                memberId: targetMember.id,
+                userId: targetUserId,
+                reason: reason || null,
+            },
+            timestamp: new Date().toISOString(),
+        });
 
         // Audit Log
         await WorkspaceRepository.logAudit(null, {

@@ -4,6 +4,7 @@ import { pool, query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import { workspaceEventBus } from "./workspaceChannelService.js";
 import type {
     WorkspaceMember,
     WorkspaceInvitation,
@@ -12,6 +13,13 @@ import type {
 } from "../../types/workspaceTypes.js";
 
 export class WorkspaceMemberService {
+    private static broadcastEvent(workspaceId: string, event: string, payload: any) {
+        workspaceEventBus.emit(`workspace:${workspaceId}`, {
+            event,
+            payload,
+            timestamp: new Date().toISOString(),
+        });
+    }
     // =========================================================================
     // 1. WORKSPACE MANAGER APPOINTMENT (CLUB MANAGER / OWNER EXCLUSIVE)
     // =========================================================================
@@ -48,9 +56,11 @@ export class WorkspaceMemberService {
 
         if (!updated) throw new Error("Failed to appoint Workspace Manager.");
 
-        // Invalidate permissions cache
-        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, managerUserId);
+        // Invalidate permissions and security caches
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, managerUserId);
         await WorkspaceRedisService.invalidateWorkspace(workspace.clubId);
+
+        this.broadcastEvent(workspaceId, "member:manager_appointed", { managerUserId, permissions });
 
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
@@ -86,9 +96,11 @@ export class WorkspaceMemberService {
         if (!updated) throw new Error("Failed to revoke Workspace Manager.");
 
         if (previousManagerId) {
-            await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, previousManagerId);
+            await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, previousManagerId);
         }
         await WorkspaceRedisService.invalidateWorkspace(workspace.clubId);
+
+        this.broadcastEvent(workspaceId, "member:manager_revoked", { previousManagerId });
 
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
@@ -120,7 +132,13 @@ export class WorkspaceMemberService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceMember> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("members:assign_role"))) {
+        const rawMgrPerms = ctx.workspace.managerPermissions || {};
+        const mgrPerms: Record<string, any> = Array.isArray(rawMgrPerms)
+            ? rawMgrPerms.reduce((acc, p) => ({ ...acc, [p]: true }), {} as Record<string, boolean>)
+            : (rawMgrPerms as Record<string, any>);
+        const isAuthorizedManager = ctx.isWorkspaceManager && !!mgrPerms.can_manage_members;
+
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("members:assign_role") && !isAuthorizedManager && !ctx.isOwner)) {
             throw new Error("Unauthorized to assign member roles.");
         }
 
@@ -161,8 +179,16 @@ export class WorkspaceMemberService {
 
         if (!updated) throw new Error("Failed to update member role.");
 
-        // Invalidate Redis permissions cache for target user
-        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, targetUserId);
+        // Invalidate permissions, capabilities, and directory caches for target user
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, targetUserId);
+
+        this.broadcastEvent(workspaceId, "member:role_changed", {
+            memberId: targetMember.id,
+            userId: targetUserId,
+            newRoleId,
+            newRole: targetNewRole.name,
+            rank: targetNewRole.rank,
+        });
 
         const isPromotion = targetNewRole.rank > currentTargetRank;
         await WorkspaceRepository.logAudit(null, {
@@ -242,9 +268,13 @@ export class WorkspaceMemberService {
             [workspaceId, targetUserId]
         );
 
-        // 3. Invalidate Redis capabilities & permissions caches
-        await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetUserId);
-        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, targetUserId);
+        // 3. Invalidate Redis capabilities, permissions, unread, and directory caches
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, targetUserId);
+
+        this.broadcastEvent(workspaceId, "member:removed", {
+            memberId: targetMember.id,
+            userId: targetUserId,
+        });
 
         // 4. Audit log
         await WorkspaceRepository.logAudit(null, {
@@ -721,8 +751,9 @@ export class WorkspaceMemberService {
         const updated = await WorkspaceRepository.updateRole(workspaceId, roleId, data);
         if (!updated) throw new Error("Failed to update role.");
 
-        // Invalidate all permissions caches in this workspace
-        await WorkspaceRedisService.invalidateAllWorkspacePermissions(workspaceId);
+        // Invalidate all permissions, capabilities, and directory caches in this workspace
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
+        this.broadcastEvent(workspaceId, "role:updated", { roleId, data });
 
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
@@ -768,8 +799,9 @@ export class WorkspaceMemberService {
         const deleted = await WorkspaceRepository.deleteRole(workspaceId, roleId, defaultMemberRole.id);
 
         if (deleted) {
-            // Invalidate all permissions caches
-            await WorkspaceRedisService.invalidateAllWorkspacePermissions(workspaceId);
+            // Invalidate all permissions, capabilities, and directory caches
+            await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
+            this.broadcastEvent(workspaceId, "role:deleted", { roleId });
 
             await WorkspaceRepository.logAudit(null, {
                 workspaceId,
@@ -784,6 +816,95 @@ export class WorkspaceMemberService {
         }
 
         return deleted;
+    }
+
+    /**
+     * Reorders role hierarchy ranks safely with escalation defenses.
+     */
+    static async reorderRoles(
+        workspaceId: string,
+        actorUserId: string,
+        updates: Array<{ id: string; rank?: number }> | string[],
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<WorkspaceRole[]> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("roles:manage") && !ctx.isOwner)) {
+            throw new Error("Unauthorized to manage roles in this workspace.");
+        }
+
+        const actorRank = ctx.member.role?.rank || 0;
+        const allRoles = await WorkspaceRepository.listRoles(workspaceId);
+        const roleMap = new Map(allRoles.map((r) => [r.id, r]));
+
+        // Normalize updates into { id, rank }[]
+        let normalizedUpdates: Array<{ id: string; rank: number }> = [];
+
+        if (updates.length > 0 && typeof updates[0] === "string") {
+            // updates is array of role IDs in descending rank order
+            const roleIds = updates as string[];
+            let currentRank = 750;
+            for (const rId of roleIds) {
+                normalizedUpdates.push({ id: rId, rank: currentRank });
+                currentRank = Math.max(210, currentRank - 10);
+            }
+        } else {
+            normalizedUpdates = (updates as Array<{ id: string; rank: number }>).map((u) => ({
+                id: u.id,
+                rank: Number(u.rank),
+            }));
+        }
+
+        const validUpdates: Array<{ id: string; rank: number }> = [];
+
+        for (const item of normalizedUpdates) {
+            const role = roleMap.get(item.id);
+            if (!role) {
+                throw new Error(`Role ${item.id} not found in this workspace.`);
+            }
+
+            // System roles cannot have their ranks altered
+            if (role.isSystem) {
+                continue;
+            }
+
+            // Escalation Protection: non-owners cannot touch roles equal or above their rank
+            if (role.rank >= actorRank && !ctx.isOwner) {
+                throw new Error(`Cannot reorder role "${role.name}" with equal or higher rank than your own.`);
+            }
+
+            // Escalation Protection: non-owners cannot set rank >= actorRank or >= 800
+            if (item.rank >= actorRank && !ctx.isOwner) {
+                throw new Error(`Cannot assign rank ${item.rank} equal to or greater than your own rank (${actorRank}).`);
+            }
+            if (item.rank >= 800 && !ctx.isOwner) {
+                throw new Error("Custom roles cannot exceed rank 799.");
+            }
+
+            validUpdates.push(item);
+        }
+
+        if (validUpdates.length === 0) {
+            return allRoles;
+        }
+
+        const updatedRoles = await WorkspaceRepository.reorderRoles(workspaceId, validUpdates);
+
+        // Invalidate all permissions, capabilities, and directory caches
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
+        this.broadcastEvent(workspaceId, "roles:reordered", { updates: validUpdates });
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "roles_reordered",
+            targetType: "role",
+            targetId: workspaceId,
+            details: { updates: validUpdates },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return updatedRoles;
     }
 
     // =========================================================================
@@ -831,9 +952,14 @@ export class WorkspaceMemberService {
 
         if (!updated) throw new Error("Failed to update custom permissions.");
 
-        // Invalidate member permissions and capabilities in Redis
-        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, targetUserId);
-        await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetUserId);
+        // Invalidate member permissions, capabilities, and directory in Redis
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId, targetUserId);
+
+        this.broadcastEvent(workspaceId, "member:permissions_updated", {
+            memberId: targetMember.id,
+            userId: targetUserId,
+            customPermissions,
+        });
 
         await WorkspaceRepository.logAudit(null, {
             workspaceId,

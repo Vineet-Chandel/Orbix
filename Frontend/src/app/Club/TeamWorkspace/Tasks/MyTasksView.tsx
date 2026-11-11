@@ -13,6 +13,8 @@ import {
     RefreshCw,
     FolderKanban,
     Lock,
+    Send,
+    Archive,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type {
@@ -34,19 +36,25 @@ interface MyTasksViewProps {
 
 type MyTasksTab =
     | "assigned_to_me"
+    | "department_tasks"
     | "created_by_me"
+    | "assigned_by_me"
+    | "awaiting_review"
     | "due_soon"
     | "overdue"
     | "completed"
-    | "awaiting_review";
+    | "archived";
 
 const TABS: Array<{ id: MyTasksTab; label: string; icon: any; color: string }> = [
     { id: "assigned_to_me", label: "Assigned to Me", icon: UserCheck, color: "text-indigo-600" },
+    { id: "department_tasks", label: "Department Tasks", icon: FolderKanban, color: "text-teal-600" },
     { id: "created_by_me", label: "Created by Me", icon: FileEdit, color: "text-blue-600" },
+    { id: "assigned_by_me", label: "Assigned by Me", icon: Send, color: "text-cyan-600" },
+    { id: "awaiting_review", label: "Awaiting Review", icon: Shield, color: "text-purple-600" },
     { id: "due_soon", label: "Due Soon", icon: Clock, color: "text-amber-600" },
     { id: "overdue", label: "Overdue", icon: AlertCircle, color: "text-red-600" },
     { id: "completed", label: "Completed", icon: CheckCircle2, color: "text-emerald-600" },
-    { id: "awaiting_review", label: "Awaiting Review", icon: Shield, color: "text-purple-600" },
+    { id: "archived", label: "Archived", icon: Archive, color: "text-neutral-500" },
 ];
 
 export const MyTasksView: React.FC<MyTasksViewProps> = ({
@@ -78,6 +86,18 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
 
     useEffect(() => {
         loadTabTasks();
+    }, [loadTabTasks]);
+
+    // Live real-time task update listener
+    useEffect(() => {
+        const handleRealtime = (e: any) => {
+            const detail = e.detail;
+            if (detail?.event?.startsWith("task:")) {
+                loadTabTasks();
+            }
+        };
+        window.addEventListener("workspace:realtime", handleRealtime);
+        return () => window.removeEventListener("workspace:realtime", handleRealtime);
     }, [loadTabTasks]);
 
     return (

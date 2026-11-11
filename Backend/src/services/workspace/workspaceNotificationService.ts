@@ -487,4 +487,76 @@ export class WorkspaceNotificationService {
             destinationUrl: `/club/${params.clubId}/workspace`,
         });
     }
+
+    // =========================================================================
+    // MENTION & CHANNEL NOTIFICATIONS
+    // =========================================================================
+
+    static async notifyMention(params: {
+        workspaceId: string;
+        clubId: string;
+        workspaceName: string;
+        recipientId: string;
+        actorId: string;
+        actorName: string;
+        resourceType: "channel" | "task";
+        resourceId: string;
+        resourceTitle: string;
+        contentSnippet: string;
+        destinationUrl: string;
+    }): Promise<WorkspaceNotification> {
+        const idempotencyKey = `mention/${params.resourceType}/${params.resourceId}/${params.recipientId}/${Date.now()}`;
+        return this.emitNotification({
+            workspaceId: params.workspaceId,
+            clubId: params.clubId,
+            workspaceName: params.workspaceName,
+            recipientId: params.recipientId,
+            actorId: params.actorId,
+            actorName: params.actorName,
+            eventType: "mention",
+            resourceType: params.resourceType,
+            resourceId: params.resourceId,
+            title: `Mentioned in ${params.resourceTitle}`,
+            message: `${params.actorName} mentioned you: "${params.contentSnippet.slice(0, 120)}${params.contentSnippet.length > 120 ? "..." : ""}"`,
+            destinationUrl: params.destinationUrl,
+            emailType: "mention",
+            idempotencyKey,
+            emailContext: {
+                resourceTitle: params.resourceTitle,
+                notes: params.contentSnippet,
+            },
+        });
+    }
+
+    static async notifyChannelUpdate(params: {
+        workspaceId: string;
+        clubId: string;
+        workspaceName: string;
+        channelId: string;
+        channelName: string;
+        recipientIds: string[];
+        actorId: string;
+        actorName: string;
+        updateType: "announcement" | "settings_changed" | "channel_archived";
+        message: string;
+    }): Promise<void> {
+        const destinationUrl = `/club/${params.clubId}/workspace/channels/${params.channelId}`;
+        for (const recipientId of params.recipientIds) {
+            if (recipientId === params.actorId) continue;
+            await this.emitNotification({
+                workspaceId: params.workspaceId,
+                clubId: params.clubId,
+                workspaceName: params.workspaceName,
+                recipientId,
+                actorId: params.actorId,
+                actorName: params.actorName,
+                eventType: "channel_message",
+                resourceType: "channel",
+                resourceId: params.channelId,
+                title: `#${params.channelName} Update`,
+                message: params.message,
+                destinationUrl,
+            }).catch(() => {});
+        }
+    }
 }

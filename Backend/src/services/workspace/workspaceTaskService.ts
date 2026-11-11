@@ -4,6 +4,7 @@ import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { workspaceEventBus } from "./workspaceChannelService.js";
 import { WorkspaceNotificationService } from "./workspaceNotificationService.js";
+import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import type {
     WorkspaceTask,
     WorkspaceTaskStatus,
@@ -85,9 +86,31 @@ export class WorkspaceTaskService {
             if (context.member.departmentId === task.departmentId) {
                 return true;
             }
+            const userDepts = (context.member as any).departments || [];
+            if (userDepts.some((d: any) => d.id === task.departmentId)) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    /**
+     * Authority check for live realtime event delivery and socket authorization
+     */
+    static async canUserViewTask(workspaceId: string, taskId: string, userId: string): Promise<boolean> {
+        try {
+            const context = await WorkspaceService.resolveContext(workspaceId, userId);
+            if (!context || (!context.member && !context.isOwner)) return false;
+            if (context.isOwner || context.isAdmin || context.isWorkspaceManager) return true;
+
+            const task = await WorkspaceRepository.findTaskById(workspaceId, taskId);
+            if (!task || task.workspaceId !== workspaceId) return false;
+
+            return this.canViewTask(context, task);
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -171,6 +194,7 @@ export class WorkspaceTaskService {
             referenceLinks?: WorkspaceTaskReferenceLink[];
             isRestricted?: boolean;
             assigneeUserIds?: string[];
+            fileIds?: string[];
         }
     ): Promise<WorkspaceTask> {
         const context = await this.getAuthorizedContext(workspaceId, actorUserId);
@@ -202,6 +226,15 @@ export class WorkspaceTaskService {
                 if (!mem || mem.membershipStatus !== "active" || mem.isSuspended) {
                     throw new Error(`Assignee user ${uid} is not an active member in this workspace.`);
                 }
+
+                // If restricted department task, validate assignee department membership
+                if (data.isRestricted && data.departmentId) {
+                    const assigneeDepts = await WorkspaceRepository.listMemberDepartments(workspaceId, mem.id);
+                    const hasDept = mem.departmentId === data.departmentId || assigneeDepts.some((d) => d.id === data.departmentId);
+                    if (!hasDept && !context.isAdmin) {
+                        throw new Error(`Assignee ${mem.user?.username || uid} does not belong to the restricted department.`);
+                    }
+                }
             }
         }
 
@@ -224,6 +257,16 @@ export class WorkspaceTaskService {
                 isRestricted: Boolean(data.isRestricted),
                 assigneeUserIds: data.assigneeUserIds || [],
             });
+
+            // Associate uploaded attachments if provided
+            if (data.fileIds && data.fileIds.length > 0) {
+                await client.query(
+                    `UPDATE public.workspace_files
+                     SET task_id = $1, parent_resource_type = 'task', parent_resource_id = $1
+                     WHERE id = ANY($2::uuid[]) AND workspace_id = $3;`,
+                    [task.id, data.fileIds, workspaceId]
+                );
+            }
 
             await client.query("COMMIT;");
 
@@ -297,10 +340,11 @@ export class WorkspaceTaskService {
             status?: WorkspaceTaskStatus | WorkspaceTaskStatus[];
             priority?: WorkspaceTaskPriority;
             assigneeUserId?: string;
+            assignedByUserId?: string;
             creatorId?: string;
             search?: string;
             isArchived?: boolean;
-            sortBy?: "created_at" | "due_date" | "priority" | "display_order";
+            sortBy?: "created_at" | "due_date" | "priority" | "display_order" | "title";
             sortDir?: "asc" | "desc";
             limit?: number;
             offset?: number;
@@ -335,7 +379,7 @@ export class WorkspaceTaskService {
     static async getMyTasks(
         workspaceId: string,
         actorUserId: string,
-        tab: "assigned_to_me" | "created_by_me" | "due_soon" | "overdue" | "completed" | "awaiting_review"
+        tab: "assigned_to_me" | "created_by_me" | "assigned_by_me" | "department_tasks" | "due_soon" | "overdue" | "completed" | "awaiting_review" | "archived"
     ): Promise<WorkspaceTask[]> {
         const context = await this.getAuthorizedContext(workspaceId, actorUserId);
 
@@ -375,7 +419,16 @@ export class WorkspaceTaskService {
             ...(context.member.departmentId ? [context.member.departmentId] : []),
         ]));
 
-        return WorkspaceRepository.getTaskAccountability(workspaceId, allowedDeptIds, isGlobalManager);
+        const scopeKey = isGlobalManager ? "global" : `user:${actorUserId}`;
+        const cacheKey = WorkspaceRedisService.buildKey("taskcounts", workspaceId, scopeKey);
+
+        return await WorkspaceRedisService.getOrComputeWithStampedeProtection(
+            cacheKey,
+            async () => {
+                return await WorkspaceRepository.getTaskAccountability(workspaceId, allowedDeptIds, isGlobalManager);
+            },
+            180
+        );
     }
 
     /**
@@ -516,10 +569,8 @@ export class WorkspaceTaskService {
         // "A user cannot approve their own submission by default."
         if (targetStatus === "approved") {
             const isSubmitter = task.latestSubmission?.submittedBy === actorUserId;
-            const isCreator = task.creatorId === actorUserId;
-            const isAssignee = task.currentAssignees?.some((a) => a.userId === actorUserId);
 
-            if ((isSubmitter || isCreator || isAssignee) && !context.isOwner) {
+            if (isSubmitter && !context.isOwner) {
                 throw new Error(
                     "Self-review policy violation: You cannot approve your own submission. An authorized reviewer or department lead must review this deliverable."
                 );
@@ -633,12 +684,11 @@ export class WorkspaceTaskService {
                 throw new Error(`User ${uid} is not an active workspace member.`);
             }
 
-            // Department assignment rule: If task is restricted to a department, verify assignee belongs to that department or has lead role
+            // Department assignment rule: If task is restricted to a department, verify assignee belongs to that department
             if (task.isRestricted && task.departmentId) {
                 const assigneeDepts = await WorkspaceRepository.listMemberDepartments(workspaceId, mem.id);
                 const hasDept = mem.departmentId === task.departmentId || assigneeDepts.some((d) => d.id === task.departmentId);
-                const isLead = context.leadDepartmentIds.includes(task.departmentId);
-                if (!hasDept && !isLead && !context.isAdmin) {
+                if (!hasDept && !context.isAdmin) {
                     throw new Error(`Assignee ${mem.user?.username || uid} does not belong to the restricted department.`);
                 }
             }
@@ -705,7 +755,8 @@ export class WorkspaceTaskService {
         taskId: string,
         content: string,
         attachments: Array<{ name: string; url: string; sizeBytes?: number; mimeType?: string }> = [],
-        expectedVersion?: number
+        expectedVersion?: number,
+        fileIds?: string[]
     ): Promise<{ task: WorkspaceTask; submission: WorkspaceTaskSubmission }> {
         const context = await this.getAuthorizedContext(workspaceId, actorUserId);
         const task = await WorkspaceRepository.findTaskById(workspaceId, taskId);
@@ -720,7 +771,7 @@ export class WorkspaceTaskService {
             throw new Error("Unauthorized: Only assigned members or managers can submit work deliverables.");
         }
 
-        // Status must be either in_progress or changes_requested
+        // Status must be either in_progress or changes_requested or assigned
         if (task.status !== "in_progress" && task.status !== "changes_requested" && task.status !== "assigned") {
             throw new Error(`Cannot submit work for a task in '${task.status}' status. Task must be in progress.`);
         }
@@ -736,6 +787,16 @@ export class WorkspaceTaskService {
                 content: content.trim(),
                 attachments,
             });
+
+            // Link any uploaded files to this submission
+            if (fileIds && fileIds.length > 0) {
+                await client.query(
+                    `UPDATE public.workspace_files
+                     SET submission_id = $1, task_id = $2, parent_resource_type = 'task_submission', parent_resource_id = $1
+                     WHERE id = ANY($3::uuid[]) AND workspace_id = $4;`,
+                    [submission.id, taskId, fileIds, workspaceId]
+                );
+            }
 
             // Transition status to 'submitted'
             const updatedTask = await WorkspaceRepository.updateTask(
@@ -802,21 +863,20 @@ export class WorkspaceTaskService {
             throw new Error("Task not found.");
         }
 
-        if (!this.canReviewTask(context, task)) {
-            throw new Error("Unauthorized: You lack permission to review deliverables for this task.");
-        }
-
-        // Self-Review Protection: Check if caller is submitter or creator
+        // Self-Review Protection: Check if caller is submitter
         if (decision === "approved") {
-            const isSubmitter = task.latestSubmission?.submittedBy === actorUserId;
-            const isCreator = task.creatorId === actorUserId;
-            const isAssignee = task.currentAssignees?.some((a) => a.userId === actorUserId);
+            const targetSub = task.submissions?.find((s) => s.id === submissionId) || task.latestSubmission;
+            const isSubmitter = targetSub?.submittedBy === actorUserId;
 
-            if ((isSubmitter || isCreator || isAssignee) && !context.isOwner) {
+            if (isSubmitter && !context.isOwner) {
                 throw new Error(
                     "Self-review policy violation: You cannot approve your own submission. An authorized reviewer or department lead must review this deliverable."
                 );
             }
+        }
+
+        if (!this.canReviewTask(context, task)) {
+            throw new Error("Unauthorized: You lack permission to review deliverables for this task.");
         }
 
         const nextStatus: WorkspaceTaskStatus = decision === "approved" ? "approved" : "changes_requested";
@@ -1180,5 +1240,7 @@ export class WorkspaceTaskService {
             payload,
             timestamp: new Date().toISOString(),
         });
+        // Asynchronously invalidate task accountability & dashboard metrics cache
+        WorkspaceRedisService.invalidateOnTaskChange(workspaceId, payload?.taskId || payload?.task?.id).catch(() => {});
     }
 }

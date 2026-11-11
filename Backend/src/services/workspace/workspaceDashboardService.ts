@@ -200,7 +200,7 @@ export class WorkspaceDashboardService {
             );
             allowedPrivateChannelIds = allPrivateChannels.rows.map((r) => r.id);
         } else {
-            // Find private channels where user has explicit override or role permit
+            // Find private channels where user has department membership OR explicit override or role permit
             const accessibleChannels = await query(
                 `SELECT c.id
                  FROM public.workspace_channels c
@@ -210,8 +210,16 @@ export class WorkspaceDashboardService {
                          (o.role_id = $3)
                      )
                  WHERE c.workspace_id = $1 AND c.is_private = true
-                   AND o.allow_permissions @> '["channels:view"]'::jsonb;`,
-                [workspaceId, context.member?.id || "00000000-0000-0000-0000-000000000000", context.member?.roleId || "00000000-0000-0000-0000-000000000000"]
+                   AND (
+                       (c.department_id IS NOT NULL AND c.department_id = ANY($4::uuid[]))
+                       OR (o.allow_permissions @> '["channels:view"]'::jsonb)
+                   );`,
+                [
+                    workspaceId,
+                    context.member?.id || "00000000-0000-0000-0000-000000000000",
+                    context.member?.roleId || "00000000-0000-0000-0000-000000000000",
+                    allowedDepartmentIds || [],
+                ]
             );
             allowedPrivateChannelIds = accessibleChannels.rows.map((r) => r.id);
         }

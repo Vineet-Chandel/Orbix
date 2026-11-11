@@ -1,17 +1,16 @@
 // Backend/scripts/test_team_workspace_phase_03.ts
-import crypto from "crypto";
-import { query } from "../src/database/client.js";
+import { pool, query } from "../src/database/client.js";
 import { WorkspaceRepository } from "../src/repositories/workspaceRepository.js";
 import { WorkspaceService } from "../src/services/workspace/workspaceService.js";
+import { WorkspaceDashboardService } from "../src/services/workspace/workspaceDashboardService.js";
 import { WorkspaceDepartmentService } from "../src/services/workspace/workspaceDepartmentService.js";
 import { WorkspaceMemberService } from "../src/services/workspace/workspaceMemberService.js";
-import redis from "../src/redis/client.js";
+import { WorkspaceRedisService } from "../src/redis/workspaceRedis.js";
 
 async function runPhase03Tests() {
-    console.log("=================================================================");
-    console.log("ORBIX TEAM WORKSPACE — PHASE 03 ACCEPTANCE & VERIFICATION SUITE");
-    console.log("DEPARTMENT & WORKSPACE MEMBER MANAGEMENT VERIFICATION");
-    console.log("=================================================================\n");
+    console.log("===============================================================================");
+    console.log("ORBIX TEAM WORKSPACE — PHASE 03 OVERVIEW, DEPTS & MEMBERS ACCEPTANCE SUITE");
+    console.log("===============================================================================\n");
 
     let passed = 0;
     let failed = 0;
@@ -27,440 +26,269 @@ async function runPhase03Tests() {
     }
 
     try {
-        // ---------------------------------------------------------------------
-        // TEST SETUP: Retrieve Test Club & Ensure Workspace Exists
-        // ---------------------------------------------------------------------
-        console.log("SETUP: Identifying Club and Provisioning Root Workspace...");
-        const clubRes = await query(`
+        // 1. SETUP
+        const clubsQuery = await query(`
             SELECT id, auth_user_id, name, slug 
             FROM public.verified_clubs 
             ORDER BY created_at ASC 
             LIMIT 1;
         `);
 
-        if (clubRes.rows.length === 0) {
-            throw new Error("No verified club found for test execution.");
+        if (clubsQuery.rows.length === 0) {
+            throw new Error("No verified club available in database for testing.");
         }
 
-        const club = clubRes.rows[0];
-        console.log(`  Using Club: "${club.name}" (ID: ${club.id}) Owner: ${club.auth_user_id}\n`);
+        const club = clubsQuery.rows[0];
+        console.log(`Target Club: "${club.name}" (Club ID: ${club.id}, Owner User ID: ${club.auth_user_id})\n`);
 
-        const { workspace, member: ownerMember } = await WorkspaceService.getOrCreateWorkspaceForClub(
+        const { workspace } = await WorkspaceService.getOrCreateWorkspaceForClub(
             club.id,
             club.auth_user_id
         );
         const workspaceId = workspace.id;
 
-        // Reset departments for clean test run
-        await query(`DELETE FROM public.workspace_departments WHERE workspace_id = $1;`, [workspaceId]);
-
-        // Create 3 temporary test users in public.users for multi-department and invitation testing
-        const suffix = Date.now().toString().slice(-6);
-        const testUsers: Array<{ id: string; email: string; username: string }> = [];
-
-        for (let i = 1; i <= 4; i++) {
-            const uid = crypto.randomUUID();
-            const email = `phase03_u${i}_${suffix}@orbix.dev`;
-            const username = `p3user${i}_${suffix}`;
-
-            await query(
-                `INSERT INTO public.users (id, email, username, firstname, lastname, password, account_type, is_public, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, 'dummy_hash', 'personal', true, NOW(), NOW())
-                 ON CONFLICT (id) DO NOTHING;`,
-                [uid, email, username, `Test${i}`, `User${suffix}`]
-            );
-
-            testUsers.push({ id: uid, email, username });
-        }
-        console.log(`  Created ${testUsers.length} isolated test users for Phase 03 suite.\n`);
-
-        // Fetch workspace roles
         const roles = await WorkspaceRepository.listRoles(workspaceId);
-        const adminRole = roles.find((r) => r.slug === "admin");
-        const leadRole = roles.find((r) => r.slug === "dept_lead");
-        const memberRole = roles.find((r) => r.slug === "member");
+        const deptLeadRole = roles.find((r) => r.slug === "dept_lead")!;
+        const memberRole = roles.find((r) => r.slug === "member")!;
 
-        if (!adminRole || !leadRole || !memberRole) {
-            throw new Error("Missing seeded workspace roles.");
-        }
+        // Generate isolated test personas
+        const randKey = Math.random().toString(36).slice(2, 7);
+        const makeUser = async (roleName: string) => {
+            const uRes = await query(
+                `INSERT INTO public.users (email, username, firstname, lastname)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING id, email, username, firstname, lastname;`,
+                [
+                    `p3_${roleName}_${randKey}@orbix.test`,
+                    `u3_${roleName}_${randKey}`.slice(0, 20),
+                    `P3_${roleName}`,
+                    "User",
+                ]
+            );
+            return uRes.rows[0];
+        };
 
-        // ---------------------------------------------------------------------
-        // TEST SUITE 1: Suggested Department Seeding & Custom Department CRUD
-        // ---------------------------------------------------------------------
-        console.log("TEST SUITE 1: Department Creation & Lifecycle");
+        const leadUser = await makeUser("lead");
+        const member1User = await makeUser("mem1");
+        const member2User = await makeUser("mem2");
 
-        // Seed 5 default suggested departments
-        const seededDepts = await WorkspaceDepartmentService.seedSuggestedDepartments(
-            workspaceId,
-            club.auth_user_id
-        );
-        assert("Seeded 5 suggested default departments", seededDepts.length === 5);
-
-        const techDept = seededDepts.find((d) => d.slug === "technical-development");
-        const designDept = seededDepts.find((d) => d.slug === "design-branding");
-        const opsDept = seededDepts.find((d) => d.slug === "operations-coordination");
-
-        assert("Technical & Development department exists with Code icon", techDept?.icon === "Code");
-        assert("Design & Branding department exists with Palette icon", designDept?.icon === "Palette");
-        assert("Operations & Coordination department exists", Boolean(opsDept));
-
-        // Test idempotency of seeding
-        const reseeded = await WorkspaceDepartmentService.seedSuggestedDepartments(
-            workspaceId,
-            club.auth_user_id
-        );
-        assert("Idempotent seeding does not duplicate departments", reseeded.length === 5);
-
-        // Create Custom Department
-        const customDeptName = `Research & AI Lab ${suffix}`;
-        const customDept = await WorkspaceDepartmentService.createDepartment(
-            workspaceId,
-            club.auth_user_id,
-            {
-                name: customDeptName,
-                description: "Deep learning model tuning and agent experiments",
-                icon: "Sparkles",
-                color: "#10b981",
-                leadUserId: testUsers[0].id,
-            }
-        );
-        assert("Custom department created with primary lead", customDept.name === customDeptName);
-        assert("Custom department generates sanitized slug", customDept.slug.startsWith("research-ai-lab"));
-
-        // Department Editing
-        const updatedDept = await WorkspaceDepartmentService.updateDepartment(
-            workspaceId,
-            club.auth_user_id,
-            customDept.id,
-            {
-                description: "Updated AI research mission description",
-                color: "#059669",
-            }
-        );
-        assert("Department updated description and color", updatedDept.description === "Updated AI research mission description");
-
-        // Department Archiving & Restoring
-        const archived = await WorkspaceDepartmentService.archiveDepartment(
-            workspaceId,
-            club.auth_user_id,
-            customDept.id
-        );
-        assert("Department is archived (status = 'archived')", archived.status === "archived");
-
-        const activeDepts = await WorkspaceDepartmentService.listDepartments(workspaceId, false);
-        assert("Archived department excluded from active list", !activeDepts.some((d) => d.id === customDept.id));
-
-        const restored = await WorkspaceDepartmentService.restoreDepartment(
-            workspaceId,
-            club.auth_user_id,
-            customDept.id
-        );
-        assert("Department restored (status = 'active')", restored.status === "active");
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 2: Multi-Department Concurrent Membership & Transfers
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 2: Multi-Department Concurrent Membership");
-
-        // Add testUsers[0] as a workspace member first
-        const mem0 = await WorkspaceRepository.createMember(null, {
-            workspaceId,
-            userId: testUsers[0].id,
-            roleId: memberRole.id,
-            roleTitle: "Full-Stack Engineer",
+        // Create 2 test departments
+        const dept1 = await WorkspaceDepartmentService.createDepartment(workspaceId, club.auth_user_id, {
+            name: `P3 Dept Alpha ${randKey}`,
+            description: "Phase 3 test department Alpha",
+            color: "#2563eb",
+            icon: "Code",
+            leadUserId: leadUser.id,
         });
 
-        // Add testUsers[0] to Department 1 (Technical) as 'lead'
-        const deptMem1 = await WorkspaceDepartmentService.addMemberToDepartment(
-            workspaceId,
-            club.auth_user_id,
-            techDept!.id,
-            mem0.id,
-            "lead",
-            "Technical Director"
-        );
-        assert("Member added to Technical Department as lead", deptMem1.departmentRole === "lead");
-
-        // Add testUsers[0] to Department 2 (Design) as 'member' concurrently
-        const deptMem2 = await WorkspaceDepartmentService.addMemberToDepartment(
-            workspaceId,
-            club.auth_user_id,
-            designDept!.id,
-            mem0.id,
-            "member",
-            "Design Contributor"
-        );
-        assert("Same member added to Design Department concurrently", deptMem2.departmentRole === "member");
-
-        // Verify member has 2 active departments
-        const memberWithDepts = await WorkspaceRepository.findMember(workspaceId, testUsers[0].id);
-        assert("Member belongs to exactly 2 departments concurrently", memberWithDepts?.departments?.length === 2);
-
-        // Verify workspace_members table still has exactly 1 row for this user
-        const memberCountCheck = await query(
-            `SELECT COUNT(*)::int as cnt FROM public.workspace_members WHERE workspace_id = $1 AND user_id = $2;`,
-            [workspaceId, testUsers[0].id]
-        );
-        assert("Single workspace_members entity preserved (no duplicates)", memberCountCheck.rows[0].cnt === 1);
-
-        // Test Department Transfer: Transfer from Design to Operations
-        await WorkspaceDepartmentService.transferMember(
-            workspaceId,
-            club.auth_user_id,
-            mem0.id,
-            designDept!.id,
-            opsDept!.id
-        );
-
-        const memberAfterTransfer = await WorkspaceRepository.findMember(workspaceId, testUsers[0].id);
-        const deptIds = (memberAfterTransfer?.departments || []).map((d) => d.id);
-        assert("Member removed from Design department after transfer", !deptIds.includes(designDept!.id));
-        assert("Member added to Operations department after transfer", deptIds.includes(opsDept!.id));
-        assert("Technical department retained intact during transfer", deptIds.includes(techDept!.id));
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 3: Scoped Department Lead Authority
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 3: Scoped Department Lead Authority");
-
-        // Add testUsers[1] to workspace
-        const mem1 = await WorkspaceRepository.createMember(null, {
-            workspaceId,
-            userId: testUsers[1].id,
-            roleId: memberRole.id,
-            roleTitle: "Junior Dev",
+        const dept2 = await WorkspaceDepartmentService.createDepartment(workspaceId, club.auth_user_id, {
+            name: `P3 Dept Beta ${randKey}`,
+            description: "Phase 3 test department Beta",
+            color: "#dc2626",
+            icon: "Palette",
         });
 
-        // testUsers[0] is lead of techDept. They should be able to add testUsers[1] to techDept.
-        const leadAddedMem = await WorkspaceDepartmentService.addMemberToDepartment(
+        // Add lead to workspace and dept1
+        await query(
+            `INSERT INTO public.workspace_members (workspace_id, user_id, role_id, role_title)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = $3;`,
+            [workspaceId, leadUser.id, deptLeadRole.id, "Department Lead"]
+        );
+
+        // Add member1 to workspace and dept1
+        const mem1Res = await query(
+            `INSERT INTO public.workspace_members (workspace_id, user_id, role_id, role_title)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = $3
+             RETURNING id;`,
+            [workspaceId, member1User.id, memberRole.id, "Member"]
+        );
+        const member1Id = mem1Res.rows[0].id;
+
+        await WorkspaceDepartmentService.addMemberToDepartment(
             workspaceId,
-            testUsers[0].id, // Lead actor
-            techDept!.id,
-            mem1.id,
+            club.auth_user_id,
+            dept1.id,
+            member1Id,
             "member",
             "Junior Dev"
         );
-        assert("Department Lead can add member to their own department", Boolean(leadAddedMem.id));
 
-        // testUsers[0] is NOT lead of opsDept. Attempting to add member to opsDept must fail!
-        let leadScopedError = false;
-        try {
-            await WorkspaceDepartmentService.addMemberToDepartment(
-                workspaceId,
-                testUsers[0].id, // Not a lead of opsDept
-                opsDept!.id,
-                mem1.id,
-                "member",
-                "Operations Associate"
-            );
-        } catch (err: any) {
-            leadScopedError = true;
-        }
-        assert("Department Lead is strictly scoped (cannot manage other departments)", leadScopedError);
+        // Add member2 to workspace and dept2 only
+        const mem2Res = await query(
+            `INSERT INTO public.workspace_members (workspace_id, user_id, role_id, role_title)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = $3
+             RETURNING id;`,
+            [workspaceId, member2User.id, memberRole.id, "Member"]
+        );
+        const member2Id = mem2Res.rows[0].id;
 
-        // ---------------------------------------------------------------------
-        // TEST SUITE 4: Workspace Manager Lifecycle & Owner Protection
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 4: Workspace Manager Designation & Owner Boundary");
-
-        // Non-owner (testUsers[0]) attempts to appoint manager -> must be rejected
-        let nonOwnerManagerError = false;
-        try {
-            await WorkspaceMemberService.appointWorkspaceManager(
-                workspaceId,
-                testUsers[0].id,
-                testUsers[1].id,
-                { can_manage_departments: true }
-            );
-        } catch (err) {
-            nonOwnerManagerError = true;
-        }
-        assert("Non-owner cannot appoint Workspace Manager", nonOwnerManagerError);
-
-        // Club Owner appoints testUsers[1] as Workspace Manager
-        const updatedWsWithManager = await WorkspaceMemberService.appointWorkspaceManager(
+        await WorkspaceDepartmentService.addMemberToDepartment(
             workspaceId,
             club.auth_user_id,
-            testUsers[1].id,
+            dept2.id,
+            member2Id,
+            "member",
+            "Designer"
+        );
+
+        // Create tasks in dept1 and dept2
+        await query(
+            `INSERT INTO public.workspace_tasks (workspace_id, department_id, title, status, priority, creator_id)
+             VALUES ($1, $2, $3, 'in_progress', 'medium', $4);`,
+            [workspaceId, dept1.id, `Task in Dept 1 ${randKey}`, club.auth_user_id]
+        );
+        await query(
+            `INSERT INTO public.workspace_tasks (workspace_id, department_id, title, status, priority, creator_id)
+             VALUES ($1, $2, $3, 'in_progress', 'high', $4);`,
+            [workspaceId, dept2.id, `Task in Dept 2 ${randKey}`, club.auth_user_id]
+        );
+
+        // ---------------------------------------------------------------------
+        // PART A: WORKSPACE OVERVIEW SCOPING & NON-LEAKAGE
+        // ---------------------------------------------------------------------
+        console.log("PART A: Workspace Overview Data Scoping & Non-Leakage");
+
+        // 1. Manager (Owner) Overview: Sees global statistics
+        const globalMetrics = await WorkspaceDashboardService.getWorkspaceOverview(workspaceId, club.auth_user_id);
+        assert("Global overview contains all active departments", globalMetrics.totalDepartments >= 2);
+        assert("Global overview contains all active members", globalMetrics.totalMembers >= 3);
+
+        // 2. Department Lead Overview: Sees only accessible department statistics
+        const leadMetrics = await WorkspaceDashboardService.getWorkspaceOverview(workspaceId, leadUser.id);
+        assert("Lead overview scopes totalDepartments to 1 (Dept 1)", leadMetrics.totalDepartments === 1);
+        assert("Lead overview does NOT count Dept 2 in totalDepartments", leadMetrics.totalDepartments < globalMetrics.totalDepartments);
+        assert("Lead overview does NOT leak Dept 2 members in totalMembers", leadMetrics.totalMembers >= 1 && leadMetrics.totalMembers < globalMetrics.totalMembers);
+
+        // ---------------------------------------------------------------------
+        // PART B: DEPARTMENT MANAGEMENT OPERATIONS
+        // ---------------------------------------------------------------------
+        console.log("\nPART B: Department Operations (Edit, Reorder, Scoped Roles)");
+
+        // 1. Edit department details
+        const updatedDept1 = await WorkspaceDepartmentService.updateDepartment(
+            workspaceId,
+            leadUser.id,
+            dept1.id,
             {
-                can_manage_departments: true,
-                can_manage_members: true,
-                can_invite_members: true,
+                name: `Renamed Alpha ${randKey}`,
+                description: "Updated description by authorized lead",
+                color: "#10b981",
             }
         );
-        assert("Club Owner appoints Workspace Manager", updatedWsWithManager.managerUserId === testUsers[1].id);
-        assert(
-            "Workspace Manager permissions configured in JSONB",
-            (updatedWsWithManager.managerPermissions as any)?.can_manage_departments === true
-        );
+        assert("Lead can update their assigned department name", updatedDept1.name === `Renamed Alpha ${randKey}`);
+        assert("Lead can update their assigned department color", updatedDept1.color === "#10b981");
 
-        // Verify in DB directly
-        const dbWsCheck = await query(
-            `SELECT manager_user_id, manager_appointed_at, manager_permissions FROM public.team_workspaces WHERE id = $1;`,
-            [workspaceId]
-        );
-        assert("Manager persisted in PostgreSQL database", dbWsCheck.rows[0].manager_user_id === testUsers[1].id);
+        // 2. Lead CANNOT edit another department (Dept 2)
+        let leadEditDept2Failed = false;
+        try {
+            await WorkspaceDepartmentService.updateDepartment(
+                workspaceId,
+                leadUser.id,
+                dept2.id,
+                { name: "Unauthorized Rename" }
+            );
+        } catch (err: any) {
+            leadEditDept2Failed = true;
+        }
+        assert("Lead cannot edit details of another department", leadEditDept2Failed);
 
-        // Club Owner revokes Workspace Manager
-        const revokedWs = await WorkspaceMemberService.revokeWorkspaceManager(
-            workspaceId,
-            club.auth_user_id
-        );
-        assert("Club Owner revokes Workspace Manager", revokedWs.managerUserId === null);
+        // 3. Reorder departments
+        const deptsBefore = await WorkspaceDepartmentService.listDepartments(workspaceId);
+        const activeDepts = deptsBefore.filter((d) => d.status === "active");
+        const reversedIds = activeDepts.map((d) => d.id).reverse();
 
-        // ---------------------------------------------------------------------
-        // TEST SUITE 5: Role Promotion / Demotion Rank Boundary Validation
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 5: Role Assignment & Rank Boundary Enforcement");
-
-        // Promote testUsers[0] to Department Lead (rank 500) by Club Owner (rank 1000)
-        const promotedMem0 = await WorkspaceMemberService.assignMemberRole(
+        const reorderSuccess = await WorkspaceDepartmentService.reorderDepartments(
             workspaceId,
             club.auth_user_id,
-            testUsers[0].id,
-            leadRole.id,
-            "Engineering Lead"
+            reversedIds
         );
-        assert("Owner promotes member to Department Lead (rank 500)", promotedMem0.role?.rank === 500);
+        assert("Manager can reorder departments", reorderSuccess === true);
 
-        // Now testUsers[0] (rank 500) attempts to promote testUsers[1] (rank 200) to Admin (rank 800) -> must fail!
-        let rankBoundaryViolation = false;
-        try {
-            await WorkspaceMemberService.assignMemberRole(
-                workspaceId,
-                testUsers[0].id, // Actor rank 600
-                testUsers[1].id, // Target
-                adminRole.id,    // Target rank 800
-                "Unauthorized Admin"
-            );
-        } catch (err) {
-            rankBoundaryViolation = true;
-        }
-        assert("Rank boundary enforced: Cannot promote to rank >= actor rank", rankBoundaryViolation);
+        const deptsAfter = await WorkspaceDepartmentService.listDepartments(workspaceId);
+        const activeAfter = deptsAfter.filter((d) => d.status === "active");
+        assert("First department after reorder matches reversed list", activeAfter[0].id === reversedIds[0]);
 
-        // Nobody can assign the "owner" role via assignMemberRole (protected)
-        let ownerRoleAssignBlocked = false;
-        const ownerRole = roles.find((r) => r.slug === "owner");
-        try {
-            await WorkspaceMemberService.assignMemberRole(
-                workspaceId,
-                club.auth_user_id,
-                testUsers[0].id,
-                ownerRole!.id
-            );
-        } catch (err) {
-            ownerRoleAssignBlocked = true;
-        }
-        assert("Owner role cannot be assigned via role assignment (protected)", ownerRoleAssignBlocked);
-
-        // ---------------------------------------------------------------------
-        // TEST SUITE 6: Cryptographic Invitations Workflow
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 6: Cryptographic Invitations Workflow");
-
-        // Generate invitation for testUsers[2]
-        const { invitation, rawToken } = await WorkspaceMemberService.createInvitation(
+        // 4. Assign Scoped Role in Department
+        const roleUpdated = await WorkspaceDepartmentService.updateDepartmentMemberRole(
             workspaceId,
-            club.auth_user_id,
+            leadUser.id,
+            dept1.id,
+            member1Id,
             {
-                email: testUsers[2].email,
-                roleId: memberRole.id,
-                departmentId: techDept!.id,
-                invitationMessage: "Welcome to the Engineering team!",
+                departmentRole: "co_lead",
+                roleTitle: "Staff Software Engineer",
             }
         );
+        assert("Lead can update department member scoped role & title", roleUpdated === true);
 
-        assert("Raw token generated (64 hex characters / 256 bits)", rawToken.length === 64);
-        assert("Invitation record created with pending status", invitation.status === "pending");
+        const dept1Details = await WorkspaceDepartmentService.getDepartmentDetails(workspaceId, dept1.id);
+        const m1InDept = dept1Details.members.find((m) => m.memberId === member1Id);
+        assert("Member has updated departmentRole = 'co_lead'", m1InDept?.departmentRole === "co_lead");
+        assert("Member has custom roleTitle = 'Staff Software Engineer'", m1InDept?.roleTitle === "Staff Software Engineer");
 
-        // Verify DB only stores SHA-256 hash, not raw token
-        const expectedHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-        assert("token_hash in DB matches computed SHA-256 hash", invitation.tokenHash === expectedHash);
+        // ---------------------------------------------------------------------
+        // PART C & D: MEMBER DIRECTORY & PRIVACY
+        // ---------------------------------------------------------------------
+        console.log("\nPART C & D: Member Directory Operations & Privacy Protection");
 
-        const dbTokenCheck = await query(
-            `SELECT token_hash, expires_at FROM public.workspace_invitations WHERE id = $1;`,
-            [invitation.id]
-        );
-        assert("Raw token is NEVER stored in database", dbTokenCheck.rows[0].token_hash === expectedHash);
-
-        const expiresAt = new Date(dbTokenCheck.rows[0].expires_at).getTime();
-        const now = Date.now();
-        const diffDays = Math.round((expiresAt - now) / (1000 * 60 * 60 * 24));
-        assert("Invitation expiry is set to 7 days", diffDays === 7);
-
-        // Accept invitation by testUsers[2] using rawToken
-        const { member: acceptedMember, workspace: joinedWs } = await WorkspaceMemberService.acceptInvitation(
-            rawToken,
-            testUsers[2].id
-        );
-        assert("Invitation accepted: member created in workspace", acceptedMember.userId === testUsers[2].id);
-        assert("Department automatically assigned on acceptance", acceptedMember.departments?.some((d) => d.id === techDept!.id) === true);
-
-        // Single-use enforcement: Attempting to accept the same token again must fail!
-        let replayAttackPrevented = false;
+        // 1. Hierarchy Check: Member cannot remove Lead
+        let memberRemoveLeadFailed = false;
         try {
-            await WorkspaceMemberService.acceptInvitation(rawToken, testUsers[3].id);
+            await WorkspaceMemberService.removeMember(workspaceId, member1User.id, leadUser.id);
         } catch (err: any) {
-            replayAttackPrevented = true;
+            memberRemoveLeadFailed = true;
         }
-        assert("Single-use token enforced: Replay attempt rejected", replayAttackPrevented);
+        assert("Member cannot remove Department Lead (hierarchy restriction)", memberRemoveLeadFailed);
 
-        // Test Revocation Workflow
-        const { invitation: inviteToRevoke, rawToken: rawRevokeToken } = await WorkspaceMemberService.createInvitation(
+        // 2. Owner Protection: Manager cannot remove Owner
+        let removeOwnerFailed = false;
+        try {
+            await WorkspaceMemberService.removeMember(workspaceId, leadUser.id, club.auth_user_id);
+        } catch (err: any) {
+            removeOwnerFailed = true;
+        }
+        assert("Cannot remove the workspace owner", removeOwnerFailed);
+
+        // 3. Authorized Member Removal
+        const removedSuccess = await WorkspaceMemberService.removeMember(
             workspaceId,
             club.auth_user_id,
-            {
-                email: testUsers[3].email,
-                roleId: memberRole.id,
-            }
+            member2User.id
         );
+        assert("Manager can remove member from workspace", removedSuccess === true);
 
-        await WorkspaceMemberService.revokeInvitation(workspaceId, club.auth_user_id, inviteToRevoke.id);
+        const checkMember2 = await WorkspaceRepository.findMember(workspaceId, member2User.id);
+        assert("Removed member no longer exists in workspace_members", checkMember2 === null);
 
-        let revokedAcceptPrevented = false;
-        try {
-            await WorkspaceMemberService.acceptInvitation(rawRevokeToken, testUsers[3].id);
-        } catch (err: any) {
-            revokedAcceptPrevented = true;
-        }
-        assert("Revoked invitation cannot be accepted", revokedAcceptPrevented);
+        const checkDept2Members = await query(
+            `SELECT * FROM public.workspace_department_members WHERE workspace_id = $1 AND user_id = $2;`,
+            [workspaceId, member2User.id]
+        );
+        assert("Removed member cleaned up from workspace_department_members", checkDept2Members.rows.length === 0);
 
-        // ---------------------------------------------------------------------
-        // TEST SUITE 7: Audit Trail Verification
-        // ---------------------------------------------------------------------
-        console.log("\nTEST SUITE 7: Audit Trail Verification");
+        // Cleanup test artifacts
+        await query(`DELETE FROM public.workspace_tasks WHERE workspace_id = $1 AND title LIKE '%${randKey}%';`, [workspaceId]);
+        await query(`DELETE FROM public.workspace_department_members WHERE workspace_id = $1 AND department_id IN ($2, $3);`, [workspaceId, dept1.id, dept2.id]);
+        await query(`DELETE FROM public.workspace_departments WHERE id IN ($1, $2);`, [dept1.id, dept2.id]);
+        await query(`DELETE FROM public.workspace_members WHERE workspace_id = $1 AND user_id IN ($2, $3, $4);`, [workspaceId, leadUser.id, member1User.id, member2User.id]);
+        await query(`DELETE FROM public.users WHERE id IN ($1, $2, $3);`, [leadUser.id, member1User.id, member2User.id]);
 
-        const auditLogs = await query(`
-            SELECT action, actor_id, details 
-            FROM public.workspace_audit_logs 
-            WHERE workspace_id = $1 
-            ORDER BY created_at DESC 
-            LIMIT 20;
-        `, [workspaceId]);
-
-        const loggedActions = auditLogs.rows.map((r: any) => r.action);
-        assert("Audit log recorded: department_created", loggedActions.includes("department_created"));
-        assert("Audit log recorded: workspace_manager_appointed", loggedActions.includes("workspace_manager_appointed"));
-        assert("Audit log recorded: workspace_manager_revoked", loggedActions.includes("workspace_manager_revoked"));
-        assert("Audit log recorded: member_promoted", loggedActions.includes("member_promoted"));
-        assert("Audit log recorded: invitation_created", loggedActions.includes("invitation_created"));
-        assert("Audit log recorded: invitation_accepted", loggedActions.includes("invitation_accepted"));
-        assert("Audit log recorded: invitation_revoked", loggedActions.includes("invitation_revoked"));
-
-    } catch (err) {
-        console.error("FATAL TEST EXCEPTION:", err);
-        failed++;
-    } finally {
-        await redis.quit();
-        console.log("\n=================================================================");
-        console.log(`ACCEPTANCE SUMMARY: ${passed} PASSED | ${failed} FAILED`);
-        console.log("=================================================================\n");
+        console.log("\n===============================================================================");
+        console.log(`PHASE 03 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
+        console.log("===============================================================================\n");
 
         if (failed > 0) {
             process.exit(1);
-        } else {
-            process.exit(0);
         }
+    } catch (err: any) {
+        console.error("Test execution failed with unhandled error:", err);
+        process.exit(1);
+    } finally {
+        await pool.end();
+        process.exit(0);
     }
 }
 

@@ -32,7 +32,8 @@ const SEARCH_CATEGORIES = [
     { label: "Messages", value: "message" },
     { label: "Members", value: "member" },
     { label: "Departments", value: "department" },
-    { label: "Files", value: "file" },
+    { label: "Files & Resources", value: "file" },
+    { label: "Discussions", value: "discussion" },
 ];
 
 export const WorkspaceSearchModal: React.FC<WorkspaceSearchModalProps> = ({
@@ -154,6 +155,8 @@ export const WorkspaceSearchModal: React.FC<WorkspaceSearchModalProps> = ({
                 return <FolderKanban className="w-4 h-4 text-purple-600" />;
             case "file":
                 return <FileText className="w-4 h-4 text-rose-600" />;
+            case "discussion":
+                return <MessageSquare className="w-4 h-4 text-sky-600" />;
             default:
                 return <Search className="w-4 h-4 text-slate-500" />;
         }

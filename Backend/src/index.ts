@@ -122,6 +122,7 @@ apiRouter.use('/institutions', institutionsRouter);
 // Team Workspace
 apiRouter.use('/club/workspace', workspaceRouter);
 apiRouter.use('/workspace', workspaceRouter);
+apiRouter.use('/team-workspaces', workspaceRouter);
 
 // Clubs (both /api/club and /api/clubs)
 apiRouter.use('/club', clubCredibilityRouter);

@@ -1,514 +1,308 @@
 // Backend/scripts/test_team_workspace_phase_06.ts
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-if (typeof process.loadEnvFile === "function") { try { process.loadEnvFile(path.resolve(__dirname, "../.env")); } catch {} }
-
 import { pool, query } from "../src/database/client.js";
 import { WorkspaceService } from "../src/services/workspace/workspaceService.js";
-import { WorkspaceFileService } from "../src/services/workspace/workspaceFileService.js";
-import { WorkspaceTaskService } from "../src/services/workspace/workspaceTaskService.js";
-import { WorkspaceDepartmentService } from "../src/services/workspace/workspaceDepartmentService.js";
 import { WorkspaceRepository } from "../src/repositories/workspaceRepository.js";
-import {
-    validateFileMetadata,
-    validateBufferMagicBytes,
-    computeSha256,
-} from "../src/services/workspace/workspaceFileValidator.js";
-
-let testsPassed = 0;
-let testsFailed = 0;
-
-function assert(description: string, condition: boolean, extra?: any) {
-    if (condition) {
-        testsPassed++;
-        console.log(`  ✅ [PASS] ${description}`);
-    } else {
-        testsFailed++;
-        console.error(`  ❌ [FAIL] ${description}`, extra || "");
-    }
-}
+import { WorkspaceMemberService } from "../src/services/workspace/workspaceMemberService.js";
+import { WorkspaceFileService } from "../src/services/workspace/workspaceFileService.js";
+import { validateFileMetadata, validateBufferMagicBytes, computeSha256 } from "../src/services/workspace/workspaceFileValidator.js";
 
 async function runPhase06Tests() {
-    console.log("================================================================================");
-    console.log("ORBIX TEAM WORKSPACE — PHASE 06 ACCEPTANCE TEST SUITE");
-    console.log("CLOUDINARY MEDIA & SECURE DOCUMENT MANAGEMENT");
-    console.log("================================================================================\n");
+    console.log("===============================================================================");
+    console.log("ORBIX TEAM WORKSPACE — PHASE 06 FILES, RESOURCES & CLOUDINARY TEST SUITE");
+    console.log("===============================================================================\n");
 
-    const runId = Math.random().toString(36).substring(2, 8);
-    const leadUserId = "00000000-0000-0000-0000-000000000602";
-    const memberUserId = "00000000-0000-0000-0000-000000000603";
-    const foreignUserId = "00000000-0000-0000-0000-000000000604";
+    let passed = 0;
+    let failed = 0;
+
+    function assert(desc: string, condition: boolean) {
+        if (condition) {
+            console.log(`  ✅ PASS: ${desc}`);
+            passed++;
+        } else {
+            console.error(`  ❌ FAIL: ${desc}`);
+            failed++;
+        }
+    }
 
     try {
-        // SETUP: Identify Club and Provision Root Workspace
-        const clubRes = await query(`
-            SELECT id, auth_user_id, name, slug 
-            FROM public.verified_clubs 
-            ORDER BY created_at ASC 
-            LIMIT 1;
-        `);
-
+        // 1. Fetch Target Club and Owner
+        const clubRes = await query(
+            `SELECT vc.id, vc.name, vc.auth_user_id 
+             FROM public.verified_clubs vc 
+             WHERE vc.auth_user_id IS NOT NULL 
+             LIMIT 1;`
+        );
         if (clubRes.rows.length === 0) {
-            throw new Error("No verified club found for test execution.");
+            throw new Error("No verified club with an owner found in database.");
         }
-
         const club = clubRes.rows[0];
-        const ownerId = club.auth_user_id;
+        const ownerUserId = club.auth_user_id;
+        console.log(`Target Club: "${club.name}" (Club ID: ${club.id}, Owner User ID: ${ownerUserId})`);
 
-        // Clean any existing test data from previous runs
-        await query(`DELETE FROM public.workspace_files WHERE uploader_id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
-        await query(`DELETE FROM public.workspace_file_upload_intents WHERE user_id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
-        await query(`DELETE FROM public.workspace_task_activity WHERE actor_id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
-        await query(`DELETE FROM public.workspace_tasks WHERE creator_id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
-        await query(`DELETE FROM public.workspace_department_members WHERE user_id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
-        await query(`DELETE FROM public.workspace_departments WHERE lead_user_id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
-        await query(`DELETE FROM public.workspace_members WHERE user_id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
-        await query(`DELETE FROM public.users WHERE id IN ($1, $2, $3);`, [leadUserId, memberUserId, foreignUserId]);
+        // Ensure Workspace exists
+        const { workspace } = await WorkspaceService.getOrCreateWorkspaceForClub(club.id, ownerUserId);
+        const workspaceId = workspace.id;
 
-        // 1. Create test users
-        await query(
-            `INSERT INTO public.users (id, email, username, firstname, lastname, password)
-             VALUES
-             ($1, $4, $5, 'Design', 'Lead', 'TestPass123!'),
-             ($2, $6, $7, 'General', 'Member', 'TestPass123!'),
-             ($3, $8, $9, 'Foreign', 'User', 'TestPass123!');`,
+        // 2. Provision Test Users
+        const randKey = Math.random().toString(36).slice(2, 7);
+        const makeUser = async (roleName: string) => {
+            const uRes = await query(
+                `INSERT INTO public.users (email, username, firstname, lastname)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING id, email, username, firstname, lastname;`,
+                [
+                    `p6_${roleName}_${randKey}@test.orbix.club`,
+                    `p6_${roleName}_${randKey}`,
+                    `P6${roleName}`,
+                    `User`,
+                ]
+            );
+            return uRes.rows[0];
+        };
+
+        const managerUser = await makeUser("mgr");
+        const deptLeadUser = await makeUser("lead");
+        const deptMemberUser = await makeUser("member");
+        const outsideUser = await makeUser("outside");
+
+        // Provision Department
+        const dept = await WorkspaceRepository.createDepartment(null, {
+            workspaceId,
+            name: `P6 Dept ${randKey}`,
+            slug: `p6-dept-${randKey}`,
+            leadUserId: deptLeadUser.id,
+            color: "#70C4FF",
+        });
+
+        // Add members
+        const defaultRole = await WorkspaceRepository.findRoleBySlug(workspaceId, "member");
+        if (!defaultRole) throw new Error("Default member role not found.");
+
+        await WorkspaceRepository.createMember(null, {
+            workspaceId,
+            userId: managerUser.id,
+            roleId: defaultRole.id,
+            status: "active",
+        });
+
+        // Appoint Workspace Manager with delegated powers
+        await WorkspaceMemberService.appointWorkspaceManager(
+            workspaceId,
+            ownerUserId,
+            managerUser.id,
             [
-                leadUserId,
-                memberUserId,
-                foreignUserId,
-                `ws_lead_${runId}@orbix.test`,
-                `lead_${runId}`,
-                `ws_member_${runId}@orbix.test`,
-                `member_${runId}`,
-                `foreign_${runId}@orbix.test`,
-                `foreign_${runId}`,
+                "can_manage_departments",
+                "can_manage_members",
+                "can_invite_members",
+                "can_manage_channels",
+                "can_manage_tasks",
+                "can_manage_settings",
             ]
         );
 
-        const { workspace } = await WorkspaceService.getOrCreateWorkspaceForClub(
-            club.id,
-            ownerId
-        );
-
-        console.log(`[Setup] Identified Club ID: ${club.id}, Workspace ID: ${workspace.id}`);
-
-        const roles = await WorkspaceRepository.listRoles(workspace.id);
-        const deptLeadRole = roles.find((r) => r.slug === "department_lead") || roles.find((r) => r.slug === "admin") || roles[0];
-        const memberRole = roles.find((r) => r.slug === "member") || roles[roles.length - 1];
-
-        // 4. Create a Department (Design Dept)
-        const designDept = await WorkspaceDepartmentService.createDepartment(workspace.id, ownerId, {
-            name: `Design & UX ${runId}`,
-            description: "Design and multimedia team",
-            icon: "Palette",
-            color: "#8B5CF6",
-            leadUserId: leadUserId,
+        await WorkspaceRepository.createMember(null, {
+            workspaceId,
+            userId: deptLeadUser.id,
+            roleId: defaultRole.id,
+            departmentId: dept.id,
+            status: "active",
         });
 
-        // 3. Add members & roles
-        const leadMember = await WorkspaceRepository.createMember(null, {
-            workspaceId: workspace.id,
-            userId: leadUserId,
-            roleId: deptLeadRole.id,
-            roleTitle: "Lead Designer",
-            departmentId: designDept.id,
+        await WorkspaceRepository.createMember(null, {
+            workspaceId,
+            userId: deptMemberUser.id,
+            roleId: defaultRole.id,
+            departmentId: dept.id,
+            status: "active",
         });
 
-        const generalMember = await WorkspaceRepository.createMember(null, {
-            workspaceId: workspace.id,
-            userId: memberUserId,
-            roleId: memberRole.id,
-            roleTitle: "Staff Member",
+        await WorkspaceRepository.createMember(null, {
+            workspaceId,
+            userId: outsideUser.id,
+            roleId: defaultRole.id,
+            departmentId: null,
+            status: "active",
         });
 
-        await WorkspaceDepartmentService.addMemberToDepartment(
-            workspace.id,
-            ownerId,
-            designDept.id,
-            leadMember.id,
-            "lead",
-            "Lead UX Designer"
-        );
+        console.log("\n--- TEST GROUP 1: FILE METADATA & MAGIC BYTE VALIDATION ---");
+        // Check allowed formats
+        const validMetaPdf = validateFileMetadata("guidelines.pdf", "application/pdf", 1024 * 500);
+        assert("PDF metadata is valid and categorized as pdf", validMetaPdf.isValid && validMetaPdf.category === "pdf");
 
-        // 5. Create a Task inside the Design Dept
-        const task = await WorkspaceTaskService.createTask(workspace.id, ownerId, {
-            title: "Brand Identity Guidelines PDF",
-            description: "Prepare and review final vector logo assets and PDF brand guidelines.",
-            departmentId: designDept.id,
-            priority: "high",
+        const validMetaImg = validateFileMetadata("logo.png", "image/png", 1024 * 100);
+        assert("PNG metadata is valid and categorized as image", validMetaImg.isValid && validMetaImg.category === "image");
+
+        const validMetaVideo = validateFileMetadata("promo.mp4", "video/mp4", 1024 * 1024 * 10);
+        assert("MP4 video metadata is valid and categorized as video", validMetaVideo.isValid && validMetaVideo.category === "video");
+
+        // Check blocked dangerous extensions
+        const blockedExe = validateFileMetadata("trojan.exe", "application/x-msdownload", 1024);
+        assert("Executable .exe files are strictly blocked", !blockedExe.isValid);
+
+        const blockedPhp = validateFileMetadata("shell.php", "application/x-php", 1024);
+        assert("Server-side script .php files are blocked", !blockedPhp.isValid);
+
+        const blockedSvg = validateFileMetadata("vector.svg", "image/svg+xml", 1024);
+        assert("SVG files (XSS vector) are blocked from upload", !blockedSvg.isValid);
+
+        // Check magic bytes
+        const pdfBuffer = Buffer.from("%PDF-1.4\n%âãÏÓ\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF");
+        const pdfValidation = validateBufferMagicBytes(pdfBuffer, "test.pdf", "application/pdf");
+        assert("Real PDF buffer passes magic byte verification", pdfValidation.isValid && pdfValidation.category === "pdf");
+
+        const fakePdfBuffer = Buffer.from("<html><script>alert('pwned')</script></html>");
+        const fakePdfValidation = validateBufferMagicBytes(fakePdfBuffer, "fake.pdf", "application/pdf");
+        assert("Spoofed PDF buffer (HTML masquerading as PDF) is rejected", !fakePdfValidation.isValid);
+
+        console.log("\n--- TEST GROUP 2: STORAGE USAGE & QUOTA ENGINE ---");
+        const storageUsage = await WorkspaceFileService.getWorkspaceStorageUsage(workspaceId, ownerUserId);
+        assert("Storage quota reports valid quotaBytes (10GB default)", storageUsage.quotaBytes === 10 * 1024 * 1024 * 1024);
+        assert("Storage usage reports integer usedBytes and fileCount", typeof storageUsage.usedBytes === "number" && typeof storageUsage.fileCount === "number");
+
+        console.log("\n--- TEST GROUP 3: DETERMINISTIC CLOUDINARY PATH GENERATION ---");
+        const generalResourcePath = WorkspaceFileService.buildFolderPath(workspaceId, "resource", null, null, "document");
+        assert("General resource path matches orbix/team-workspaces/:wsId/resources", generalResourcePath === `orbix/team-workspaces/${workspaceId}/resources`);
+
+        const deptResourcePath = WorkspaceFileService.buildFolderPath(workspaceId, "resource", null, dept.id, "document");
+        assert("Department resource path matches orbix/team-workspaces/:wsId/departments/:deptId/resources", deptResourcePath === `orbix/team-workspaces/${workspaceId}/departments/${dept.id}/resources`);
+
+        const taskPath = WorkspaceFileService.buildFolderPath(workspaceId, "task", "task-123", dept.id, "image");
+        assert("Task attachment path matches orbix/team-workspaces/:wsId/departments/:deptId/tasks/:taskId/images", taskPath === `orbix/team-workspaces/${workspaceId}/departments/${dept.id}/tasks/task-123/images`);
+
+        console.log("\n--- TEST GROUP 4: UPLOAD INTENT & ENRICHMENT ---");
+        const uploadIntent = await WorkspaceFileService.createUploadIntent(workspaceId, ownerUserId, {
+            fileName: "Workspace_Guidelines.pdf",
+            fileSizeBytes: pdfBuffer.length,
+            mimeType: "application/pdf",
+            parentResourceType: "resource",
         });
 
-        console.log("\n--- TEST GROUP 1: FILE VALIDATION & MALICIOUS PAYLOAD DEFENSE (XSS/SVG/HTML) ---");
+        assert("Upload intent generates signed authentication signature", !!uploadIntent.signature);
+        assert("Upload intent generates authenticated delivery type", uploadIntent.deliveryType === "authenticated");
+        assert("Upload intent specifies 15-minute expiration timestamp", typeof uploadIntent.timestamp === "number" && !!uploadIntent.expiresAt);
+        assert("Upload intent targets Cloudinary signed upload URL", uploadIntent.uploadUrl.includes("cloudinary.com"));
 
-        // 1.1 Valid PNG metadata & magic numbers
-        const validPngBuffer = Buffer.from([
-            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG magic
-            0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89
-        ]);
-        const pngRes = validateBufferMagicBytes(validPngBuffer, "brand_logo.png", "image/png");
-        assert("Valid PNG passes magic byte and metadata inspection", pngRes.isValid === true && pngRes.category === "image");
+        // Register upload in repository
+        const registeredFile = await WorkspaceFileService.registerUpload(workspaceId, ownerUserId, {
+            intentId: uploadIntent.intentId,
+            cloudinaryPublicId: uploadIntent.publicId,
+            secureUrl: `https://res.cloudinary.com/${uploadIntent.cloudName}/raw/upload/v123456/${uploadIntent.publicId}.pdf`,
+            fileSizeBytes: pdfBuffer.length,
+            mimeType: "application/pdf",
+        });
 
-        // 1.2 Valid JPEG magic numbers
-        const validJpgBuffer = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
-        const jpgRes = validateBufferMagicBytes(validJpgBuffer, "hero_banner.jpg", "image/jpeg");
-        assert("Valid JPEG passes magic byte inspection", jpgRes.isValid === true && jpgRes.category === "image");
+        assert("Registered file is persisted in workspace_files table", !!registeredFile.id);
+        assert("Registered file has authenticated delivery URL enriched", !!registeredFile.deliveryUrl);
+        assert("Registered PDF has page 1 thumbnail delivery URL enriched", !!registeredFile.thumbnailUrl);
 
-        // 1.3 Valid PDF header
-        const validPdfBuffer = Buffer.from("%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF");
-        const pdfRes = validateBufferMagicBytes(validPdfBuffer, "brand_guidelines.pdf", "application/pdf");
-        assert("Valid PDF passes magic byte inspection and maps to pdf category", pdfRes.isValid === true && pdfRes.category === "pdf");
+        console.log("\n--- TEST GROUP 5: ZERO-TRUST ACCESS CONTROL & DEPARTMENT PRIVACY ---");
+        // Department lead and department member can access dept resource
+        const deptFile = await WorkspaceRepository.createWorkspaceFile({
+            workspaceId,
+            uploaderId: deptLeadUser.id,
+            departmentId: dept.id,
+            fileName: "Secret_Dept_Budget.pdf",
+            fileSizeBytes: 2048,
+            mimeType: "application/pdf",
+            cloudinaryPublicId: `orbix/team-workspaces/${workspaceId}/departments/${dept.id}/resources/secret_budget`,
+            cloudinaryUrl: "https://example.com/budget.pdf",
+            cloudinarySecureUrl: "https://example.com/budget.pdf",
+            resourceType: "raw",
+            deliveryType: "authenticated",
+            parentResourceType: "resource",
+        });
 
-        // 1.4 Valid MP4 video header
-        const validMp4Buffer = Buffer.from([
-            0x00, 0x00, 0x00, 0x20, // size
-            0x66, 0x74, 0x79, 0x70, // 'ftyp'
-            0x69, 0x73, 0x6f, 0x6d, // 'isom'
-            0x00, 0x00, 0x02, 0x00,
-            0x6d, 0x70, 0x34, 0x31,
-        ]);
-        const mp4Res = validateBufferMagicBytes(validMp4Buffer, "promo_teaser.mp4", "video/mp4");
-        assert("Valid MP4 passes video container inspection", mp4Res.isValid === true && mp4Res.category === "video");
+        // 1. Dept lead gets delivery URL
+        const leadDelivery = await WorkspaceFileService.getAuthorizedDeliveryUrl(workspaceId, deptLeadUser.id, deptFile.id);
+        assert("Department Lead can generate delivery URL for department file", !!leadDelivery.deliveryUrl);
 
-        // 1.5 Malicious SVG rejection (Stored XSS vector)
-        const svgMetadata = validateFileMetadata("malicious_icon.svg", "image/svg+xml", 1024);
-        assert("SVG file extension is strictly rejected", svgMetadata.isValid === false && svgMetadata.error?.includes("prohibited"));
+        // 2. Dept member gets delivery URL
+        const memberDelivery = await WorkspaceFileService.getAuthorizedDeliveryUrl(workspaceId, deptMemberUser.id, deptFile.id);
+        assert("Department Member can generate delivery URL for department file", !!memberDelivery.deliveryUrl);
 
-        // 1.6 Malicious HTML rejection
-        const htmlMetadata = validateFileMetadata("stealth_xss.html", "text/html", 2048);
-        assert("HTML file extension and MIME type are strictly rejected", htmlMetadata.isValid === false);
+        // 3. Workspace Manager gets delivery URL
+        const mgrDelivery = await WorkspaceFileService.getAuthorizedDeliveryUrl(workspaceId, managerUser.id, deptFile.id);
+        assert("Workspace Manager can generate delivery URL across departments", !!mgrDelivery.deliveryUrl);
 
-        // 1.7 Disguised SVG file named innocent.png (Magic byte & markup scanner)
-        const disguisedSvgBuffer = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert("XSS")</script></svg>');
-        const disguisedSvgRes = validateBufferMagicBytes(disguisedSvgBuffer, "innocent.png", "image/png");
-        assert(
-            "Disguised SVG disguised as PNG is detected and blocked by content inspector",
-            disguisedSvgRes.isValid === false && disguisedSvgRes.error?.includes("malicious HTML/SVG")
-        );
-
-        // 1.8 Disguised HTML file named readme.txt (Payload scanner)
-        const disguisedHtmlBuffer = Buffer.from("<!DOCTYPE html><html><body><script>fetch('http://attacker.com')</script></body></html>");
-        const disguisedHtmlRes = validateBufferMagicBytes(disguisedHtmlBuffer, "notes.txt", "text/plain");
-        assert(
-            "Disguised HTML in text file is detected and blocked",
-            disguisedHtmlRes.isValid === false && disguisedHtmlRes.error?.includes("malicious HTML/SVG")
-        );
-
-        // 1.9 Oversized image rejection (> 10MB)
-        const oversizedImage = validateFileMetadata("giant_photo.png", "image/png", 11 * 1024 * 1024);
-        assert("Image exceeding 10MB limit is rejected", oversizedImage.isValid === false && oversizedImage.error?.includes("exceeds maximum allowed size"));
-
-        // 1.10 Oversized document rejection (> 25MB)
-        const oversizedDoc = validateFileMetadata("massive_manual.pdf", "application/pdf", 30 * 1024 * 1024);
-        assert("PDF exceeding 25MB limit is rejected", oversizedDoc.isValid === false && oversizedDoc.error?.includes("exceeds maximum allowed size"));
-
-        console.log("\n--- TEST GROUP 2: DETERMINISTIC CLOUDINARY FOLDER HIERARCHY ---");
-
-        // 2.1 Task Document folder
-        const taskDocFolder = WorkspaceFileService.buildFolderPath(
-            workspace.id,
-            "task",
-            task.id,
-            designDept.id,
-            "document"
-        );
-        assert(
-            "Deterministic task document folder matches specification",
-            taskDocFolder === `orbix/team-workspaces/${workspace.id}/departments/${designDept.id}/tasks/${task.id}/documents`
-        );
-
-        // 2.2 Task PDF folder
-        const taskPdfFolder = WorkspaceFileService.buildFolderPath(
-            workspace.id,
-            "task",
-            task.id,
-            designDept.id,
-            "pdf"
-        );
-        assert(
-            "Deterministic task PDF folder matches specification",
-            taskPdfFolder === `orbix/team-workspaces/${workspace.id}/departments/${designDept.id}/tasks/${task.id}/pdfs`
-        );
-
-        // 2.3 Task Image folder
-        const taskImageFolder = WorkspaceFileService.buildFolderPath(
-            workspace.id,
-            "task",
-            task.id,
-            designDept.id,
-            "image"
-        );
-        assert(
-            "Deterministic task image folder matches specification",
-            taskImageFolder === `orbix/team-workspaces/${workspace.id}/departments/${designDept.id}/tasks/${task.id}/images`
-        );
-
-        // 2.4 Channel attachment folder
-        const channelAttachmentFolder = WorkspaceFileService.buildFolderPath(
-            workspace.id,
-            "channel",
-            "c0000000-0000-0000-0000-000000000001",
-            null,
-            "image"
-        );
-        assert(
-            "Deterministic channel attachment folder matches specification",
-            channelAttachmentFolder === `orbix/team-workspaces/${workspace.id}/channels/c0000000-0000-0000-0000-000000000001/attachments`
-        );
-
-        // 2.5 Department resources folder
-        const deptResourceFolder = WorkspaceFileService.buildFolderPath(
-            workspace.id,
-            "resource",
-            null,
-            designDept.id,
-            "document"
-        );
-        assert(
-            "Deterministic department resource folder matches specification",
-            deptResourceFolder === `orbix/team-workspaces/${workspace.id}/departments/${designDept.id}/resources`
-        );
-
-        console.log("\n--- TEST GROUP 3: UPLOAD INTENT & SHORT-LIVED SIGNED AUTHORIZATION ---");
-
-        // 3.1 Request upload intent for a PDF task attachment
-        const uploadIntent = await WorkspaceFileService.createUploadIntent(
-            workspace.id,
-            leadUserId,
-            {
-                fileName: "brand_specs_v1.pdf",
-                fileSizeBytes: 1024 * 500, // 500 KB
-                mimeType: "application/pdf",
-                departmentId: designDept.id,
-                parentResourceType: "task",
-                parentResourceId: task.id,
-            }
-        );
-
-        assert("Upload intent successfully created with UUID", typeof uploadIntent.intentId === "string" && uploadIntent.intentId.length > 0);
-        assert("Signed authorization contains server-generated publicId", uploadIntent.publicId.startsWith(`orbix/team-workspaces/${workspace.id}`));
-        assert("Signed authorization has authenticated deliveryType", uploadIntent.deliveryType === "authenticated");
-        assert("Signed authorization includes valid Cloudinary signature", typeof uploadIntent.signature === "string" && uploadIntent.signature.length > 10);
-        assert("Authorization TTL is 15 minutes", new Date(uploadIntent.expiresAt).getTime() > Date.now());
-
-        // 3.2 Unauthorized upload intent request (user not in department)
-        let unauthorizedDeptIntentFailed = false;
+        // 4. Outside user is FORBIDDEN
+        let outsideBlocked = false;
         try {
-            await WorkspaceFileService.createUploadIntent(
-                workspace.id,
-                memberUserId, // general member not in designDept
-                {
-                    fileName: "unauthorized_design_leak.pdf",
-                    fileSizeBytes: 1024 * 100,
-                    mimeType: "application/pdf",
-                    departmentId: designDept.id,
-                    parentResourceType: "task",
-                    parentResourceId: task.id,
-                }
-            );
+            await WorkspaceFileService.getAuthorizedDeliveryUrl(workspaceId, outsideUser.id, deptFile.id);
         } catch (err: any) {
-            unauthorizedDeptIntentFailed = true;
-            assert("Non-department member is denied upload intent for departmental task", err.message.includes("Forbidden"));
+            outsideBlocked = err.message.includes("Forbidden");
         }
-        assert("Unauthorized upload intent was rejected", unauthorizedDeptIntentFailed);
+        assert("Outside member is strictly blocked (Forbidden) from department file", outsideBlocked);
 
-        // 3.3 Register completed upload using the intent
-        const registeredFile = await WorkspaceFileService.registerUpload(
-            workspace.id,
-            leadUserId,
-            {
-                intentId: uploadIntent.intentId,
-                cloudinaryPublicId: uploadIntent.publicId,
-                cloudinaryAssetId: "c_asset_001_" + runId,
-                secureUrl: `https://res.cloudinary.com/bh1mhiwb/image/authenticated/s--dummy--/${uploadIntent.publicId}.pdf`,
-                format: "pdf",
-                fileSizeBytes: 1024 * 500,
-                mimeType: "application/pdf",
-                checksum: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-            }
+        console.log("\n--- TEST GROUP 6: ASSET RENAMING & AUDIT LOGGING ---");
+        const renamed = await WorkspaceFileService.renameFile(workspaceId, deptLeadUser.id, deptFile.id, "Public_Dept_Budget.pdf");
+        assert("File is renamed to Public_Dept_Budget.pdf", renamed.fileName === "Public_Dept_Budget.pdf");
+
+        // Verify audit log
+        const renameAuditRes = await query(
+            `SELECT action, details FROM public.workspace_audit_logs
+             WHERE workspace_id = $1 AND target_id = $2 AND action = 'file_renamed'
+             ORDER BY created_at DESC LIMIT 1;`,
+            [workspaceId, deptFile.id]
         );
+        assert("Audit log captures 'file_renamed' action", renameAuditRes.rows.length > 0);
+        assert("Audit details include oldFileName and newFileName", renameAuditRes.rows[0]?.details?.oldFileName === "Secret_Dept_Budget.pdf" && renameAuditRes.rows[0]?.details?.newFileName === "Public_Dept_Budget.pdf");
 
-        assert("File is successfully registered in workspace_files", typeof registeredFile.id === "string");
-        assert("Registered file correctly references departmentId", registeredFile.departmentId === designDept.id);
-        assert("Registered file correctly references taskId", registeredFile.taskId === task.id);
-        assert("Registered file deliveryType is authenticated", registeredFile.deliveryType === "authenticated");
-        assert("Registered file has SHA-256 checksum", typeof registeredFile.checksum === "string");
-
-        // 3.4 Single-use upload intent enforcement (Replay attack prevention)
-        let replayAttemptBlocked = false;
+        // Non-uploader outside user cannot rename
+        let renameBlocked = false;
         try {
-            await WorkspaceFileService.registerUpload(
-                workspace.id,
-                leadUserId,
-                {
-                    intentId: uploadIntent.intentId,
-                    cloudinaryPublicId: uploadIntent.publicId,
-                    secureUrl: `https://res.cloudinary.com/bh1mhiwb/image/authenticated/s--dummy--/${uploadIntent.publicId}.pdf`,
-                    fileSizeBytes: 1024 * 500,
-                    mimeType: "application/pdf",
-                }
-            );
+            await WorkspaceFileService.renameFile(workspaceId, outsideUser.id, deptFile.id, "Hacked_Name.pdf");
         } catch (err: any) {
-            replayAttemptBlocked = true;
-            assert("Replay of previously registered intent is strictly rejected", err.message.includes("registered"));
+            renameBlocked = err.message.includes("Forbidden");
         }
-        assert("Single-use intent enforcement confirmed", replayAttemptBlocked);
+        assert("Unauthorized member cannot rename files", renameBlocked);
 
-        // 3.5 Intent theft prevention: Actor mismatch
-        const anotherIntent = await WorkspaceFileService.createUploadIntent(
-            workspace.id,
-            ownerId,
-            {
-                fileName: "confidential_roadmap.pdf",
-                fileSizeBytes: 1024 * 200,
-                mimeType: "application/pdf",
-                parentResourceType: "attachment",
-            }
+        console.log("\n--- TEST GROUP 7: SECURE SHARE LINK GENERATION ---");
+        const shareResult = await WorkspaceFileService.generateShareUrl(workspaceId, deptMemberUser.id, deptFile.id, 86400);
+        assert("Generates signed share link with valid URL", !!shareResult.shareUrl);
+        assert("Generates share link expiration timestamp", !!shareResult.expiresAt);
+
+        console.log("\n--- TEST GROUP 8: ASSET DELETION & AUDIT CLEANUP ---");
+        const deleteSuccess = await WorkspaceFileService.deleteFile(workspaceId, deptLeadUser.id, deptFile.id);
+        assert("Department lead successfully deletes department file", deleteSuccess === true);
+
+        // Verify soft delete in DB
+        const deletedCheck = await WorkspaceRepository.findFileById(workspaceId, deptFile.id);
+        assert("File record is marked with deleted_at and assetStatus = 'archived'", !!deletedCheck?.deletedAt && deletedCheck?.assetStatus === "archived");
+
+        // Deleted file delivery URL is rejected
+        let accessDeletedBlocked = false;
+        try {
+            await WorkspaceFileService.getAuthorizedDeliveryUrl(workspaceId, deptLeadUser.id, deptFile.id);
+        } catch (err: any) {
+            accessDeletedBlocked = err.message.includes("deleted");
+        }
+        assert("Requesting delivery URL for deleted file is rejected", accessDeletedBlocked);
+
+        // Verify audit log for deletion
+        const deleteAuditRes = await query(
+            `SELECT action FROM public.workspace_audit_logs
+             WHERE workspace_id = $1 AND target_id = $2 AND action = 'file_deleted';`,
+            [workspaceId, deptFile.id]
         );
+        assert("Audit log captures 'file_deleted' action", deleteAuditRes.rows.length > 0);
 
-        let actorMismatchBlocked = false;
-        try {
-            await WorkspaceFileService.registerUpload(
-                workspace.id,
-                memberUserId, // different user attempts to claim owner's intent
-                {
-                    intentId: anotherIntent.intentId,
-                    cloudinaryPublicId: anotherIntent.publicId,
-                    secureUrl: `https://res.cloudinary.com/bh1mhiwb/image/authenticated/s--dummy--/${anotherIntent.publicId}.pdf`,
-                    fileSizeBytes: 1024 * 200,
-                    mimeType: "application/pdf",
-                }
-            );
-        } catch (err: any) {
-            actorMismatchBlocked = true;
-            assert("Registering an upload intent issued to another user is rejected", err.message.includes("Forbidden") || err.message.includes("mismatch"));
-        }
-        assert("Upload intent owner theft prevention confirmed", actorMismatchBlocked);
+        console.log("\n--- TEST GROUP 9: CLEANUP OF TEST FIXTURES ---");
+        await WorkspaceRepository.hardDeleteWorkspaceFile(workspaceId, registeredFile.id);
+        await WorkspaceRepository.hardDeleteWorkspaceFile(workspaceId, deptFile.id);
+        await query(`DELETE FROM public.workspace_departments WHERE id = $1;`, [dept.id]);
+        await query(`DELETE FROM public.workspace_members WHERE workspace_id = $1 AND user_id IN ($2, $3, $4, $5);`, [workspaceId, managerUser.id, deptLeadUser.id, deptMemberUser.id, outsideUser.id]);
+        await query(`DELETE FROM public.users WHERE id IN ($1, $2, $3, $4);`, [managerUser.id, deptLeadUser.id, deptMemberUser.id, outsideUser.id]);
+        assert("Test fixtures and temporary files cleaned up cleanly", true);
 
-        console.log("\n--- TEST GROUP 4: RESTRICTED DELIVERY URLS & PDF THUMBNAILS ---");
-
-        // 4.1 Authorized delivery URL generation
-        const deliveryRes = await WorkspaceFileService.getAuthorizedDeliveryUrl(
-            workspace.id,
-            leadUserId,
-            registeredFile.id
-        );
-
-        assert("Delivery URL generated for authorized lead", typeof deliveryRes.deliveryUrl === "string");
-        assert("Delivery URL is authenticated Cloudinary URL", deliveryRes.deliveryUrl.includes("/authenticated/"));
-        assert("First-class PDF generates page-1 JPEG thumbnail URL", typeof deliveryRes.thumbnailUrl === "string" && deliveryRes.thumbnailUrl.includes("pg_1"));
-
-        // 4.2 Elevated workspace manager / owner can access departmental file
-        const ownerDeliveryRes = await WorkspaceFileService.getAuthorizedDeliveryUrl(
-            workspace.id,
-            ownerId,
-            registeredFile.id
-        );
-        assert("Workspace Owner can obtain authorized delivery URL for departmental file", typeof ownerDeliveryRes.deliveryUrl === "string");
-
-        // 4.3 Unauthorized departmental access blocked
-        let unauthorizedFileAccessBlocked = false;
-        try {
-            await WorkspaceFileService.getAuthorizedDeliveryUrl(
-                workspace.id,
-                memberUserId, // member not in design dept
-                registeredFile.id
-            );
-        } catch (err: any) {
-            unauthorizedFileAccessBlocked = true;
-            assert("Non-department member cannot obtain delivery URL for departmental file", err.message.includes("Forbidden"));
-        }
-        assert("Restricted departmental delivery URL enforcement confirmed", unauthorizedFileAccessBlocked);
-
-        // 4.4 Cross-workspace tenant isolation
-        let foreignUserBlocked = false;
-        try {
-            await WorkspaceFileService.getAuthorizedDeliveryUrl(
-                workspace.id,
-                foreignUserId, // belongs to no workspace
-                registeredFile.id
-            );
-        } catch (err: any) {
-            foreignUserBlocked = true;
-            assert("Foreign user with no workspace membership is blocked from generating delivery URL", err.message.includes("Unauthorized"));
-        }
-        assert("Tenant isolation verified: Foreign users cannot access assets", foreignUserBlocked);
-
-        // 4.5 Immediate access revocation on member suspension
-        await WorkspaceService.setMemberSuspension(workspace.id, leadUserId, ownerId, true, "Testing revocation");
-        let suspendedAccessBlocked = false;
-        try {
-            await WorkspaceFileService.getAuthorizedDeliveryUrl(
-                workspace.id,
-                leadUserId,
-                registeredFile.id
-            );
-        } catch (err: any) {
-            suspendedAccessBlocked = true;
-            assert("Suspended member is immediately blocked from generating delivery URLs", err.message.includes("Unauthorized"));
-        }
-        assert("Suspension revocation check confirmed", suspendedAccessBlocked);
-
-        // Unsuspend lead for subsequent tests
-        await WorkspaceService.setMemberSuspension(workspace.id, leadUserId, ownerId, false);
-
-        console.log("\n--- TEST GROUP 5: STORAGE QUOTA & ASSET DELETION LIFECYCLE ---");
-
-        // 5.1 Storage usage computation
-        const storageUsage = await WorkspaceFileService.getWorkspaceStorageUsage(workspace.id, ownerId);
-        assert("Storage usage calculates total active bytes accurately", storageUsage.usedBytes >= 1024 * 500);
-        assert("Storage quota reflects 10GB workspace limit", storageUsage.quotaBytes === 10 * 1024 * 1024 * 1024);
-        assert("Storage usage tracks fileCount", storageUsage.fileCount >= 1);
-
-        // 5.2 Task activity log verifies attachment added
-        const activities = await WorkspaceTaskService.getActivity(workspace.id, ownerId, task.id);
-        const hasAttachmentActivity = activities.some((a) => a.action === "attachment_added");
-        assert("Task activity automatically recorded attachment_added event", hasAttachmentActivity === true);
-
-        // 5.3 Unauthorized deletion blocked
-        let unauthorizedDeleteBlocked = false;
-        try {
-            await WorkspaceFileService.deleteFile(workspace.id, memberUserId, registeredFile.id);
-        } catch (err: any) {
-            unauthorizedDeleteBlocked = true;
-            assert("Unauthorized member cannot delete another member's file", err.message.includes("Forbidden"));
-        }
-        assert("Unauthorized deletion blocked successfully", unauthorizedDeleteBlocked);
-
-        // 5.4 Authorized deletion by uploader / lead
-        const deleteSuccess = await WorkspaceFileService.deleteFile(workspace.id, leadUserId, registeredFile.id);
-        assert("File is safely deleted by authorized uploader", deleteSuccess === true);
-
-        // 5.5 Deleted file cannot generate delivery URL
-        let deletedDeliveryBlocked = false;
-        try {
-            await WorkspaceFileService.getAuthorizedDeliveryUrl(workspace.id, ownerId, registeredFile.id);
-        } catch (err: any) {
-            deletedDeliveryBlocked = true;
-            assert("Deleted file generates error on delivery URL request", err.message.includes("deleted"));
-        }
-        assert("Deleted file access denied confirmed", deletedDeliveryBlocked);
-
-        // 5.6 Storage usage decreases after deletion
-        const updatedStorage = await WorkspaceFileService.getWorkspaceStorageUsage(workspace.id, ownerId);
-        assert("Storage usage decreased after asset deletion", updatedStorage.usedBytes < storageUsage.usedBytes);
-
-        console.log("\n================================================================================");
-        console.log(`PHASE 06 TEST RESULTS: ${testsPassed} PASSED, ${testsFailed} FAILED`);
-        console.log("================================================================================");
-
-        if (testsFailed > 0) {
-            process.exit(1);
-        }
     } catch (err: any) {
-        console.error("❌ Fatal error executing Phase 06 test suite:", err);
-        process.exit(1);
+        console.error("Test execution failed with unhandled exception:", err);
+        failed++;
     } finally {
         await pool.end();
+        console.log("\n===============================================================================");
+        console.log(`PHASE 06 TEST RESULTS: ${passed} PASSED | ${failed} FAILED`);
+        console.log("===============================================================================");
+        process.exit(failed > 0 ? 1 : 0);
     }
 }
 

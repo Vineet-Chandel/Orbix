@@ -42,8 +42,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ clubId, onNa
 
     useEffect(() => {
         loadNotifications();
-        const interval = setInterval(loadNotifications, 30000); // 30s poll
-        return () => clearInterval(interval);
+        const interval = setInterval(loadNotifications, 30000); // 30s fallback poll
+        
+        const handleRealtime = (e: any) => {
+            const detail = e.detail;
+            if (detail?.event?.startsWith("notification:") || detail?.event?.startsWith("task:") || detail?.event?.startsWith("member:")) {
+                loadNotifications();
+            }
+        };
+        window.addEventListener("workspace:realtime", handleRealtime);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("workspace:realtime", handleRealtime);
+        };
     }, [clubId]);
 
     // Close on click outside

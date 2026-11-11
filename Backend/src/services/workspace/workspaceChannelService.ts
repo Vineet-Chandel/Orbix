@@ -4,6 +4,7 @@ import { query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import { WorkspaceNotificationService } from "./workspaceNotificationService.js";
 import type {
     WorkspaceChannel,
     WorkspaceChannelCategory,
@@ -48,14 +49,15 @@ export class WorkspaceChannelService {
         }
 
         // 1. Department isolation check
+        let isDepartmentMember = false;
         if (channel.departmentId) {
             const userDepts = ctx.member.departments || [];
-            const inDept =
+            isDepartmentMember =
                 ctx.member.departmentId === channel.departmentId ||
                 userDepts.some((d) => d.id === channel.departmentId) ||
                 ctx.leadDepartmentIds.includes(channel.departmentId);
 
-            if (!inDept && channel.isPrivate) {
+            if (!isDepartmentMember && channel.isPrivate) {
                 return false;
             }
         }
@@ -90,6 +92,9 @@ export class WorkspaceChannelService {
 
         // If the channel is flagged private and no explicit allow was granted:
         if (channel.isPrivate) {
+            if (channel.departmentId && isDepartmentMember) {
+                return true;
+            }
             return false;
         }
 
@@ -161,7 +166,8 @@ export class WorkspaceChannelService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceChannelCategory> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager)) {
+        const isLeadForDept = data.departmentId ? ctx?.leadDepartmentIds?.includes(data.departmentId) : false;
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !isLeadForDept && !ctx.permissions.includes("channels:manage"))) {
             throw new Error("Unauthorized to create channel categories.");
         }
 
@@ -253,7 +259,11 @@ export class WorkspaceChannelService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceChannelCategory> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager)) {
+        const existing = await WorkspaceRepository.findCategoryById(workspaceId, categoryId);
+        if (!existing) throw new Error("Category not found.");
+
+        const isLeadForDept = existing.departmentId ? ctx?.leadDepartmentIds?.includes(existing.departmentId) : false;
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !isLeadForDept && !ctx.permissions.includes("channels:manage"))) {
             throw new Error("Unauthorized to update channel category.");
         }
 
@@ -282,7 +292,11 @@ export class WorkspaceChannelService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<boolean> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager)) {
+        const existing = await WorkspaceRepository.findCategoryById(workspaceId, categoryId);
+        if (!existing) throw new Error("Category not found.");
+
+        const isLeadForDept = existing.departmentId ? ctx?.leadDepartmentIds?.includes(existing.departmentId) : false;
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !isLeadForDept && !ctx.permissions.includes("channels:manage"))) {
             throw new Error("Unauthorized to delete channel category.");
         }
 
@@ -299,6 +313,34 @@ export class WorkspaceChannelService {
                 userAgent: reqMeta.userAgent || null,
             });
             this.broadcastEvent(workspaceId, "category:deleted", { categoryId });
+        }
+        return success;
+    }
+
+    static async reorderCategories(
+        workspaceId: string,
+        actorUserId: string,
+        categoryIds: string[],
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !ctx.permissions.includes("channels:manage"))) {
+            throw new Error("Unauthorized to reorder channel categories.");
+        }
+
+        const success = await WorkspaceRepository.reorderCategories(workspaceId, categoryIds);
+        if (success) {
+            await WorkspaceRepository.logAudit(null, {
+                workspaceId,
+                actorId: actorUserId,
+                action: "channel_categories_reordered",
+                targetType: "workspace",
+                targetId: workspaceId,
+                details: { categoryIds },
+                ipAddress: reqMeta.ipAddress || null,
+                userAgent: reqMeta.userAgent || null,
+            });
+            this.broadcastEvent(workspaceId, "category:reordered", { categoryIds });
         }
         return success;
     }
@@ -324,7 +366,8 @@ export class WorkspaceChannelService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceChannel> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !ctx.permissions.includes("channels:create"))) {
+        const isLeadForDept = data.departmentId ? ctx?.leadDepartmentIds?.includes(data.departmentId) : false;
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !isLeadForDept && !ctx.permissions.includes("channels:create"))) {
             throw new Error("Unauthorized to create channels in this workspace.");
         }
 
@@ -424,12 +467,13 @@ export class WorkspaceChannelService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceChannel> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !ctx.permissions.includes("channels:manage"))) {
-            throw new Error("Unauthorized to edit channel settings.");
-        }
-
         const existing = await WorkspaceRepository.findChannelById(workspaceId, channelId);
         if (!existing) throw new Error("Channel not found.");
+
+        const isLeadForDept = existing.departmentId ? ctx?.leadDepartmentIds?.includes(existing.departmentId) : false;
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !isLeadForDept && !ctx.permissions.includes("channels:manage"))) {
+            throw new Error("Unauthorized to edit channel settings.");
+        }
 
         // If category is changing and syncWithNewCategory is requested
         if (data.categoryId && data.categoryId !== existing.categoryId && data.syncWithNewCategory) {
@@ -462,7 +506,11 @@ export class WorkspaceChannelService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<boolean> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager)) {
+        const existing = await WorkspaceRepository.findChannelById(workspaceId, channelId);
+        if (!existing) throw new Error("Channel not found.");
+
+        const isLeadForDept = existing.departmentId ? ctx?.leadDepartmentIds?.includes(existing.departmentId) : false;
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !isLeadForDept && !ctx.permissions.includes("channels:manage"))) {
             throw new Error("Unauthorized to delete channel.");
         }
 
@@ -479,6 +527,34 @@ export class WorkspaceChannelService {
                 userAgent: reqMeta.userAgent || null,
             });
             this.broadcastEvent(workspaceId, "channel:deleted", { channelId });
+        }
+        return success;
+    }
+
+    static async reorderChannels(
+        workspaceId: string,
+        actorUserId: string,
+        channelIds: string[],
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !ctx.permissions.includes("channels:manage"))) {
+            throw new Error("Unauthorized to reorder channels.");
+        }
+
+        const success = await WorkspaceRepository.reorderChannels(workspaceId, channelIds);
+        if (success) {
+            await WorkspaceRepository.logAudit(null, {
+                workspaceId,
+                actorId: actorUserId,
+                action: "channels_reordered",
+                targetType: "workspace",
+                targetId: workspaceId,
+                details: { channelIds },
+                ipAddress: reqMeta.ipAddress || null,
+                userAgent: reqMeta.userAgent || null,
+            });
+            this.broadcastEvent(workspaceId, "channel:reordered", { channelIds });
         }
         return success;
     }
@@ -523,6 +599,9 @@ export class WorkspaceChannelService {
             userAgent: reqMeta.userAgent || null,
         });
 
+        // Invalidate permissions and security caches
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
+
         return override;
     }
 
@@ -559,6 +638,9 @@ export class WorkspaceChannelService {
             userAgent: reqMeta.userAgent || null,
         });
 
+        // Invalidate permissions and security caches
+        await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
+
         return override;
     }
 
@@ -592,6 +674,36 @@ export class WorkspaceChannelService {
         });
 
         return true;
+    }
+
+    static async deleteOverride(
+        workspaceId: string,
+        actorUserId: string,
+        channelId: string,
+        overrideId: string,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !ctx.permissions.includes("channels:manage"))) {
+            throw new Error("Unauthorized to delete channel override.");
+        }
+
+        const success = await WorkspaceRepository.deleteOverride(workspaceId, overrideId);
+        if (success) {
+            await WorkspaceRepository.logAudit(null, {
+                workspaceId,
+                actorId: actorUserId,
+                action: "channel_override_deleted",
+                targetType: "channel",
+                targetId: channelId,
+                details: { overrideId },
+                ipAddress: reqMeta.ipAddress || null,
+                userAgent: reqMeta.userAgent || null,
+            });
+            this.broadcastEvent(workspaceId, "channel:override_deleted", { channelId, overrideId });
+            await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
+        }
+        return success;
     }
 
     // =========================================================================
@@ -700,6 +812,44 @@ export class WorkspaceChannelService {
             channelId,
             message: finalMessage,
         });
+
+        // Invalidate cached unread counters for the workspace
+        await WorkspaceRedisService.invalidateUnreadCounts(workspaceId);
+
+        // Notify mentioned members asynchronously without blocking
+        if (mentions.users && mentions.users.length > 0) {
+            (async () => {
+                try {
+                    const ch = await WorkspaceRepository.findChannelById(workspaceId, channelId);
+                    const channelName = ch ? ch.name : "general";
+                    const uRes = await query(
+                        `SELECT u.id, u.username FROM public.users u
+                         JOIN public.workspace_members wm ON wm.user_id = u.id
+                         WHERE wm.workspace_id = $1 AND LOWER(u.username) = ANY($2);`,
+                        [workspaceId, mentions.users.map((u: string) => u.toLowerCase())]
+                    );
+                    const senderName = ctx.member?.user?.username || "A member";
+                    for (const row of uRes.rows) {
+                        if (row.id === actorUserId) continue;
+                        await WorkspaceNotificationService.notifyMention({
+                            workspaceId,
+                            clubId: ctx.workspace.clubId,
+                            workspaceName: ctx.workspace.name,
+                            recipientId: row.id,
+                            actorId: actorUserId,
+                            actorName: senderName,
+                            resourceType: "channel",
+                            resourceId: channelId,
+                            resourceTitle: `#${channelName}`,
+                            contentSnippet: data.content.slice(0, 100),
+                            destinationUrl: `/club/${ctx.workspace.clubId}/workspace/channels/${channelId}`,
+                        }).catch(() => {});
+                    }
+                } catch (err) {
+                    console.warn("[sendMessage] mention dispatch error:", err);
+                }
+            })();
+        }
 
         return finalMessage;
     }
@@ -954,13 +1104,20 @@ export class WorkspaceChannelService {
         if (!canView) return;
 
         await WorkspaceRepository.markChannelRead(channelId, actorUserId, lastReadMessageId);
+        await WorkspaceRedisService.invalidateUnreadCounts(workspaceId, actorUserId);
     }
 
     static async getUnreadCounts(
         workspaceId: string,
         actorUserId: string
     ): Promise<Record<string, number>> {
-        return await WorkspaceRepository.getChannelUnreadCounts(workspaceId, actorUserId);
+        const cached = await WorkspaceRedisService.getCachedUnreadCounts(workspaceId, actorUserId);
+        if (cached) {
+            return cached;
+        }
+        const counts = await WorkspaceRepository.getChannelUnreadCounts(workspaceId, actorUserId);
+        await WorkspaceRedisService.setCachedUnreadCounts(workspaceId, actorUserId, counts);
+        return counts;
     }
 
     static async searchMessages(

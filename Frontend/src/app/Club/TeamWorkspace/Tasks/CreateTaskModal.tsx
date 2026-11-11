@@ -154,6 +154,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     referenceLinks,
                     isRestricted,
                     assigneeUserIds: selectedAssigneeIds,
+                    fileIds: uploadedFiles.map((f) => f.id),
                 },
                 clubId
             );

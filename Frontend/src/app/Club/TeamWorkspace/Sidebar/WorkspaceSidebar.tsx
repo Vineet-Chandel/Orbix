@@ -1,5 +1,5 @@
 // Frontend/src/app/Club/TeamWorkspace/Sidebar/WorkspaceSidebar.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Hash,
     Volume2,
@@ -11,6 +11,12 @@ import {
     Plus,
     Settings,
     Search,
+    Bell,
+    BellOff,
+    ArrowUp,
+    ArrowDown,
+    Sliders,
+    Sparkles,
 } from "lucide-react";
 import type {
     WorkspaceChannelCategory,
@@ -21,6 +27,7 @@ import type {
 
 interface WorkspaceSidebarProps {
     categories: WorkspaceChannelCategory[];
+    clubId?: string;
     activeChannelId: string | null;
     activeNavSection?: string;
     unreadCounts: Record<string, number>;
@@ -30,6 +37,8 @@ interface WorkspaceSidebarProps {
     onSelectChannel: (channel: WorkspaceChannel) => void;
     onSelectNavSection?: (section: any) => void;
     onOpenCreateCategory: () => void;
+    onOpenEditCategory?: (category: WorkspaceChannelCategory) => void;
+    onReorderCategories?: (direction: "up" | "down", categoryId: string) => void;
     onOpenCreateChannel: (categoryId?: string | null) => void;
     onOpenChannelSettings: (channel: WorkspaceChannel) => void;
     onOpenSearch?: () => void;
@@ -37,21 +46,55 @@ interface WorkspaceSidebarProps {
 
 export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     categories,
+    clubId,
     activeChannelId,
     unreadCounts,
     currentMember,
     canManageChannels,
     onSelectChannel,
     onOpenCreateCategory,
+    onOpenEditCategory,
+    onReorderCategories,
     onOpenCreateChannel,
     onOpenChannelSettings,
     onOpenSearch,
+    activeNavSection,
+    onSelectNavSection,
 }) => {
     // Collapsed categories map
     const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
+    // Muted categories map (persisted in localStorage)
+    const [mutedCategories, setMutedCategories] = useState<Record<string, boolean>>(() => {
+        try {
+            const raw = localStorage.getItem(`orbix_muted_categories_${clubId || "default"}`);
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(
+                `orbix_muted_categories_${clubId || "default"}`,
+                JSON.stringify(mutedCategories)
+            );
+        } catch (e) {
+            // Ignore storage quota
+        }
+    }, [mutedCategories, clubId]);
+
     const toggleCategory = (categoryId: string) => {
         setCollapsedCategories((prev) => ({
+            ...prev,
+            [categoryId]: !prev[categoryId],
+        }));
+    };
+
+    const toggleMuteCategory = (categoryId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setMutedCategories((prev) => ({
             ...prev,
             [categoryId]: !prev[categoryId],
         }));
@@ -92,6 +135,28 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 </div>
             )}
 
+            {/* Quick Recognition Jump */}
+            {onSelectNavSection && (
+                <div className="px-3 pt-2">
+                    <button
+                        onClick={() => onSelectNavSection("recognition")}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition ${
+                            activeNavSection === "recognition"
+                                ? "bg-[#FFE566] text-black"
+                                : "bg-white hover:bg-[#FFE566]/40 text-neutral-800"
+                        }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            <Sparkles className="w-3.5 h-3.5 fill-black text-black" />
+                            <span>Orbix Recognition</span>
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.2 bg-[#FAF6EE] border border-black rounded font-mono font-bold">
+                            Orbits
+                        </span>
+                    </button>
+                </div>
+            )}
+
             {/* Channels Header with Add Category action */}
             <div className="px-3.5 pt-3.5 pb-2 flex items-center justify-between">
                 <span className="text-[11px] font-black text-neutral-600 uppercase tracking-wider">
@@ -123,9 +188,14 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                         )}
                     </div>
                 ) : (
-                    categories.map((cat) => {
+                    categories.map((cat, catIdx) => {
                         const isCollapsed = collapsedCategories[cat.id];
+                        const isMuted = !!mutedCategories[cat.id];
                         const channels = cat.channels || [];
+                        const categoryUnreads = channels.reduce(
+                            (acc, ch) => acc + (unreadCounts[ch.id] || 0),
+                            0
+                        );
 
                         return (
                             <div key={cat.id} className="space-y-1">
@@ -140,31 +210,100 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                                         ) : (
                                             <ChevronDown className="w-3.5 h-3.5 text-black shrink-0" />
                                         )}
-                                        <span className="text-xs font-black text-neutral-800 uppercase tracking-wide truncate">
+                                        <span className={`text-xs font-black uppercase tracking-wide truncate ${isMuted ? "text-neutral-400 line-through" : "text-neutral-800"}`}>
                                             {cat.name}
                                         </span>
                                         {cat.isPrivate && (
                                             <Lock className="w-3 h-3 text-neutral-700 shrink-0" />
                                         )}
+                                        {/* Category-level unread counter badge when collapsed or unread */}
+                                        {!isMuted && isCollapsed && categoryUnreads > 0 && (
+                                            <span className="px-1.5 py-0.2 text-[9px] font-black bg-[#FFE566] text-black border border-black rounded-full shadow-neo-xxs shrink-0">
+                                                +{categoryUnreads}
+                                            </span>
+                                        )}
                                     </button>
 
-                                    {canManageChannels && (
+                                    {/* Action Group */}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        {/* Category Mute toggle */}
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onOpenCreateChannel(cat.id);
-                                            }}
-                                            title={`Add channel to ${cat.name}`}
-                                            className="opacity-0 group-hover:opacity-100 p-1 text-black hover:bg-[#FFE566] border border-black rounded transition"
+                                            onClick={(e) => toggleMuteCategory(cat.id, e)}
+                                            title={isMuted ? "Unmute Category" : "Mute Category"}
+                                            className={`p-1 rounded text-black transition ${
+                                                isMuted
+                                                    ? "opacity-100 text-neutral-500"
+                                                    : "opacity-0 group-hover:opacity-100 hover:bg-[#FFE566] border border-black"
+                                            }`}
                                         >
-                                            <Plus className="w-3.5 h-3.5" />
+                                            {isMuted ? (
+                                                <BellOff className="w-3 h-3 text-neutral-500" />
+                                            ) : (
+                                                <Bell className="w-3 h-3" />
+                                            )}
                                         </button>
-                                    )}
+
+                                        {/* Category Reorder Up/Down */}
+                                        {canManageChannels && onReorderCategories && (
+                                            <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
+                                                <button
+                                                    disabled={catIdx === 0}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onReorderCategories("up", cat.id);
+                                                    }}
+                                                    title="Move Category Up"
+                                                    className="p-0.5 hover:bg-white disabled:opacity-30 rounded border border-transparent hover:border-black text-black"
+                                                >
+                                                    <ArrowUp className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                    disabled={catIdx === categories.length - 1}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onReorderCategories("down", cat.id);
+                                                    }}
+                                                    title="Move Category Down"
+                                                    className="p-0.5 hover:bg-white disabled:opacity-30 rounded border border-transparent hover:border-black text-black"
+                                                >
+                                                    <ArrowDown className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Edit Category Cog */}
+                                        {canManageChannels && onOpenEditCategory && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onOpenEditCategory(cat);
+                                                }}
+                                                title={`Edit ${cat.name} Category`}
+                                                className="opacity-0 group-hover:opacity-100 p-1 text-black hover:bg-white border border-black rounded transition"
+                                            >
+                                                <Sliders className="w-3 h-3" />
+                                            </button>
+                                        )}
+
+                                        {/* Add Channel to Category */}
+                                        {canManageChannels && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onOpenCreateChannel(cat.id);
+                                                }}
+                                                title={`Add channel to ${cat.name}`}
+                                                className="opacity-0 group-hover:opacity-100 p-1 text-black hover:bg-[#FFE566] border border-black rounded transition"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Channels under Category */}
                                 {!isCollapsed && (
-                                    <div className="space-y-1 pl-1">
+                                    <div className={`space-y-1 pl-1 ${isMuted ? "opacity-60" : ""}`}>
                                         {channels.length === 0 ? (
                                             <div className="px-3 py-1 text-[11px] font-medium text-neutral-500 italic">
                                                 No channels in category
@@ -172,7 +311,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                                         ) : (
                                             channels.map((ch) => {
                                                 const isActive = activeChannelId === ch.id;
-                                                const unread = unreadCounts[ch.id] || 0;
+                                                const unread = isMuted ? 0 : unreadCounts[ch.id] || 0;
 
                                                 return (
                                                     <div

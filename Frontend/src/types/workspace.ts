@@ -222,6 +222,11 @@ export interface WorkspaceChannelOverride {
 
     role?: WorkspaceRole | null;
     member?: WorkspaceMember | null;
+    roleName?: string;
+    roleColor?: string;
+    memberUsername?: string;
+    memberFirstName?: string;
+    memberLastName?: string;
 }
 
 export type WorkspaceFileDeliveryType = "authenticated" | "private" | "upload";
@@ -684,6 +689,8 @@ export interface WorkspaceTask {
     reassignmentHistory?: WorkspaceTaskAssignment[];
     latestSubmission?: WorkspaceTaskSubmission | null;
     latestReview?: WorkspaceTaskReview | null;
+    submissions?: WorkspaceTaskSubmission[];
+    reviews?: WorkspaceTaskReview[];
     watchers?: WorkspaceTaskWatcher[];
     isWatching?: boolean;
     commentsCount?: number;
@@ -821,7 +828,7 @@ export interface WorkspaceAuditLogEntry {
 
 export interface WorkspaceSearchResultItem {
     id: string;
-    type: "channel" | "message" | "member" | "department" | "task" | "file";
+    type: "channel" | "message" | "member" | "department" | "task" | "file" | "discussion";
     title: string;
     snippet?: string | null;
     destinationUrl: string;
@@ -956,6 +963,7 @@ export interface WorkspaceNavigationCapabilities {
     canViewActivity: boolean;
     canViewAuditLogs: boolean;
     canViewSettings: boolean;
+    canViewResources?: boolean;
     allowedTabs: string[];
 }
 
@@ -1013,6 +1021,185 @@ export interface UserClubWorkspaceSummary {
         roleTitle: string;
     }>;
 }
+
+export interface WorkspaceSettingsData {
+    id: string;
+    clubId: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    iconUrl: string | null;
+    workspaceStatus: string;
+    managerUserId: string | null;
+    managerAppointedAt: string | null;
+    managerPermissions: Record<string, any> | string[];
+    customSettings: Record<string, any>;
+    isOwner: boolean;
+    isWorkspaceManager: boolean;
+    canManageSettings: boolean;
+}
+
+export interface WorkspacePermissionPreviewResult extends MemberCapabilityResolution {
+    isPreview: true;
+    simulatedTarget: string;
+}
+
+export interface RoleReorderPayload {
+    id: string;
+    rank?: number;
+}
+
+// ============================================================================
+// ORBIX RECOGNITION & IMMUTABLE ORBITS LEDGER TYPES
+// ============================================================================
+
+export interface WorkspaceRecognitionPolicy {
+    workspaceId: string;
+    isEnabled: boolean;
+    pointUnitName: string;
+    minPointsPerAward: number;
+    maxPointsPerAward: number;
+    managerMonthlyBudget: number;
+    recipientMonthlyCap: number;
+    dailyAwardLimitPerIssuer: number;
+    requireTaskLink: boolean;
+    requireEvidenceLink: boolean;
+    minReasonLength: number;
+    isWorkspaceVisible: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+    updatedBy?: string | null;
+}
+
+export interface WorkspaceRecognitionCategory {
+    id: string;
+    workspaceId: string;
+    name: string;
+    slug: string;
+    description: string;
+    icon: string;
+    isSystem: boolean;
+    isActive: boolean;
+    displayOrder: number;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface WorkspaceRecognitionBudget {
+    id: string;
+    workspaceId: string;
+    userId: string;
+    yearMonth: string;
+    allocatedBudget: number;
+    usedBudget: number;
+    remainingBudget: number;
+    allocatedBy?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export type RecognitionTransactionType = "award" | "reversal";
+export type RecognitionStatus = "completed" | "reversed";
+
+export interface WorkspaceRecognitionLedgerEntry {
+    id: string;
+    workspaceId: string;
+    recipientId: string;
+    issuerId: string;
+    departmentId?: string | null;
+    transactionType: RecognitionTransactionType;
+    pointsDelta: number;
+    categoryId: string;
+    appreciationReason: string;
+    linkedTaskId?: string | null;
+    linkedMilestoneId?: string | null;
+    evidenceUrl?: string | null;
+    referenceAwardId?: string | null;
+    idempotencyKey?: string | null;
+    status: RecognitionStatus;
+    isReversed: boolean;
+    reversalReason?: string | null;
+    reversedAt?: string | null;
+    reversedBy?: string | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    createdAt: string;
+
+    categoryName?: string;
+    departmentName?: string;
+
+    recipient?: {
+        id: string;
+        username: string;
+        firstName?: string | null;
+        lastName?: string | null;
+        name?: string;
+        avatarUrl?: string | null;
+        roleTitle?: string | null;
+    };
+    issuer?: {
+        id: string;
+        username: string;
+        firstName?: string | null;
+        lastName?: string | null;
+        name?: string;
+        avatarUrl?: string | null;
+        roleTitle?: string | null;
+    };
+    category?: {
+        id: string;
+        name: string;
+        slug: string;
+        icon: string;
+    };
+    department?: {
+        id: string;
+        name: string;
+        slug: string;
+        color?: string;
+    } | null;
+    linkedTask?: {
+        id: string;
+        title: string;
+        status: string;
+    } | null;
+}
+
+export interface AwardOrbitsDTO {
+    recipientUserId: string;
+    amount: number;
+    categorySlugOrId: string;
+    reason: string;
+    departmentId?: string | null;
+    linkedTaskId?: string | null;
+    linkedMilestoneId?: string | null;
+    evidenceUrl?: string | null;
+    idempotencyKey?: string | null;
+}
+
+export interface ReverseAwardDTO {
+    reversalReason: string;
+    idempotencyKey?: string | null;
+}
+
+export interface MemberRecognitionSummary {
+    workspaceId: string;
+    userId: string;
+    totalOrbitsEarned: number;
+    currentBalance: number;
+    allTimePoints: number;
+    totalAwardsReceived: number;
+    awardsReceivedCount: number;
+    monthlyOrbitsEarned: number;
+    monthlyAwardsReceived: number;
+    monthlyRemainingAllowance: number;
+    allocatedBudget?: number;
+    usedBudget?: number;
+    remainingBudget?: number;
+    canAward: boolean;
+    recentAwards: WorkspaceRecognitionLedgerEntry[];
+}
+
 
 
 
