@@ -1,12 +1,11 @@
 // Frontend/src/app/Club/TeamWorkspace/MemberWorkspaceView.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Briefcase,
     Building2,
     ChevronDown,
     Check,
-    ShieldAlert,
     ArrowLeft,
     Compass,
 } from "lucide-react";
@@ -101,6 +100,13 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
                 </p>
                 <div className="flex items-center gap-3 mt-6 flex-wrap justify-center">
                     <button
+                        onClick={() => navigate("/auth/signin?tab=club")}
+                        className="px-5 py-2.5 bg-[#FFE566] hover:bg-[#fedb30] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                        <Building2 className="w-4 h-4 text-black" />
+                        Login with Club Credentials
+                    </button>
+                    <button
                         onClick={() => navigate("/clubs")}
                         className="px-5 py-2.5 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
                     >
@@ -126,16 +132,23 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
     if (paramClubId && !currentWorkspace) {
         return (
             <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 sm:p-10 flex flex-col items-center justify-center text-center animate-in fade-in duration-200">
-                <div className="w-16 h-16 bg-rose-100 border-2 border-black rounded-2xl flex items-center justify-center mb-5 shadow-neo-sm">
-                    <ShieldAlert className="w-8 h-8 text-rose-600" />
+                <div className="w-16 h-16 bg-[#FFE566] border-2 border-black rounded-2xl flex items-center justify-center mb-5 shadow-neo-sm">
+                    <Building2 className="w-8 h-8 text-black" />
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                    Workspace Access Denied
+                    Club Manager Access Required
                 </h2>
                 <p className="text-sm font-bold text-neutral-700 max-w-md mt-2 leading-relaxed">
-                    You do not hold active membership in this club's workspace, or your invitation has not been confirmed.
+                    Club representatives and managers cannot access club workspaces through personal accounts. Please sign in with your club credentials to access your club workspace.
                 </p>
                 <div className="flex items-center gap-3 mt-6 flex-wrap justify-center">
+                    <button
+                        onClick={() => navigate("/auth/signin?tab=club")}
+                        className="px-5 py-2.5 bg-[#FFE566] hover:bg-[#fedb30] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                        <Building2 className="w-4 h-4 text-black" />
+                        Sign In with Club Credentials
+                    </button>
                     {workspaces.length > 0 && (
                         <button
                             onClick={() => navigate(`/workspace/${workspaces[0].clubId}`)}
@@ -248,13 +261,24 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
         </div>
     ) : null;
 
-    const clubMeta = {
-        id: currentWorkspace.clubId,
-        name: currentWorkspace.clubName,
-        slug: currentWorkspace.clubSlug,
-        logo_url: currentWorkspace.clubLogoUrl,
-        college_name: currentWorkspace.collegeName,
-    };
+    const clubMeta = useMemo(() => {
+        if (!currentWorkspace) return null;
+        return {
+            id: currentWorkspace.clubId,
+            name: currentWorkspace.clubName,
+            slug: currentWorkspace.clubSlug,
+            logo_url: currentWorkspace.clubLogoUrl,
+            college_name: currentWorkspace.collegeName,
+        };
+    }, [
+        currentWorkspace?.clubId,
+        currentWorkspace?.clubName,
+        currentWorkspace?.clubSlug,
+        currentWorkspace?.clubLogoUrl,
+        currentWorkspace?.collegeName,
+    ]);
+
+    if (!clubMeta) return null;
 
     return (
         <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">

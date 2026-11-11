@@ -1,5 +1,5 @@
 // Frontend/src/app/Club/TeamWorkspace/Files/ResourceLibraryView.tsx
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     FolderArchive,
     UploadCloud,
@@ -56,6 +56,10 @@ export const ResourceLibraryView: React.FC<ResourceLibraryViewProps> = ({
     isAdmin = false,
 }) => {
     const toast = useToast();
+    const toastRef = useRef(toast);
+    useEffect(() => {
+        toastRef.current = toast;
+    }, [toast]);
 
     // Data States
     const [files, setFiles] = useState<WorkspaceFile[]>([]);
@@ -119,13 +123,13 @@ export const ResourceLibraryView: React.FC<ResourceLibraryViewProps> = ({
                 }
             } catch (err: any) {
                 console.error("Failed to load workspace files:", err);
-                toast.error(err?.response?.data?.message || "Failed to load workspace resources.");
+                toastRef.current.error(err?.response?.data?.message || "Failed to load workspace resources.");
             } finally {
                 setLoading(false);
                 setRefreshing(false);
             }
         },
-        [clubId, toast]
+        [clubId]
     );
 
     useEffect(() => {

@@ -37,6 +37,7 @@ const TermsConditionsPage = lazy(() => import("./LandingPages/Legal/TermsConditi
 const GuardianConsentPage = lazy(() => import("./LandingPages/Legal/GuardianConsentPage"));
 const PublicEventRegistrationPage = lazy(() => import("./app/Events/PublicEventRegistrationPage"));
 const PublicCertificateVerifyPage = lazy(() => import("./app/Certificates/PublicCertificateVerifyPage"));
+const JoinClubPage = lazy(() => import("./app/Club/JoinClubPage"));
 
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
@@ -149,6 +150,9 @@ const App = () => {
           <Route path="/workspace" element={<WorkspaceRedirect />} />
 
           {/* Club Verification, Dedicated Dashboard & Public Presence */}
+          <Route path="/club/team-workspace/join" element={<JoinClubPage />} />
+          <Route path="/join-club" element={<JoinClubPage />} />
+          <Route path="/club/join" element={<JoinClubPage />} />
           <Route path="/club/status" element={<ClubStatusPage />} />
           <Route path="/clubs/status" element={<Navigate to="/club/status" replace />} />
           <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />

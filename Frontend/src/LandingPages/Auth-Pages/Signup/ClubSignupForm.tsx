@@ -900,8 +900,8 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
             const clubUser = resultData?.user || {
                 username: payload.username,
-                firstName: payload.contactPersonName,
-                lastName: "Representative",
+                firstName: payload.clubName,
+                lastName: "Club",
                 gmail: payload.contactEmail,
                 accountType: "club",
             };

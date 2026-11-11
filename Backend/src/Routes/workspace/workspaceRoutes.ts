@@ -14,6 +14,7 @@ import { WorkspaceTemplateService } from "../../services/workspace/workspaceTemp
 import { WorkspaceCapabilityService } from "../../services/workspace/workspaceCapabilityService.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import { ClubTeamService } from "../../services/club/clubTeamService.js";
 import { query } from "../../database/client.js";
 import multer from "multer";
 
@@ -34,17 +35,44 @@ async function resolveClubId(req: Request, res: Response): Promise<string | null
         return null;
     }
 
+    const isPersonalAccount = authUser.accountType === "personal" || !authUser.accountType;
     const requestedClubId = (req.query.clubId as string) || req.body?.clubId || req.params?.clubId;
+
     if (requestedClubId) {
+        // Enforce rule: Club representatives/managers cannot access the club workspace from personal account
+        if (isPersonalAccount) {
+            const managerCheck = await query(
+                `SELECT 1 FROM public.verified_clubs vc
+                 LEFT JOIN public.team_workspaces tw ON tw.club_id = vc.id
+                 WHERE vc.id = $1 AND (vc.auth_user_id = $2 OR tw.owner_id = $2)
+                 LIMIT 1;`,
+                [requestedClubId, authUser.id]
+            );
+            if (managerCheck.rows.length > 0) {
+                res.status(403).json({
+                    success: false,
+                    isClubManagerBlocked: true,
+                    message: "Club managers must sign in via the Club Portal using club credentials to access this workspace.",
+                });
+                return null;
+            }
+        }
+
         // Strict tenant isolation: verify caller belongs to the requested club or workspace
         const hasAccess = await query(
             `SELECT 1 FROM public.verified_clubs vc
              LEFT JOIN public.club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
              LEFT JOIN public.team_workspaces tw ON tw.club_id = vc.id
              LEFT JOIN public.workspace_members wm ON wm.workspace_id = tw.id AND wm.user_id = $1 AND wm.membership_status = 'active' AND wm.is_suspended = false
-             WHERE vc.id = $2 AND (vc.auth_user_id = $1 OR cm.user_id = $1 OR wm.user_id = $1)
+             LEFT JOIN public.workspace_roles r ON r.id = wm.role_id
+             WHERE vc.id = $2 AND (
+                 -- Club session: full access
+                 (NOT $3 AND (vc.auth_user_id = $1 OR tw.owner_id = $1 OR cm.user_id = $1 OR wm.user_id = $1))
+                 -- Personal session: strictly subordinate roles (rank < 1000, e.g. Workspace Manager, Dept Lead, Member)
+                 OR ($3 AND wm.user_id = $1 AND r.rank < 1000 AND r.slug != 'owner')
+             )
              LIMIT 1;`,
-            [authUser.id, requestedClubId]
+            [authUser.id, requestedClubId, isPersonalAccount]
         );
 
         if (hasAccess.rows.length === 0) {
@@ -58,9 +86,12 @@ async function resolveClubId(req: Request, res: Response): Promise<string | null
     const clubRes = await query(
         `SELECT vc.id FROM public.verified_clubs vc
          LEFT JOIN public.club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
-         WHERE vc.auth_user_id = $1 OR cm.user_id = $1
+         WHERE (
+             (NOT $2 AND vc.auth_user_id = $1)
+             OR cm.user_id = $1
+         )
          LIMIT 1;`,
-        [authUser.id]
+        [authUser.id, isPersonalAccount]
     );
 
     if (clubRes.rows.length === 0) {
@@ -196,10 +227,24 @@ workspaceRouter.get("/my-workspaces", authenticate, async (req: Request, res: Re
             return res.status(401).json({ success: false, message: "Authentication required." });
         }
 
-        const workspaces = await WorkspaceRepository.findUserWorkspaces(authUser.id);
+        // Check if user is a club manager of an active verified club
+        const clubManagerRes = await query(
+            `SELECT vc.id, vc.name, vc.slug FROM public.verified_clubs vc
+             WHERE vc.auth_user_id = $1 AND vc.is_active = true
+             LIMIT 1;`,
+            [authUser.id]
+        );
+        const isClubManager = clubManagerRes.rows.length > 0;
+        const managedClub = isClubManager ? clubManagerRes.rows[0] : null;
+
+        // Club managers cannot access workspaces from their personal account
+        const workspaces = isClubManager ? [] : await WorkspaceRepository.findUserWorkspaces(authUser.id);
+
         return res.json({
             success: true,
             workspaces,
+            isClubManager,
+            managedClub,
         });
     } catch (err: any) {
         console.error("GET /api/club/workspace/my-workspaces error:", err);
@@ -1261,20 +1306,198 @@ workspaceRouter.get("/invitations/verify", async (req: Request, res: Response) =
 });
 
 /**
+ * GET /api/club/workspace/invitations/my-pending
+ * Lists all pending invitations for the authenticated user (club team & workspace)
+ */
+workspaceRouter.get("/invitations/my-pending", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: "Authentication required." });
+        }
+
+        // 1. Pending club team invitations for this user
+        const clubInvRes = await query(
+            `SELECT inv.id, inv.token, inv.club_id AS "clubId", c.name AS "clubName", c.slug AS "clubSlug",
+                    c.logo_url AS "clubLogoUrl", c.college_name AS "collegeName",
+                    t.name AS "teamName",
+                    COALESCE(inv.position_title, inv.team_title, inv.title, 'Member') AS "roleName",
+                    u_by.username AS "inviterUsername", u_by.firstname AS "inviterFirstName", u_by.lastname AS "inviterLastName",
+                    inv.invitation_message AS "invitationMessage",
+                    inv.expires_at AS "expiresAt",
+                    inv.created_at AS "createdAt"
+             FROM public.club_team_invitations inv
+             JOIN public.verified_clubs c ON c.id = inv.club_id
+             LEFT JOIN public.club_teams t ON t.id = inv.team_id
+             LEFT JOIN public.users u_by ON u_by.id = inv.inviter_user_id
+             WHERE inv.invited_user_id = $1 AND inv.status = 'pending' AND inv.expires_at > NOW()
+             ORDER BY inv.created_at DESC;`,
+            [authUser.id]
+        );
+
+        // 2. Pending workspace invitations matching user's email or user id
+        const userEmail = (authUser.email || authUser.gmail || "").toLowerCase().trim();
+        const wsInvRes = await query(
+            `SELECT wi.id, wi.workspace_id AS "workspaceId", tw.name AS "workspaceName", tw.slug AS "workspaceSlug",
+                    vc.id AS "clubId", vc.name AS "clubName", vc.slug AS "clubSlug", vc.logo_url AS "clubLogoUrl", vc.college_name AS "collegeName",
+                    r.name AS "roleName", wd.name AS "departmentName",
+                    u_by.username AS "inviterUsername", u_by.firstname AS "inviterFirstName", u_by.lastname AS "inviterLastName",
+                    wi.invitation_message AS "invitationMessage",
+                    wi.expires_at AS "expiresAt",
+                    wi.created_at AS "createdAt"
+             FROM public.workspace_invitations wi
+             JOIN public.team_workspaces tw ON tw.id = wi.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
+             JOIN public.workspace_roles r ON r.id = wi.role_id
+             LEFT JOIN public.workspace_departments wd ON wd.id = wi.department_id
+             LEFT JOIN public.users u_by ON u_by.id = wi.inviter_id
+             WHERE (wi.invited_user_id = $1 OR (wi.email IS NOT NULL AND LOWER(wi.email) = $2))
+               AND wi.status = 'pending' AND wi.expires_at > NOW()
+             ORDER BY wi.created_at DESC;`,
+            [authUser.id, userEmail]
+        );
+
+        const invitations = [
+            ...clubInvRes.rows.map((r) => ({
+                id: r.id,
+                type: "club_team" as const,
+                token: r.token,
+                clubId: r.clubId,
+                clubName: r.clubName,
+                clubSlug: r.clubSlug,
+                clubLogoUrl: r.clubLogoUrl,
+                collegeName: r.collegeName,
+                roleName: r.roleName,
+                departmentName: r.teamName || null,
+                inviterName: `${r.inviterFirstName || ""} ${r.inviterLastName || ""}`.trim() || r.inviterUsername || "Club Manager",
+                invitationMessage: r.invitationMessage,
+                expiresAt: r.expiresAt,
+                createdAt: r.createdAt,
+            })),
+            ...wsInvRes.rows.map((r) => ({
+                id: r.id,
+                type: "workspace" as const,
+                token: null,
+                clubId: r.clubId,
+                clubName: r.clubName,
+                clubSlug: r.clubSlug,
+                clubLogoUrl: r.clubLogoUrl,
+                collegeName: r.collegeName,
+                roleName: r.roleName,
+                departmentName: r.departmentName || null,
+                inviterName: `${r.inviterFirstName || ""} ${r.inviterLastName || ""}`.trim() || r.inviterUsername || "Workspace Manager",
+                invitationMessage: r.invitationMessage,
+                expiresAt: r.expiresAt,
+                createdAt: r.createdAt,
+            })),
+        ];
+
+        return res.json({ success: true, invitations });
+    } catch (err: any) {
+        console.error("GET /api/club/workspace/invitations/my-pending error:", err);
+        return res.status(500).json({ success: false, message: err.message || "Failed to load pending invitations." });
+    }
+});
+
+/**
  * POST /api/club/workspace/invitations/accept
- * Accept invitation using raw token
+ * Accept invitation using raw token or pending invitation ID
  */
 workspaceRouter.post("/invitations/accept", authenticate, async (req: Request, res: Response) => {
     try {
-        const { token } = req.body;
-        if (!token || typeof token !== "string") {
-            return res.status(400).json({ success: false, message: "Invitation token is required." });
+        const { token, invitationId, type } = req.body;
+        const authUser = (req as any).user;
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: "Authentication required." });
         }
 
-        const authUser = (req as any).user;
+        // 1. Direct acceptance via invitationId
+        if (invitationId && (!token || typeof token !== "string" || !token.trim())) {
+            if (type === "club_team") {
+                const result = await ClubTeamService.acceptInvitation(invitationId, authUser.id);
+                let workspace = await WorkspaceRepository.findByClubId(result.clubId);
+                if (!workspace) {
+                    workspace = await WorkspaceService.initializeForClub(result.clubId, authUser.id);
+                }
+                const member = workspace ? await WorkspaceRepository.findMember(workspace.id, authUser.id) : null;
+                return res.json({
+                    success: true,
+                    workspace,
+                    member,
+                    clubId: result.clubId,
+                    clubName: result.clubName,
+                    message: result.message,
+                });
+            } else {
+                // Workspace invitation acceptance by ID
+                const invRes = await query(
+                    `SELECT id, workspace_id, role_id, department_id, inviter_id, email, expires_at, status
+                     FROM public.workspace_invitations
+                     WHERE id = $1 LIMIT 1;`,
+                    [invitationId]
+                );
+                const inv = invRes.rows[0];
+                if (!inv) return res.status(404).json({ success: false, message: "Invitation not found." });
+                if (inv.status !== "pending") return res.status(400).json({ success: false, message: `Invitation already ${inv.status}.` });
+                if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ success: false, message: "Invitation has expired." });
+
+                const workspace = await WorkspaceRepository.findById(inv.workspace_id);
+                if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+                const member = await WorkspaceRepository.createMember(null, {
+                    workspaceId: workspace.id,
+                    userId: authUser.id,
+                    roleId: inv.role_id,
+                    departmentId: inv.department_id || null,
+                    membershipStatus: "active",
+                    invitedBy: inv.inviter_id,
+                });
+
+                if (inv.department_id) {
+                    await WorkspaceRepository.addDepartmentMember(null, {
+                        workspaceId: workspace.id,
+                        departmentId: inv.department_id,
+                        memberId: member.id,
+                        userId: authUser.id,
+                        departmentRole: "member",
+                        roleTitle: "Department Member",
+                        assignedBy: inv.inviter_id,
+                    });
+                }
+
+                await query(
+                    `UPDATE public.workspace_invitations SET status = 'accepted', accepted_at = NOW(), invited_user_id = $2, updated_at = NOW() WHERE id = $1;`,
+                    [inv.id, authUser.id]
+                );
+
+                if (workspace.clubId) {
+                    await query(
+                        `INSERT INTO public.club_memberships
+                            (club_id, user_id, club_role, access_role, title, status, invited_by, joined_at)
+                         VALUES ($1, $2, 'member', 'member', 'Member', 'active', $3, NOW())
+                         ON CONFLICT (club_id, user_id) DO UPDATE SET status = 'active', updated_at = NOW();`,
+                        [workspace.clubId, authUser.id, inv.inviter_id]
+                    );
+                }
+
+                return res.json({
+                    success: true,
+                    workspace,
+                    member,
+                    clubId: workspace.clubId,
+                    clubName: workspace.name,
+                    message: `Successfully joined ${workspace.name}!`,
+                });
+            }
+        }
+
+        // 2. Acceptance via raw token
+        if (!token || typeof token !== "string" || !token.trim()) {
+            return res.status(400).json({ success: false, message: "Invitation token or invitation ID is required." });
+        }
 
         const { workspace, member } = await WorkspaceMemberService.acceptInvitation(
-            token,
+            token.trim(),
             authUser.id,
             getAuditContext(req)
         );
@@ -1283,6 +1506,8 @@ workspaceRouter.post("/invitations/accept", authenticate, async (req: Request, r
             success: true,
             workspace,
             member,
+            clubId: workspace?.clubId,
+            clubName: workspace?.name,
             message: `Successfully joined ${workspace.name}!`,
         });
     } catch (err: any) {

@@ -1,5 +1,5 @@
 // Frontend/src/app/Club/TeamWorkspace/Dashboard/WorkspaceOverviewView.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
     Users,
     FolderKanban,
@@ -45,6 +45,12 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
     onSelectDepartment,
 }) => {
     const toast = useToast();
+    const toastRef = useRef(toast);
+    useEffect(() => {
+        toastRef.current = toast;
+    }, [toast]);
+
+    const isFetchingRef = useRef(false);
     const [metrics, setMetrics] = useState<WorkspaceOverviewMetrics | null>(null);
     const [deptInsights, setDeptInsights] = useState<Record<string, WorkspaceDepartmentInsight>>({});
     const [loading, setLoading] = useState<boolean>(true);
@@ -52,16 +58,27 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
 
     // Filter departments strictly authorized to this user (prevents leaking restricted departments)
     const isGlobalManager = isAdmin || Boolean(capabilities?.capabilities.departments.viewAll);
-    const authorizedDepartments = departments.filter((d) => {
-        if (isGlobalManager) return true;
-        const assignedIds = [
-            ...(capabilities?.capabilities.departments.memberDepartmentIds || []),
-            ...(capabilities?.leadDepartmentIds || []),
-        ];
-        return assignedIds.includes(d.id);
-    });
+    const authorizedDepartments = useMemo(() => {
+        return departments.filter((d) => {
+            if (isGlobalManager) return true;
+            const assignedIds = [
+                ...(capabilities?.capabilities.departments.memberDepartmentIds || []),
+                ...(capabilities?.leadDepartmentIds || []),
+            ];
+            return assignedIds.includes(d.id);
+        });
+    }, [departments, isGlobalManager, capabilities]);
+
+    // Stable serialized department key for dependencies
+    const authorizedDeptIdsKey = useMemo(() => {
+        return authorizedDepartments.slice(0, 8).map((d) => d.id).sort().join(",");
+    }, [authorizedDepartments]);
 
     const loadData = useCallback(async (isRefresh = false) => {
+        if (!clubId) return;
+        if (isFetchingRef.current && !isRefresh) return;
+        isFetchingRef.current = true;
+
         try {
             if (isRefresh) setRefreshing(true);
             else setLoading(true);
@@ -73,30 +90,33 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
 
             // Fetch insights only for authorized departments (up to 8)
             const targetDepts = authorizedDepartments.slice(0, 8);
-            const insightsMap: Record<string, WorkspaceDepartmentInsight> = {};
+            if (targetDepts.length > 0) {
+                const insightsMap: Record<string, WorkspaceDepartmentInsight> = {};
 
-            await Promise.all(
-                targetDepts.map(async (dept) => {
-                    try {
-                        const insightRes = await workspaceApi.getDepartmentInsight(dept.id, clubId);
-                        if (insightRes?.data) {
-                            insightsMap[dept.id] = insightRes.data;
+                await Promise.all(
+                    targetDepts.map(async (dept) => {
+                        try {
+                            const insightRes = await workspaceApi.getDepartmentInsight(dept.id, clubId);
+                            if (insightRes?.data) {
+                                insightsMap[dept.id] = insightRes.data;
+                            }
+                        } catch {
+                            // Suppress individual department permission errors
                         }
-                    } catch (err) {
-                        // Suppress individual department permission errors
-                    }
-                })
-            );
+                    })
+                );
 
-            setDeptInsights(insightsMap);
+                setDeptInsights(insightsMap);
+            }
         } catch (err: any) {
             console.error("Failed to load workspace overview metrics:", err);
-            toast.error(err.message || "Failed to load workspace metrics.");
+            toastRef.current.error(err.message || "Failed to load workspace metrics.");
         } finally {
             setLoading(false);
             setRefreshing(false);
+            isFetchingRef.current = false;
         }
-    }, [clubId, authorizedDepartments, toast]);
+    }, [clubId, authorizedDeptIdsKey, authorizedDepartments]);
 
     useEffect(() => {
         loadData();

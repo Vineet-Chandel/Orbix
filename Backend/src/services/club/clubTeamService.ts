@@ -975,6 +975,8 @@ export class ClubTeamService {
             invitedUsername: targetUser.username,
             teamName,
             expiresAt,
+            token,
+            inviteLink: `/club/team-workspace/join?token=${token}`,
             message: `Invitation successfully sent to @${targetUser.username}. A notification has been placed in their Orbix inbox.`,
         };
     }
@@ -1287,6 +1289,57 @@ export class ClubTeamService {
                     })
                 ]
             ).catch(() => {});
+        }
+
+        // 6. Ensure synchronization into team_workspaces & workspace_members
+        try {
+            const wsRes = await query(
+                `SELECT id FROM public.team_workspaces WHERE club_id = $1 LIMIT 1;`,
+                [clubId]
+            );
+            let workspaceId = wsRes.rows[0]?.id;
+            if (!workspaceId) {
+                const newWs = await query(
+                    `INSERT INTO public.team_workspaces
+                        (club_id, owner_id, name, slug, workspace_status, created_at, updated_at)
+                     VALUES ($1, $2, $3, $4, 'active', NOW(), NOW())
+                     ON CONFLICT (club_id) DO UPDATE SET workspace_status = 'active'
+                     RETURNING id;`,
+                    [clubId, inv.inviter_user_id || recipientUserId, inv.clubName, inv.clubSlug || `club-${Date.now()}`]
+                );
+                workspaceId = newWs.rows[0]?.id;
+            }
+
+            if (workspaceId) {
+                let roleRes = await query(
+                    `SELECT id FROM public.workspace_roles WHERE workspace_id = $1 AND slug = 'member' LIMIT 1;`,
+                    [workspaceId]
+                );
+                let roleId = roleRes.rows[0]?.id;
+                if (!roleId) {
+                    const anyRole = await query(
+                        `SELECT id FROM public.workspace_roles WHERE workspace_id = $1 ORDER BY rank DESC LIMIT 1;`,
+                        [workspaceId]
+                    );
+                    roleId = anyRole.rows[0]?.id;
+                }
+
+                if (roleId) {
+                    await query(
+                        `INSERT INTO public.workspace_members
+                            (workspace_id, user_id, club_membership_id, role_id, role_title, membership_status, is_suspended, invited_by, joined_at, created_at, updated_at)
+                         VALUES ($1, $2, $3, $4, $5, 'active', false, $6, NOW(), NOW(), NOW())
+                         ON CONFLICT (workspace_id, user_id) DO UPDATE
+                         SET membership_status = 'active',
+                             is_suspended = false,
+                             role_title = EXCLUDED.role_title,
+                             updated_at = NOW();`,
+                        [workspaceId, recipientUserId, membershipId, roleId, title || "Member", inv.inviter_user_id]
+                    );
+                }
+            }
+        } catch (wsErr) {
+            console.warn("[ClubTeamService] Non-fatal: Workspace synchronization error on invitation acceptance:", wsErr);
         }
 
         return {

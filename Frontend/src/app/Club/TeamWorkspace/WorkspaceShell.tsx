@@ -1,5 +1,5 @@
 // Frontend/src/app/Club/TeamWorkspace/WorkspaceShell.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     Users,
     Hash,
@@ -77,6 +77,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     initialSection,
 }) => {
     const toast = useToast();
+    const toastRef = useRef(toast);
+    useEffect(() => {
+        toastRef.current = toast;
+    }, [toast]);
 
     // Data States
     const [workspace, setWorkspace] = useState<TeamWorkspace | null>(null);
@@ -183,17 +187,17 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 ]);
 
                 if (res.isNew) {
-                    toast.success("Team Workspace successfully provisioned for your chapter!");
+                    toastRef.current.success("Team Workspace successfully provisioned for your chapter!");
                 }
             }
         } catch (err: any) {
             console.error("Workspace load error:", err);
-            toast.error(err.message || "Failed to load Team Workspace.");
+            toastRef.current.error(err.message || "Failed to load Team Workspace.");
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [club.id, toast, loadCategories]);
+    }, [club.id, loadCategories]);
 
     useEffect(() => {
         loadWorkspace();

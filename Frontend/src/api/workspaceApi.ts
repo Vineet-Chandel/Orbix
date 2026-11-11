@@ -293,11 +293,64 @@ export const workspaceApi = {
             { clubId }
         ),
 
-    acceptInvitation: (token: string) =>
-        apiClient.post<{ success: boolean; workspace: any; member: any; message: string }>(
-            "/club/workspace/invitations/accept",
-            { token }
-        ),
+    verifyInvitation: (token: string) =>
+        apiClient.get<{
+            success: boolean;
+            isValid: boolean;
+            reason?: string;
+            invitation?: {
+                id: string;
+                email?: string;
+                workspaceId?: string;
+                workspaceName?: string;
+                workspaceSlug?: string;
+                clubId?: string;
+                clubName: string | null;
+                clubSlug?: string | null;
+                clubLogoUrl?: string | null;
+                collegeName?: string | null;
+                roleName: string;
+                roleRank?: number;
+                departmentName?: string | null;
+                inviterName: string;
+                invitationMessage?: string | null;
+                expiresAt: string | Date;
+                invitationType?: "workspace" | "club_team";
+            };
+        }>("/club/workspace/invitations/verify", { params: { token } }),
+
+    getMyPendingInvitations: () =>
+        apiClient.get<{
+            success: boolean;
+            invitations: Array<{
+                id: string;
+                type: "workspace" | "club_team";
+                token?: string | null;
+                clubId?: string;
+                clubName: string;
+                clubSlug?: string;
+                clubLogoUrl?: string | null;
+                collegeName?: string | null;
+                roleName: string;
+                departmentName?: string | null;
+                inviterName: string;
+                invitationMessage?: string | null;
+                expiresAt: string;
+                createdAt: string;
+            }>;
+        }>("/club/workspace/invitations/my-pending"),
+
+    acceptInvitation: (payload: string | { token?: string; invitationId?: string; type?: string }) => {
+        const body = typeof payload === "string" ? { token: payload } : payload;
+        return apiClient.post<{
+            success: boolean;
+            workspace: any;
+            member: any;
+            clubId?: string;
+            clubName?: string;
+            message: string;
+        }>("/club/workspace/invitations/accept", body);
+    },
 
     // =========================================================================
     // CHANNEL CATEGORIES (PHASE 04)
@@ -1148,9 +1201,12 @@ export const workspaceApi = {
      * Phase 01: Discovers all club workspaces the user belongs to
      */
     getMyWorkspaces: () =>
-        apiClient.get<{ success: boolean; workspaces: UserClubWorkspaceSummary[] }>(
-            "/club/workspace/my-workspaces"
-        ),
+        apiClient.get<{
+            success: boolean;
+            workspaces: UserClubWorkspaceSummary[];
+            isClubManager?: boolean;
+            managedClub?: { id: string; name: string; slug: string } | null;
+        }>("/club/workspace/my-workspaces"),
 
     /**
      * Phase 01: Updates custom permission overrides for a specific member

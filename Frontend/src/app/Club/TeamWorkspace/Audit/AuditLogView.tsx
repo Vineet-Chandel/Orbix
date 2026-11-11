@@ -1,5 +1,5 @@
 // Frontend/src/app/Club/TeamWorkspace/Audit/AuditLogView.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     Shield,
     Filter,
@@ -19,6 +19,10 @@ interface AuditLogViewProps {
 
 export const AuditLogView: React.FC<AuditLogViewProps> = ({ clubId, isAdmin }) => {
     const toast = useToast();
+    const toastRef = useRef(toast);
+    useEffect(() => {
+        toastRef.current = toast;
+    }, [toast]);
     const [logs, setLogs] = useState<WorkspaceAuditLogEntry[]>([]);
     const [total, setTotal] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
@@ -61,13 +65,13 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ clubId, isAdmin }) =
                 }
             } catch (err: any) {
                 console.error("Failed to load audit logs:", err);
-                toast.error(err.message || "Failed to load audit logs.");
+                toastRef.current.error(err.message || "Failed to load audit logs.");
             } finally {
                 setLoading(false);
                 setRefreshing(false);
             }
         },
-        [clubId, isAdmin, actionFilter, targetTypeFilter, toast]
+        [clubId, isAdmin, actionFilter, targetTypeFilter]
     );
 
     useEffect(() => {

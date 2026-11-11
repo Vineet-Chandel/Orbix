@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, Award, Plus } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, Award, Building2, KeyRound, UserPlus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
@@ -8,6 +8,7 @@ import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { buildApiUrl } from "../../api/apiClient";
 import { workspaceApi } from "../../api/workspaceApi";
+import { JoinClubModal } from "../Club/JoinClubModal";
 import type { UserClubWorkspaceSummary } from "../../types/workspace";
 
 export type SidebarTab =
@@ -89,27 +90,29 @@ export const Sidebar = ({
     });
 
     const [clubWorkspaces, setClubWorkspaces] = useState<UserClubWorkspaceSummary[]>([]);
+    const [isClubManager, setIsClubManager] = useState(false);
     const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+    const [isJoinClubModalOpen, setIsJoinClubModalOpen] = useState(false);
+
+    const loadWorkspaces = async () => {
+        try {
+            setLoadingWorkspaces(true);
+            const res = await workspaceApi.getMyWorkspaces();
+            if (res.success) {
+                setClubWorkspaces(res.workspaces || []);
+                if (res.isClubManager !== undefined) {
+                    setIsClubManager(Boolean(res.isClubManager));
+                }
+            }
+        } catch (err) {
+            console.warn("[Sidebar] Failed to load user workspaces:", err);
+        } finally {
+            setLoadingWorkspaces(false);
+        }
+    };
 
     useEffect(() => {
-        let isMounted = true;
-        const fetchWorkspaces = async () => {
-            try {
-                setLoadingWorkspaces(true);
-                const res = await workspaceApi.getMyWorkspaces();
-                if (isMounted && res.success && res.workspaces) {
-                    setClubWorkspaces(res.workspaces);
-                }
-            } catch (err) {
-                console.warn("[Sidebar] Failed to load user workspaces:", err);
-            } finally {
-                if (isMounted) setLoadingWorkspaces(false);
-            }
-        };
-        fetchWorkspaces();
-        return () => {
-            isMounted = false;
-        };
+        loadWorkspaces();
     }, []);
 
     const handleToggleSection = (section: CollapsibleSection) => {
@@ -789,89 +792,159 @@ export const Sidebar = ({
                                 className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
                             >
                                 {clubWorkspaces.length > 0 ? (
-                                    clubWorkspaces.map((ws) => {
-                                        const isCurrent =
-                                            location.pathname.startsWith(`/workspace/${ws.clubId}`) ||
-                                            (location.pathname === "/workspace" && clubWorkspaces[0]?.clubId === ws.clubId);
+                                    <>
+                                        {clubWorkspaces.map((ws) => {
+                                            const isCurrent =
+                                                location.pathname.startsWith(`/workspace/${ws.clubId}`) ||
+                                                (location.pathname === "/workspace" && clubWorkspaces[0]?.clubId === ws.clubId);
 
-                                        return (
-                                            <Link
-                                                key={ws.workspaceId}
-                                                to={`/workspace/${ws.clubId}`}
-                                                onClick={() => {
-                                                    if (onTabChange) onTabChange("workspace" as any);
-                                                }}
-                                                className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                                                    isCurrent
-                                                        ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                                        : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                                                }`}
-                                                title={!isExpanded ? `${ws.clubName} Workspace` : undefined}
-                                            >
-                                                {/* Active vertical accent bar */}
-                                                <span
-                                                    className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                                        isCurrent && isExpanded ? "bg-black opacity-100" : "bg-transparent opacity-0"
+                                            return (
+                                                <Link
+                                                    key={ws.workspaceId}
+                                                    to={`/workspace/${ws.clubId}`}
+                                                    onClick={() => {
+                                                        if (onTabChange) onTabChange("workspace" as any);
+                                                    }}
+                                                    className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
+                                                        isCurrent
+                                                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
+                                                            : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                                                     }`}
-                                                />
+                                                    title={!isExpanded ? `${ws.clubName} Workspace` : undefined}
+                                                >
+                                                    {/* Active vertical accent bar */}
+                                                    <span
+                                                        className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                                            isCurrent && isExpanded ? "bg-black opacity-100" : "bg-transparent opacity-0"
+                                                        }`}
+                                                    />
 
-                                                <div className="flex items-center w-full min-w-0">
-                                                    {/* Club Icon / Avatar: DEAD-CENTER in 44px container */}
-                                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                                        <div className="w-6 h-6 rounded-md border border-black bg-neutral-100 flex items-center justify-center overflow-hidden font-black text-[10px] text-black shadow-[1px_1px_0px_#000]">
-                                                            {ws.clubLogoUrl ? (
-                                                                <img src={ws.clubLogoUrl} alt={ws.clubName} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                ws.clubName.slice(0, 2).toUpperCase()
-                                                            )}
+                                                    <div className="flex items-center w-full min-w-0">
+                                                        {/* Club Icon / Avatar: DEAD-CENTER in 44px container */}
+                                                        <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                                            <div className="w-6 h-6 rounded-md border border-black bg-neutral-100 flex items-center justify-center overflow-hidden font-black text-[10px] text-black shadow-[1px_1px_0px_#000]">
+                                                                {ws.clubLogoUrl ? (
+                                                                    <img src={ws.clubLogoUrl} alt={ws.clubName} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    ws.clubName.slice(0, 2).toUpperCase()
+                                                                )}
+                                                            </div>
                                                         </div>
+
+                                                        {/* Text label only rendered when expanded */}
+                                                        {isExpanded && (
+                                                            <div className="min-w-0 flex-1 pr-1 animate-fadeIn">
+                                                                <p className={`whitespace-nowrap truncate text-xs ${isCurrent ? "font-black text-black" : "font-bold text-neutral-800"}`}>
+                                                                    {ws.clubName}
+                                                                </p>
+                                                                <p className="whitespace-nowrap truncate text-[9px] font-bold text-neutral-500 uppercase tracking-wider">
+                                                                    {ws.roleTitle || ws.roleName}
+                                                                </p>
+                                                            </div>
+                                                        )}
                                                     </div>
 
-                                                    {/* Text label only rendered when expanded */}
+                                                    {/* Tooltip when rail collapsed */}
+                                                    {!isExpanded && (
+                                                        <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
+                                                            <span>{ws.clubName}</span>
+                                                            <span className="text-[10px] text-neutral-400">({ws.roleTitle || ws.roleName})</span>
+                                                        </div>
+                                                    )}
+                                                </Link>
+                                            );
+                                        })}
+
+                                        {/* Quick Actions: Join Another Club & Login with Club Credentials */}
+                                        <div className="pt-1 mt-1 border-t border-black/10 space-y-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsJoinClubModalOpen(true)}
+                                                className={`flex items-center rounded-xl text-xs transition-all duration-150 group cursor-pointer w-full bg-[#A6FF70]/30 hover:bg-[#A6FF70] text-black border-2 border-black/30 hover:border-black font-black ${
+                                                    isExpanded ? "px-2.5 py-1.5 justify-between" : "w-11 h-11 justify-center mx-auto"
+                                                }`}
+                                                title={!isExpanded ? "Join Another Club" : undefined}
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <UserPlus className="w-3.5 h-3.5 text-black flex-shrink-0" />
                                                     {isExpanded && (
-                                                        <div className="min-w-0 flex-1 pr-1 animate-fadeIn">
-                                                            <p className={`whitespace-nowrap truncate text-xs ${isCurrent ? "font-black text-black" : "font-bold text-neutral-800"}`}>
-                                                                {ws.clubName}
-                                                            </p>
-                                                            <p className="whitespace-nowrap truncate text-[9px] font-bold text-neutral-500 uppercase tracking-wider">
-                                                                {ws.roleTitle || ws.roleName}
-                                                            </p>
+                                                        <span className="truncate text-[11px] font-black text-black">Join Another Club</span>
+                                                    )}
+                                                </div>
+                                            </button>
+
+                                            <Link
+                                                to="/auth/signin?tab=club"
+                                                className={`flex items-center rounded-xl text-xs transition-all duration-150 group cursor-pointer w-full bg-[#FFE566] hover:bg-[#fedb30] text-black border-2 border-black shadow-[2px_2px_0px_#000] font-black ${
+                                                    isExpanded ? "px-2.5 py-1.5 justify-between" : "w-11 h-11 justify-center mx-auto"
+                                                }`}
+                                                title={!isExpanded ? "Login with Club Credentials" : undefined}
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <Building2 className="w-3.5 h-3.5 text-black flex-shrink-0" />
+                                                    {isExpanded && (
+                                                        <div className="min-w-0 flex-1 truncate text-left">
+                                                            <p className="truncate text-[11px] font-black text-black">Login to Club</p>
                                                         </div>
                                                     )}
                                                 </div>
-
-                                                {/* Tooltip when rail collapsed */}
-                                                {!isExpanded && (
-                                                    <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                                        <span>{ws.clubName}</span>
-                                                        <span className="text-[10px] text-neutral-400">({ws.roleTitle || ws.roleName})</span>
-                                                    </div>
-                                                )}
+                                                {isExpanded && <KeyRound className="w-3 h-3 text-black flex-shrink-0" />}
                                             </Link>
-                                        );
-                                    })
+                                        </div>
+                                    </>
                                 ) : (
                                     /* Zero club workspaces state */
                                     <div className="p-2 text-center">
                                         {isExpanded ? (
-                                            <div className="space-y-1.5 py-1">
-                                                <p className="text-[11px] font-bold text-neutral-600">No active club workspace</p>
-                                                <Link
-                                                    to="/clubs"
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black bg-[#FFE566] text-black border border-black rounded-lg shadow-neo-xs hover:bg-[#fedb30] transition"
-                                                >
-                                                    <Plus className="w-3 h-3 text-black" />
-                                                    <span>Explore Clubs</span>
-                                                </Link>
+                                            <div className="space-y-2 py-1">
+                                                <p className="text-[11px] font-bold text-neutral-600">
+                                                    No active club workspace
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                                                    <Link
+                                                        to="/clubs"
+                                                        className="inline-flex items-center justify-center gap-1 px-2 py-2 text-[10px] font-black bg-[#FFE566] hover:bg-[#fedb30] text-black border-2 border-black rounded-xl shadow-neo-xs transition cursor-pointer"
+                                                    >
+                                                        <Compass className="w-3.5 h-3.5 text-black" />
+                                                        <span>Explore Club</span>
+                                                    </Link>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsJoinClubModalOpen(true)}
+                                                        className="inline-flex items-center justify-center gap-1 px-2 py-2 text-[10px] font-black bg-[#A6FF70] hover:bg-[#92f557] text-black border-2 border-black rounded-xl shadow-neo-xs transition cursor-pointer"
+                                                    >
+                                                        <UserPlus className="w-3.5 h-3.5 text-black" />
+                                                        <span>Join Club</span>
+                                                    </button>
+                                                </div>
+                                                {isClubManager && (
+                                                    <Link
+                                                        to="/auth/signin?tab=club"
+                                                        className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-neutral-600 hover:text-black hover:underline transition"
+                                                    >
+                                                        <Building2 className="w-3 h-3 text-neutral-500" />
+                                                        <span>Login to Club Portal</span>
+                                                    </Link>
+                                                )}
                                             </div>
                                         ) : (
-                                            <Link
-                                                to="/clubs"
-                                                className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-black/5 text-neutral-600 hover:text-black"
-                                                title="Explore Clubs"
-                                            >
-                                                <Compass className="w-5 h-5 text-neutral-600" />
-                                            </Link>
+                                            <div className="flex flex-col items-center gap-1.5 py-1">
+                                                <Link
+                                                    to="/clubs"
+                                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#FFE566] hover:bg-[#fedb30] text-black border-2 border-black shadow-neo-xs transition-all mx-auto"
+                                                    title="Explore Club"
+                                                >
+                                                    <Compass className="w-4 h-4 text-black" />
+                                                </Link>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsJoinClubModalOpen(true)}
+                                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#A6FF70] hover:bg-[#92f557] text-black border-2 border-black shadow-neo-xs transition-all cursor-pointer mx-auto"
+                                                    title="Join Club"
+                                                >
+                                                    <UserPlus className="w-4 h-4 text-black" />
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -1063,6 +1136,15 @@ export const Sidebar = ({
                             <span className="truncate">Settings</span>
                         </Link>
 
+                        <Link
+                            to="/auth/signin?tab=club"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-[#FFE566]/50 transition-colors"
+                        >
+                            <Building2 className="w-3.5 h-3.5 text-black flex-shrink-0" />
+                            <span className="truncate font-black">Login to Club Portal</span>
+                        </Link>
+
                         <div className="my-1.5 border-t-2 border-black/15" />
 
                         <button
@@ -1109,6 +1191,15 @@ export const Sidebar = ({
                     </div>
                 </div>
             )}
+
+            {/* Join Club Workspace Modal */}
+            <JoinClubModal
+                isOpen={isJoinClubModalOpen}
+                onClose={() => setIsJoinClubModalOpen(false)}
+                onJoined={() => {
+                    loadWorkspaces();
+                }}
+            />
         </>
     );
 };

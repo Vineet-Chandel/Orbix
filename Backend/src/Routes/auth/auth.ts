@@ -450,116 +450,181 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-        // 1. Query authoritative database for credentials and full user profile (by email or username)
-        let Result = await query(
-            `SELECT
-                id,
-                firstname AS "firstName",
-                middlename AS "middleName",
-                lastname AS "lastName",
-                email AS gmail,
-                username,
-                password AS password_hash,
-                termsaccepted AS "termsAccepted",
-                account_type AS "accountType",
-                headline,
-                bio,
-                avatar_url AS "avatarUrl",
-                photo_url AS "photoUrl",
-                previous_photo_url AS "previousPhotoUrl",
-                (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
-                cover_image_url AS "coverImageUrl",
-                website,
-                linkedin,
-                github,
-                custom_link AS "customLink",
-                location,
-                skills,
-                links,
-                is_open_to_work AS "isOpenToWork",
-                is_hireable AS "isHireable",
-                is_public AS "isPublic",
-                COALESCE(is_email_verified, false) AS "isEmailVerified",
-                email_verified_at AS "emailVerifiedAt",
-                (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
-                (COALESCE(is_email_verified, false) = true) AS "isVerified",
-                COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
-                two_factor_enabled_at AS "twoFactorEnabledAt",
-                created_at AS "createdAt"
-            FROM users
-            WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
-            LIMIT 1;`,
-            [validatedData.gmail]
-        );
+        // Context-aware Account Type resolution (seamless personal vs club login)
+        const requestedAccountType =
+            validatedData.accountType ||
+            req.body?.accountType ||
+            req.body?.loginMode ||
+            req.body?.expectedAccountType;
+        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
 
-        // 2. If not matched directly on users, check verified_clubs (slug/name/email) or club_verification_requests
-        if (Result.rows.length === 0) {
-            const clubLookup = await query(
-                `SELECT auth_user_id FROM verified_clubs 
-                 WHERE LOWER(slug) = LOWER($1) 
-                    OR LOWER(public_email) = LOWER($1)
-                    OR LOWER(name) = LOWER($1)
-                    OR LOWER(REPLACE(slug, '-', '')) = LOWER(REPLACE($1, '-', ''))
-                    OR LOWER(REPLACE(name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
-                 LIMIT 1;`,
+        let Result: any = { rows: [] };
+
+        if (effectiveAccountType === "club") {
+            // 1. Club Portal Authentication:
+            // First check if input matches a club user directly by username or internal club email
+            Result = await query(
+                `SELECT
+                    id,
+                    firstname AS "firstName",
+                    middlename AS "middleName",
+                    lastname AS "lastName",
+                    email AS gmail,
+                    username,
+                    password AS password_hash,
+                    termsaccepted AS "termsAccepted",
+                    account_type AS "accountType",
+                    headline,
+                    bio,
+                    avatar_url AS "avatarUrl",
+                    photo_url AS "photoUrl",
+                    previous_photo_url AS "previousPhotoUrl",
+                    (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                    cover_image_url AS "coverImageUrl",
+                    website,
+                    linkedin,
+                    github,
+                    custom_link AS "customLink",
+                    location,
+                    skills,
+                    links,
+                    is_open_to_work AS "isOpenToWork",
+                    is_hireable AS "isHireable",
+                    is_public AS "isPublic",
+                    COALESCE(is_email_verified, false) AS "isEmailVerified",
+                    email_verified_at AS "emailVerifiedAt",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                    COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                    two_factor_enabled_at AS "twoFactorEnabledAt",
+                    created_at AS "createdAt"
+                FROM users
+                WHERE (LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1))
+                  AND account_type = 'club'
+                LIMIT 1;`,
                 [validatedData.gmail]
             );
-            let targetUserId: string | null = clubLookup.rows[0]?.auth_user_id || null;
 
-            if (!targetUserId) {
-                const reqLookup = await query(
-                    `SELECT auth_user_id FROM club_verification_requests 
-                     WHERE LOWER(contact_email) = LOWER($1) 
-                        OR LOWER(college_official_email) = LOWER($1)
-                        OR LOWER(club_name) = LOWER($1)
-                        OR LOWER(REPLACE(club_name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
+            // 2. If not matched on users as a club account, resolve via verified_clubs or club_verification_requests
+            if (Result.rows.length === 0) {
+                const clubLookup = await query(
+                    `SELECT auth_user_id FROM verified_clubs 
+                     WHERE LOWER(slug) = LOWER($1) 
+                        OR LOWER(public_email) = LOWER($1)
+                        OR LOWER(name) = LOWER($1)
+                        OR LOWER(REPLACE(slug, '-', '')) = LOWER(REPLACE($1, '-', ''))
+                        OR LOWER(REPLACE(name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
                      LIMIT 1;`,
                     [validatedData.gmail]
                 );
-                targetUserId = reqLookup.rows[0]?.auth_user_id || null;
-            }
+                let targetUserId: string | null = clubLookup.rows[0]?.auth_user_id || null;
 
-            if (targetUserId) {
-                Result = await query(
-                    `SELECT
-                        id,
-                        firstname AS "firstName",
-                        middlename AS "middleName",
-                        lastname AS "lastName",
-                        email AS gmail,
-                        username,
-                        password AS password_hash,
-                        termsaccepted AS "termsAccepted",
-                        account_type AS "accountType",
-                        headline,
-                        bio,
-                        avatar_url AS "avatarUrl",
-                        photo_url AS "photoUrl",
-                        previous_photo_url AS "previousPhotoUrl",
-                        (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
-                        cover_image_url AS "coverImageUrl",
-                        website,
-                        linkedin,
-                        github,
-                        custom_link AS "customLink",
-                        location,
-                        skills,
-                        links,
-                        is_open_to_work AS "isOpenToWork",
-                        is_hireable AS "isHireable",
-                        is_public AS "isPublic",
-                        COALESCE(is_email_verified, false) AS "isEmailVerified",
-                        email_verified_at AS "emailVerifiedAt",
-                        (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
-                        (COALESCE(is_email_verified, false) = true) AS "isVerified",
-                        COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
-                        two_factor_enabled_at AS "twoFactorEnabledAt",
-                        created_at AS "createdAt"
-                    FROM users
-                    WHERE id = $1
-                    LIMIT 1;`,
-                    [targetUserId]
-                );
+                if (!targetUserId) {
+                    const reqLookup = await query(
+                        `SELECT auth_user_id FROM club_verification_requests 
+                         WHERE LOWER(contact_email) = LOWER($1) 
+                            OR LOWER(college_official_email) = LOWER($1)
+                            OR LOWER(club_name) = LOWER($1)
+                            OR LOWER(REPLACE(club_name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
+                         LIMIT 1;`,
+                        [validatedData.gmail]
+                    );
+                    targetUserId = reqLookup.rows[0]?.auth_user_id || null;
+                }
+
+                if (targetUserId) {
+                    Result = await query(
+                        `SELECT
+                            id,
+                            firstname AS "firstName",
+                            middlename AS "middleName",
+                            lastname AS "lastName",
+                            email AS gmail,
+                            username,
+                            password AS password_hash,
+                            termsaccepted AS "termsAccepted",
+                            account_type AS "accountType",
+                            headline,
+                            bio,
+                            avatar_url AS "avatarUrl",
+                            photo_url AS "photoUrl",
+                            previous_photo_url AS "previousPhotoUrl",
+                            (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                            cover_image_url AS "coverImageUrl",
+                            website,
+                            linkedin,
+                            github,
+                            custom_link AS "customLink",
+                            location,
+                            skills,
+                            links,
+                            is_open_to_work AS "isOpenToWork",
+                            is_hireable AS "isHireable",
+                            is_public AS "isPublic",
+                            COALESCE(is_email_verified, false) AS "isEmailVerified",
+                            email_verified_at AS "emailVerifiedAt",
+                            (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                            (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                            COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                            two_factor_enabled_at AS "twoFactorEnabledAt",
+                            created_at AS "createdAt"
+                        FROM users
+                        WHERE id = $1
+                        LIMIT 1;`,
+                        [targetUserId]
+                    );
+                }
+            }
+        } else {
+            // Personal Account Authentication:
+            Result = await query(
+                `SELECT
+                    id,
+                    firstname AS "firstName",
+                    middlename AS "middleName",
+                    lastname AS "lastName",
+                    email AS gmail,
+                    username,
+                    password AS password_hash,
+                    termsaccepted AS "termsAccepted",
+                    account_type AS "accountType",
+                    headline,
+                    bio,
+                    avatar_url AS "avatarUrl",
+                    photo_url AS "photoUrl",
+                    previous_photo_url AS "previousPhotoUrl",
+                    (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                    cover_image_url AS "coverImageUrl",
+                    website,
+                    linkedin,
+                    github,
+                    custom_link AS "customLink",
+                    location,
+                    skills,
+                    links,
+                    is_open_to_work AS "isOpenToWork",
+                    is_hireable AS "isHireable",
+                    is_public AS "isPublic",
+                    COALESCE(is_email_verified, false) AS "isEmailVerified",
+                    email_verified_at AS "emailVerifiedAt",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                    COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                    two_factor_enabled_at AS "twoFactorEnabledAt",
+                    created_at AS "createdAt"
+                FROM users
+                WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
+                LIMIT 1;`,
+                [validatedData.gmail]
+            );
+
+            // If an account is found but its account_type is 'club', notify user to use club portal
+            if (Result.rows[0]?.accountType === "club") {
+                return res.status(403).json({
+                    success: false,
+                    code: "ACCOUNT_TYPE_MISMATCH",
+                    message: "This is a Club account. Please use the Club Portal to sign in.",
+                });
             }
         }
 
@@ -584,15 +649,6 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 message: "Invalid Credentials"
             });
         }
-
-        // Context-aware Account Type resolution (seamless personal vs club login)
-        const requestedAccountType =
-            validatedData.accountType ||
-            req.body?.accountType ||
-            req.body?.loginMode ||
-            req.body?.expectedAccountType;
-
-        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
 
         // Intercept login if Two-Factor Authentication is enabled on this account
         if (user.isTwoFactorEnabled) {

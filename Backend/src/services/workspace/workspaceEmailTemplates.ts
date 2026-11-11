@@ -339,7 +339,7 @@ export class WorkspaceEmailTemplates {
         const subject = `Task Approved: ${ctx.resourceTitle || "Your submission"}`;
         const html = baseLayout(
             subject,
-            `<h1>Submission Approved! 🎉</h1>
+            `<h1>Submission Approved!</h1>
             <p>Hi ${ctx.recipientName},</p>
             <p>Great job! Your submission for <strong>${ctx.resourceTitle}</strong> in <strong>${ctx.workspaceName}</strong> has been approved by <strong>${ctx.actorName || "the reviewer"}</strong>.</p>
             <div class="info-box">

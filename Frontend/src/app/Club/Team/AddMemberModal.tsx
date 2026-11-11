@@ -8,6 +8,9 @@ import {
     Users,
     Briefcase,
     Info,
+    Copy,
+    Check,
+    Link as LinkIcon,
 } from "lucide-react";
 import { OrbixLoader, OrbixButton } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
@@ -65,6 +68,14 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     const [teamRole, setTeamRole] = useState<"member" | "co_lead" | "lead">("member");
     const [message, setMessage] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Generated Invite Link state for sharing
+    const [generatedInvite, setGeneratedInvite] = useState<{
+        token: string;
+        link: string;
+        username: string;
+    } | null>(null);
+    const [copied, setCopied] = useState(false);
 
     const searchDebounceRef = useRef<any>(null);
 
@@ -168,12 +179,29 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 { title: "Invitation Sent" }
             );
             onInvitationSent();
-            onClose();
+            if (data.token) {
+                const fullLink = `${window.location.origin}/club/team-workspace/join?token=${data.token}`;
+                setGeneratedInvite({
+                    token: data.token,
+                    link: fullLink,
+                    username: selectedUser.username,
+                });
+            } else {
+                onClose();
+            }
         } catch (err: any) {
             toast.error(err.message || "Unable to send invitation. Please try again.", { title: "Network Error" });
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleCopy = () => {
+        if (!generatedInvite) return;
+        navigator.clipboard.writeText(generatedInvite.link);
+        setCopied(true);
+        toast.success("Join link copied to clipboard!");
+        setTimeout(() => setCopied(false), 3000);
     };
 
     if (!isOpen) return null;
@@ -213,7 +241,68 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     </button>
                 </div>
 
-                <form onSubmit={handleSendInvitation} className="space-y-4">
+                {generatedInvite ? (
+                    <div className="space-y-4 py-2">
+                        <div className="p-4 bg-[#A6FF70]/20 border-2 border-black rounded-xl space-y-2">
+                            <div className="flex items-center gap-2 text-black font-black text-sm">
+                                <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+                                <span>Invitation Dispatched to @{generatedInvite.username}!</span>
+                            </div>
+                            <p className="text-xs text-neutral-700 font-medium leading-relaxed">
+                                A notification was delivered to their Orbix inbox. You can also copy and share the direct join link below to invite them via WhatsApp, Discord, or email.
+                            </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                Shareable Join Link
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    <LinkIcon className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={generatedInvite.link}
+                                        className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold bg-neutral-50 border-2 border-black rounded-xl focus:outline-none select-all"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleCopy}
+                                    className={`px-3 py-2 text-xs font-black border-2 border-black rounded-xl flex items-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer ${
+                                        copied
+                                            ? "bg-[#A6FF70] text-black"
+                                            : "bg-[#FFE566] hover:bg-[#fedb30] text-black"
+                                    }`}
+                                >
+                                    {copied ? (
+                                        <>
+                                            <Check className="w-3.5 h-3.5" />
+                                            <span>Copied!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy className="w-3.5 h-3.5" />
+                                            <span>Copy Link</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-5 py-2.5 rounded-xl border-2 border-black bg-black text-white hover:bg-neutral-800 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-all"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSendInvitation} className="space-y-4">
                     {/* Step 1: User Search */}
                     <div className="space-y-2">
                         <label className="block text-xs font-black uppercase tracking-wider text-black">
@@ -543,6 +632,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                         </OrbixButton>
                     </div>
                 </form>
+                )}
             </div>
         </div>,
         document.body

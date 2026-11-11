@@ -5,6 +5,7 @@ import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import { workspaceEventBus } from "./workspaceChannelService.js";
+import { ClubTeamService } from "../club/clubTeamService.js";
 import type {
     WorkspaceMember,
     WorkspaceInvitation,
@@ -344,6 +345,21 @@ export class WorkspaceMemberService {
             if (!dept) throw new Error("Selected department does not exist.");
         }
 
+        // Rule: Club managers cannot be invited to join other club workspaces with any role
+        const managerEmailRes = await query(
+            `SELECT vc.id, vc.name FROM public.verified_clubs vc
+             JOIN public.users u ON u.id = vc.auth_user_id
+             JOIN public.team_workspaces tw ON tw.club_id = vc.id
+             WHERE (LOWER(u.email) = LOWER($1) OR LOWER(vc.public_email) = LOWER($1))
+               AND vc.is_active = true
+               AND tw.id != $2
+             LIMIT 1;`,
+            [email, workspaceId]
+        );
+        if (managerEmailRes.rows.length > 0) {
+            throw new Error("Club managers are not permitted to join other club workspaces with any role.");
+        }
+
         // Check if user already exists in workspace
         const existingUserRes = await query(
             `SELECT id FROM public.users WHERE LOWER(email) = $1 LIMIT 1;`,
@@ -352,6 +368,16 @@ export class WorkspaceMemberService {
         const existingUserId = existingUserRes.rows[0]?.id || null;
 
         if (existingUserId) {
+            const managerUserRes = await query(
+                `SELECT vc.id, vc.name FROM public.verified_clubs vc
+                 JOIN public.team_workspaces tw ON tw.club_id = vc.id
+                 WHERE vc.auth_user_id = $1 AND vc.is_active = true AND tw.id != $2 LIMIT 1;`,
+                [existingUserId, workspaceId]
+            );
+            if (managerUserRes.rows.length > 0) {
+                throw new Error("Club managers are not permitted to join other club workspaces with any role.");
+            }
+
             const alreadyMember = await WorkspaceRepository.findMember(workspaceId, existingUserId);
             if (alreadyMember && alreadyMember.membershipStatus === "active") {
                 throw new Error("This user is already an active member of this workspace.");
@@ -438,10 +464,29 @@ export class WorkspaceMemberService {
         acceptingUserId: string,
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<{ workspace: TeamWorkspace; member: WorkspaceMember }> {
-        const tokenHash = crypto.createHash("sha256").update(rawToken.trim()).digest("hex");
-        const invitation = await WorkspaceRepository.findInvitationByTokenHash(tokenHash);
+        const cleanToken = rawToken.trim();
+        const tokenHash = crypto.createHash("sha256").update(cleanToken).digest("hex");
+        let invitation = await WorkspaceRepository.findInvitationByTokenHash(tokenHash);
 
         if (!invitation) {
+            // Check if this token belongs to club_team_invitations
+            const clubInvRes = await query(
+                `SELECT id, club_id FROM public.club_team_invitations WHERE token = $1 LIMIT 1;`,
+                [cleanToken]
+            );
+            const clubInv = clubInvRes.rows[0];
+            if (clubInv) {
+                await ClubTeamService.acceptInvitation(clubInv.id, acceptingUserId);
+                let ws = await WorkspaceRepository.findByClubId(clubInv.club_id);
+                if (!ws) {
+                    ws = await WorkspaceService.initializeForClub(clubInv.club_id, acceptingUserId);
+                }
+                const mem = ws ? await WorkspaceRepository.findMember(ws.id, acceptingUserId) : null;
+                return {
+                    workspace: ws || ({ id: "", name: "Club Workspace" } as any),
+                    member: mem || ({ id: "", roleTitle: "Member" } as any),
+                };
+            }
             throw new Error("Invalid or unrecognized invitation token.");
         }
 
@@ -461,6 +506,17 @@ export class WorkspaceMemberService {
         );
         const user = userRes.rows[0];
         if (!user) throw new Error("Authenticated user not found.");
+
+        // Rule: Club managers are not permitted to join other club workspaces with any role
+        const managerCheck = await query(
+            `SELECT vc.id, vc.name FROM public.verified_clubs vc
+             JOIN public.team_workspaces tw ON tw.club_id = vc.id
+             WHERE vc.auth_user_id = $1 AND vc.is_active = true AND tw.id != $2 LIMIT 1;`,
+            [acceptingUserId, invitation.workspaceId]
+        );
+        if (managerCheck.rows.length > 0) {
+            throw new Error("Club managers are not permitted to join other club workspaces with any role.");
+        }
 
         const workspace = await WorkspaceRepository.findById(invitation.workspaceId);
         if (!workspace || workspace.workspaceStatus === "archived") {
@@ -517,6 +573,18 @@ export class WorkspaceMemberService {
                 [invitation.id, acceptingUserId]
             );
 
+            // 3b. Sync into public.club_memberships so both systems are fully unified
+            if (workspace.clubId) {
+                await client.query(
+                    `INSERT INTO public.club_memberships
+                        (club_id, user_id, club_role, access_role, title, status, invited_by, joined_at)
+                     VALUES ($1, $2, 'member', 'member', $3, 'active', $4, NOW())
+                     ON CONFLICT (club_id, user_id) DO UPDATE
+                     SET status = 'active', updated_at = NOW();`,
+                    [workspace.clubId, acceptingUserId, invitation.role?.name || "Member", invitation.inviterId]
+                );
+            }
+
             // 4. Log audit record
             await WorkspaceRepository.logAudit(client, {
                 workspaceId: workspace.id,
@@ -562,23 +630,77 @@ export class WorkspaceMemberService {
             workspaceId: string;
             workspaceName: string;
             workspaceSlug: string;
+            clubId?: string;
             clubName: string | null;
+            clubSlug?: string | null;
+            clubLogoUrl?: string | null;
+            collegeName?: string | null;
             roleName: string;
             roleRank: number;
             departmentName: string | null;
             inviterName: string;
             invitationMessage: string | null;
             expiresAt: Date;
+            invitationType?: "workspace" | "club_team";
         };
     }> {
         if (!rawToken || !rawToken.trim()) {
             return { isValid: false, reason: "Token is required." };
         }
 
-        const tokenHash = crypto.createHash("sha256").update(rawToken.trim()).digest("hex");
+        const cleanToken = rawToken.trim();
+        const tokenHash = crypto.createHash("sha256").update(cleanToken).digest("hex");
         const invitation = await WorkspaceRepository.findInvitationByTokenHash(tokenHash);
 
         if (!invitation) {
+            // Check if this token belongs to club_team_invitations
+            const clubInvRes = await query(
+                `SELECT inv.*, c.id AS "clubId", c.name AS "clubName", c.slug AS "clubSlug", c.logo_url AS "clubLogoUrl", c.college_name AS "collegeName",
+                        t.name AS "teamName",
+                        u_by.username AS "inviterUsername", u_by.firstname AS "inviterFirstName", u_by.lastname AS "inviterLastName"
+                 FROM public.club_team_invitations inv
+                 JOIN public.verified_clubs c ON c.id = inv.club_id
+                 LEFT JOIN public.club_teams t ON t.id = inv.team_id
+                 LEFT JOIN public.users u_by ON u_by.id = inv.inviter_user_id
+                 WHERE inv.token = $1 LIMIT 1;`,
+                [cleanToken]
+            );
+            const clubInv = clubInvRes.rows[0];
+            if (clubInv) {
+                if (clubInv.status !== "pending") {
+                    return { isValid: false, reason: `This invitation has already been ${clubInv.status}.` };
+                }
+                if (new Date(clubInv.expires_at) < new Date()) {
+                    return { isValid: false, reason: "This invitation has expired." };
+                }
+                const inviterName = clubInv.inviterFirstName
+                    ? `${clubInv.inviterFirstName} ${clubInv.inviterLastName || ""}`.trim()
+                    : (clubInv.inviterUsername || "Club Manager");
+
+                return {
+                    isValid: true,
+                    invitation: {
+                        id: clubInv.id,
+                        email: "",
+                        workspaceId: "",
+                        workspaceName: clubInv.clubName,
+                        workspaceSlug: clubInv.clubSlug,
+                        clubId: clubInv.clubId,
+                        clubName: clubInv.clubName,
+                        clubSlug: clubInv.clubSlug,
+                        clubLogoUrl: clubInv.clubLogoUrl,
+                        collegeName: clubInv.collegeName,
+                        roleName: clubInv.position_title || clubInv.team_title || clubInv.title || "Member",
+                        roleRank: 100,
+                        departmentName: clubInv.teamName || null,
+                        inviterName,
+                        invitationMessage: clubInv.invitation_message,
+                        expiresAt: new Date(clubInv.expires_at),
+                        invitationType: "club_team",
+                    },
+                };
+            }
+
             return { isValid: false, reason: "Invalid or unrecognized invitation token." };
         }
 
@@ -602,7 +724,8 @@ export class WorkspaceMemberService {
         }
 
         // Fetch club and inviter names
-        const clubRes = await query(`SELECT name FROM public.verified_clubs WHERE id = $1 LIMIT 1;`, [workspace.clubId]);
+        const clubRes = await query(`SELECT id, name, slug, logo_url, college_name FROM public.verified_clubs WHERE id = $1 LIMIT 1;`, [workspace.clubId]);
+        const club = clubRes.rows[0];
         const inviterRes = await query(`SELECT firstname, lastname, username FROM public.users WHERE id = $1 LIMIT 1;`, [invitation.inviterId]);
         const inviter = inviterRes.rows[0];
         const inviterName = inviter
@@ -617,13 +740,18 @@ export class WorkspaceMemberService {
                 workspaceId: workspace.id,
                 workspaceName: workspace.name,
                 workspaceSlug: workspace.slug,
-                clubName: clubRes.rows[0]?.name || null,
+                clubId: club?.id || workspace.clubId,
+                clubName: club?.name || null,
+                clubSlug: club?.slug || null,
+                clubLogoUrl: club?.logo_url || null,
+                collegeName: club?.college_name || null,
                 roleName: invitation.role?.name || "Member",
                 roleRank: invitation.role?.rank || 100,
                 departmentName: invitation.department?.name || null,
                 inviterName,
                 invitationMessage: invitation.invitationMessage,
                 expiresAt: new Date(invitation.expiresAt),
+                invitationType: "workspace",
             },
         };
     }

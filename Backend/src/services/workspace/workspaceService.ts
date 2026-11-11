@@ -452,6 +452,13 @@ export class WorkspaceService {
         }
 
         // Check if user is a member of the club in club_memberships
+        // Ensure club managers of other clubs cannot join
+        const otherClubRes = await query(
+            `SELECT id FROM public.verified_clubs WHERE auth_user_id = $1 AND id != $2 AND is_active = true LIMIT 1;`,
+            [userId, workspace.clubId]
+        );
+        if (otherClubRes.rows.length > 0) return null;
+
         const memRes = await query(
             `SELECT id, access_role, club_role, title 
              FROM public.club_memberships 

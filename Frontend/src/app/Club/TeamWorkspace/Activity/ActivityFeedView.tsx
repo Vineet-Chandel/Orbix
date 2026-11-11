@@ -1,5 +1,5 @@
 // Frontend/src/app/Club/TeamWorkspace/Activity/ActivityFeedView.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     Activity,
     Filter,
@@ -43,6 +43,10 @@ export const ActivityFeedView: React.FC<ActivityFeedViewProps> = ({
     currentMember,
 }) => {
     const toast = useToast();
+    const toastRef = useRef(toast);
+    useEffect(() => {
+        toastRef.current = toast;
+    }, [toast]);
     const [events, setEvents] = useState<WorkspaceActivityEvent[]>([]);
     const [total, setTotal] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
@@ -86,13 +90,13 @@ export const ActivityFeedView: React.FC<ActivityFeedViewProps> = ({
                 }
             } catch (err: any) {
                 console.error("Failed to load activity feed:", err);
-                toast.error(err.message || "Failed to load activity feed.");
+                toastRef.current.error(err.message || "Failed to load activity feed.");
             } finally {
                 setLoading(false);
                 setRefreshing(false);
             }
         },
-        [clubId, selectedDeptId, selectedActorId, selectedEventType, toast]
+        [clubId, selectedDeptId, selectedActorId, selectedEventType]
     );
 
     useEffect(() => {

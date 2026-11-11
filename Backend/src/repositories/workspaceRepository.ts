@@ -1147,6 +1147,23 @@ export class WorkspaceRepository {
         invitedBy?: string | null;
     }): Promise<WorkspaceMember> {
         const targetClient = client?.query ? client : { query };
+
+        // Enforce rule: Club managers cannot join other club workspaces with any role
+        const wsRes = await targetClient.query(
+            `SELECT club_id, owner_id FROM public.team_workspaces WHERE id = $1 LIMIT 1;`,
+            [data.workspaceId]
+        );
+        const ws = wsRes.rows[0];
+        if (ws && ws.owner_id !== data.userId) {
+            const isClubManager = await targetClient.query(
+                `SELECT id, name FROM public.verified_clubs WHERE auth_user_id = $1 AND id != $2 AND is_active = true LIMIT 1;`,
+                [data.userId, ws.club_id]
+            );
+            if (isClubManager.rows.length > 0) {
+                throw new Error("Club managers are not permitted to join other club workspaces with any role.");
+            }
+        }
+
         const res = await targetClient.query(
             `INSERT INTO public.workspace_members (
                 workspace_id,
@@ -6771,6 +6788,16 @@ export class WorkspaceRepository {
                AND wm.membership_status = 'active'
                AND wm.is_suspended = false
                AND tw.workspace_status = 'active'
+               -- Exclude supreme club manager/owner roles (rank 1000, slug 'owner', workspace owner, or club representative)
+               AND r.rank < 1000
+               AND r.slug != 'owner'
+               AND tw.owner_id != $1
+               AND vc.auth_user_id != $1
+               -- A club manager / representative of an active verified club cannot access or join workspaces via personal account
+               AND NOT EXISTS (
+                   SELECT 1 FROM public.verified_clubs vc_rep
+                   WHERE vc_rep.auth_user_id = $1 AND vc_rep.is_active = true
+               )
              ORDER BY tw.created_at ASC;`,
             [userId]
         );

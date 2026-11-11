@@ -108,7 +108,7 @@ export class OnboardingEmailService {
         const accountsUrl = `${frontendUrl}/profile/edit`;
         const exploreUrl = `${frontendUrl}/explore`;
 
-        const subject = `Welcome to Orbix! 👋`;
+        const subject = `Welcome to Orbix!`;
 
         const html = `<!DOCTYPE html>
 <html lang="en">
@@ -164,7 +164,7 @@ export class OnboardingEmailService {
                 Hey ${recipientFirstName},
               </h1>
               <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #222222; font-weight: 500;">
-                Welcome to Orbix! 👋
+                Welcome to Orbix!
               </p>
               <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #333333;">
                 I'm <strong>Vineet Chandel</strong>, the founder of Orbix, and I'm genuinely glad to have you here.
@@ -225,7 +225,7 @@ export class OnboardingEmailService {
               <!-- Question from Founder Box -->
               <div style="background-color: #FFF9E6; border: 2px solid #000000; border-radius: 12px; padding: 20px; margin: 24px 0; box-shadow: 3px 3px 0px #000000;">
                 <div style="font-size: 13px; font-weight: 900; text-transform: uppercase; color: #855800; letter-spacing: 1px; margin-bottom: 8px;">
-                  💬 One thing I'd love to know...
+                  One thing I'd love to know...
                 </div>
                 <div style="font-size: 16px; font-weight: 900; color: #000000; margin-bottom: 8px;">
                   What brought you to Orbix?
@@ -234,7 +234,7 @@ export class OnboardingEmailService {
                   Are you here to improve your coding skills, showcase your projects, discover opportunities, connect with developers, or something else?
                 </p>
                 <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #000000; font-weight: 700;">
-                  👉 Just hit <span style="background-color: #FFE566; padding: 2px 6px; border: 1px solid #000000; border-radius: 4px;">Reply</span> and tell me. I personally love hearing from people who are part of what we're building.
+                  Just hit <span style="background-color: #FFE566; padding: 2px 6px; border: 1px solid #000000; border-radius: 4px;">Reply</span> and tell me. I personally love hearing from people who are part of what we're building.
                 </p>
               </div>
 
@@ -259,7 +259,7 @@ export class OnboardingEmailService {
           <tr>
             <td style="background-color: #FAF6EE; border-top: 2px solid #000000; padding: 18px 28px; text-align: center;">
               <p style="margin: 0; font-size: 11px; line-height: 1.5; color: #777777;">
-                Sent with ❤️ by <strong>Orbix</strong> • Reply directly to this email to reach founder Vineet Chandel.
+                Sent by <strong>Orbix</strong> • Reply directly to this email to reach founder Vineet Chandel.
               </p>
             </td>
           </tr>
@@ -273,7 +273,7 @@ export class OnboardingEmailService {
 
         const text = `Hey ${recipientFirstName},
 
-Welcome to Orbix! 👋
+Welcome to Orbix!
 
 I'm Vineet Chandel, the founder of Orbix, and I'm genuinely glad to have you here.
 
@@ -356,7 +356,7 @@ An Ecosystem for Developers`;
         const statusUrl = `${frontendUrl}/club/status`;
         const exploreUrl = `${frontendUrl}/explore`;
 
-        const subject = `We received your club application for ${clubName}! 🏛️`;
+        const subject = `We received your club application for ${clubName}!`;
 
         const html = `<!DOCTYPE html>
 <html lang="en">
@@ -412,7 +412,7 @@ An Ecosystem for Developers`;
                 Hey ${firstName},
               </h1>
               <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #222222; font-weight: 500;">
-                Welcome to the Orbix Campus Ecosystem! 🏛️
+                Welcome to the Orbix Campus Ecosystem!
               </p>
               <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #333333;">
                 I'm <strong>Vineet Chandel</strong>, the founder of Orbix, and I'm genuinely thrilled to see <strong>${clubName}</strong> taking the first step to join our verified campus network.
@@ -470,7 +470,7 @@ An Ecosystem for Developers`;
               <!-- Question from Founder Box -->
               <div style="background-color: #FFF9E6; border: 2px solid #000000; border-radius: 12px; padding: 20px; margin: 24px 0; box-shadow: 3px 3px 0px #000000;">
                 <div style="font-size: 13px; font-weight: 900; text-transform: uppercase; color: #855800; letter-spacing: 1px; margin-bottom: 8px;">
-                  💬 One thing I'd love to know...
+                  One thing I'd love to know...
                 </div>
                 <div style="font-size: 16px; font-weight: 900; color: #000000; margin-bottom: 8px;">
                   What is the biggest event or project ${clubName} is planning this semester?
@@ -479,7 +479,7 @@ An Ecosystem for Developers`;
                   Are you hosting a hackathon, organizing technical workshops, launching a recruitment drive, or building an open-source cohort?
                 </p>
                 <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #000000; font-weight: 700;">
-                  👉 Just hit <span style="background-color: #FFE566; padding: 2px 6px; border: 1px solid #000000; border-radius: 4px;">Reply</span> and tell me. I personally read every email and would love to support what your student community is building.
+                  Just hit <span style="background-color: #FFE566; padding: 2px 6px; border: 1px solid #000000; border-radius: 4px;">Reply</span> and tell me. I personally read every email and would love to support what your student community is building.
                 </p>
               </div>
 
@@ -515,7 +515,7 @@ An Ecosystem for Developers`;
 
         const text = `Hey ${firstName},
 
-Welcome to the Orbix Campus Ecosystem! 🏛️
+Welcome to the Orbix Campus Ecosystem!
 
 I'm Vineet Chandel, the founder of Orbix, and I'm genuinely thrilled to see ${clubName} taking the first step to join our verified campus network.
 
@@ -723,7 +723,7 @@ Submitted: ${submittedAt ? new Date(submittedAt).toUTCString() : new Date().toUT
         const dashboardUrl = `${frontendUrl}/club/dashboard`;
         const publicClubUrl = `${frontendUrl}/clubs/${slug}`;
 
-        const subject = `🎉 Congratulations! ${clubName} is now officially verified on Orbix!`;
+        const subject = `Congratulations! ${clubName} is now officially verified on Orbix!`;
 
         const html = `<!DOCTYPE html>
 <html lang="en">
@@ -764,7 +764,7 @@ Submitted: ${submittedAt ? new Date(submittedAt).toUTCString() : new Date().toUT
                   </td>
                   <td align="right">
                     <span style="background-color: #a2ff86; color: #000000; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #000000; box-shadow: 1px 1px 0px #000000; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block;">
-                      ✓ Verified Chapter
+                      Verified Chapter
                     </span>
                   </td>
                 </tr>
@@ -779,7 +779,7 @@ Submitted: ${submittedAt ? new Date(submittedAt).toUTCString() : new Date().toUT
                 Hey ${firstName},
               </h1>
               <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #000000; font-weight: 900;">
-                Huge congratulations! ${clubName} is now officially verified on Orbix! 🎉
+                Huge congratulations! ${clubName} is now officially verified on Orbix!
               </p>
               <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #333333;">
                 I'm <strong>Vineet Chandel</strong>, founder of Orbix. Our collegiate review team has verified your credentials and institutional affiliation with <strong>${collegeName}</strong>.
@@ -837,7 +837,7 @@ Submitted: ${submittedAt ? new Date(submittedAt).toUTCString() : new Date().toUT
               <!-- Founder Support Box -->
               <div style="background-color: #FFF9E6; border: 2px solid #000000; border-radius: 12px; padding: 20px; margin: 24px 0; box-shadow: 3px 3px 0px #000000;">
                 <div style="font-size: 13px; font-weight: 900; text-transform: uppercase; color: #855800; letter-spacing: 1px; margin-bottom: 8px;">
-                  🤝 Direct Founder Support
+                  Direct Founder Support
                 </div>
                 <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.6; color: #333333;">
                   If you or your core team ever need help configuring custom certificates, onboarding members, or organizing a campus hackathon, <strong>just hit Reply to reach me directly</strong>.
@@ -875,7 +875,7 @@ Submitted: ${submittedAt ? new Date(submittedAt).toUTCString() : new Date().toUT
 
         const text = `Hey ${firstName},
 
-Huge congratulations! ${clubName} is now officially verified on Orbix! 🎉
+Huge congratulations! ${clubName} is now officially verified on Orbix!
 
 I'm Vineet Chandel, founder of Orbix. Our collegiate review team has verified your credentials and institutional affiliation with ${collegeName}.
 

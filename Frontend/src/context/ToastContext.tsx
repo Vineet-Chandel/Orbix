@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useRef, useMemo } from "react";
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
@@ -109,18 +109,21 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
         [error]
     );
 
+    const contextValue = useMemo(
+        () => ({
+            show,
+            error,
+            success,
+            warning,
+            info,
+            handleError,
+            dismiss,
+        }),
+        [show, error, success, warning, info, handleError, dismiss]
+    );
+
     return (
-        <ToastContext.Provider
-            value={{
-                show,
-                error,
-                success,
-                warning,
-                info,
-                handleError,
-                dismiss,
-            }}
-        >
+        <ToastContext.Provider value={contextValue}>
             {children}
 
             {/* Stacked Bottom Notifications Portal */}

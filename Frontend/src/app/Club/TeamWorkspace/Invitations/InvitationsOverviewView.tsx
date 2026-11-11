@@ -1,5 +1,5 @@
 // Frontend/src/app/Club/TeamWorkspace/Invitations/InvitationsOverviewView.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     Mail,
     UserPlus,
@@ -34,6 +34,10 @@ export const InvitationsOverviewView: React.FC<InvitationsOverviewViewProps> = (
     currentMember,
 }) => {
     const toast = useToast();
+    const toastRef = useRef(toast);
+    useEffect(() => {
+        toastRef.current = toast;
+    }, [toast]);
     const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -51,11 +55,11 @@ export const InvitationsOverviewView: React.FC<InvitationsOverviewViewProps> = (
                 setInvitations(res.invitations || []);
             }
         } catch (err: any) {
-            toast.error(err.message || "Failed to load invitations");
+            toastRef.current.error(err.message || "Failed to load invitations");
         } finally {
             setLoading(false);
         }
-    }, [clubId, statusFilter, toast]);
+    }, [clubId, statusFilter]);
 
     useEffect(() => {
         loadInvitations();
