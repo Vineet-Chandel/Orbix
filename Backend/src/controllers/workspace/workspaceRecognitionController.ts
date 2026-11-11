@@ -355,4 +355,204 @@ export class WorkspaceRecognitionController {
             return res.status(status).json({ success: false, message: err.message });
         }
     }
+
+    /**
+     * GET /recognition/leaderboards
+     * Query:
+     *   period?: "this_week" | "this_month" | "all_time" | "last_30_days" | "last_90_days"
+     *   departmentId?: string
+     */
+    static async getLeaderboards(req: Request, res: Response) {
+        try {
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const authUser = (req as any).user;
+            const period = (req.query.period as any) || "this_month";
+            const departmentId = (req.query.departmentId as string) || undefined;
+
+            const leaderboards = await WorkspaceRecognitionService.getThreeLeaderboards(
+                workspaceId,
+                authUser.id,
+                { period, departmentId }
+            );
+
+            return res.json({ success: true, leaderboards });
+        } catch (err: any) {
+            const status = err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
+
+    /**
+     * GET /recognition/analytics/comprehensive
+     * Query:
+     *   period?: "this_week" | "this_month" | "all_time" | "last_30_days" | "last_90_days"
+     *   departmentId?: string
+     */
+    static async getComprehensiveAnalytics(req: Request, res: Response) {
+        try {
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const authUser = (req as any).user;
+            const period = (req.query.period as any) || "this_month";
+            const departmentId = (req.query.departmentId as string) || undefined;
+
+            const analytics = await WorkspaceRecognitionService.getComprehensiveAnalytics(
+                workspaceId,
+                authUser.id,
+                { period, departmentId }
+            );
+
+            return res.json({ success: true, analytics });
+        } catch (err: any) {
+            const status = err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
+
+    /**
+     * GET /recognition/analytics/members/:userId
+     * Query:
+     *   period?: "this_week" | "this_month" | "all_time" | "last_30_days" | "last_90_days"
+     */
+    static async getIndividualAnalytics(req: Request, res: Response) {
+        try {
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const authUser = (req as any).user;
+            const targetUserId = req.params.userId;
+            const period = (req.query.period as any) || "this_month";
+
+            const analytics = await WorkspaceRecognitionService.getIndividualMemberAnalytics(
+                workspaceId,
+                authUser.id,
+                targetUserId,
+                { period }
+            );
+
+            return res.json({ success: true, analytics });
+        } catch (err: any) {
+            const status = err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
+
+    /**
+     * GET /recognition/leaderboards/redis/top
+     * Query:
+     *   boardType: "contributors" | "leaders" | "departments"
+     *   period?: "this_week" | "this_month" | "all_time" | "last_30_days" | "last_90_days"
+     *   limit?: number (max 100)
+     *   offset?: number
+     *   departmentId?: string
+     */
+    static async getRedisTopRankings(req: Request, res: Response) {
+        try {
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const authUser = (req as any).user;
+            const boardType = (req.query.boardType as any) || "contributors";
+            const period = (req.query.period as any) || "this_month";
+            const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+            const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+            const departmentId = (req.query.departmentId as string) || undefined;
+
+            const result = await WorkspaceRecognitionService.getRedisTopRankings(
+                workspaceId,
+                authUser.id,
+                { boardType, period, limit, offset, departmentId }
+            );
+
+            return res.json({ success: true, ...result });
+        } catch (err: any) {
+            const status = err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
+
+    /**
+     * GET /recognition/leaderboards/redis/nearby
+     * Query:
+     *   boardType?: "contributors" | "leaders" | "departments"
+     *   period?: "this_week" | "this_month" | "all_time" | "last_30_days" | "last_90_days"
+     *   userId?: string (defaults to authUser.id)
+     *   radius?: number (default 2)
+     *   departmentId?: string
+     */
+    static async getRedisNearbyRankings(req: Request, res: Response) {
+        try {
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const authUser = (req as any).user;
+            const boardType = (req.query.boardType as any) || "contributors";
+            const period = (req.query.period as any) || "this_month";
+            const targetUserId = (req.query.userId as string) || authUser.id;
+            const radius = req.query.radius ? parseInt(req.query.radius as string, 10) : 2;
+            const departmentId = (req.query.departmentId as string) || undefined;
+
+            const result = await WorkspaceRecognitionService.getRedisNearbyRankings(
+                workspaceId,
+                authUser.id,
+                { boardType, period, targetUserId, radius, departmentId }
+            );
+
+            return res.json({ success: true, ...result });
+        } catch (err: any) {
+            const status = err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
+
+    /**
+     * POST /recognition/leaderboards/rebuild
+     * Body:
+     *   period?: "this_week" | "this_month" | "all_time"
+     */
+    static async rebuildLeaderboards(req: Request, res: Response) {
+        try {
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const authUser = (req as any).user;
+            const period = (req.body?.period as any) || "this_month";
+
+            const result = await WorkspaceRecognitionService.rebuildWorkspaceLeaderboards(
+                workspaceId,
+                authUser.id,
+                period
+            );
+
+            return res.json({
+                success: true,
+                message: "Successfully rebuilt Redis leaderboards from PostgreSQL source of truth.",
+                ...result,
+            });
+        } catch (err: any) {
+            const status = err.message.includes("Forbidden") || err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
+
+    /**
+     * POST /recognition/leaderboards/reconcile
+     * Body:
+     *   period?: "this_week" | "this_month" | "all_time"
+     */
+    static async reconcileLeaderboards(req: Request, res: Response) {
+        try {
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const authUser = (req as any).user;
+            const period = (req.body?.period as any) || "this_month";
+
+            const result = await WorkspaceRecognitionService.reconcileLeaderboards(
+                workspaceId,
+                authUser.id,
+                period
+            );
+
+            return res.json({
+                success: true,
+                message: result.matched
+                    ? "Leaderboards are perfectly synchronized between Redis and PostgreSQL."
+                    : `Reconciled ${result.correctedCount} discrepancies.`,
+                ...result,
+            });
+        } catch (err: any) {
+            const status = err.message.includes("Forbidden") || err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
+        }
+    }
 }

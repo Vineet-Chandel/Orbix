@@ -3,6 +3,8 @@ import { pool, query } from "../../database/client.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
+import { WorkspaceRecognitionRedisService, type RecognitionBoardType, type RedisRankEntry } from "../../redis/workspaceRecognitionRedis.js";
+import { WorkspaceRecognitionReconciliationService } from "./workspaceRecognitionReconciliationService.js";
 import { workspaceEventBus } from "./workspaceChannelService.js";
 import { WorkspaceNotificationService } from "./workspaceNotificationService.js";
 import type {
@@ -15,6 +17,8 @@ import type {
     MemberRecognitionSummary,
     LeaderboardPeriod,
     ThreeLeaderboardsResponse,
+    WorkspaceAnalyticsSummary,
+    IndividualMemberAnalytics,
 } from "../../types/workspaceTypes.js";
 
 export class WorkspaceRecognitionService {
@@ -37,6 +41,16 @@ export class WorkspaceRecognitionService {
         const policy = await WorkspaceRepository.getRecognitionPolicy(workspaceId);
         if (!policy.isEnabled) {
             throw new Error("Orbix Recognition is currently disabled for this workspace.");
+        }
+
+        // Burst Rate Limit: Max 25 award attempts per 10 seconds per issuer
+        const burstLimit = await WorkspaceRecognitionRedisService.checkBurstRateLimit(
+            `${workspaceId}:award:${issuerUserId}`,
+            25,
+            10
+        );
+        if (!burstLimit.allowed) {
+            throw new Error("Rate limit exceeded: Too many award attempts. Please slow down.");
         }
 
         // 3. Idempotency Check
@@ -219,17 +233,27 @@ export class WorkspaceRecognitionService {
 
             await client.query("COMMIT;");
 
-            // 14. Realtime Broadcast & In-App Notification
-            workspaceEventBus.emit(workspaceId, "recognition:awarded", {
-                awardId: ledgerEntry.id,
-                recipientId: dto.recipientUserId,
-                issuerId: issuerUserId,
-                amount,
-                categoryName: category.name,
-                reason: trimmedReason,
-            });
+            // 14. Realtime Leaderboard Projection & Outbox Processing
+            try {
+                await WorkspaceRecognitionReconciliationService.processOutboxEvent({
+                    workspaceId,
+                    eventType: "recognition:awarded",
+                    payload: {
+                        awardId: ledgerEntry.id,
+                        recipientId: dto.recipientUserId,
+                        issuerId: issuerUserId,
+                        amount,
+                        categoryId: category.id,
+                        categoryName: category.name,
+                        reason: trimmedReason,
+                        createdAt: ledgerEntry.createdAt,
+                    },
+                });
+            } catch (err: any) {
+                console.warn("[RecognitionAward] Realtime outbox projection warning:", err.message);
+            }
 
-            // In-app notification to recipient
+            // Targeted in-app notification to recipient
             const issuerName = ctx.member.user?.firstName 
                 ? `${ctx.member.user.firstName} ${ctx.member.user.lastName || ""}`.trim()
                 : (ctx.member.user?.username || "A workspace leader");
@@ -274,6 +298,9 @@ export class WorkspaceRecognitionService {
                     }
                 })
                 .catch(() => {});
+
+            // Invalidate leaderboards cache
+            WorkspaceRedisService.invalidateLeaderboards(workspaceId).catch(() => {});
 
             return ledgerEntry;
         } catch (err) {
@@ -333,14 +360,26 @@ export class WorkspaceRecognitionService {
 
             await client.query("COMMIT;");
 
-            // Realtime Broadcast
-            workspaceEventBus.emit(workspaceId, "recognition:reversed", {
-                originalAwardId: awardId,
-                reversalId: result.reversalEntry.id,
-                recipientId: original.recipientId,
-                pointsDelta: -original.pointsDelta,
-                reversedBy: actorUserId,
-            });
+            // Realtime Leaderboard Projection & Outbox Processing
+            try {
+                await WorkspaceRecognitionReconciliationService.processOutboxEvent({
+                    workspaceId,
+                    eventType: "recognition:reversed",
+                    payload: {
+                        originalAwardId: awardId,
+                        reversalId: result.reversalEntry.id,
+                        recipientId: original.recipientId,
+                        pointsDelta: -original.pointsDelta,
+                        reversedBy: actorUserId,
+                        reversalReason,
+                    },
+                });
+            } catch (err: any) {
+                console.warn("[RecognitionReversal] Realtime outbox projection warning:", err.message);
+            }
+
+            // Invalidate leaderboards cache
+            WorkspaceRedisService.invalidateLeaderboards(workspaceId).catch(() => {});
 
             return result;
         } catch (err) {
@@ -372,7 +411,9 @@ export class WorkspaceRecognitionService {
         if (!ctx || !ctx.isOwner) {
             throw new Error("Only the Club Owner has authority to modify recognition policies and limits.");
         }
-        return WorkspaceRepository.updateRecognitionPolicy(null, workspaceId, updates, actorUserId);
+        const updated = await WorkspaceRepository.updateRecognitionPolicy(null, workspaceId, updates, actorUserId);
+        WorkspaceRedisService.invalidateLeaderboards(workspaceId).catch(() => {});
+        return updated;
     }
 
     /**
@@ -693,5 +734,363 @@ export class WorkspaceRecognitionService {
             throw new Error("Only the Club Owner has authority to modify recognition categories.");
         }
         return WorkspaceRepository.updateRecognitionCategory(workspaceId, categoryId, updates);
+    }
+
+    /**
+     * Retrieves the three separate leaderboards (Contributors, Leads, Departments)
+     * with zero-trust membership validation, Redis caching, and member position identification.
+     */
+    static async getThreeLeaderboards(
+        workspaceId: string,
+        actorUserId: string,
+        options: {
+            period?: LeaderboardPeriod;
+            departmentId?: string;
+        } = {}
+    ): Promise<ThreeLeaderboardsResponse> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended || ctx.member.membershipStatus !== "active") {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const period: LeaderboardPeriod = options.period || "this_month";
+
+        // Try reading from cache
+        const cacheKeyPeriod = period;
+        const cacheKeyDept = options.departmentId || "all";
+        const cached = await WorkspaceRedisService.getCachedLeaderboards(workspaceId, cacheKeyPeriod, cacheKeyDept);
+
+        if (cached) {
+            const currentUid = actorUserId;
+            let currentMemberPosition = cached.currentMemberPosition;
+            if (ctx.isOwner || ctx.member.roleTitle === "Workspace Manager" || ctx.member.roleTitle === "Club Manager") {
+                currentMemberPosition = { type: "excluded_manager" };
+            } else {
+                const leadEntry = cached.leads?.find((l: any) => l.userId === currentUid);
+                if (leadEntry) {
+                    currentMemberPosition = {
+                        type: "lead",
+                        rank: leadEntry.rank,
+                        orbits: leadEntry.leadPersonalOrbits,
+                        departmentName: leadEntry.departmentName,
+                        dpi: leadEntry.departmentPerformanceIndex,
+                    };
+                } else {
+                    const contribEntry = cached.contributors?.find((c: any) => c.userId === currentUid);
+                    if (contribEntry) {
+                        currentMemberPosition = {
+                            type: "contributor",
+                            rank: contribEntry.rank,
+                            orbits: contribEntry.orbitsEarned,
+                            departmentName: contribEntry.departmentName,
+                        };
+                    }
+                }
+            }
+            return {
+                ...cached,
+                currentMemberPosition,
+            };
+        }
+
+        // Compute authoritative leaderboards
+        const leaderboards = await WorkspaceRepository.getThreeLeaderboards(workspaceId, {
+            period,
+            departmentId: options.departmentId,
+            currentUserId: actorUserId,
+        });
+
+        // Cache for 60 seconds
+        await WorkspaceRedisService.setCachedLeaderboards(
+            workspaceId,
+            cacheKeyPeriod,
+            cacheKeyDept,
+            leaderboards,
+            60
+        );
+
+        return leaderboards;
+    }
+
+    /**
+     * Retrieves comprehensive workspace-wide and comparative analytics.
+     * Accessible by Club Manager, Workspace Manager, and Department Leads.
+     */
+    static async getComprehensiveAnalytics(
+        workspaceId: string,
+        actorUserId: string,
+        options: {
+            period?: LeaderboardPeriod;
+            departmentId?: string;
+        } = {}
+    ): Promise<WorkspaceAnalyticsSummary> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended || ctx.member.membershipStatus !== "active") {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        return WorkspaceRepository.getComprehensiveWorkspaceAnalytics(workspaceId, options);
+    }
+
+    /**
+     * Retrieves individual performance and recognition analytics for a member.
+     * Accessible by the member themselves, or by authorized managers and leads.
+     */
+    static async getIndividualMemberAnalytics(
+        workspaceId: string,
+        actorUserId: string,
+        targetUserId: string,
+        options: {
+            period?: LeaderboardPeriod;
+        } = {}
+    ): Promise<IndividualMemberAnalytics> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended || ctx.member.membershipStatus !== "active") {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        return WorkspaceRepository.getIndividualMemberAnalytics(workspaceId, targetUserId, options);
+    }
+
+    // =========================================================================
+    // PHASE 07 — REDIS LEADERBOARDS, REALTIME AND RECONCILIATION
+    // =========================================================================
+
+    /**
+     * Retrieves fast top rankings from Redis sorted set with PostgreSQL profile hydration.
+     * Automatically falls back to PostgreSQL and triggers background cache reconstruction if cold.
+     */
+    static async getRedisTopRankings(
+        workspaceId: string,
+        actorUserId: string,
+        params: {
+            boardType: RecognitionBoardType;
+            period?: LeaderboardPeriod;
+            limit?: number;
+            offset?: number;
+            departmentId?: string;
+        }
+    ): Promise<{
+        source: "redis" | "postgres";
+        entries: any[];
+        period: LeaderboardPeriod;
+        boardType: RecognitionBoardType;
+    }> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended || ctx.member.membershipStatus !== "active") {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const period = params.period || "this_month";
+        const limit = params.limit || 50;
+        const offset = params.offset || 0;
+
+        // Try Redis sorted set projection with hydration
+        if (params.boardType === "contributors") {
+            const redisEntries = await WorkspaceRecognitionRedisService.getHydratedTopContributors(
+                workspaceId,
+                period,
+                limit,
+                offset,
+                params.departmentId
+            );
+
+            if (redisEntries && redisEntries.length > 0) {
+                return {
+                    source: "redis",
+                    entries: redisEntries,
+                    period,
+                    boardType: "contributors",
+                };
+            }
+        } else if (params.boardType === "departments") {
+            const redisDeptEntries = await WorkspaceRecognitionRedisService.getHydratedTopDepartments(
+                workspaceId,
+                period,
+                limit,
+                offset
+            );
+
+            if (redisDeptEntries && redisDeptEntries.length > 0) {
+                return {
+                    source: "redis",
+                    entries: redisDeptEntries,
+                    period,
+                    boardType: "departments",
+                };
+            }
+        }
+
+        // Cache miss or Redis cold start: fall back to PostgreSQL and rebuild Redis in background
+        const fallback = await WorkspaceRepository.getThreeLeaderboards(workspaceId, {
+            period,
+            departmentId: params.departmentId,
+        });
+
+        // Trigger asynchronous self-healing rebuild in background
+        WorkspaceRecognitionReconciliationService.rebuildWorkspaceLeaderboards(workspaceId, period).catch(
+            (err) => console.warn("[RedisLeaderboard] Self-healing rebuild warning:", err.message)
+        );
+
+        let fallbackEntries: any[] = [];
+        if (params.boardType === "contributors") {
+            fallbackEntries = fallback.contributors.slice(offset, offset + limit);
+        } else if (params.boardType === "leaders") {
+            fallbackEntries = fallback.leads.slice(offset, offset + limit);
+        } else {
+            fallbackEntries = fallback.departments.slice(offset, offset + limit);
+        }
+
+        return {
+            source: "postgres",
+            entries: fallbackEntries,
+            period,
+            boardType: params.boardType,
+        };
+    }
+
+    /**
+     * Retrieves a member's nearby rankings from Redis sorted set.
+     */
+    static async getRedisNearbyRankings(
+        workspaceId: string,
+        actorUserId: string,
+        params: {
+            boardType?: RecognitionBoardType;
+            period?: LeaderboardPeriod;
+            targetUserId?: string;
+            radius?: number;
+            departmentId?: string;
+        } = {}
+    ): Promise<{
+        nearby: RedisRankEntry[];
+        targetUserId: string;
+        targetRank: number | null;
+        targetScore: number | null;
+        period: LeaderboardPeriod;
+    }> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended || ctx.member.membershipStatus !== "active") {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const boardType = params.boardType || "contributors";
+        const period = params.period || "this_month";
+        const targetUserId = params.targetUserId || actorUserId;
+        const radius = params.radius || 2;
+
+        let nearby = await WorkspaceRecognitionRedisService.getNearbyRankings(
+            workspaceId,
+            boardType,
+            period,
+            targetUserId,
+            radius,
+            params.departmentId
+        );
+
+        // If not found in Redis, trigger a rebuild and try once more
+        if (!nearby) {
+            await WorkspaceRecognitionReconciliationService.rebuildWorkspaceLeaderboards(workspaceId, period);
+            nearby = await WorkspaceRecognitionRedisService.getNearbyRankings(
+                workspaceId,
+                boardType,
+                period,
+                targetUserId,
+                radius,
+                params.departmentId
+            );
+        }
+
+        const { rank, score } = await WorkspaceRecognitionRedisService.getEntityRank(
+            workspaceId,
+            boardType,
+            period,
+            targetUserId,
+            params.departmentId
+        );
+
+        return {
+            nearby: nearby || [],
+            targetUserId,
+            targetRank: rank,
+            targetScore: score,
+            period,
+        };
+    }
+
+    /**
+     * Rebuilds all Redis sorted set leaderboards from PostgreSQL source of truth.
+     * Restricted to managers and policy admins.
+     */
+    static async rebuildWorkspaceLeaderboards(
+        workspaceId: string,
+        actorUserId: string,
+        period: LeaderboardPeriod = "this_month"
+    ): Promise<{
+        success: boolean;
+        contributorsCount: number;
+        leadersCount: number;
+        departmentsCount: number;
+    }> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended || ctx.member.membershipStatus !== "active") {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const isOwner = ctx.isOwner;
+        const isManager = ctx.isWorkspaceManager || ctx.isAdmin;
+        const hasPolicyPerm = ctx.permissions.includes("recognition:manage_policy");
+
+        if (!isOwner && !isManager && !hasPolicyPerm) {
+            throw new Error("Forbidden: Administrator or Manager role required to rebuild leaderboards.");
+        }
+
+        const result = await WorkspaceRecognitionReconciliationService.rebuildWorkspaceLeaderboards(
+            workspaceId,
+            period
+        );
+
+        return {
+            success: true,
+            ...result,
+        };
+    }
+
+    /**
+     * Reconciles Redis sorted set projections against PostgreSQL aggregates.
+     * Restricted to managers and policy admins.
+     */
+    static async reconcileLeaderboards(
+        workspaceId: string,
+        actorUserId: string,
+        period: LeaderboardPeriod = "this_month"
+    ): Promise<{
+        success: boolean;
+        matched: boolean;
+        discrepanciesFound: number;
+        correctedCount: number;
+    }> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended || ctx.member.membershipStatus !== "active") {
+            throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        const isOwner = ctx.isOwner;
+        const isManager = ctx.isWorkspaceManager || ctx.isAdmin;
+        const hasPolicyPerm = ctx.permissions.includes("recognition:manage_policy");
+
+        if (!isOwner && !isManager && !hasPolicyPerm) {
+            throw new Error("Forbidden: Administrator or Manager role required to reconcile leaderboards.");
+        }
+
+        const result = await WorkspaceRecognitionReconciliationService.reconcileLeaderboards(
+            workspaceId,
+            period
+        );
+
+        return {
+            success: true,
+            ...result,
+        };
     }
 }

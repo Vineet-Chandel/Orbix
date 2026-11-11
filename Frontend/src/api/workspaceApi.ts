@@ -49,6 +49,10 @@ import type {
     MemberRecognitionSummary,
     DepartmentRecognitionSummary,
     MemberRecognitionProfile,
+    LeaderboardPeriod,
+    ThreeLeaderboardsResponse,
+    WorkspaceAnalyticsSummary,
+    IndividualMemberAnalytics,
 } from "../types/workspace";
 
 export const workspaceApi = {
@@ -1329,6 +1333,168 @@ export const workspaceApi = {
         }>(`/club/workspace/recognition/awards/${awardId}/notes`, {
             params: clubId ? { clubId } : undefined,
         }),
+
+    getLeaderboards: (
+        period?: LeaderboardPeriod,
+        departmentId?: string,
+        clubId?: string,
+        workspaceId?: string
+    ) => {
+        const url = workspaceId
+            ? `/team-workspaces/${workspaceId}/recognition/leaderboards`
+            : "/club/workspace/recognition/leaderboards";
+        return apiClient.get<{
+            success: boolean;
+            leaderboards: ThreeLeaderboardsResponse;
+        }>(url, {
+            params: {
+                period,
+                departmentId,
+                clubId: !workspaceId ? clubId : undefined,
+            },
+        });
+    },
+
+    getComprehensiveAnalytics: (
+        period?: LeaderboardPeriod,
+        departmentId?: string,
+        clubId?: string,
+        workspaceId?: string
+    ) => {
+        const url = workspaceId
+            ? `/team-workspaces/${workspaceId}/recognition/analytics/comprehensive`
+            : "/club/workspace/recognition/analytics/comprehensive";
+        return apiClient.get<{
+            success: boolean;
+            analytics: WorkspaceAnalyticsSummary;
+        }>(url, {
+            params: {
+                period,
+                departmentId,
+                clubId: !workspaceId ? clubId : undefined,
+            },
+        });
+    },
+
+    getIndividualMemberAnalytics: (
+        userId: string,
+        period?: LeaderboardPeriod,
+        clubId?: string,
+        workspaceId?: string
+    ) => {
+        const url = workspaceId
+            ? `/team-workspaces/${workspaceId}/recognition/analytics/members/${userId}`
+            : `/club/workspace/recognition/analytics/members/${userId}`;
+        return apiClient.get<{
+            success: boolean;
+            analytics: IndividualMemberAnalytics;
+        }>(url, {
+            params: {
+                period,
+                clubId: !workspaceId ? clubId : undefined,
+            },
+        });
+    },
+
+    getRedisTopRankings: (
+        boardType: "contributors" | "leaders" | "departments",
+        period?: LeaderboardPeriod,
+        departmentId?: string,
+        limit = 50,
+        offset = 0,
+        clubId?: string,
+        workspaceId?: string
+    ) => {
+        const url = workspaceId
+            ? `/team-workspaces/${workspaceId}/recognition/leaderboards/redis/top`
+            : "/club/workspace/recognition/leaderboards/redis/top";
+        return apiClient.get<{
+            success: boolean;
+            source: "redis" | "postgres";
+            entries: any[];
+            period: LeaderboardPeriod;
+            boardType: string;
+        }>(url, {
+            params: {
+                boardType,
+                period,
+                departmentId,
+                limit,
+                offset,
+                clubId: !workspaceId ? clubId : undefined,
+            },
+        });
+    },
+
+    getRedisNearbyRankings: (
+        boardType?: "contributors" | "leaders" | "departments",
+        period?: LeaderboardPeriod,
+        userId?: string,
+        radius = 2,
+        departmentId?: string,
+        clubId?: string,
+        workspaceId?: string
+    ) => {
+        const url = workspaceId
+            ? `/team-workspaces/${workspaceId}/recognition/leaderboards/redis/nearby`
+            : "/club/workspace/recognition/leaderboards/redis/nearby";
+        return apiClient.get<{
+            success: boolean;
+            nearby: Array<{
+                entityId: string;
+                score: number;
+                rank: number;
+                isTarget?: boolean;
+            }>;
+            targetUserId: string;
+            targetRank: number | null;
+            targetScore: number | null;
+            period: LeaderboardPeriod;
+        }>(url, {
+            params: {
+                boardType,
+                period,
+                userId,
+                radius,
+                departmentId,
+                clubId: !workspaceId ? clubId : undefined,
+            },
+        });
+    },
+
+    rebuildLeaderboards: (
+        period?: LeaderboardPeriod,
+        clubId?: string,
+        workspaceId?: string
+    ) => {
+        const url = workspaceId
+            ? `/team-workspaces/${workspaceId}/recognition/leaderboards/rebuild`
+            : "/club/workspace/recognition/leaderboards/rebuild";
+        return apiClient.post<{
+            success: boolean;
+            message: string;
+            contributorsCount: number;
+            leadersCount: number;
+            departmentsCount: number;
+        }>(url, { period, clubId: !workspaceId ? clubId : undefined });
+    },
+
+    reconcileLeaderboards: (
+        period?: LeaderboardPeriod,
+        clubId?: string,
+        workspaceId?: string
+    ) => {
+        const url = workspaceId
+            ? `/team-workspaces/${workspaceId}/recognition/leaderboards/reconcile`
+            : "/club/workspace/recognition/leaderboards/reconcile";
+        return apiClient.post<{
+            success: boolean;
+            message: string;
+            matched: boolean;
+            discrepanciesFound: number;
+            correctedCount: number;
+        }>(url, { period, clubId: !workspaceId ? clubId : undefined });
+    },
 };
 
 export default workspaceApi;

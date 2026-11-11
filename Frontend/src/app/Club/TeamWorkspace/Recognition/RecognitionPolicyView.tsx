@@ -30,6 +30,7 @@ export const RecognitionPolicyView: React.FC<RecognitionPolicyViewProps> = ({
     onCategoriesUpdated,
 }) => {
     // Policy form state
+    const [isEnabled, setIsEnabled] = useState<boolean>(policy.isEnabled ?? true);
     const [minPoints, setMinPoints] = useState<number>(policy.minPointsPerAward);
     const [maxPoints, setMaxPoints] = useState<number>(policy.maxPointsPerAward);
     const [recipientMonthlyCap, setRecipientMonthlyCap] = useState<number>(policy.recipientMonthlyCap);
@@ -37,6 +38,11 @@ export const RecognitionPolicyView: React.FC<RecognitionPolicyViewProps> = ({
     const [minReasonLength, setMinReasonLength] = useState<number>(policy.minReasonLength);
     const [requireTaskLink, setRequireTaskLink] = useState<boolean>(policy.requireTaskLink);
     const [isWorkspaceVisible, setIsWorkspaceVisible] = useState<boolean>(policy.isWorkspaceVisible);
+    const [dpiApproved, setDpiApproved] = useState<number>(policy.dpiWeightApprovedTasks ?? 35);
+    const [dpiOnTime, setDpiOnTime] = useState<number>(policy.dpiWeightOnTime ?? 35);
+    const [dpiParticipation, setDpiParticipation] = useState<number>(policy.dpiWeightParticipation ?? 20);
+    const [dpiRecognition, setDpiRecognition] = useState<number>(policy.dpiWeightRecognition ?? 10);
+    const [dpiCap, setDpiCap] = useState<number>(policy.dpiRecognitionCapPerMember ?? 50);
 
     const [saving, setSaving] = useState(false);
     const [feedbackMsg, setFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -49,6 +55,7 @@ export const RecognitionPolicyView: React.FC<RecognitionPolicyViewProps> = ({
         try {
             const res = await workspaceApi.updateRecognitionPolicy(
                 {
+                    isEnabled,
                     minPointsPerAward: minPoints,
                     maxPointsPerAward: maxPoints,
                     recipientMonthlyCap,
@@ -56,6 +63,11 @@ export const RecognitionPolicyView: React.FC<RecognitionPolicyViewProps> = ({
                     minReasonLength,
                     requireTaskLink,
                     isWorkspaceVisible,
+                    dpiWeightApprovedTasks: dpiApproved,
+                    dpiWeightOnTime: dpiOnTime,
+                    dpiWeightParticipation: dpiParticipation,
+                    dpiWeightRecognition: dpiRecognition,
+                    dpiRecognitionCapPerMember: dpiCap,
                 },
                 clubId
             );
@@ -135,6 +147,36 @@ export const RecognitionPolicyView: React.FC<RecognitionPolicyViewProps> = ({
                         <Save className="w-4 h-4" />
                         <span>{saving ? "Saving..." : "Save Policy Changes"}</span>
                     </button>
+                </div>
+
+                {/* Rollout Feature Flag Card */}
+                <div className={`p-4 border-2 border-black rounded-xl flex items-center justify-between transition ${
+                    isEnabled ? "bg-[#A6FF70]/30 shadow-[2px_2px_0px_#000]" : "bg-neutral-100 shadow-[2px_2px_0px_#000]"
+                }`}>
+                    <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                            <h5 className="text-xs font-black text-black">Orbix Recognition System Status</h5>
+                            <span className={`px-2 py-0.5 text-[10px] font-black rounded-full border border-black ${
+                                isEnabled ? "bg-[#A6FF70] text-black" : "bg-neutral-300 text-neutral-700"
+                            }`}>
+                                {isEnabled ? "ACTIVE" : "PAUSED"}
+                            </span>
+                        </div>
+                        <p className="text-[11px] font-bold text-neutral-600">
+                            {isEnabled 
+                                ? "Recognition is active. Eligible members can receive Orbits and view live leaderboards."
+                                : "Recognition is paused. Point awarding and leaderboards are disabled for this workspace."}
+                        </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={(e) => setIsEnabled(e.target.checked)}
+                            className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-neutral-300 border-2 border-black peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-black after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-2 after:border-black after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FFE566]"></div>
+                    </label>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -257,6 +299,89 @@ export const RecognitionPolicyView: React.FC<RecognitionPolicyViewProps> = ({
                             <span>{isWorkspaceVisible ? "Public" : "Restricted"}</span>
                             {isWorkspaceVisible ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
                         </button>
+                    </div>
+                </div>
+
+                {/* Department Performance Index (DPI) Formula Weights */}
+                <div className="mt-6 pt-5 border-t-2 border-black space-y-3">
+                    <div>
+                        <h4 className="text-xs font-black text-black uppercase tracking-wider">
+                            Department Performance Index (DPI) Formula Weights
+                        </h4>
+                        <p className="text-[11px] text-neutral-600 font-medium">
+                            Configure percentage weights for the transparent 0–100 DPI formula (Formula Version: {policy.dpiFormulaVersion || "v1.0"}).
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                            <label className="block text-[11px] font-black text-black">Approved Tasks (%)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={dpiApproved}
+                                onChange={(e) => setDpiApproved(parseFloat(e.target.value) || 0)}
+                                className="w-full px-2.5 py-1.5 bg-neutral-50 border-2 border-black rounded-lg text-xs font-black focus:outline-none focus:bg-white shadow-[1px_1px_0px_#000]"
+                            />
+                            <p className="text-[10px] text-neutral-500">Default: 35%</p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="block text-[11px] font-black text-black">On-Time Rate (%)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={dpiOnTime}
+                                onChange={(e) => setDpiOnTime(parseFloat(e.target.value) || 0)}
+                                className="w-full px-2.5 py-1.5 bg-neutral-50 border-2 border-black rounded-lg text-xs font-black focus:outline-none focus:bg-white shadow-[1px_1px_0px_#000]"
+                            />
+                            <p className="text-[10px] text-neutral-500">Default: 35%</p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="block text-[11px] font-black text-black">Participation (%)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={dpiParticipation}
+                                onChange={(e) => setDpiParticipation(parseFloat(e.target.value) || 0)}
+                                className="w-full px-2.5 py-1.5 bg-neutral-50 border-2 border-black rounded-lg text-xs font-black focus:outline-none focus:bg-white shadow-[1px_1px_0px_#000]"
+                            />
+                            <p className="text-[10px] text-neutral-500">Default: 20%</p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="block text-[11px] font-black text-black">Recognition (%)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={dpiRecognition}
+                                onChange={(e) => setDpiRecognition(parseFloat(e.target.value) || 0)}
+                                className="w-full px-2.5 py-1.5 bg-neutral-50 border-2 border-black rounded-lg text-xs font-black focus:outline-none focus:bg-white shadow-[1px_1px_0px_#000]"
+                            />
+                            <p className="text-[10px] text-neutral-500">Default: 10%</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <div className="space-y-1">
+                            <label className="block text-[11px] font-black text-black">
+                                Recognition Cap per Member (Orbits)
+                            </label>
+                            <input
+                                type="number"
+                                min={10}
+                                max={500}
+                                value={dpiCap}
+                                onChange={(e) => setDpiCap(parseInt(e.target.value, 10) || 50)}
+                                className="w-full px-2.5 py-1.5 bg-neutral-50 border-2 border-black rounded-lg text-xs font-black focus:outline-none focus:bg-white shadow-[1px_1px_0px_#000]"
+                            />
+                            <p className="text-[10px] text-neutral-500">Prevents unlimited recognition awards from inflating department performance</p>
+                        </div>
                     </div>
                 </div>
             </form>

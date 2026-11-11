@@ -53,6 +53,10 @@ import type {
     WorkspaceRecognitionLedgerEntry,
     WorkspaceRecognitionPeriodAggregate,
     MemberRecognitionSummary,
+    LeaderboardPeriod,
+    ThreeLeaderboardsResponse,
+    WorkspaceAnalyticsSummary,
+    IndividualMemberAnalytics,
 } from "../types/workspaceTypes.js";
 
 export class WorkspaceRepository {
@@ -7065,7 +7069,7 @@ export class WorkspaceRepository {
                 updated_at AS "updatedAt"
              FROM public.workspace_recognition_categories
              WHERE workspace_id = $1
-               AND (${isUuid ? `id = $2 OR slug = $2` : `slug = $2`})
+               AND (${isUuid ? `id = $2::uuid` : `slug = $2`})
              LIMIT 1;`,
             [workspaceId, slugOrId]
         );
@@ -8385,24 +8389,31 @@ export class WorkspaceRepository {
 
         // 3. Query Club Owner & Workspace Managers (to exclude from contributor leaderboard)
         const wsMetaRes = await query(
-            `SELECT tw.id, tw.club_id, vc.auth_user_id AS "ownerId"
+            `SELECT tw.id, tw.club_id, tw.manager_user_id AS "managerUserId", vc.auth_user_id AS "ownerId"
              FROM public.team_workspaces tw
              JOIN public.verified_clubs vc ON vc.id = tw.club_id
              WHERE tw.id = $1;`,
             [workspaceId]
         );
         const ownerId = wsMetaRes.rows[0]?.ownerId;
+        const wsManagerId = wsMetaRes.rows[0]?.managerUserId;
 
         const managersRes = await query(
             `SELECT wm.user_id
              FROM public.workspace_members wm
              JOIN public.workspace_roles r ON r.id = wm.role_id
              WHERE wm.workspace_id = $1
-               AND (r.name IN ('Club Manager', 'Workspace Manager') OR r.slug IN ('club_manager', 'workspace_manager', 'owner', 'manager'));`,
+               AND (
+                   r.name IN ('Club Manager', 'Workspace Manager', 'Administrator', 'Workspace Owner') 
+                   OR r.slug IN ('club_manager', 'workspace_manager', 'owner', 'manager', 'admin')
+                   OR r.rank >= 800
+                   OR wm.role_title IN ('Club Manager', 'Workspace Manager')
+               );`,
             [workspaceId]
         );
         const managerUserIds = new Set<string>(managersRes.rows.map((r: any) => r.user_id));
         if (ownerId) managerUserIds.add(ownerId);
+        if (wsManagerId) managerUserIds.add(wsManagerId);
 
         // 4. Query Departments & Structural Department Leads / Co-leads
         const deptsRes = await query(
@@ -8747,18 +8758,22 @@ export class WorkspaceRepository {
 
         // Query active participation contributions per department in the period
         // (submissions, reviews, comments, and received awards)
-        let participationTimeFilter = "";
+        let subTimeFilter = "";
+        let revTimeFilter = "";
+        let commTimeFilter = "";
         const participationParams: any[] = [workspaceId];
         if (start && end) {
             participationParams.push(start.toISOString(), end.toISOString());
-            participationTimeFilter = ` AND created_at >= $2 AND created_at <= $3`;
+            subTimeFilter = ` AND wts.created_at >= $2 AND wts.created_at <= $3`;
+            revTimeFilter = ` AND wtr.created_at >= $2 AND wtr.created_at <= $3`;
+            commTimeFilter = ` AND wtc.created_at >= $2 AND wtc.created_at <= $3`;
         }
 
         const contribSubmissionsRes = await query(
             `SELECT DISTINCT wt.department_id AS "departmentId", wts.submitted_by AS "userId"
              FROM public.workspace_task_submissions wts
              JOIN public.workspace_tasks wt ON wt.id = wts.task_id
-             WHERE wts.workspace_id = $1 ${participationTimeFilter};`,
+             WHERE wts.workspace_id = $1 ${subTimeFilter};`,
             participationParams
         );
 
@@ -8766,7 +8781,7 @@ export class WorkspaceRepository {
             `SELECT DISTINCT wt.department_id AS "departmentId", wtr.reviewer_id AS "userId"
              FROM public.workspace_task_reviews wtr
              JOIN public.workspace_tasks wt ON wt.id = wtr.task_id
-             WHERE wtr.workspace_id = $1 ${participationTimeFilter};`,
+             WHERE wtr.workspace_id = $1 ${revTimeFilter};`,
             participationParams
         );
 
@@ -8774,7 +8789,7 @@ export class WorkspaceRepository {
             `SELECT DISTINCT wt.department_id AS "departmentId", wtc.author_id AS "userId"
              FROM public.workspace_task_comments wtc
              JOIN public.workspace_tasks wt ON wt.id = wtc.task_id
-             WHERE wtc.workspace_id = $1 ${participationTimeFilter};`,
+             WHERE wtc.workspace_id = $1 ${commTimeFilter};`,
             participationParams
         );
 
@@ -9128,6 +9143,575 @@ export class WorkspaceRepository {
             departments: finalDepartments,
             formulaVersion,
             weights,
+        };
+    }
+
+    // =========================================================================
+    // 17. PHASE 06: TEAM & INDIVIDUAL ANALYTICS ENGINE
+    // =========================================================================
+
+    /**
+     * Generates comprehensive workspace-wide and department comparative analytics.
+     */
+    static async getComprehensiveWorkspaceAnalytics(
+        workspaceId: string,
+        options: {
+            period?: LeaderboardPeriod;
+            departmentId?: string;
+        } = {}
+    ): Promise<WorkspaceAnalyticsSummary> {
+        const period: LeaderboardPeriod = options.period || "this_month";
+
+        // 1. Resolve period boundaries
+        const resolvePeriodBoundaries = (p: LeaderboardPeriod) => {
+            const now = new Date();
+            if (p === "all_time") {
+                return { start: null, end: null };
+            }
+            if (p === "this_week") {
+                const d = new Date(now);
+                const day = d.getUTCDay();
+                const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+                const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0));
+                const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff + 6, 23, 59, 59, 999));
+                return { start, end };
+            }
+            if (p === "this_month") {
+                const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+                const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+                return { start, end };
+            }
+            if (p === "last_30_days") {
+                const end = now;
+                const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                return { start, end };
+            }
+            if (p === "last_90_days") {
+                const end = now;
+                const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                return { start, end };
+            }
+            return { start: null, end: null };
+        };
+
+        const { start, end } = resolvePeriodBoundaries(period);
+
+        // 2. Query Total Orbits Awarded & Received
+        let ledgerTimeFilter = "";
+        const ledgerParams: any[] = [workspaceId];
+        if (start && end) {
+            ledgerParams.push(start.toISOString(), end.toISOString());
+            ledgerTimeFilter = ` AND created_at >= $2 AND created_at <= $3`;
+        }
+
+        const totalsRes = await query(
+            `SELECT
+                COALESCE(SUM(points_delta) FILTER (WHERE points_delta > 0), 0)::integer AS "totalAwarded",
+                COALESCE(SUM(points_delta) FILTER (WHERE points_delta > 0), 0)::integer AS "totalReceived",
+                COUNT(DISTINCT recipient_id)::integer AS "activeRecipients",
+                COUNT(DISTINCT issuer_id)::integer AS "activeIssuers"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1 AND is_reversed = false AND transaction_type = 'award' ${ledgerTimeFilter};`,
+            ledgerParams
+        );
+        const totalOrbitsAwarded = totalsRes.rows[0]?.totalAwarded || 0;
+        const totalOrbitsReceived = totalsRes.rows[0]?.totalReceived || 0;
+
+        // 3. Query Tasks in Workspace (evaluating approved count and on-time rate)
+        let tasksTimeFilter = "";
+        const tasksParams: any[] = [workspaceId];
+        if (start && end) {
+            tasksParams.push(start.toISOString(), end.toISOString());
+            tasksTimeFilter = ` AND (
+                (wt.due_date >= $2 AND wt.due_date <= $3) OR
+                (wt.completed_at >= $2 AND wt.completed_at <= $3) OR
+                (wt.created_at >= $2 AND wt.created_at <= $3)
+            )`;
+        }
+
+        const tasksRes = await query(
+            `SELECT
+                wt.id,
+                wt.department_id AS "departmentId",
+                wt.status,
+                wt.due_date AS "dueDate",
+                wt.completed_at AS "completedAt",
+                COALESCE((wt.custom_fields->>'is_blocked')::boolean, false) AS "isBlocked",
+                EXISTS (
+                    SELECT 1 FROM public.workspace_task_reviews wtr 
+                    WHERE wtr.task_id = wt.id AND wtr.decision = 'approved'
+                ) AS "hasApprovedReview",
+                EXISTS (
+                    SELECT 1 FROM public.workspace_task_submissions wts 
+                    WHERE wts.task_id = wt.id AND (wt.due_date IS NULL OR wts.created_at <= wt.due_date)
+                ) AS "hasOnTimeSubmission"
+             FROM public.workspace_tasks wt
+             WHERE wt.workspace_id = $1
+               AND wt.is_archived = false
+               AND wt.status != 'cancelled'
+               ${tasksTimeFilter};`,
+            tasksParams
+        );
+
+        const allTasks = tasksRes.rows;
+        const approvedTasks = allTasks.filter((t: any) => t.status === "completed" || t.hasApprovedReview);
+        const totalApprovedTasks = approvedTasks.length;
+
+        let onTimeCount = 0;
+        approvedTasks.forEach((t: any) => {
+            if (!t.dueDate) onTimeCount++;
+            else if (t.completedAt && new Date(t.completedAt) <= new Date(t.dueDate)) onTimeCount++;
+            else if (t.hasOnTimeSubmission) onTimeCount++;
+        });
+        const onTimeCompletionRate = totalApprovedTasks > 0
+            ? Math.round((onTimeCount / totalApprovedTasks) * 1000) / 10
+            : 100;
+
+        // 4. Query Active Contributors
+        // Members who either received an award OR submitted/completed a task in the period
+        const activeSubmissionsRes = await query(
+            `SELECT DISTINCT wts.submitted_by AS "userId"
+             FROM public.workspace_task_submissions wts
+             WHERE wts.workspace_id = $1 ${ledgerTimeFilter};`,
+            ledgerParams
+        );
+        const activeContributorSet = new Set<string>();
+        activeSubmissionsRes.rows.forEach((r: any) => activeContributorSet.add(r.userId));
+
+        const activeAwardeesRes = await query(
+            `SELECT DISTINCT recipient_id AS "userId"
+             FROM public.workspace_recognition_ledger
+             WHERE workspace_id = $1 AND is_reversed = false AND transaction_type = 'award' ${ledgerTimeFilter};`,
+            ledgerParams
+        );
+        activeAwardeesRes.rows.forEach((r: any) => activeContributorSet.add(r.userId));
+        const activeContributors = activeContributorSet.size;
+
+        // 5. Historical Contribution Trends (4 chronological sub-intervals)
+        const contributionTrends: WorkspaceAnalyticsSummary["contributionTrends"] = [];
+        const numIntervals = 4;
+        const now = new Date();
+        const intervalDurationMs = start && end
+            ? Math.max(1, (end.getTime() - start.getTime()) / numIntervals)
+            : (30 * 24 * 60 * 60 * 1000) / numIntervals;
+        const baselineStart = start ? start.getTime() : now.getTime() - 30 * 24 * 60 * 60 * 1000;
+
+        for (let i = 0; i < numIntervals; i++) {
+            const intStart = new Date(baselineStart + i * intervalDurationMs);
+            const intEnd = new Date(baselineStart + (i + 1) * intervalDurationMs);
+            const label = `Period ${i + 1} (${intStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })})`;
+
+            const intLedgerRes = await query(
+                `SELECT COALESCE(SUM(points_delta), 0)::integer AS "orbits"
+                 FROM public.workspace_recognition_ledger
+                 WHERE workspace_id = $1 AND is_reversed = false AND transaction_type = 'award'
+                   AND created_at >= $2 AND created_at <= $3;`,
+                [workspaceId, intStart.toISOString(), intEnd.toISOString()]
+            );
+
+            const intTasksRes = await query(
+                `SELECT COUNT(wt.id)::integer AS "tasksApproved"
+                 FROM public.workspace_tasks wt
+                 WHERE wt.workspace_id = $1 AND wt.is_archived = false AND wt.status != 'cancelled'
+                   AND (wt.status = 'completed' OR EXISTS (SELECT 1 FROM public.workspace_task_reviews wtr WHERE wtr.task_id = wt.id AND wtr.decision = 'approved'))
+                   AND ((wt.completed_at >= $2 AND wt.completed_at <= $3) OR (wt.created_at >= $2 AND wt.created_at <= $3));`,
+                [workspaceId, intStart.toISOString(), intEnd.toISOString()]
+            );
+
+            contributionTrends.push({
+                periodLabel: label,
+                orbits: intLedgerRes.rows[0]?.orbits || 0,
+                tasksApproved: intTasksRes.rows[0]?.tasksApproved || 0,
+            });
+        }
+
+        // 6. Leverage ThreeLeaderboards calculation for Department & Leadership Analytics
+        const leaderboardsData = await this.getThreeLeaderboards(workspaceId, { period });
+
+        // Build Department Comparison with Normalized Metrics
+        const departmentComparison: WorkspaceAnalyticsSummary["departmentComparison"] = [];
+        for (const d of leaderboardsData.departments) {
+            const overdueTasks = allTasks.filter(
+                (t: any) => t.departmentId === d.departmentId && t.status !== "completed" && t.dueDate && new Date(t.dueDate) < now
+            ).length;
+
+            departmentComparison.push({
+                departmentId: d.departmentId,
+                departmentName: d.departmentName,
+                color: d.departmentColor,
+                memberCount: d.metrics.activeMemberCount,
+                activeContributors: d.metrics.participatingMemberCount,
+                dpi: d.departmentPerformanceIndex,
+                hasSufficientData: d.hasSufficientData,
+                insufficientDataReason: d.insufficientDataReason,
+                approvedTaskDeliveryRate: d.approvedTaskDeliveryRate,
+                onTimeDeliveryRate: d.onTimeDeliveryRate,
+                tasksAssigned: d.metrics.tasksDue,
+                tasksCompleted: d.metrics.tasksApproved,
+                approvedSubmissions: d.metrics.tasksApproved,
+                overdueTasks,
+                totalOrbits: d.metrics.totalDepartmentOrbits,
+                orbitsPerMember: d.metrics.rawOrbitsPerMember,
+            });
+        }
+
+        // 7. Recognition Distribution & Bias/Overconcentration Detection
+        const catRes = await query(
+            `SELECT
+                rc.name AS "name",
+                rc.slug AS "slug",
+                COALESCE(SUM(wrl.points_delta), 0)::integer AS "points",
+                COUNT(wrl.id)::integer AS "count"
+             FROM public.workspace_recognition_categories rc
+             LEFT JOIN public.workspace_recognition_ledger wrl 
+                ON wrl.category_id = rc.id AND wrl.workspace_id = $1 AND wrl.transaction_type = 'award' AND wrl.is_reversed = false ${ledgerTimeFilter.replace(/created_at/g, 'wrl.created_at')}
+             WHERE rc.workspace_id = $1 AND rc.is_active = true
+             GROUP BY rc.id, rc.name, rc.slug
+             ORDER BY "points" DESC;`,
+            ledgerParams
+        );
+
+        const totalCatPoints = catRes.rows.reduce((sum: number, r: any) => sum + r.points, 0) || 1;
+        const categoriesDistribution = catRes.rows.map((r: any) => ({
+            name: r.name,
+            slug: r.slug,
+            points: r.points,
+            count: r.count,
+            percentage: Math.round((r.points / totalCatPoints) * 1000) / 10,
+        }));
+
+        const totalDeptPoints = departmentComparison.reduce((sum, d) => sum + d.totalOrbits, 0) || 1;
+        const departmentsDistribution = departmentComparison.map((d) => ({
+            departmentName: d.departmentName,
+            points: d.totalOrbits,
+            percentage: Math.round((d.totalOrbits / totalDeptPoints) * 1000) / 10,
+        }));
+
+        // Detect potential overconcentration for human review (never punitive)
+        let overconcentrationAlert: string | null = null;
+        const fairnessAlerts: NonNullable<WorkspaceAnalyticsSummary["fairnessAlerts"]> = [];
+
+        const highestDept = departmentsDistribution.find((d) => d.percentage >= 60 && d.points > 20);
+        if (highestDept) {
+            overconcentrationAlert = `Notice for human review: Recognition is heavily concentrated in ${highestDept.departmentName} (${highestDept.percentage}% of all awarded points in this period). Review recognition balance across other departments.`;
+            fairnessAlerts.push({
+                type: "department_concentration",
+                title: "Department Concentration Notice",
+                detail: `Recognition is heavily concentrated in ${highestDept.departmentName} (${highestDept.percentage}% of points in this period). Review to ensure balanced recognition across departments.`,
+                severity: "info",
+            });
+        }
+
+        // Recipient concentration check
+        const topContributor = leaderboardsData.contributors[0];
+        if (topContributor && topContributor.orbitsEarned > 50 && totalOrbitsAwarded > 100) {
+            const recipientRatio = Math.round((topContributor.orbitsEarned / totalOrbitsAwarded) * 100);
+            if (recipientRatio >= 40) {
+                fairnessAlerts.push({
+                    type: "recipient_concentration",
+                    title: "Recipient Concentration Notice",
+                    detail: `Top contributor (${topContributor.name}) received ${recipientRatio}% of all awarded points in this period. Review to ensure appreciation is distributed across all contributors.`,
+                    severity: "info",
+                });
+            }
+        }
+
+        // 8. Manager Award Activity & Budget Utilization
+        const managerActivityRes = await query(
+            `SELECT
+                u.id AS "managerId",
+                TRIM(CONCAT(u.firstname, ' ', u.lastname)) AS "name",
+                u.username,
+                u.avatar_url AS "avatarUrl",
+                r.name AS "roleTitle",
+                COALESCE(SUM(wrl.points_delta), 0)::integer AS "totalOrbitsAwarded",
+                COUNT(wrl.id)::integer AS "awardCount",
+                COALESCE(wrb.allocated_budget, 500)::integer AS "monthlyBudget",
+                COALESCE(wrb.used_budget, 0)::integer AS "budgetUsed"
+             FROM public.workspace_members wm
+             JOIN public.users u ON u.id = wm.user_id
+             JOIN public.workspace_roles r ON r.id = wm.role_id
+             LEFT JOIN public.workspace_recognition_ledger wrl 
+                ON wrl.issuer_id = u.id AND wrl.workspace_id = $1 AND wrl.transaction_type = 'award' AND wrl.is_reversed = false ${ledgerTimeFilter.replace(/created_at/g, 'wrl.created_at')}
+             LEFT JOIN public.workspace_recognition_budgets wrb 
+                ON wrb.user_id = u.id AND wrb.workspace_id = $1 AND wrb.year_month = TO_CHAR(NOW(), 'YYYY-MM')
+             WHERE wm.workspace_id = $1
+               AND (
+                   r.slug IN ('admin', 'manager', 'owner', 'workspace_manager', 'club_manager')
+                   OR wm.role_title IN ('Workspace Manager', 'Club Manager')
+                   OR wrb.allocated_budget IS NOT NULL
+                   OR wrl.id IS NOT NULL
+               )
+             GROUP BY u.id, u.firstname, u.lastname, u.username, u.avatar_url, r.name, wrb.allocated_budget, wrb.used_budget
+             ORDER BY "totalOrbitsAwarded" DESC, "name" ASC;`,
+            ledgerParams
+        );
+
+        const managerAwardActivity: WorkspaceAnalyticsSummary["managerAwardActivity"] = managerActivityRes.rows.map(
+            (r: any) => ({
+                managerId: r.managerId,
+                name: r.name || r.username,
+                username: r.username,
+                avatarUrl: r.avatarUrl || undefined,
+                roleTitle: r.roleTitle,
+                totalOrbitsAwarded: r.totalOrbitsAwarded,
+                awardCount: r.awardCount,
+                monthlyBudget: r.monthlyBudget,
+                budgetUsed: r.budgetUsed,
+            })
+        );
+
+        // Manager award dominance check
+        const totalMgrAwards = managerAwardActivity.reduce((sum, m) => sum + m.awardCount, 0);
+        if (totalMgrAwards >= 10) {
+            const dominantMgr = managerAwardActivity.find((m) => (m.awardCount / totalMgrAwards) >= 0.85);
+            if (dominantMgr) {
+                fairnessAlerts.push({
+                    type: "manager_dominance",
+                    title: "Issuer Concentration Notice",
+                    detail: `Manager ${dominantMgr.name} issued over 85% of all recognition awards in this period. Encourage delegation and peer leadership participation.`,
+                    severity: "info",
+                });
+            }
+        }
+
+        // 9. Leadership Analytics
+        const leadershipAnalytics: WorkspaceAnalyticsSummary["leadershipAnalytics"] = leaderboardsData.leads.map(
+            (l: any) => ({
+                leadId: l.userId,
+                leadName: l.name,
+                username: l.username,
+                avatarUrl: l.avatarUrl,
+                roleName: l.roleName,
+                departmentId: l.departmentId,
+                departmentName: l.departmentName,
+                departmentColor: l.departmentColor,
+                dpi: l.departmentPerformanceIndex,
+                hasSufficientData: l.hasSufficientData,
+                teamParticipationRate: l.deliveryStatistics.participationRate,
+                approvedWorkCount: l.deliveryStatistics.tasksApproved,
+                deadlineReliabilityRate: l.deliveryStatistics.onTimeDeliveryRate,
+                leadPersonalOrbits: l.leadPersonalOrbits,
+            })
+        );
+
+        return {
+            period,
+            periodStart: start ? start.toISOString() : null,
+            periodEnd: end ? end.toISOString() : null,
+            totalOrbitsAwarded,
+            totalOrbitsReceived,
+            activeContributors,
+            totalApprovedTasks,
+            onTimeCompletionRate,
+            contributionTrends,
+            departmentComparison,
+            recognitionDistribution: {
+                categories: categoriesDistribution,
+                departments: departmentsDistribution,
+                overconcentrationAlert,
+            },
+            fairnessAlerts,
+            managerAwardActivity,
+            leadershipAnalytics,
+        };
+    }
+
+    /**
+     * Generates actionable performance analytics for an individual workspace member.
+     * Evaluates task delivery, on-time submissions, revision rates, and recognition trends.
+     */
+    static async getIndividualMemberAnalytics(
+        workspaceId: string,
+        targetUserId: string,
+        options: {
+            period?: LeaderboardPeriod;
+        } = {}
+    ): Promise<IndividualMemberAnalytics> {
+        // 1. Fetch user & member record
+        const memberRes = await query(
+            `SELECT
+                u.id AS "userId",
+                TRIM(CONCAT(u.firstname, ' ', u.lastname)) AS "name",
+                u.username,
+                u.avatar_url AS "avatarUrl",
+                wm.role_title AS "roleTitle",
+                r.name AS "roleName",
+                wd.id AS "departmentId",
+                wd.name AS "departmentName",
+                wd.color AS "departmentColor"
+             FROM public.workspace_members wm
+             JOIN public.users u ON u.id = wm.user_id
+             JOIN public.workspace_roles r ON r.id = wm.role_id
+             LEFT JOIN public.workspace_departments wd ON wd.id = wm.department_id
+             WHERE wm.workspace_id = $1 AND wm.user_id = $2;`,
+            [workspaceId, targetUserId]
+        );
+
+        if (memberRes.rows.length === 0) {
+            throw new Error("Member not found in workspace.");
+        }
+        const member = memberRes.rows[0];
+
+        // 2. Fetch Personal Summary (Total, Monthly, Weekly Orbits)
+        const summary = await this.getMemberRecognitionSummary(workspaceId, targetUserId);
+
+        // 3. Category Breakdown for Member
+        const catRes = await query(
+            `SELECT
+                rc.name,
+                rc.slug,
+                rc.icon,
+                COALESCE(SUM(wrl.points_delta), 0)::integer AS "points",
+                COUNT(wrl.id)::integer AS "count"
+             FROM public.workspace_recognition_categories rc
+             JOIN public.workspace_recognition_ledger wrl ON wrl.category_id = rc.id
+             WHERE wrl.workspace_id = $1 AND wrl.recipient_id = $2 AND wrl.is_reversed = false AND wrl.transaction_type = 'award'
+             GROUP BY rc.id, rc.name, rc.slug, rc.icon
+             ORDER BY "points" DESC;`,
+            [workspaceId, targetUserId]
+        );
+        const categoriesBreakdown = catRes.rows.map((r: any) => ({
+            name: r.name,
+            slug: r.slug,
+            points: r.points,
+            count: r.count,
+            icon: r.icon || "Award",
+        }));
+
+        // 4. Tasks Assigned, Completed, Approved
+        const tasksRes = await query(
+            `SELECT
+                wt.id,
+                wt.status,
+                wt.due_date AS "dueDate",
+                wt.completed_at AS "completedAt",
+                EXISTS (
+                    SELECT 1 FROM public.workspace_task_reviews wtr 
+                    WHERE wtr.task_id = wt.id AND wtr.decision = 'approved'
+                ) AS "hasApprovedReview"
+             FROM public.workspace_task_assignments wta
+             JOIN public.workspace_tasks wt ON wt.id = wta.task_id
+             WHERE wta.workspace_id = $1 AND wta.user_id = $2
+               AND wt.is_archived = false AND wt.status != 'cancelled';`,
+            [workspaceId, targetUserId]
+        );
+
+        const assignedTasks = tasksRes.rows;
+        const tasksAssigned = assignedTasks.length;
+        const tasksCompleted = assignedTasks.filter((t: any) => t.status === "completed").length;
+        const tasksApproved = assignedTasks.filter((t: any) => t.status === "completed" || t.hasApprovedReview).length;
+
+        // 5. Task Submissions: On-Time Submission Rate & Revision Request Rate
+        const subRes = await query(
+            `SELECT
+                wts.id,
+                wts.status,
+                wts.created_at AS "submittedAt",
+                wt.due_date AS "dueDate",
+                EXISTS (
+                    SELECT 1 FROM public.workspace_task_reviews wtr 
+                    WHERE wtr.submission_id = wts.id AND wtr.decision = 'changes_requested'
+                ) AS "hadChangesRequested"
+             FROM public.workspace_task_submissions wts
+             JOIN public.workspace_tasks wt ON wt.id = wts.task_id
+             WHERE wts.workspace_id = $1 AND wts.submitted_by = $2;`,
+            [workspaceId, targetUserId]
+        );
+
+        const submissions = subRes.rows;
+        let onTimeSubmissionRate: number | null = null;
+        let submissionRevisionRate: number | null = null;
+
+        if (submissions.length > 0) {
+            let onTimeCount = 0;
+            let revisedCount = 0;
+
+            submissions.forEach((s: any) => {
+                if (!s.dueDate || new Date(s.submittedAt) <= new Date(s.dueDate)) {
+                    onTimeCount++;
+                }
+                if (s.status === "changes_requested" || s.hadChangesRequested) {
+                    revisedCount++;
+                }
+            });
+
+            onTimeSubmissionRate = Math.round((onTimeCount / submissions.length) * 1000) / 10;
+            submissionRevisionRate = Math.round((revisedCount / submissions.length) * 1000) / 10;
+        }
+
+        // 6. Department Participation Count
+        const partRes = await query(
+            `SELECT
+                (SELECT COUNT(*)::int FROM public.workspace_task_submissions WHERE workspace_id = $1 AND submitted_by = $2) +
+                (SELECT COUNT(*)::int FROM public.workspace_task_comments WHERE workspace_id = $1 AND author_id = $2) +
+                (SELECT COUNT(*)::int FROM public.workspace_recognition_ledger WHERE workspace_id = $1 AND recipient_id = $2 AND is_reversed = false) AS "participationCount";`,
+            [workspaceId, targetUserId]
+        );
+        const departmentParticipation = parseInt(partRes.rows[0]?.participationCount, 10) || 0;
+
+        // 7. Individual 4-Week Trend
+        const trends: IndividualMemberAnalytics["trends"] = [];
+        const now = new Date();
+        for (let i = 3; i >= 0; i--) {
+            const wStart = new Date(now.getTime() - (i + 1) * 7 * 24 * 60 * 60 * 1000);
+            const wEnd = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+            const label = i === 0 ? "Current Week" : `${i}w ago`;
+
+            const wOrbitsRes = await query(
+                `SELECT COALESCE(SUM(points_delta), 0)::integer AS "orbits"
+                 FROM public.workspace_recognition_ledger
+                 WHERE workspace_id = $1 AND recipient_id = $2 AND is_reversed = false AND transaction_type = 'award'
+                   AND created_at >= $3 AND created_at <= $4;`,
+                [workspaceId, targetUserId, wStart.toISOString(), wEnd.toISOString()]
+            );
+
+            const wTasksRes = await query(
+                `SELECT COUNT(wt.id)::integer AS "tasksCompleted"
+                 FROM public.workspace_task_assignments wta
+                 JOIN public.workspace_tasks wt ON wt.id = wta.task_id
+                 WHERE wta.workspace_id = $1 AND wta.user_id = $2 AND wt.is_archived = false AND wt.status = 'completed'
+                   AND wt.completed_at >= $3 AND wt.completed_at <= $4;`,
+                [workspaceId, targetUserId, wStart.toISOString(), wEnd.toISOString()]
+            );
+
+            trends.push({
+                periodLabel: label,
+                orbits: wOrbitsRes.rows[0]?.orbits || 0,
+                tasksCompleted: wTasksRes.rows[0]?.tasksCompleted || 0,
+            });
+        }
+
+        // 8. Sufficient Data Safeguard
+        const hasSufficientTaskData = tasksAssigned > 0;
+        const insufficientDataReason = !hasSufficientTaskData
+            ? "No tasks assigned to member in this workspace"
+            : undefined;
+
+        return {
+            userId: member.userId,
+            name: member.name || member.username,
+            username: member.username,
+            avatarUrl: member.avatarUrl || undefined,
+            roleTitle: member.roleTitle || member.roleName,
+            department: member.departmentId ? {
+                id: member.departmentId,
+                name: member.departmentName,
+                color: member.departmentColor,
+            } : null,
+            totalOrbits: summary.totalOrbitsEarned,
+            weeklyOrbits: summary.weeklyOrbitsEarned,
+            monthlyOrbits: summary.monthlyOrbitsEarned,
+            categoriesBreakdown,
+            tasksAssigned,
+            tasksCompleted,
+            tasksApproved,
+            onTimeSubmissionRate,
+            submissionRevisionRate,
+            departmentParticipation,
+            trends,
+            hasSufficientTaskData,
+            insufficientDataReason,
         };
     }
 }

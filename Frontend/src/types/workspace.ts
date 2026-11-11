@@ -1379,6 +1379,128 @@ export interface ThreeLeaderboardsResponse {
     };
 }
 
+// ============================================================================
+// PHASE 06: TEAM AND INDIVIDUAL ANALYTICS TYPES
+// ============================================================================
+
+export interface WorkspaceAnalyticsSummary {
+    period: LeaderboardPeriod;
+    periodStart: string | null;
+    periodEnd: string | null;
+    totalOrbitsAwarded: number;
+    totalOrbitsReceived: number;
+    activeContributors: number;
+    totalApprovedTasks: number;
+    onTimeCompletionRate: number;
+    contributionTrends: Array<{
+        periodLabel: string;
+        orbits: number;
+        tasksApproved: number;
+    }>;
+    departmentComparison: Array<{
+        departmentId: string;
+        departmentName: string;
+        color?: string;
+        memberCount: number;
+        activeContributors: number;
+        dpi: number | null;
+        hasSufficientData: boolean;
+        insufficientDataReason?: string;
+        approvedTaskDeliveryRate: number;
+        onTimeDeliveryRate: number;
+        tasksAssigned: number;
+        tasksCompleted: number;
+        approvedSubmissions: number;
+        overdueTasks: number;
+        totalOrbits: number;
+        orbitsPerMember: number;
+    }>;
+    recognitionDistribution: {
+        categories: Array<{
+            name: string;
+            slug: string;
+            points: number;
+            count: number;
+            percentage: number;
+        }>;
+        departments: Array<{
+            departmentName: string;
+            points: number;
+            percentage: number;
+        }>;
+        overconcentrationAlert?: string | null;
+    };
+    fairnessAlerts?: Array<{
+        type: "department_concentration" | "recipient_concentration" | "manager_dominance" | "velocity_spike";
+        title: string;
+        detail: string;
+        severity: "info" | "warning";
+    }>;
+    managerAwardActivity: Array<{
+        managerId: string;
+        name: string;
+        username: string;
+        avatarUrl?: string;
+        roleTitle: string;
+        totalOrbitsAwarded: number;
+        awardCount: number;
+        monthlyBudget: number;
+        budgetUsed: number;
+    }>;
+    leadershipAnalytics: Array<{
+        leadId: string;
+        leadName: string;
+        username: string;
+        avatarUrl?: string;
+        roleName: string;
+        departmentId: string;
+        departmentName: string;
+        departmentColor?: string;
+        dpi: number | null;
+        hasSufficientData: boolean;
+        teamParticipationRate: number;
+        approvedWorkCount: number;
+        deadlineReliabilityRate: number;
+        leadPersonalOrbits: number;
+    }>;
+}
+
+export interface IndividualMemberAnalytics {
+    userId: string;
+    name: string;
+    username: string;
+    avatarUrl?: string;
+    roleTitle: string;
+    department?: {
+        id: string;
+        name: string;
+        color?: string;
+    } | null;
+    totalOrbits: number;
+    weeklyOrbits: number;
+    monthlyOrbits: number;
+    categoriesBreakdown: Array<{
+        name: string;
+        slug: string;
+        points: number;
+        count: number;
+        icon: string;
+    }>;
+    tasksAssigned: number;
+    tasksCompleted: number;
+    tasksApproved: number;
+    onTimeSubmissionRate: number | null;
+    submissionRevisionRate: number | null;
+    departmentParticipation: number | null;
+    trends: Array<{
+        periodLabel: string;
+        orbits: number;
+        tasksCompleted: number;
+    }>;
+    hasSufficientTaskData: boolean;
+    insufficientDataReason?: string;
+}
+
 
 
 

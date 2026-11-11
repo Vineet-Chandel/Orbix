@@ -7,6 +7,8 @@ import {
 } from "../queues/workspaceQueues.js";
 import { WorkspaceRepository } from "../repositories/workspaceRepository.js";
 import { WorkspaceEmailService, type SendWorkspaceEmailOptions } from "../services/workspace/workspaceEmailService.js";
+import { WorkspaceRecognitionReconciliationService } from "../services/workspace/workspaceRecognitionReconciliationService.js";
+import { startRecognitionWorker, stopRecognitionWorker } from "./workspaceRecognitionWorker.js";
 import { query } from "../database/client.js";
 
 let emailWorker: Worker | null = null;
@@ -197,6 +199,18 @@ export async function dispatchOutboxEvents(batchSize = 25): Promise<number> {
                     payload
                 );
                 enqueued = res.enqueued;
+            } else if (eventType === "recognition:awarded" || eventType === "recognition:reversed") {
+                const res = await enqueueWorkspaceJob(
+                    QUEUE_NAMES.RECOGNITION,
+                    "process_outbox_event",
+                    {
+                        workspaceId: event.workspaceId,
+                        eventType: event.eventType,
+                        payload: event.payload,
+                    },
+                    { jobId: `rec-outbox-${event.id}` }
+                );
+                enqueued = res.enqueued;
             } else {
                 enqueued = true;
             }
@@ -209,6 +223,14 @@ export async function dispatchOutboxEvents(batchSize = 25): Promise<number> {
                 // If queue is temporarily offline, execute synchronously or keep pending
                 if (eventType.startsWith("email_")) {
                     await WorkspaceEmailService.sendEmail(payload as any as SendWorkspaceEmailOptions);
+                    await WorkspaceRepository.markOutboxEventStatus(event.id, "published");
+                    publishedCount++;
+                } else if (eventType.startsWith("recognition:")) {
+                    await WorkspaceRecognitionReconciliationService.processOutboxEvent({
+                        workspaceId: event.workspaceId,
+                        eventType: event.eventType,
+                        payload: event.payload,
+                    });
                     await WorkspaceRepository.markOutboxEventStatus(event.id, "published");
                     publishedCount++;
                 } else {
@@ -232,6 +254,7 @@ export function startWorkspaceWorkers(): void {
         emailWorker = createEmailWorker();
         reminderWorker = createReminderWorker();
         notificationWorker = createNotificationWorker();
+        startRecognitionWorker();
         isWorkersRunning = true;
         console.log("✅ Workspace BullMQ workers started successfully");
     } catch (err: any) {
@@ -247,6 +270,7 @@ export async function stopWorkspaceWorkers(): Promise<void> {
     if (emailWorker) await emailWorker.close();
     if (reminderWorker) await reminderWorker.close();
     if (notificationWorker) await notificationWorker.close();
+    await stopRecognitionWorker();
     isWorkersRunning = false;
     console.log("🛑 Workspace BullMQ workers stopped");
 }

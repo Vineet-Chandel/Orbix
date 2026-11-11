@@ -3615,6 +3615,70 @@ workspaceRouter.get("/recognition/awards/:awardId/notes", authenticate, async (r
     return WorkspaceRecognitionController.getAwardNotes(req, res);
 });
 
+workspaceRouter.get("/recognition/leaderboards", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getLeaderboards(req, res);
+});
+
+workspaceRouter.get("/recognition/analytics/comprehensive", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getComprehensiveAnalytics(req, res);
+});
+
+workspaceRouter.get("/recognition/analytics/members/:userId", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getIndividualAnalytics(req, res);
+});
+
+// Phase 07: Redis Leaderboard projections & Reconciliation routes (club query-based)
+workspaceRouter.get("/recognition/leaderboards/redis/top", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getRedisTopRankings(req, res);
+});
+
+workspaceRouter.get("/recognition/leaderboards/redis/nearby", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.getRedisNearbyRankings(req, res);
+});
+
+workspaceRouter.post("/recognition/leaderboards/rebuild", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.rebuildLeaderboards(req, res);
+});
+
+workspaceRouter.post("/recognition/leaderboards/reconcile", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceRecognitionController.reconcileLeaderboards(req, res);
+});
+
 // Parameterized workspace recognition routes (e.g. /api/team-workspaces/:workspaceId/recognition/...)
 workspaceRouter.post("/:workspaceId/recognition/awards", authenticate, WorkspaceRecognitionController.awardOrbits);
 workspaceRouter.post("/:workspaceId/recognition/awards/:awardId/reverse", authenticate, WorkspaceRecognitionController.reverseAward);
@@ -3623,6 +3687,11 @@ workspaceRouter.get("/:workspaceId/recognition/departments/:departmentId", authe
 workspaceRouter.get("/:workspaceId/recognition/members/:userId/profile", authenticate, WorkspaceRecognitionController.getMemberProfile);
 workspaceRouter.post("/:workspaceId/recognition/awards/:awardId/notes", authenticate, WorkspaceRecognitionController.addAppreciationNote);
 workspaceRouter.get("/:workspaceId/recognition/awards/:awardId/notes", authenticate, WorkspaceRecognitionController.getAwardNotes);
+workspaceRouter.get("/:workspaceId/recognition/leaderboards", authenticate, WorkspaceRecognitionController.getLeaderboards);
+workspaceRouter.get("/:workspaceId/recognition/leaderboards/redis/top", authenticate, WorkspaceRecognitionController.getRedisTopRankings);
+workspaceRouter.get("/:workspaceId/recognition/leaderboards/redis/nearby", authenticate, WorkspaceRecognitionController.getRedisNearbyRankings);
+workspaceRouter.post("/:workspaceId/recognition/leaderboards/rebuild", authenticate, WorkspaceRecognitionController.rebuildLeaderboards);
+workspaceRouter.post("/:workspaceId/recognition/leaderboards/reconcile", authenticate, WorkspaceRecognitionController.reconcileLeaderboards);
 workspaceRouter.get("/:workspaceId/recognition/policy", authenticate, WorkspaceRecognitionController.getPolicy);
 workspaceRouter.patch("/:workspaceId/recognition/policy", authenticate, WorkspaceRecognitionController.updatePolicy);
 workspaceRouter.get("/:workspaceId/recognition/categories", authenticate, WorkspaceRecognitionController.getCategories);
@@ -3632,6 +3701,8 @@ workspaceRouter.get("/:workspaceId/recognition/summary", authenticate, Workspace
 workspaceRouter.post("/:workspaceId/recognition/budget", authenticate, WorkspaceRecognitionController.allocateBudget);
 workspaceRouter.get("/:workspaceId/recognition/budgets", authenticate, WorkspaceRecognitionController.listBudgets);
 workspaceRouter.get("/:workspaceId/recognition/analytics", authenticate, WorkspaceRecognitionController.getAnalytics);
+workspaceRouter.get("/:workspaceId/recognition/analytics/comprehensive", authenticate, WorkspaceRecognitionController.getComprehensiveAnalytics);
+workspaceRouter.get("/:workspaceId/recognition/analytics/members/:userId", authenticate, WorkspaceRecognitionController.getIndividualAnalytics);
 
 
 

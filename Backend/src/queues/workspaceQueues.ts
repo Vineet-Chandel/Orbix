@@ -6,6 +6,7 @@ export const QUEUE_NAMES = {
     EMAILS: "workspace-emails",
     REMINDERS: "workspace-reminders",
     MAINTENANCE: "workspace-maintenance",
+    RECOGNITION: "workspace-recognition",
 } as const;
 
 export type WorkspaceQueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];

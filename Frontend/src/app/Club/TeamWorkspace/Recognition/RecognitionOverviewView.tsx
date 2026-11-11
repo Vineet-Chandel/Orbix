@@ -30,6 +30,7 @@ import { AwardBudgetsView } from "./AwardBudgetsView";
 import { RecognitionPolicyView } from "./RecognitionPolicyView";
 import { AwardAnalyticsView } from "./AwardAnalyticsView";
 import { DepartmentRecognitionView } from "./DepartmentRecognitionView";
+import { ThreeLeaderboardsView } from "./ThreeLeaderboardsView";
 
 interface RecognitionOverviewViewProps {
     clubId: string;
@@ -54,9 +55,9 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
     isAdmin: _isAdmin,
     isWorkspaceManager,
 }) => {
-    // Navigation Subtab: Overview | History | Department | Budgets | Policy | Analytics
+    // Navigation Subtab: Overview | Leaderboards | History | Department | Budgets | Policy | Analytics
     const [subTab, setSubTab] = useState<
-        "overview" | "history" | "department" | "budgets" | "policy" | "analytics"
+        "overview" | "leaderboards" | "history" | "department" | "budgets" | "policy" | "analytics"
     >("overview");
 
     // Data States
@@ -131,6 +132,18 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                     >
                         <Sparkles className="w-3.5 h-3.5 fill-black" />
                         Overview
+                    </button>
+
+                    <button
+                        onClick={() => setSubTab("leaderboards")}
+                        className={`px-3.5 py-1.5 text-xs font-black rounded-xl border-2 border-black transition shadow-[2px_2px_0px_#000] flex items-center gap-1.5 active:translate-x-[1px] active:translate-y-[1px] ${
+                            subTab === "leaderboards"
+                                ? "bg-[#FFE566] text-black"
+                                : "bg-white hover:bg-neutral-50 text-neutral-800"
+                        }`}
+                    >
+                        <Trophy className="w-3.5 h-3.5 text-amber-600" />
+                        Leaderboards
                     </button>
 
                     <button
@@ -213,7 +226,12 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                     {canAward && (
                         <button
                             onClick={() => setIsAwardModalOpen(true)}
-                            className="px-4 py-2 bg-[#FFE566] hover:bg-[#fedb33] text-black border-2 border-black rounded-xl text-xs font-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition flex items-center gap-1.5"
+                            disabled={policy ? !policy.isEnabled : false}
+                            className={`px-4 py-2 border-2 border-black rounded-xl text-xs font-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition flex items-center gap-1.5 ${
+                                policy && !policy.isEnabled
+                                    ? "bg-neutral-200 text-neutral-500 cursor-not-allowed"
+                                    : "bg-[#FFE566] hover:bg-[#fedb33] text-black"
+                            }`}
                         >
                             <Sparkles className="w-4 h-4 fill-black" />
                             <span>Award Orbits</span>
@@ -221,6 +239,29 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                     )}
                 </div>
             </div>
+
+            {/* Feature Flag Disabled Banner */}
+            {policy && !policy.isEnabled && (
+                <div className="p-4 bg-amber-100 border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <Shield className="w-5 h-5 text-amber-700 flex-shrink-0" />
+                        <div>
+                            <h4 className="text-xs font-black text-black">Orbix Recognition Is Currently Paused</h4>
+                            <p className="text-[11px] font-bold text-neutral-700">
+                                Point awarding and active leaderboards are paused by club administration. Normal Team Workspace tasks and channels remain fully operational.
+                            </p>
+                        </div>
+                    </div>
+                    {isOwner && (
+                        <button
+                            onClick={() => setSubTab("policy")}
+                            className="px-3 py-1.5 bg-[#FFE566] hover:bg-[#fedb33] text-black border-2 border-black rounded-xl text-xs font-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition"
+                        >
+                            Configure Policy
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* TAB 1: OVERVIEW */}
             {subTab === "overview" && (
@@ -424,6 +465,17 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
                         />
                     </div>
                 </div>
+            )}
+
+            {/* TAB 1.5: THREE LEADERBOARDS */}
+            {subTab === "leaderboards" && (
+                <ThreeLeaderboardsView
+                    clubId={clubId}
+                    workspaceId={_workspaceId}
+                    departments={departments}
+                    isOwner={isOwner}
+                    isWorkspaceManager={isWorkspaceManager}
+                />
             )}
 
             {/* TAB 2: AWARD HISTORY */}
