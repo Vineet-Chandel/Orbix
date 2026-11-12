@@ -7,6 +7,7 @@ import {
     Send,
     MessageCircle,
     Users,
+    Building2,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -20,6 +21,8 @@ interface ThreadSidebarProps {
     thread: WorkspaceThread;
     channelId: string;
     clubId: string;
+    clubName?: string;
+    isClubContext?: boolean;
     currentMember: WorkspaceMember | null;
     canManageThreads: boolean;
     onClose: () => void;
@@ -30,6 +33,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     thread,
     channelId,
     clubId,
+    clubName,
+    isClubContext = false,
     currentMember,
     canManageThreads,
     onClose,
@@ -313,14 +318,49 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 ) : (
                     messages.map((msg) => (
                         <div key={msg.id} className="flex items-start gap-2.5 text-xs">
-                            <div className="w-7 h-7 rounded-full bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center font-black text-[10px] text-black uppercase shrink-0 mt-0.5">
-                                {msg.sender?.firstName?.[0] || "U"}
+                            <div
+                                className={`w-7 h-7 rounded-full border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center font-black text-[10px] text-black uppercase shrink-0 mt-0.5 overflow-hidden ${
+                                    msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                        ? "bg-amber-300"
+                                        : "bg-[#FFE566]"
+                                }`}
+                            >
+                                {msg.sender?.avatarUrl ? (
+                                    <img
+                                        src={msg.sender.avatarUrl}
+                                        alt={msg.sender.firstName}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : msg.sender?.isClub ? (
+                                    <Building2 className="w-3.5 h-3.5 text-black" />
+                                ) : (
+                                    msg.sender?.firstName?.[0] || "U"
+                                )}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="font-black text-black">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-black text-black flex items-center gap-1">
+                                        {(msg.sender?.isClub || msg.senderRole?.name === "Club Identity") && (
+                                            <Building2 className="w-3 h-3 text-amber-600 shrink-0" />
+                                        )}
                                         {msg.sender?.firstName} {msg.sender?.lastName}
                                     </span>
+                                    {(msg.senderRole || msg.sender?.isClub) && (
+                                        <span
+                                            className="px-1.5 py-0.5 rounded-full text-[9px] font-black border border-black"
+                                            style={{
+                                                color: "#000",
+                                                backgroundColor:
+                                                    msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                                        ? "#FCD34D"
+                                                        : msg.senderRole?.color || "#FFE566",
+                                            }}
+                                        >
+                                            {msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                                ? "Club Identity"
+                                                : msg.senderRole?.name}
+                                        </span>
+                                    )}
                                     <span className="text-[10px] font-bold text-neutral-500">
                                         {new Date(msg.createdAt).toLocaleTimeString([], {
                                             hour: "2-digit",
@@ -345,13 +385,25 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                         <Lock className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                         <span>This thread has been locked by a moderator.</span>
                     </div>
+                ) : !isClubContext &&
+                  currentMember?.role?.slug !== "owner" &&
+                  !canManageThreads &&
+                  !currentMember?.role?.permissions?.includes("messages:send") &&
+                  !currentMember?.role?.permissions?.includes("*") ? (
+                    <div className="py-2 px-3 rounded-xl bg-neutral-100 border-2 border-black text-center text-xs font-black text-neutral-700 shadow-[1.5px_1.5px_0px_#000]">
+                        Observers have read-only access to threads.
+                    </div>
                 ) : (
                     <form onSubmit={handleSendReply} className="flex items-center gap-2">
                         <input
                             type="text"
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
-                            placeholder={`Reply to #${thread.name}...`}
+                            placeholder={
+                                isClubContext
+                                    ? `Reply as ${clubName || "Club"} (Club Identity)...`
+                                    : `Reply to #${thread.name}...`
+                            }
                             disabled={sending}
                             className="flex-1 px-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-semibold text-black placeholder-neutral-500 focus:outline-none shadow-[1.5px_1.5px_0px_#000]"
                         />

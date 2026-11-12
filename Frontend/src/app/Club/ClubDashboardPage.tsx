@@ -248,6 +248,7 @@ export default function ClubDashboardPage() {
 
     // Fetch club profile and events (leveraging Redux and Redis caching)
     const fetchClubData = async (force = false) => {
+        if (user?.accountType !== "club") return;
         if (isFetchingClubRef.current && !force) return;
         isFetchingClubRef.current = true;
         try {
@@ -268,8 +269,8 @@ export default function ClubDashboardPage() {
                 }
             } else {
                 const err: any = profileResult.reason;
-                if (typeof err === "string" && (err.includes("401") || err.toLowerCase().includes("unauthorized") || err.toLowerCase().includes("authentication required"))) {
-                    navigate("/auth/signin", { replace: true });
+                if (typeof err === "string" && (err.includes("401") || err.toLowerCase().includes("unauthorized") || err.toLowerCase().includes("authentication required") || err.toLowerCase().includes("club portal"))) {
+                    navigate("/auth/signin?tab=club", { replace: true });
                     return;
                 }
                 if (typeof err === "string" && (err.includes("404") || err.includes("403") || err.toLowerCase().includes("no verified club"))) {
@@ -289,7 +290,7 @@ export default function ClubDashboardPage() {
 
     // Fetch inbox unread count
     const fetchInboxCounts = async () => {
-        if (isFetchingInboxRef.current) return;
+        if (user?.accountType !== "club" || isFetchingInboxRef.current) return;
         isFetchingInboxRef.current = true;
         try {
             const queryParam = club?.id ? `?clubId=${encodeURIComponent(club.id)}` : "";
@@ -312,6 +313,7 @@ export default function ClubDashboardPage() {
     };
 
     useEffect(() => {
+        if (user?.accountType !== "club") return;
         fetchClubData();
         fetchInboxCounts();
 
@@ -322,7 +324,7 @@ export default function ClubDashboardPage() {
             clearInterval(notifInterval);
             window.removeEventListener("focus", fetchInboxCounts);
         };
-    }, []);
+    }, [user?.accountType]);
 
     // Open Event Scope Selection Modal
     const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
@@ -425,7 +427,7 @@ export default function ClubDashboardPage() {
             // ignore
         }
         dispatch(clearUser());
-        navigate("/auth/signin", { replace: true });
+        navigate("/auth/signin?tab=club", { replace: true });
     };
 
     // Date formatting matching Personal Account ("Today, 29 October 2026")
@@ -993,6 +995,7 @@ export default function ClubDashboardPage() {
                         {activeTab === "team-workspace" && (
                             <WorkspaceShell
                                 club={club}
+                                isClubContext={true}
                                 onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
                         )}

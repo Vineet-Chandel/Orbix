@@ -330,6 +330,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 gmail: validatedData.gmail,
                 username: validatedData.username,
                 sid: sessionId,
+                accountType: "personal",
             },
             JWT_SECRET,
             {
@@ -345,6 +346,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 gmail: validatedData.gmail,
                 username: validatedData.username,
                 sid: sessionId,
+                accountType: "personal",
                 type: "refresh"
             },
             JWT_SECRET,
@@ -401,6 +403,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 gmail: validatedData.gmail,
                 avatarUrl: defaultAvatarUrl,
                 photoUrl: null,
+                accountType: "personal",
                 isEmailVerified: true,
                 isVerifiedCoder: true,
                 isVerified: true,
@@ -570,6 +573,7 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                             created_at AS "createdAt"
                         FROM users
                         WHERE id = $1
+                          AND account_type = 'club'
                         LIMIT 1;`,
                         [targetUserId]
                     );
@@ -629,6 +633,14 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         }
 
         const user = Result.rows[0];
+
+        if (user && effectiveAccountType === "club" && user.accountType !== "club") {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                message: "Please sign in with your dedicated Club Portal credentials.",
+            });
+        }
 
         if (!user || !user.password_hash) {
             await bcrypt.compare("dummy", "$2b$10$XN4E5x6gT3x7l3eUaR9UOuQYx8wO1bU1Jv3bT6D2p7t3Z6U1q9F4W");
@@ -757,12 +769,30 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        // Enrich club status & verified club details for all accounts
-        await enrichUserWithClubData(safeUser, user.id);
+        // Enrich club status & verified club details ONLY for club portal accounts
+        if (effectiveAccountType === "club") {
+            await enrichUserWithClubData(safeUser, user.id);
+        } else {
+            safeUser.verifiedClub = null;
+            safeUser.clubStatus = "none";
+            safeUser.clubName = null;
+            safeUser.clubId = null;
+            safeUser.application = null;
+        }
 
         await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
-        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, password_hash, termsAccepted: user.termsAccepted });
+        await userDetailsCache({
+            id: user.id,
+            firstName: user.firstName,
+            middleName: user.middleName,
+            lastName: user.lastName,
+            gmail: user.gmail,
+            username: user.username,
+            password_hash,
+            termsAccepted: user.termsAccepted,
+            accountType: effectiveAccountType,
+        });
         return res.status(200).json({
             success: true,
             message: "Login successfully",
@@ -842,7 +872,11 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             });
         }
 
-        // Fetch full authoritative user profile from database
+        const decodedSub = typeof decoded?.sub === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded.sub)
+            ? decoded.sub
+            : null;
+
+        // Fetch full authoritative user profile from database (prefer immutable UUID over mutable email/username)
         const Result = await query(
             `SELECT
                 id,
@@ -879,9 +913,9 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
                 two_factor_enabled_at AS "twoFactorEnabledAt",
                 created_at AS "createdAt"
             FROM users
-            WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
+            WHERE ${decodedSub ? "id = $1::uuid" : "(LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1))"}
             LIMIT 1;`,
-            [userGmail]
+            [decodedSub || userGmail]
         );
         const user = Result.rows[0];
 
@@ -909,7 +943,18 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             throttleTouchSession(existingSessionId);
         }
 
-        const refreshedAccountType = decoded?.accountType || user.accountType || "personal";
+        const dbAccountType = user.accountType === "club" ? "club" : "personal";
+        if (decoded?.accountType && decoded.accountType !== dbAccountType) {
+            res.clearCookie("token", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+            res.clearCookie("refreshToken", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                message: "Session account type mismatch. Please sign in again.",
+            });
+        }
+
+        const refreshedAccountType = dbAccountType;
 
         // Generate fresh Access Token (8 hours) and fresh Refresh Token (7 days) retaining existing session ID
         const newAccessToken = jwt.sign(
@@ -982,10 +1027,18 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        // Enrich club status & verified club details for all accounts
-        await enrichUserWithClubData(safeUser, user.id);
+        // Enrich club status & verified club details ONLY for club accounts
+        if (refreshedAccountType === "club") {
+            await enrichUserWithClubData(safeUser, user.id);
+        } else {
+            safeUser.verifiedClub = null;
+            safeUser.clubStatus = "none";
+            safeUser.clubName = null;
+            safeUser.clubId = null;
+            safeUser.application = null;
+        }
 
-        await userDetailsCache({ ...user, id: user.id });
+        await userDetailsCache({ ...user, id: user.id, accountType: refreshedAccountType });
 
         return res.status(200).json({
             success: true,
@@ -1118,9 +1171,21 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
             ipAddress: ip
         });
 
-        // Context-aware Account Type resolution on 2FA Login
+        // Context-aware Account Type resolution on 2FA Login (enforced against authoritative DB record)
         const requestedAccountType = req.body?.accountType || req.body?.loginMode || req.body?.expectedAccountType;
-        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
+        const dbAccountTypeRes = await query(`SELECT account_type FROM users WHERE id = $1 LIMIT 1;`, [user.id]);
+        const dbAccountType = dbAccountTypeRes.rows[0]?.account_type === "club" ? "club" : "personal";
+        if (requestedAccountType && requestedAccountType !== dbAccountType) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                message:
+                    dbAccountType === "club"
+                        ? "This is a Club account. Please use the Club Portal to sign in."
+                        : "Please sign in with your dedicated Club Portal credentials.",
+            });
+        }
+        const effectiveAccountType = dbAccountType;
 
         // Create canonical persistent session record on genuine 2FA authentication
         const sessionResult = await createSession({
@@ -1193,9 +1258,17 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        await enrichUserWithClubData(safeUser, user.id);
+        if (effectiveAccountType === "club") {
+            await enrichUserWithClubData(safeUser, user.id);
+        } else {
+            safeUser.verifiedClub = null;
+            safeUser.clubStatus = "none";
+            safeUser.clubName = null;
+            safeUser.clubId = null;
+            safeUser.application = null;
+        }
         await resetSigninFailures({ email: user.gmail, ip });
-        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, termsAccepted: user.termsAccepted });
+        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, termsAccepted: user.termsAccepted, accountType: effectiveAccountType });
 
         return res.status(200).json({
             success: true,

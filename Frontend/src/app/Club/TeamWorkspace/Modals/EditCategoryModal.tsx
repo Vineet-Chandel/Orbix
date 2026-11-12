@@ -9,6 +9,7 @@ import type {
 } from "../../../../types/workspace";
 import { NeoSelect } from "../../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../../components/NeoCheckbox";
+import { ConfirmationModal } from "../../../../components/ConfirmationModal";
 
 interface EditCategoryModalProps {
     isOpen: boolean;
@@ -39,6 +40,7 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     const [isPrivate, setIsPrivate] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen && category) {
@@ -83,18 +85,12 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     };
 
     const handleDelete = async () => {
-        const hasChannels = category.channels && category.channels.length > 0;
-        const confirmMsg = hasChannels
-            ? `Category "${category.name}" contains ${category.channels?.length || 0} channel(s). Deleting it will unassign those channels. Proceed?`
-            : `Are you sure you want to delete category "${category.name}"?`;
-
-        if (!confirm(confirmMsg)) return;
-
         try {
             setDeleting(true);
             const res = await workspaceApi.deleteCategory(category.id, clubId);
             if (res.success) {
                 toast.success(`Category "${category.name}" deleted.`);
+                setIsDeleteConfirmOpen(false);
                 onCategoryDeleted(category.id);
                 onClose();
             }
@@ -249,7 +245,7 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                         <button
                             type="button"
                             disabled={deleting || submitting}
-                            onClick={handleDelete}
+                            onClick={() => setIsDeleteConfirmOpen(true)}
                             className="px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 border-2 border-rose-300 hover:border-rose-600 rounded-xl transition flex items-center gap-1.5"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -275,6 +271,23 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                     </div>
                 </form>
             </div>
+
+            {/* Delete Category Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => setIsDeleteConfirmOpen(false)}
+                onConfirm={handleDelete}
+                title={`Delete Category "${category.name}"?`}
+                description={
+                    category.channels && category.channels.length > 0
+                        ? `Category "${category.name}" contains ${category.channels.length} channel(s). Deleting it will unassign those channels. Proceed?`
+                        : `Are you sure you want to permanently delete category "${category.name}"?`
+                }
+                confirmText="Delete Category"
+                cancelText="Cancel"
+                variant="danger"
+                isLoading={deleting}
+            />
         </div>
     );
 };

@@ -102,6 +102,14 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
             { key: "files:manage", label: "Manage Assets", description: "Move, rename, organize, or purge workspace files" },
         ],
     },
+    {
+        name: "Recognition & Orbits",
+        description: "Merit awards, peer appreciation, and incentive policy controls",
+        permissions: [
+            { key: "recognition:award", label: "Award Orbits", description: "Grant recognition points and orbits to deserving team members" },
+            { key: "recognition:manage_policy", label: "Manage Recognition Policy", description: "Configure monthly budgets, point limits, and DPI weights" },
+        ],
+    },
 ];
 
 const PRESET_COLORS = [
@@ -200,8 +208,8 @@ export const CreateEditRoleModal: React.FC<CreateEditRoleModalProps> = ({
             return;
         }
 
-        if (rank < 100 || rank > maxRankAllowed) {
-            toast.error(`Role rank must be between 100 and ${maxRankAllowed}.`);
+        if (rank < 1 || rank > maxRankAllowed) {
+            toast.error(`Role rank must be between 1 and ${maxRankAllowed}.`);
             return;
         }
 
@@ -298,7 +306,7 @@ export const CreateEditRoleModal: React.FC<CreateEditRoleModalProps> = ({
                             </label>
                             <input
                                 type="number"
-                                min={100}
+                                min={1}
                                 max={maxRankAllowed}
                                 value={rank}
                                 onChange={(e) => setRank(Number(e.target.value))}

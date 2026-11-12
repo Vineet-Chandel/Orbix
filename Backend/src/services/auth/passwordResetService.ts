@@ -80,11 +80,15 @@ export class PasswordResetService {
     /**
      * Resolves a user account from username, email, or club credentials.
      */
+    /**
+     * Resolves a user account by email, username, or (when in club mode) club slug/name.
+     * Enforces strict isolation between personal and club identities.
+     */
     static async resolveUser(identifier: string, accountType: "personal" | "club" = "personal") {
         const cleanId = (identifier || "").trim().toLowerCase();
         if (!cleanId) return null;
 
-        // 1. If in club mode, first check verified_clubs and club_verification_requests
+        // 1. Club recovery mode: ONLY resolve dedicated account_type = 'club' records
         if (accountType === "club") {
             const clubLookup = await query(
                 `SELECT auth_user_id FROM verified_clubs 
@@ -106,6 +110,7 @@ export class PasswordResetService {
                         OR LOWER(college_official_email) = LOWER($1)
                         OR LOWER(club_name) = LOWER($1)
                         OR LOWER(REPLACE(club_name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
+                     ORDER BY submitted_at DESC
                      LIMIT 1;`,
                     [cleanId]
                 );
@@ -115,9 +120,11 @@ export class PasswordResetService {
             if (targetUserId) {
                 const clubUserRes = await query(
                     `SELECT id, email, username, firstname AS "firstName", lastname AS "lastName",
-                            photo_url AS "photoUrl", avatar_url AS "avatarUrl", password AS password_hash
+                            photo_url AS "photoUrl", avatar_url AS "avatarUrl", password AS password_hash,
+                            account_type AS "accountType"
                      FROM users
                      WHERE id = $1
+                       AND account_type = 'club'
                      LIMIT 1;`,
                     [targetUserId]
                 );
@@ -125,14 +132,33 @@ export class PasswordResetService {
                     return { ...clubUserRes.rows[0], matchedVia: "club_profile" };
                 }
             }
+
+            const directClubRes = await query(
+                `SELECT id, email, username, firstname AS "firstName", lastname AS "lastName",
+                        photo_url AS "photoUrl", avatar_url AS "avatarUrl", password AS password_hash,
+                        account_type AS "accountType"
+                 FROM users
+                 WHERE (LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1))
+                   AND account_type = 'club'
+                 LIMIT 1;`,
+                [cleanId]
+            );
+
+            if (directClubRes.rows[0]) {
+                return { ...directClubRes.rows[0], matchedVia: "club_credential" };
+            }
+
+            return null;
         }
 
-        // 2. Query users table directly by email or username
+        // 2. Personal recovery mode: ONLY resolve personal (non-club) accounts
         const userRes = await query(
             `SELECT id, email, username, firstname AS "firstName", lastname AS "lastName",
-                    photo_url AS "photoUrl", avatar_url AS "avatarUrl", password AS password_hash
+                    photo_url AS "photoUrl", avatar_url AS "avatarUrl", password AS password_hash,
+                    account_type AS "accountType"
              FROM users
-             WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
+             WHERE (LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1))
+               AND COALESCE(account_type, 'personal') != 'club'
              LIMIT 1;`,
             [cleanId]
         );
@@ -141,31 +167,43 @@ export class PasswordResetService {
             return { ...userRes.rows[0], matchedVia: "user_credential" };
         }
 
-        // 3. Fallback: If user searched in personal mode but entered a club slug/name, or vice versa
-        const fallbackClubLookup = await query(
-            `SELECT auth_user_id FROM verified_clubs 
-             WHERE LOWER(slug) = LOWER($1) 
-                OR LOWER(public_email) = LOWER($1)
-                OR LOWER(name) = LOWER($1)
-             LIMIT 1;`,
-            [cleanId]
-        );
-        const fallbackUserId = fallbackClubLookup.rows[0]?.auth_user_id;
-        if (fallbackUserId) {
-            const fallbackRes = await query(
-                `SELECT id, email, username, firstname AS "firstName", lastname AS "lastName",
-                        photo_url AS "photoUrl", avatar_url AS "avatarUrl", password AS password_hash
-                 FROM users
-                 WHERE id = $1
-                 LIMIT 1;`,
-                [fallbackUserId]
-            );
-            if (fallbackRes.rows[0]) {
-                return { ...fallbackRes.rows[0], matchedVia: "fallback_club" };
-            }
+        return null;
+    }
+
+    /**
+     * Resolves an externally routable email address for password reset OTP delivery.
+     * Dedicated club accounts often store an internal `@club.orbix` login email on `users`,
+     * so we look up their verified public email or application contact email when needed.
+     */
+    private static async resolveDeliveryEmail(userId: string, userEmail: string, accountType: string): Promise<string> {
+        const normalized = (userEmail || "").toLowerCase().trim();
+        if (accountType !== "club" || (normalized && !normalized.endsWith("@club.orbix"))) {
+            return normalized;
         }
 
-        return null;
+        try {
+            const clubEmailRes = await query(
+                `SELECT COALESCE(
+                    NULLIF(LOWER(TRIM(vc.public_email)), ''),
+                    NULLIF(LOWER(TRIM(cvr.contact_email)), '')
+                 ) AS delivery_email
+                 FROM users u
+                 LEFT JOIN verified_clubs vc ON vc.auth_user_id = u.id
+                 LEFT JOIN club_verification_requests cvr ON cvr.auth_user_id = u.id
+                 WHERE u.id = $1
+                 ORDER BY cvr.submitted_at DESC NULLS LAST
+                 LIMIT 1;`,
+                [userId]
+            );
+            const candidate = clubEmailRes.rows[0]?.delivery_email;
+            if (candidate && !candidate.endsWith("@club.orbix")) {
+                return candidate;
+            }
+        } catch (err) {
+            console.warn("[PasswordResetService] Club delivery email lookup fallback:", err);
+        }
+
+        return normalized;
     }
 
     /**
@@ -203,7 +241,7 @@ export class PasswordResetService {
         }
 
         const userId = user.id;
-        const normalizedEmail = user.email.toLowerCase().trim();
+        const normalizedEmail = await this.resolveDeliveryEmail(userId, user.email, accountType);
 
         // Rate Limiting Check: 60-second cooldown in Redis
         if (redis && redis.status === "ready") {
@@ -344,7 +382,8 @@ export class PasswordResetService {
         }
 
         const userRes = await query(
-            `SELECT id, email, username, firstname AS "firstName", lastname AS "lastName"
+            `SELECT id, email, username, firstname AS "firstName", lastname AS "lastName",
+                    account_type AS "accountType"
              FROM users WHERE id = $1 LIMIT 1;`,
             [userId]
         );
@@ -355,7 +394,15 @@ export class PasswordResetService {
             throw err;
         }
 
-        const normalizedEmail = user.email.toLowerCase().trim();
+        const expectedAccountType = decoded.accountType === "club" ? "club" : "personal";
+        const dbAccountType = user.accountType === "club" ? "club" : "personal";
+        if (dbAccountType !== expectedAccountType) {
+            const err: any = new Error("Account type mismatch for password reset session.");
+            err.statusCode = 403;
+            throw err;
+        }
+
+        const normalizedEmail = await this.resolveDeliveryEmail(userId, user.email, expectedAccountType);
 
         // Check Cooldown in Redis
         if (redis && redis.status === "ready") {

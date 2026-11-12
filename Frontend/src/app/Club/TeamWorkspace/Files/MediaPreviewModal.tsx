@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { X, Download, Loader2, Image as ImageIcon, Video } from "lucide-react";
 import workspaceApi from "../../../../api/workspaceApi";
 import type { WorkspaceFile } from "../../../../types/workspace";
+import { useToast } from "../../../../context/ToastContext";
 
 interface MediaPreviewModalProps {
     file: WorkspaceFile;
@@ -17,6 +18,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
     isOpen,
     onClose,
 }) => {
+    const toast = useToast();
     const [deliveryUrl, setDeliveryUrl] = useState<string | null>(file.deliveryUrl || null);
     const [loading, setLoading] = useState<boolean>(!file.deliveryUrl);
     const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
             a.click();
             document.body.removeChild(a);
         } catch {
-            alert("Failed to download media.");
+            toast.error("Failed to download media.");
         }
     };
 

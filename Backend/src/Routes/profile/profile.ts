@@ -263,9 +263,14 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
 
         const cooldownInfo = computeCollegeCooldown(userRow.collegeUpdatedAt);
 
+        const resolvedAccountType =
+            (req.user as any)?.accountType === "club" || userRow.accountType === "club"
+                ? "club"
+                : "personal";
+
         const fullUser: any = {
             ...userRow,
-            accountType: (req.user as any)?.accountType || userRow.accountType || "personal",
+            accountType: resolvedAccountType,
             college,
             collegeUpdatedAt: userRow.collegeUpdatedAt,
             canChangeCollege: cooldownInfo.canChangeCollege,

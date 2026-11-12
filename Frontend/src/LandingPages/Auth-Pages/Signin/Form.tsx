@@ -109,7 +109,14 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             }
 
             const queryReturn = searchParams.get("returnUrl") || searchParams.get("redirect");
-            if (queryReturn && (queryReturn.startsWith("/blog") || queryReturn.startsWith("/blogs") || queryReturn.startsWith("/"))) {
+            const isAllowedClubJoin =
+                queryReturn?.startsWith("/club/join") ||
+                queryReturn?.startsWith("/club/team-workspace/join");
+            if (
+                queryReturn &&
+                queryReturn.startsWith("/") &&
+                (!queryReturn.startsWith("/club") || isAllowedClubJoin)
+            ) {
                 return queryReturn;
             }
         } catch {

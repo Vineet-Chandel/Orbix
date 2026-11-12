@@ -988,7 +988,8 @@ export class WorkspaceRepository {
                     'username', u.username,
                     'firstName', u.firstname,
                     'lastName', u.lastname,
-                    'avatarUrl', u.avatar_url
+                    'avatarUrl', u.avatar_url,
+                    'accountType', u.account_type
                 ) AS "user",
                 json_build_object(
                     'id', r.id,
@@ -1040,7 +1041,7 @@ export class WorkspaceRepository {
     ): Promise<{ members: WorkspaceMember[]; total: number }> {
         const { status, departmentId, roleId, search, limit = 50, offset = 0 } = options;
 
-        let whereClause = `WHERE wm.workspace_id = $1`;
+        let whereClause = `WHERE wm.workspace_id = $1 AND COALESCE(u.account_type, 'personal') <> 'club'`;
         const params: any[] = [workspaceId];
         let idx = 2;
 
@@ -1098,7 +1099,8 @@ export class WorkspaceRepository {
                     'username', u.username,
                     'firstName', u.firstname,
                     'lastName', u.lastname,
-                    'avatarUrl', u.avatar_url
+                    'avatarUrl', u.avatar_url,
+                    'accountType', u.account_type
                 ) AS "user",
                 json_build_object(
                     'id', r.id,
@@ -2255,6 +2257,7 @@ export class WorkspaceRepository {
             channelId: string;
             senderId: string;
             senderMemberId: string;
+            senderType?: "member" | "club";
             content: string;
             messageType?: "text" | "system" | "announcement" | "thread_starter";
             parentMessageId?: string | null;
@@ -2271,6 +2274,7 @@ export class WorkspaceRepository {
                 channel_id,
                 sender_id,
                 sender_member_id,
+                sender_type,
                 content,
                 message_type,
                 parent_message_id,
@@ -2279,7 +2283,7 @@ export class WorkspaceRepository {
                 created_at,
                 updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5, COALESCE($6, 'text'), $7, $8, $9::jsonb, NOW(), NOW()
+                $1, $2, $3, $4, COALESCE($5, 'member'), $6, COALESCE($7, 'text'), $8, $9, $10::jsonb, NOW(), NOW()
             )
             RETURNING
                 id,
@@ -2287,6 +2291,7 @@ export class WorkspaceRepository {
                 channel_id AS "channelId",
                 sender_id AS "senderId",
                 sender_member_id AS "senderMemberId",
+                sender_type AS "senderType",
                 content,
                 message_type AS "messageType",
                 parent_message_id AS "parentMessageId",
@@ -2305,6 +2310,7 @@ export class WorkspaceRepository {
                 data.channelId,
                 data.senderId,
                 data.senderMemberId,
+                data.senderType || "member",
                 data.content,
                 data.messageType || "text",
                 data.parentMessageId || null,
@@ -2341,6 +2347,7 @@ export class WorkspaceRepository {
                 wm.channel_id AS "channelId",
                 wm.sender_id AS "senderId",
                 wm.sender_member_id AS "senderMemberId",
+                wm.sender_type AS "senderType",
                 wm.content,
                 wm.message_type AS "messageType",
                 wm.parent_message_id AS "parentMessageId",
@@ -2358,11 +2365,18 @@ export class WorkspaceRepository {
                 u.firstname AS "senderFirstName",
                 u.lastname AS "senderLastName",
                 u.avatar_url AS "senderAvatarUrl",
+                u.account_type AS "senderAccountType",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                vc.logo_url AS "clubLogoUrl",
+                (wm.sender_type = 'club' OR u.account_type = 'club') AS "isClubSender",
                 wr.name AS "roleName",
                 wr.color AS "roleColor",
                 wr.rank AS "roleRank"
              FROM public.workspace_messages wm
              JOIN public.users u ON u.id = wm.sender_id
+             JOIN public.team_workspaces tw ON tw.id = wm.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
              LEFT JOIN public.workspace_members wmem ON wmem.id = wm.sender_member_id
              LEFT JOIN public.workspace_roles wr ON wr.id = wmem.role_id
              WHERE wm.workspace_id = $1 AND wm.id = $2
@@ -2372,17 +2386,26 @@ export class WorkspaceRepository {
 
         if (!res.rows[0]) return null;
         const row = res.rows[0];
+        const isClub = Boolean(row.senderType === "club" || row.isClubSender || row.senderAccountType === "club");
 
         return {
             ...row,
             sender: {
                 id: row.senderId,
-                username: row.senderUsername,
-                firstName: row.senderFirstName,
-                lastName: row.senderLastName,
-                avatarUrl: row.senderAvatarUrl,
+                username: isClub ? (row.clubSlug || row.senderUsername) : row.senderUsername,
+                firstName: isClub ? (row.clubName || row.senderFirstName) : row.senderFirstName,
+                lastName: isClub ? "" : row.senderLastName,
+                avatarUrl: isClub ? (row.clubLogoUrl || row.senderAvatarUrl) : row.senderAvatarUrl,
+                isClub,
             },
-            senderRole: row.roleName
+            senderRole: isClub
+                ? {
+                      id: "club-identity",
+                      name: "Club Identity",
+                      color: "#f59e0b",
+                      rank: 9999,
+                  }
+                : row.roleName
                 ? {
                       id: row.roleId,
                       name: row.roleName,
@@ -2435,6 +2458,7 @@ export class WorkspaceRepository {
                 wm.channel_id AS "channelId",
                 wm.sender_id AS "senderId",
                 wm.sender_member_id AS "senderMemberId",
+                wm.sender_type AS "senderType",
                 CASE WHEN wm.is_deleted THEN '[Message deleted]' ELSE wm.content END AS content,
                 wm.message_type AS "messageType",
                 wm.parent_message_id AS "parentMessageId",
@@ -2452,6 +2476,11 @@ export class WorkspaceRepository {
                 u.firstname AS "senderFirstName",
                 u.lastname AS "senderLastName",
                 u.avatar_url AS "senderAvatarUrl",
+                u.account_type AS "senderAccountType",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                vc.logo_url AS "clubLogoUrl",
+                (wm.sender_type = 'club' OR u.account_type = 'club') AS "isClubSender",
                 wr.name AS "roleName",
                 wr.color AS "roleColor",
                 wr.rank AS "roleRank",
@@ -2460,6 +2489,8 @@ export class WorkspaceRepository {
                 wt.message_count AS "threadMessageCount"
              FROM public.workspace_messages wm
              JOIN public.users u ON u.id = wm.sender_id
+             JOIN public.team_workspaces tw ON tw.id = wm.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
              LEFT JOIN public.workspace_members wmem ON wmem.id = wm.sender_member_id
              LEFT JOIN public.workspace_roles wr ON wr.id = wmem.role_id
              LEFT JOIN public.workspace_threads wt ON wt.parent_message_id = wm.id
@@ -2522,44 +2553,54 @@ export class WorkspaceRepository {
             filesMap.get(f.messageId)!.push(f);
         }
 
-        return res.rows.map((row: any) => ({
-            id: row.id,
-            workspaceId: row.workspaceId,
-            channelId: row.channelId,
-            senderId: row.senderId,
-            senderMemberId: row.senderMemberId,
-            content: row.content,
-            messageType: row.messageType,
-            parentMessageId: row.parentMessageId,
-            threadId: row.threadId,
-            isPinned: row.isPinned,
-            pinnedAt: row.pinnedAt,
-            pinnedBy: row.pinnedBy,
-            isEdited: row.isEdited,
-            editedAt: row.editedAt,
-            isDeleted: row.isDeleted,
-            deletedAt: row.deletedAt || null,
-            mentions: row.mentions,
-            createdAt: row.createdAt,
-            updatedAt: row.updatedAt,
-            sender: {
-                id: row.senderId,
-                username: row.senderUsername,
-                firstName: row.senderFirstName,
-                lastName: row.senderLastName,
-                avatarUrl: row.senderAvatarUrl,
-            },
-            senderRole: row.roleName
-                ? {
-                      id: row.roleId,
-                      name: row.roleName,
-                      color: row.roleColor,
-                      rank: row.roleRank,
-                  }
-                : null,
-            reactions: reactionsMap.get(row.id) || [],
-            attachments: filesMap.get(row.id) || [],
-            thread: row.threadInstanceId
+        return res.rows.map((row: any) => {
+            const isClub = Boolean(row.senderType === "club" || row.isClubSender || row.senderAccountType === "club");
+            return {
+                id: row.id,
+                workspaceId: row.workspaceId,
+                channelId: row.channelId,
+                senderId: row.senderId,
+                senderMemberId: row.senderMemberId,
+                content: row.content,
+                messageType: row.messageType,
+                parentMessageId: row.parentMessageId,
+                threadId: row.threadId,
+                isPinned: row.isPinned,
+                pinnedAt: row.pinnedAt,
+                pinnedBy: row.pinnedBy,
+                isEdited: row.isEdited,
+                editedAt: row.editedAt,
+                isDeleted: row.isDeleted,
+                deletedAt: row.deletedAt || null,
+                mentions: row.mentions,
+                createdAt: row.createdAt,
+                updatedAt: row.updatedAt,
+                sender: {
+                    id: row.senderId,
+                    username: isClub ? (row.clubSlug || row.senderUsername) : row.senderUsername,
+                    firstName: isClub ? (row.clubName || row.senderFirstName) : row.senderFirstName,
+                    lastName: isClub ? "" : row.senderLastName,
+                    avatarUrl: isClub ? (row.clubLogoUrl || row.senderAvatarUrl) : row.senderAvatarUrl,
+                    isClub,
+                },
+                senderRole: isClub
+                    ? {
+                          id: "club-identity",
+                          name: "Club Identity",
+                          color: "#f59e0b",
+                          rank: 9999,
+                      }
+                    : row.roleName
+                    ? {
+                          id: row.roleId,
+                          name: row.roleName,
+                          color: row.roleColor,
+                          rank: row.roleRank,
+                      }
+                    : null,
+                reactions: reactionsMap.get(row.id) || [],
+                attachments: filesMap.get(row.id) || [],
+                thread: row.threadInstanceId
                 ? {
                       id: row.threadInstanceId,
                       workspaceId: row.workspaceId,
@@ -2579,7 +2620,8 @@ export class WorkspaceRepository {
                       updatedAt: row.updatedAt,
                   }
                 : null,
-        }));
+            };
+        });
     }
 
     static async updateMessage(
@@ -2670,14 +2712,23 @@ export class WorkspaceRepository {
                 wm.workspace_id AS "workspaceId",
                 wm.channel_id AS "channelId",
                 wm.sender_id AS "senderId",
+                wm.sender_type AS "senderType",
                 wm.content,
                 wm.created_at AS "createdAt",
                 wc.name AS "channelName",
                 u.username AS "senderUsername",
                 u.firstname AS "senderFirstName",
-                u.lastname AS "senderLastName"
+                u.lastname AS "senderLastName",
+                u.avatar_url AS "senderAvatarUrl",
+                u.account_type AS "senderAccountType",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                vc.logo_url AS "clubLogoUrl",
+                (wm.sender_type = 'club' OR u.account_type = 'club') AS "isClubSender"
              FROM public.workspace_messages wm
              JOIN public.users u ON u.id = wm.sender_id
+             JOIN public.team_workspaces tw ON tw.id = wm.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
              JOIN public.workspace_channels wc ON wc.id = wm.channel_id
              ${where}
              ORDER BY wm.created_at DESC
@@ -2685,33 +2736,46 @@ export class WorkspaceRepository {
             params
         );
 
-        return res.rows.map((row: any) => ({
-            id: row.id,
-            workspaceId: row.workspaceId,
-            channelId: row.channelId,
-            senderId: row.senderId,
-            senderMemberId: "",
-            parentMessageId: null,
-            threadId: null,
-            content: row.content,
-            messageType: "text",
-            isPinned: false,
-            pinnedAt: null,
-            pinnedBy: null,
-            isEdited: false,
-            editedAt: null,
-            isDeleted: false,
-            deletedAt: null,
-            mentions: { users: [], roles: [], everyone: false },
-            createdAt: row.createdAt,
-            updatedAt: row.createdAt,
-            sender: {
-                id: row.senderId,
-                username: row.senderUsername,
-                firstName: row.senderFirstName,
-                lastName: row.senderLastName,
-            },
-        }));
+        return res.rows.map((row: any) => {
+            const isClub = Boolean(row.senderType === "club" || row.isClubSender || row.senderAccountType === "club");
+            return {
+                id: row.id,
+                workspaceId: row.workspaceId,
+                channelId: row.channelId,
+                senderId: row.senderId,
+                senderMemberId: "",
+                parentMessageId: null,
+                threadId: null,
+                content: row.content,
+                messageType: "text",
+                isPinned: false,
+                pinnedAt: null,
+                pinnedBy: null,
+                isEdited: false,
+                editedAt: null,
+                isDeleted: false,
+                deletedAt: null,
+                mentions: { users: [], roles: [], everyone: false },
+                createdAt: row.createdAt,
+                updatedAt: row.createdAt,
+                sender: {
+                    id: row.senderId,
+                    username: isClub ? (row.clubSlug || row.senderUsername) : row.senderUsername,
+                    firstName: isClub ? (row.clubName || row.senderFirstName) : row.senderFirstName,
+                    lastName: isClub ? "" : row.senderLastName,
+                    avatarUrl: isClub ? (row.clubLogoUrl || row.senderAvatarUrl) : row.senderAvatarUrl,
+                    isClub,
+                },
+                senderRole: isClub
+                    ? {
+                          id: "club-identity",
+                          name: "Club Identity",
+                          color: "#f59e0b",
+                          rank: 9999,
+                      }
+                    : null,
+            };
+        });
     }
 
     static async addReaction(
@@ -6188,9 +6252,11 @@ export class WorkspaceRepository {
             const membersRes = await query(
                 `SELECT
                     COUNT(*)::int AS "totalMembers",
-                    COUNT(*) FILTER (WHERE membership_status = 'active' AND is_suspended = false)::int AS "activeMembers"
-                 FROM public.workspace_members
-                 WHERE workspace_id = $1;`,
+                    COUNT(*) FILTER (WHERE wm.membership_status = 'active' AND wm.is_suspended = false)::int AS "activeMembers"
+                 FROM public.workspace_members wm
+                 JOIN public.users u ON u.id = wm.user_id
+                 WHERE wm.workspace_id = $1
+                   AND COALESCE(u.account_type, 'personal') <> 'club';`,
                 [workspaceId]
             );
             totalMembers = Number(membersRes.rows[0]?.totalMembers || 0);
@@ -6201,8 +6267,10 @@ export class WorkspaceRepository {
                     COUNT(DISTINCT wm.id)::int AS "totalMembers",
                     COUNT(DISTINCT wm.id) FILTER (WHERE wm.membership_status = 'active' AND wm.is_suspended = false)::int AS "activeMembers"
                  FROM public.workspace_members wm
+                 JOIN public.users u ON u.id = wm.user_id
                  LEFT JOIN public.workspace_department_members wdm ON wdm.member_id = wm.id
                  WHERE wm.workspace_id = $1
+                   AND COALESCE(u.account_type, 'personal') <> 'club'
                    AND (wm.department_id = ANY($2::uuid[]) OR wdm.department_id = ANY($2::uuid[]));`,
                 [workspaceId, allowedDepartmentIds]
             );
@@ -6788,16 +6856,6 @@ export class WorkspaceRepository {
                AND wm.membership_status = 'active'
                AND wm.is_suspended = false
                AND tw.workspace_status = 'active'
-               -- Exclude supreme club manager/owner roles (rank 1000, slug 'owner', workspace owner, or club representative)
-               AND r.rank < 1000
-               AND r.slug != 'owner'
-               AND tw.owner_id != $1
-               AND vc.auth_user_id != $1
-               -- A club manager / representative of an active verified club cannot access or join workspaces via personal account
-               AND NOT EXISTS (
-                   SELECT 1 FROM public.verified_clubs vc_rep
-                   WHERE vc_rep.auth_user_id = $1 AND vc_rep.is_active = true
-               )
              ORDER BY tw.created_at ASC;`,
             [userId]
         );
@@ -7169,6 +7227,7 @@ export class WorkspaceRepository {
              JOIN public.workspace_roles wr ON wr.id = wm.role_id
              WHERE wm.workspace_id = $1
                AND wm.membership_status = 'active'
+               AND COALESCE(u.account_type, 'personal') <> 'club'
                AND (wr.rank >= 800 OR wm.user_id = $2)
                AND wr.rank < 1000;`,
             [workspaceId, ws?.managerUserId || null]
@@ -7643,10 +7702,11 @@ export class WorkspaceRepository {
                 ) AS "recipient",
                 json_build_object(
                     'id', iu.id,
-                    'username', iu.username,
-                    'firstName', iu.firstname,
-                    'lastName', iu.lastname,
-                    'avatarUrl', iu.avatar_url
+                    'username', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.slug, iu.username) ELSE iu.username END,
+                    'firstName', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.name, iu.firstname) ELSE iu.firstname END,
+                    'lastName', CASE WHEN iu.account_type = 'club' THEN '' ELSE iu.lastname END,
+                    'avatarUrl', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.logo_url, iu.avatar_url) ELSE iu.avatar_url END,
+                    'isClub', (iu.account_type = 'club')
                 ) AS "issuer",
                 json_build_object(
                     'id', rc.id,
@@ -7661,6 +7721,8 @@ export class WorkspaceRepository {
                     json_build_object('id', wt.id, 'title', wt.title, 'status', wt.status)
                 ELSE NULL END AS "linkedTask"
              FROM public.workspace_recognition_ledger wrl
+             JOIN public.team_workspaces tw ON tw.id = wrl.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
              JOIN public.users ru ON ru.id = wrl.recipient_id
              JOIN public.users iu ON iu.id = wrl.issuer_id
              JOIN public.workspace_recognition_categories rc ON rc.id = wrl.category_id
@@ -7973,10 +8035,11 @@ export class WorkspaceRepository {
                 ) AS "recipient",
                 json_build_object(
                     'id', iu.id,
-                    'username', iu.username,
-                    'firstName', iu.firstname,
-                    'lastName', iu.lastname,
-                    'avatarUrl', iu.avatar_url
+                    'username', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.slug, iu.username) ELSE iu.username END,
+                    'firstName', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.name, iu.firstname) ELSE iu.firstname END,
+                    'lastName', CASE WHEN iu.account_type = 'club' THEN '' ELSE iu.lastname END,
+                    'avatarUrl', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.logo_url, iu.avatar_url) ELSE iu.avatar_url END,
+                    'isClub', (iu.account_type = 'club')
                 ) AS "issuer",
                 json_build_object(
                     'id', rc.id,
@@ -7991,6 +8054,8 @@ export class WorkspaceRepository {
                     json_build_object('id', wt.id, 'title', wt.title, 'status', wt.status)
                 ELSE NULL END AS "linkedTask"
              FROM public.workspace_recognition_ledger wrl
+             JOIN public.team_workspaces tw ON tw.id = wrl.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
              JOIN public.users ru ON ru.id = wrl.recipient_id
              JOIN public.users iu ON iu.id = wrl.issuer_id
              JOIN public.workspace_recognition_categories rc ON rc.id = wrl.category_id
@@ -8044,10 +8109,11 @@ export class WorkspaceRepository {
                 ) AS "recipient",
                 json_build_object(
                     'id', iu.id,
-                    'username', iu.username,
-                    'firstName', iu.firstname,
-                    'lastName', iu.lastname,
-                    'avatarUrl', iu.avatar_url
+                    'username', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.slug, iu.username) ELSE iu.username END,
+                    'firstName', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.name, iu.firstname) ELSE iu.firstname END,
+                    'lastName', CASE WHEN iu.account_type = 'club' THEN '' ELSE iu.lastname END,
+                    'avatarUrl', CASE WHEN iu.account_type = 'club' THEN COALESCE(vc.logo_url, iu.avatar_url) ELSE iu.avatar_url END,
+                    'isClub', (iu.account_type = 'club')
                 ) AS "issuer",
                 json_build_object(
                     'id', rc.id,
@@ -8062,6 +8128,8 @@ export class WorkspaceRepository {
                     json_build_object('id', wt.id, 'title', wt.title, 'status', wt.status)
                 ELSE NULL END AS "linkedTask"
              FROM public.workspace_recognition_ledger wrl
+             JOIN public.team_workspaces tw ON tw.id = wrl.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
              JOIN public.users ru ON ru.id = wrl.recipient_id
              JOIN public.users iu ON iu.id = wrl.issuer_id
              JOIN public.workspace_recognition_categories rc ON rc.id = wrl.category_id
@@ -8523,7 +8591,8 @@ export class WorkspaceRepository {
              LEFT JOIN public.workspace_departments wd ON wd.id = COALESCE(wdm.department_id, wm.department_id)
              WHERE wm.workspace_id = $1
                AND wm.membership_status = 'active'
-               AND wm.is_suspended = false;`,
+               AND wm.is_suspended = false
+               AND COALESCE(u.account_type, 'personal') <> 'club';`,
             [workspaceId]
         );
 

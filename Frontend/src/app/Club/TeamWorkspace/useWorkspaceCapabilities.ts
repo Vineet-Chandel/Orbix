@@ -56,10 +56,10 @@ export function useWorkspaceCapabilities({
     const can = useCallback(
         <M extends keyof WorkspaceModuleCapabilities>(
             moduleName: M,
-            actionName: keyof WorkspaceModuleCapabilities[M]
+            actionName: keyof NonNullable<WorkspaceModuleCapabilities[M]>
         ): boolean => {
             if (!capabilities) return false;
-            const mod = capabilities.capabilities[moduleName];
+            const mod = capabilities.capabilities[moduleName] as any;
             if (!mod) return false;
             return Boolean(mod[actionName]);
         },

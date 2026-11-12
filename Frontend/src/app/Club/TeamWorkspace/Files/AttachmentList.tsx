@@ -16,6 +16,8 @@ import workspaceApi from "../../../../api/workspaceApi";
 import type { WorkspaceFile } from "../../../../types/workspace";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { MediaPreviewModal } from "./MediaPreviewModal";
+import { useToast } from "../../../../context/ToastContext";
+import { ConfirmationModal } from "../../../../components/ConfirmationModal";
 
 interface AttachmentListProps {
     files: WorkspaceFile[];
@@ -34,9 +36,11 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({
     compact = false,
     className = "",
 }) => {
+    const toast = useToast();
     const [selectedPdf, setSelectedPdf] = useState<WorkspaceFile | null>(null);
     const [selectedMedia, setSelectedMedia] = useState<WorkspaceFile | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [fileToDelete, setFileToDelete] = useState<string | null>(null);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
     if (!files || files.length === 0) {
@@ -105,23 +109,29 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({
             document.body.removeChild(a);
         } catch (err: any) {
             console.error("Failed to generate download URL:", err);
-            alert("Failed to download file. Your session may have expired.");
+            toast.error("Failed to download file. Your session may have expired.");
         } finally {
             setDownloadingId(null);
         }
     };
 
-    const handleDelete = async (fileId: string) => {
-        if (!confirm("Are you sure you want to remove this attachment?")) return;
+    const handleDelete = (fileId: string) => {
+        setFileToDelete(fileId);
+    };
+
+    const confirmDeleteFile = async () => {
+        if (!fileToDelete) return;
         try {
-            setDeletingId(fileId);
-            await workspaceApi.deleteFile(fileId, clubId);
+            setDeletingId(fileToDelete);
+            await workspaceApi.deleteFile(fileToDelete, clubId);
             if (onFileDeleted) {
-                onFileDeleted(fileId);
+                onFileDeleted(fileToDelete);
             }
+            toast.success("Attachment removed.");
+            setFileToDelete(null);
         } catch (err: any) {
             console.error("Failed to delete file:", err);
-            alert(err?.response?.data?.message || "Failed to delete file.");
+            toast.error(err?.response?.data?.message || "Failed to delete file.");
         } finally {
             setDeletingId(null);
         }
@@ -247,6 +257,19 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({
                     onClose={() => setSelectedMedia(null)}
                 />
             )}
+
+            {/* Remove Attachment Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(fileToDelete)}
+                onClose={() => setFileToDelete(null)}
+                onConfirm={confirmDeleteFile}
+                title="Remove Attachment?"
+                description="Are you sure you want to delete this attachment? This action cannot be undone."
+                confirmText="Remove File"
+                cancelText="Cancel"
+                variant="danger"
+                isLoading={Boolean(deletingId)}
+            />
         </div>
     );
 };

@@ -25,7 +25,7 @@ import {
     Send,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAppDispatch, clearUser } from "../../store";
+import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { OrbixLoader } from "../../components/ui/loader";
@@ -143,6 +143,7 @@ export default function ClubStatusPage() {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const toast = useToast();
+    const { user } = useAppSelector((state) => state.user);
 
     // Data State
     const [application, setApplication] = useState<ClubApplication | null>(null);
@@ -182,6 +183,7 @@ export default function ClubStatusPage() {
 
     // Fetch Status Data from Database
     const fetchStatus = async (isManualRefresh = false) => {
+        if (user?.accountType !== "club") return;
         if (isManualRefresh) setRefreshing(true);
         else if (!application) setLoading(true);
         setError(null);
@@ -209,8 +211,8 @@ export default function ClubStatusPage() {
             }
 
             if (!res || !res.ok) {
-                if (res?.status === 401) {
-                    navigate("/auth/signin");
+                if (res?.status === 401 || res?.status === 403) {
+                    navigate("/auth/signin?tab=club", { replace: true });
                     return;
                 }
                 throw new Error(data?.message || "Failed to load club application status.");
@@ -244,16 +246,18 @@ export default function ClubStatusPage() {
 
     // Initial mount fetch
     useEffect(() => {
+        if (user?.accountType !== "club") return;
         fetchStatus();
-    }, []);
+    }, [user?.accountType]);
 
     // Periodic auto-poll every 30 seconds for live database updates
     useEffect(() => {
+        if (user?.accountType !== "club") return;
         const timer = setInterval(() => {
             fetchStatus(false);
         }, 30000);
         return () => clearInterval(timer);
-    }, []);
+    }, [user?.accountType]);
 
     const handleLogout = async () => {
         try {
@@ -269,7 +273,7 @@ export default function ClubStatusPage() {
         }
         dispatch(clearUser());
         toast.info("Signed out successfully.");
-        navigate("/auth/signin");
+        navigate("/auth/signin?tab=club");
     };
 
     // Handle sending OTP to contact email

@@ -382,6 +382,9 @@ export class WorkspaceTaskService {
         tab: "assigned_to_me" | "created_by_me" | "assigned_by_me" | "department_tasks" | "due_soon" | "overdue" | "completed" | "awaiting_review" | "archived"
     ): Promise<WorkspaceTask[]> {
         const context = await this.getAuthorizedContext(workspaceId, actorUserId);
+        if (context.isClubAccount) {
+            throw new Error("Unauthorized: My Tasks is reserved for personal workspace member accounts.");
+        }
 
         const myDepts = await WorkspaceRepository.listMemberDepartments(workspaceId, context.member.id);
         const allowedDeptIds = Array.from(new Set([

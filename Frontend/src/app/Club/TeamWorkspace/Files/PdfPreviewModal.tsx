@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import workspaceApi from "../../../../api/workspaceApi";
 import type { WorkspaceFile } from "../../../../types/workspace";
+import { useToast } from "../../../../context/ToastContext";
 
 interface PdfPreviewModalProps {
     file: WorkspaceFile;
@@ -26,6 +27,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
     isOpen,
     onClose,
 }) => {
+    const toast = useToast();
     const [deliveryUrl, setDeliveryUrl] = useState<string | null>(file.deliveryUrl || null);
     const [page, setPage] = useState<number>(1);
     const [pageThumbnailUrl, setPageThumbnailUrl] = useState<string | null>(file.thumbnailUrl || null);
@@ -104,7 +106,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
             a.click();
             document.body.removeChild(a);
         } catch {
-            alert("Failed to download PDF.");
+            toast.error("Failed to download PDF.");
         }
     };
 

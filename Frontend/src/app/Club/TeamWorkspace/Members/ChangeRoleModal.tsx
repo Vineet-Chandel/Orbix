@@ -12,6 +12,7 @@ interface ChangeRoleModalProps {
     roles: WorkspaceRole[];
     currentActor: WorkspaceMember | null;
     clubId: string;
+    isClubContext?: boolean;
     onSuccess: () => void;
 }
 
@@ -22,6 +23,7 @@ export const ChangeRoleModal: React.FC<ChangeRoleModalProps> = ({
     roles,
     currentActor,
     clubId,
+    isClubContext = false,
     onSuccess,
 }) => {
     const toast = useToast();
@@ -40,14 +42,17 @@ export const ChangeRoleModal: React.FC<ChangeRoleModalProps> = ({
     if (!isOpen || !member) return null;
 
     const actorRank = currentActor?.role?.rank ?? 0;
-    const isOwner = currentActor?.role?.slug === "owner" || actorRank === 1000;
+    const isPersonalOwner = !isClubContext && (currentActor?.role?.slug === "owner" || actorRank >= 1000);
 
-    // Filter available roles: cannot assign "owner", and rank must be strictly less than actor rank unless owner
-    const assignableRoles = roles.filter((r) => {
-        if (r.slug === "owner") return false;
-        if (!isOwner && r.rank >= actorRank) return false;
-        return true;
-    });
+    // Club account can assign any role (0..1000); personal members cannot assign owner or >= actorRank
+    const assignableRoles = [...roles]
+        .filter((r) => {
+            if (isClubContext) return true;
+            if (r.slug === "owner" || r.rank >= 1000) return false;
+            if (!isPersonalOwner && r.rank >= actorRank) return false;
+            return true;
+        })
+        .sort((a, b) => b.rank - a.rank);
 
     const fullName = `${member.user?.firstName || ""} ${member.user?.lastName || ""}`.trim() || member.user?.username || "Unknown";
 

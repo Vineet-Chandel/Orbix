@@ -21,6 +21,7 @@ import {
     Clock,
     User,
     Shield,
+    Building2,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
@@ -34,10 +35,14 @@ import type {
 } from "../../../../types/workspace";
 import { FileUploadZone } from "../Files/FileUploadZone";
 import { AttachmentList } from "../Files/AttachmentList";
+import { ConfirmationModal } from "../../../../components/ConfirmationModal";
 
 interface ChannelViewProps {
     channel: WorkspaceChannel;
     clubId: string;
+    clubName?: string;
+    clubLogoUrl?: string | null;
+    isClubContext?: boolean;
     currentMember: WorkspaceMember | null;
     canManageChannels: boolean;
     members?: WorkspaceMember[];
@@ -51,6 +56,9 @@ const COMMON_EMOJIS = ["👍", "❤️", "🔥", "🎉", "🚀", "👀", "💡",
 export const ChannelView: React.FC<ChannelViewProps> = ({
     channel,
     clubId,
+    clubName,
+    clubLogoUrl,
+    isClubContext = false,
     currentMember,
     canManageChannels,
     members = [],
@@ -59,6 +67,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     onChannelUpdated,
 }) => {
     const toast = useToast();
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     // Data states
     const [messages, setMessages] = useState<WorkspaceMessage[]>([]);
@@ -87,6 +96,10 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     // Search state
     const [searchQuery, setSearchQuery] = useState("");
     const [isSearching, setIsSearching] = useState(false);
+
+    // Delete message confirmation modal state
+    const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+    const [isDeletingMessage, setIsDeletingMessage] = useState(false);
     const [searchResults, setSearchResults] = useState<WorkspaceMessage[]>([]);
 
     // Emoji picker popover state: messageId -> boolean
@@ -382,21 +395,29 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     };
 
     // Delete message
-    const handleDeleteMessage = async (messageId: string) => {
-        if (!confirm("Are you sure you want to delete this message?")) return;
+    const handleDeleteMessage = (messageId: string) => {
+        setMessageToDelete(messageId);
+    };
+
+    const confirmDeleteMessage = async () => {
+        if (!messageToDelete) return;
         try {
-            const res = await workspaceApi.deleteMessage(messageId, clubId);
+            setIsDeletingMessage(true);
+            const res = await workspaceApi.deleteMessage(messageToDelete, clubId);
             if (res.success) {
                 setMessages((prev) =>
                     prev.map((m) =>
-                        m.id === messageId
+                        m.id === messageToDelete
                             ? { ...m, isDeleted: true, content: "This message was deleted." }
                             : m
                     )
                 );
+                setMessageToDelete(null);
             }
         } catch (err: any) {
             toast.error(err.message || "Failed to delete message.");
+        } finally {
+            setIsDeletingMessage(false);
         }
     };
 
@@ -543,10 +564,19 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     };
 
     const isAnnouncementReadOnly =
+        !isClubContext &&
         channel.channelType === "announcement" &&
         !canManageChannels &&
         currentMember?.role?.slug !== "owner" &&
+        currentMember?.role?.slug !== "dept_lead" &&
         currentMember?.role?.slug !== "lead";
+
+    const isObserverReadOnly =
+        !isClubContext &&
+        currentMember?.role?.slug !== "owner" &&
+        !canManageChannels &&
+        !currentMember?.role?.permissions?.includes("messages:send") &&
+        !currentMember?.role?.permissions?.includes("*");
 
     return (
         <div className="flex-1 flex flex-col h-full bg-[#FAF6EE] overflow-hidden">
@@ -753,27 +783,51 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 }`}
                             >
                                 {/* Sender Avatar */}
-                                <div className="w-9 h-9 rounded-full bg-[#FFE566] border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center font-black text-xs text-black uppercase shrink-0 mt-0.5">
-                                    {msg.sender?.firstName?.[0] || "U"}
+                                <div
+                                    className={`w-9 h-9 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center font-black text-xs text-black uppercase shrink-0 mt-0.5 overflow-hidden ${
+                                        msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                            ? "bg-amber-300"
+                                            : "bg-[#FFE566]"
+                                    }`}
+                                >
+                                    {msg.sender?.avatarUrl ? (
+                                        <img
+                                            src={msg.sender.avatarUrl}
+                                            alt={msg.sender.firstName}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : msg.sender?.isClub ? (
+                                        <Building2 className="w-4 h-4 text-black" />
+                                    ) : (
+                                        msg.sender?.firstName?.[0] || "U"
+                                    )}
                                 </div>
 
                                 {/* Message Content Container */}
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-black text-black">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-sm font-black text-black flex items-center gap-1.5">
+                                            {(msg.sender?.isClub || msg.senderRole?.name === "Club Identity") && (
+                                                <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                            )}
                                             {msg.sender?.firstName} {msg.sender?.lastName}
                                         </span>
 
                                         {/* Sender Role Badge */}
-                                        {msg.senderRole && (
+                                        {(msg.senderRole || msg.sender?.isClub) && (
                                             <span
                                                 className="px-2 py-0.5 rounded-full text-[10px] font-black border-2 border-black shadow-[1px_1px_0px_#000]"
                                                 style={{
                                                     color: "#000",
-                                                    backgroundColor: msg.senderRole.color || "#FFE566",
+                                                    backgroundColor:
+                                                        msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                                            ? "#FCD34D"
+                                                            : msg.senderRole?.color || "#FFE566",
                                                 }}
                                             >
-                                                {msg.senderRole.name}
+                                                {msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                                    ? "🏛️ Club Identity"
+                                                    : msg.senderRole?.name}
                                             </span>
                                         )}
 
@@ -975,7 +1029,11 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
             {/* 3. MESSAGE COMPOSER */}
             <div className="p-4 border-t-2 border-black bg-white shrink-0">
-                {isAnnouncementReadOnly ? (
+                {isObserverReadOnly ? (
+                    <div className="p-3 rounded-xl bg-neutral-100 border-2 border-black text-center text-xs font-black text-neutral-700 shadow-[2px_2px_0px_#000]">
+                        Observers have read-only viewing access and cannot post messages in this channel.
+                    </div>
+                ) : isAnnouncementReadOnly ? (
                     <div className="p-3 rounded-xl bg-[#FFE566] border-2 border-black text-center text-xs font-black text-black shadow-[2px_2px_0px_#000]">
                         Only chapter administrators and leads can post in announcement channels.
                     </div>
@@ -1028,6 +1086,34 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                             </div>
                         )}
 
+                        {/* Inline Emoji Quick Picker Popover */}
+                        {showEmojiPicker && (
+                            <div className="p-2 bg-white border-2 border-black rounded-xl shadow-neo flex items-center gap-1.5 flex-wrap animate-in fade-in">
+                                {["👋", "👍", "❤️", "🔥", "🎉", "🚀", "👀", "💡", "👏", "✅"].map((em) => (
+                                    <button
+                                        key={em}
+                                        type="button"
+                                        onClick={() => {
+                                            setContent((prev) => (prev ? `${prev} ${em}` : em));
+                                            setShowEmojiPicker(false);
+                                            textareaRef.current?.focus();
+                                        }}
+                                        className="w-8 h-8 rounded-lg hover:bg-[#FFE566] border border-transparent hover:border-black flex items-center justify-center text-base transition"
+                                    >
+                                        {em}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEmojiPicker(false)}
+                                    className="ml-auto p-1 text-neutral-500 hover:text-black rounded-lg"
+                                    title="Close emoji picker"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        )}
+
                         {/* Expandable Attachment Zone */}
                         {showAttachmentZone && (
                             <div className="mb-3 p-3 bg-white border-2 border-black rounded-2xl space-y-2 shadow-neo">
@@ -1066,6 +1152,17 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                         )}
 
                         <div className="relative rounded-2xl bg-[#FAF6EE] border-2 border-black focus-within:shadow-[3px_3px_0px_#000] transition overflow-hidden">
+                            {isClubContext && (
+                                <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-100 border-b border-black/15 text-[11px] font-black text-amber-900">
+                                    {clubLogoUrl ? (
+                                        <img src={clubLogoUrl} alt={clubName} className="w-4 h-4 rounded-full border border-black object-cover" />
+                                    ) : (
+                                        <Building2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                    )}
+                                    <span>Posting as official club: <strong className="text-black">{clubName || "Club"}</strong> (Club Identity)</span>
+                                </div>
+                            )}
+
                             <textarea
                                 ref={textareaRef}
                                 value={content}
@@ -1076,7 +1173,11 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                         handleSendMessage();
                                     }
                                 }}
-                                placeholder={`Message #${channel.name}...`}
+                                placeholder={
+                                    isClubContext
+                                        ? `Message #${channel.name} as ${clubName || "Club"} (Club Official)...`
+                                        : `Message #${channel.name}...`
+                                }
                                 rows={2}
                                 className="w-full px-4 pt-3 pb-12 bg-transparent text-sm font-semibold text-black placeholder-neutral-500 focus:outline-none resize-none"
                             />
@@ -1085,11 +1186,12 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                             <div className="absolute left-3 bottom-2.5 flex items-center gap-1.5">
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        const emoji = prompt("Enter an emoji to insert:", "👋");
-                                        if (emoji) setContent((prev) => prev + " " + emoji);
-                                    }}
-                                    className="p-1.5 rounded-lg border border-transparent hover:border-black hover:bg-white text-black transition"
+                                    onClick={() => setShowEmojiPicker((prev) => !prev)}
+                                    className={`p-1.5 rounded-lg border transition ${
+                                        showEmojiPicker
+                                            ? "border-black bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
+                                            : "border-transparent hover:border-black hover:bg-white text-black"
+                                    }`}
                                     title="Add emoji"
                                 >
                                     <Smile className="w-4 h-4" />
@@ -1186,6 +1288,19 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Delete Message Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(messageToDelete)}
+                onClose={() => setMessageToDelete(null)}
+                onConfirm={confirmDeleteMessage}
+                title="Delete Message?"
+                description="Are you sure you want to delete this message? This action will permanently remove its contents."
+                confirmText="Delete Message"
+                cancelText="Cancel"
+                variant="danger"
+                isLoading={isDeletingMessage}
+            />
         </div>
     );
 };

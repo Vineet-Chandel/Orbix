@@ -39,13 +39,14 @@ export class WorkspaceMemberService {
         const workspace = await WorkspaceRepository.findById(workspaceId);
         if (!workspace) throw new Error("Workspace not found.");
 
-        if (workspace.ownerId !== actorUserId) {
+        const actorCtx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (workspace.ownerId !== actorUserId && !actorCtx?.isClubAccount && !actorCtx?.isOwner) {
             throw new Error("Only the Club Owner has authority to appoint or change the Workspace Manager.");
         }
 
-        // Verify target user is an active member of this workspace
+        // Verify target user is an active personal member of this workspace
         const member = await WorkspaceRepository.findMember(workspaceId, managerUserId);
-        if (!member || member.isSuspended) {
+        if (!member || member.isSuspended || member.user?.accountType === "club") {
             throw new Error("Target user must be an active workspace member to become Workspace Manager.");
         }
 
@@ -88,7 +89,8 @@ export class WorkspaceMemberService {
         const workspace = await WorkspaceRepository.findById(workspaceId);
         if (!workspace) throw new Error("Workspace not found.");
 
-        if (workspace.ownerId !== actorUserId) {
+        const actorCtx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (workspace.ownerId !== actorUserId && !actorCtx?.isClubAccount && !actorCtx?.isOwner) {
             throw new Error("Only the Club Owner has authority to revoke the Workspace Manager.");
         }
 
@@ -133,41 +135,51 @@ export class WorkspaceMemberService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceMember> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx) {
+            throw new Error("Unauthorized to assign member roles.");
+        }
+
         const rawMgrPerms = ctx.workspace.managerPermissions || {};
         const mgrPerms: Record<string, any> = Array.isArray(rawMgrPerms)
             ? rawMgrPerms.reduce((acc, p) => ({ ...acc, [p]: true }), {} as Record<string, boolean>)
             : (rawMgrPerms as Record<string, any>);
         const isAuthorizedManager = ctx.isWorkspaceManager && !!mgrPerms.can_manage_members;
 
-        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("members:assign_role") && !isAuthorizedManager && !ctx.isOwner)) {
+        if (!ctx.isClubAccount && !ctx.isAdmin && !ctx.permissions.includes("members:assign_role") && !isAuthorizedManager && !ctx.isOwner) {
             throw new Error("Unauthorized to assign member roles.");
         }
 
         const targetMember = await WorkspaceRepository.findMember(workspaceId, targetUserId);
         if (!targetMember) throw new Error("Target user is not a member of this workspace.");
 
+        if (targetMember.user?.accountType === "club") {
+            throw new Error("The club account role cannot be modified.");
+        }
+
         const targetNewRole = await WorkspaceRepository.findRoleById(workspaceId, newRoleId);
         if (!targetNewRole) throw new Error("Target role does not exist in this workspace.");
 
-        // Hierarchy Protection 1: Cannot alter role of the Owner
-        if (targetMember.role?.slug === "owner" || targetMember.role?.rank === 1000) {
-            throw new Error("The workspace owner role is permanent and cannot be modified.");
+        const actorIsClubAccount = Boolean(ctx.isClubAccount);
+
+        // Hierarchy Protection 1: Personal actors cannot alter a Workspace Owner
+        if ((targetMember.role?.slug === "owner" || (targetMember.role?.rank || 0) >= 1000) && !actorIsClubAccount) {
+            throw new Error("The workspace owner role cannot be modified by personal members.");
         }
 
-        // Hierarchy Protection 2: Cannot grant the Owner role to anyone else
-        if (targetNewRole.slug === "owner" || targetNewRole.rank === 1000) {
-            throw new Error("The workspace owner role cannot be granted through regular role assignment.");
+        // Hierarchy Protection 2: Personal actors cannot grant the Workspace Owner role
+        if ((targetNewRole.slug === "owner" || targetNewRole.rank >= 1000) && !actorIsClubAccount) {
+            throw new Error("The workspace owner role cannot be granted through personal role assignment.");
         }
 
-        // Hierarchy Protection 3: Actor must outrank target user
+        // Hierarchy Protection 3: Personal actors must strictly outrank target user
         const actorRank = ctx.member.role?.rank || 0;
         const currentTargetRank = targetMember.role?.rank || 0;
-        if (actorRank <= currentTargetRank && !ctx.isOwner) {
+        if (!actorIsClubAccount && actorRank <= currentTargetRank) {
             throw new Error("Cannot modify roles of a member with equal or higher rank.");
         }
 
-        // Hierarchy Protection 4: Actor cannot assign a role with rank >= actor's rank
-        if (targetNewRole.rank >= actorRank && !ctx.isOwner) {
+        // Hierarchy Protection 4: Personal actors cannot assign a role with rank >= actor's rank
+        if (!actorIsClubAccount && targetNewRole.rank >= actorRank) {
             throw new Error("Cannot assign a role with equal or higher rank than your own.");
         }
 
@@ -232,15 +244,26 @@ export class WorkspaceMemberService {
             throw new Error("Target user is not a member of this workspace.");
         }
 
-        // Protection: Cannot remove workspace owner
-        if (targetMember.role?.slug === "owner" || targetMember.role?.rank === 1000) {
+        if (targetUserId === actorUserId) {
+            throw new Error("You cannot remove your own workspace membership.");
+        }
+
+        if (targetMember.user?.accountType === "club") {
+            throw new Error("The club account cannot be removed from its workspace.");
+        }
+
+        const actorIsClubAccount = Boolean(actorCtx.isClubAccount);
+
+        // Protection: Personal actors cannot remove a Workspace Owner; Club account has supreme removal right
+        const isTargetOwner = targetMember.role?.slug === "owner" || (targetMember.role?.rank || 0) >= 1000;
+        if (isTargetOwner && !actorIsClubAccount) {
             throw new Error("The workspace owner cannot be removed.");
         }
 
-        // Hierarchy rule: Actor must outrank target (unless owner)
-        const actorRank = actorCtx.isOwner ? 1000 : (actorCtx.member.role?.rank || 0);
+        // Hierarchy rule: Personal actors must strictly outrank target
+        const actorRank = actorCtx.member.role?.rank || 0;
         const targetRank = targetMember.role?.rank || 0;
-        if (actorRank <= targetRank && !actorCtx.isOwner) {
+        if (!actorIsClubAccount && actorRank <= targetRank) {
             throw new Error("Cannot remove a member with equal or higher hierarchy rank.");
         }
 
@@ -248,6 +271,7 @@ export class WorkspaceMemberService {
         const isMgr = actorCtx.isWorkspaceManager;
         const mgrPerms = (actorCtx.workspace.managerPermissions || {}) as Record<string, any>;
         const canRemove =
+            actorIsClubAccount ||
             actorCtx.isOwner ||
             actorCtx.isAdmin ||
             (isMgr && !!mgrPerms.can_manage_members) ||
@@ -255,6 +279,12 @@ export class WorkspaceMemberService {
 
         if (!canRemove) {
             throw new Error("Forbidden: You do not possess permission to remove workspace members.");
+        }
+
+        // 0. Clear Workspace Manager designation if target held it
+        if (actorCtx.workspace.managerUserId === targetUserId) {
+            await WorkspaceRepository.setWorkspaceManager(workspaceId, null, []);
+            await WorkspaceRedisService.invalidateWorkspace(actorCtx.workspace.clubId);
         }
 
         // 1. Remove from all department member associations
@@ -315,7 +345,21 @@ export class WorkspaceMemberService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<{ invitation: WorkspaceInvitation; rawToken: string }> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("members:invite"))) {
+        const rawMgrPerms = ctx?.workspace.managerPermissions || {};
+        const mgrPerms: Record<string, any> = Array.isArray(rawMgrPerms)
+            ? rawMgrPerms.reduce((acc, p) => ({ ...acc, [p]: true }), {} as Record<string, boolean>)
+            : (rawMgrPerms as Record<string, any>);
+        const isAuthorizedManager = Boolean(
+            ctx?.isWorkspaceManager && (mgrPerms.can_invite_members || mgrPerms.can_manage_members)
+        );
+        if (
+            !ctx ||
+            (!ctx.isClubAccount &&
+                !ctx.isOwner &&
+                !ctx.isAdmin &&
+                !ctx.permissions.includes("members:invite") &&
+                !isAuthorizedManager)
+        ) {
             throw new Error("Unauthorized to invite members into this workspace.");
         }
 
@@ -334,8 +378,13 @@ export class WorkspaceMemberService {
         const role = await WorkspaceRepository.findRoleById(workspaceId, data.roleId);
         if (!role) throw new Error("Selected role does not exist.");
 
+        const actorIsClubAccount = Boolean(ctx.isClubAccount);
+        if ((role.slug === "owner" || role.rank >= 1000) && !actorIsClubAccount) {
+            throw new Error("Only the club account can invite users with the Workspace Owner role.");
+        }
+
         const actorRank = ctx.member.role?.rank || 0;
-        if (role.rank >= actorRank && !ctx.isOwner) {
+        if (!actorIsClubAccount && role.rank >= actorRank) {
             throw new Error("Cannot invite a member with a role equal to or higher than your own.");
         }
 
@@ -501,11 +550,14 @@ export class WorkspaceMemberService {
 
         // Verify accepting user
         const userRes = await query(
-            `SELECT id, email, username FROM public.users WHERE id = $1 LIMIT 1;`,
+            `SELECT id, email, username, account_type FROM public.users WHERE id = $1 LIMIT 1;`,
             [acceptingUserId]
         );
         const user = userRes.rows[0];
         if (!user) throw new Error("Authenticated user not found.");
+        if (user.account_type === "club") {
+            throw new Error("Club accounts cannot accept personal workspace member invitations.");
+        }
 
         // Rule: Club managers are not permitted to join other club workspaces with any role
         const managerCheck = await query(
@@ -525,7 +577,14 @@ export class WorkspaceMemberService {
 
         // Revalidate inviter's status and invitation permissions at acceptance time
         const inviterCtx = await WorkspaceService.resolveContext(invitation.workspaceId, invitation.inviterId);
-        if (!inviterCtx || inviterCtx.member.isSuspended || (!inviterCtx.isAdmin && !inviterCtx.permissions.includes("members:invite"))) {
+        if (
+            !inviterCtx ||
+            inviterCtx.member.isSuspended ||
+            (!inviterCtx.isClubAccount &&
+                !inviterCtx.isOwner &&
+                !inviterCtx.isAdmin &&
+                !inviterCtx.permissions.includes("members:invite"))
+        ) {
             await WorkspaceRepository.updateInvitationStatus(invitation.id, "revoked", {
                 revokedAt: new Date(),
                 revokedBy: invitation.inviterId,
@@ -604,8 +663,8 @@ export class WorkspaceMemberService {
 
             await client.query("COMMIT;");
 
-            // Invalidate permissions cache
-            await WorkspaceRedisService.invalidateMemberPermissions(workspace.id, acceptingUserId);
+            // Invalidate permissions, capabilities, and directory caches
+            await WorkspaceRedisService.invalidateOnSecurityChange(workspace.id, acceptingUserId);
 
             const fullMember = await WorkspaceRepository.findMember(workspace.id, acceptingUserId);
             return { workspace, member: fullMember || member };
@@ -1050,21 +1109,25 @@ export class WorkspaceMemberService {
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceMember> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
-        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("roles:manage") && !ctx.isOwner)) {
+        if (!ctx || (!ctx.isClubAccount && !ctx.isAdmin && !ctx.permissions.includes("roles:manage") && !ctx.isOwner)) {
             throw new Error("Unauthorized to modify member permissions.");
         }
 
         const targetMember = await WorkspaceRepository.findMember(workspaceId, targetUserId);
         if (!targetMember) throw new Error("Target user is not a member of this workspace.");
+        if (targetMember.user?.accountType === "club") {
+            throw new Error("Club account permissions cannot be modified.");
+        }
 
+        const actorIsClubAccount = Boolean(ctx.isClubAccount);
         const actorRank = ctx.member.role?.rank || 0;
         const targetRank = targetMember.role?.rank || 0;
-        if (targetRank >= actorRank && !ctx.isOwner) {
+        if (!actorIsClubAccount && targetRank >= actorRank) {
             throw new Error("Cannot modify permissions of a member with equal or higher rank.");
         }
 
-        // Validate that actor cannot grant permissions they do not possess (unless Owner)
-        if (!ctx.isOwner && !ctx.permissions.includes("*")) {
+        // Validate that actor cannot grant permissions they do not possess (unless Club Account or Owner)
+        if (!actorIsClubAccount && !ctx.isOwner && !ctx.permissions.includes("*")) {
             for (const [perm, granted] of Object.entries(customPermissions)) {
                 if (granted && !ctx.permissions.includes(perm)) {
                     throw new Error(`Cannot grant permission you do not possess: ${perm}`);

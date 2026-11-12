@@ -89,6 +89,7 @@ export interface WorkspaceDepartmentMember {
         firstName: string;
         lastName: string;
         avatarUrl?: string | null;
+        accountType?: string;
     };
 }
 
@@ -118,6 +119,7 @@ export interface WorkspaceMember {
         firstName: string;
         lastName: string;
         avatarUrl?: string | null;
+        accountType?: string;
     };
     role?: WorkspaceRole;
     department?: WorkspaceDepartment | null;
@@ -460,6 +462,7 @@ export interface WorkspaceMessage {
         firstName: string;
         lastName: string;
         avatarUrl?: string | null;
+        isClub?: boolean;
     };
     senderRole?: {
         id: string;
@@ -949,6 +952,13 @@ export interface WorkspaceModuleCapabilities {
     audit: {
         view: boolean;
     };
+    recognition?: {
+        view: boolean;
+        award: boolean;
+        reverse: boolean;
+        managePolicy: boolean;
+        manageBudgets: boolean;
+    };
 }
 
 export interface WorkspaceNavigationCapabilities {
@@ -964,6 +974,8 @@ export interface WorkspaceNavigationCapabilities {
     canViewAuditLogs: boolean;
     canViewSettings: boolean;
     canViewResources?: boolean;
+    canViewRecognition?: boolean;
+    canAwardRecognition?: boolean;
     allowedTabs: string[];
 }
 
@@ -982,6 +994,7 @@ export interface MemberCapabilityResolution {
     highestManageableRank: number;
     isOwner: boolean;
     isAdmin: boolean;
+    isClubAccount?: boolean;
     isWorkspaceManager: boolean;
     leadDepartmentIds: string[];
     memberDepartmentIds: string[];
@@ -1153,6 +1166,7 @@ export interface WorkspaceRecognitionLedgerEntry {
         name?: string;
         avatarUrl?: string | null;
         roleTitle?: string | null;
+        isClub?: boolean;
     };
     category?: {
         id: string;

@@ -6,6 +6,7 @@ import { useToast } from "../../../../context/ToastContext";
 import type { TeamWorkspace, WorkspaceMember } from "../../../../types/workspace";
 import { NeoSelect } from "../../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../../components/NeoCheckbox";
+import { ConfirmationModal } from "../../../../components/ConfirmationModal";
 
 interface WorkspaceManagerModalProps {
     isOpen: boolean;
@@ -45,6 +46,7 @@ export const WorkspaceManagerModal: React.FC<WorkspaceManagerModalProps> = ({
     const [permissions, setPermissions] = useState<ManagerPermissionsState>(DEFAULT_PERMISSIONS);
     const [loading, setLoading] = useState(false);
     const [isRevoking, setIsRevoking] = useState(false);
+    const [isRevokeConfirmOpen, setIsRevokeConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (workspace?.managerUserId) {
@@ -110,13 +112,12 @@ export const WorkspaceManagerModal: React.FC<WorkspaceManagerModalProps> = ({
     };
 
     const handleRevoke = async () => {
-        if (!confirm("Are you sure you want to revoke the Workspace Manager designation?")) return;
-
         try {
             setIsRevoking(true);
             const res = await workspaceApi.revokeManager(clubId);
             if (res.success) {
                 toast.success(res.message || "Workspace Manager revoked");
+                setIsRevokeConfirmOpen(false);
                 onSuccess();
                 onClose();
             } else {
@@ -182,7 +183,7 @@ export const WorkspaceManagerModal: React.FC<WorkspaceManagerModalProps> = ({
 
                         <button
                             type="button"
-                            onClick={handleRevoke}
+                            onClick={() => setIsRevokeConfirmOpen(true)}
                             disabled={isRevoking}
                             className="px-2.5 py-1 text-[11px] font-bold text-red-700 bg-red-100 hover:bg-red-200 border border-black rounded-lg transition-all flex items-center gap-1"
                         >
@@ -289,6 +290,19 @@ export const WorkspaceManagerModal: React.FC<WorkspaceManagerModalProps> = ({
                     </div>
                 </form>
             </div>
+
+            {/* Revoke Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={isRevokeConfirmOpen}
+                onClose={() => setIsRevokeConfirmOpen(false)}
+                onConfirm={handleRevoke}
+                title="Revoke Workspace Manager Designation?"
+                description="Are you sure you want to revoke the Workspace Manager designation? The current manager will immediately lose delegated workspace management privileges."
+                confirmText="Revoke Manager"
+                cancelText="Keep Manager"
+                variant="danger"
+                isLoading={isRevoking}
+            />
         </div>
     );
 };

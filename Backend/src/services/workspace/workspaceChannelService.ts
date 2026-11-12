@@ -117,6 +117,11 @@ export class WorkspaceChannelService {
         if (!ctx || ctx.member.isSuspended) return false;
         if (ctx.isOwner || ctx.isAdmin) return true;
 
+        // Observer or roles without message send permission cannot post
+        if (!ctx.permissions.includes("messages:send") && !ctx.permissions.includes("*")) {
+            return false;
+        }
+
         const channel = await WorkspaceRepository.findChannelById(workspaceId, channelId);
         if (!channel) return false;
 
@@ -142,8 +147,13 @@ export class WorkspaceChannelService {
         if (!canView) return false;
 
         const thread = await WorkspaceRepository.findThreadById(workspaceId, threadId);
+        const ctx = await WorkspaceService.resolveContext(workspaceId, userId);
+        if (!ctx || ctx.member.isSuspended) return false;
+        if (!ctx.isOwner && !ctx.isAdmin && !ctx.permissions.includes("messages:send") && !ctx.permissions.includes("*")) {
+            return false;
+        }
+
         if (!thread || thread.isLocked || thread.isArchived) {
-            const ctx = await WorkspaceService.resolveContext(workspaceId, userId);
             if (!ctx?.isAdmin && !ctx?.isOwner) return false;
         }
 
@@ -717,6 +727,7 @@ export class WorkspaceChannelService {
         data: {
             content: string;
             messageType?: "text" | "announcement" | "system";
+            senderType?: "member" | "club";
             parentMessageId?: string | null;
             threadId?: string | null;
             attachments?: Array<{
@@ -761,6 +772,7 @@ export class WorkspaceChannelService {
             channelId,
             senderId: actorUserId,
             senderMemberId: ctx.member.id,
+            senderType: data.senderType || "member",
             content: data.content.trim(),
             messageType: data.messageType || "text",
             parentMessageId: data.parentMessageId || null,
@@ -828,7 +840,9 @@ export class WorkspaceChannelService {
                          WHERE wm.workspace_id = $1 AND LOWER(u.username) = ANY($2);`,
                         [workspaceId, mentions.users.map((u: string) => u.toLowerCase())]
                     );
-                    const senderName = ctx.member?.user?.username || "A member";
+                    const senderName = finalMessage.sender?.isClub
+                        ? `${finalMessage.sender.firstName || "Club"} (Club)`
+                        : (ctx.member?.user?.username || "A member");
                     for (const row of uRes.rows) {
                         if (row.id === actorUserId) continue;
                         await WorkspaceNotificationService.notifyMention({

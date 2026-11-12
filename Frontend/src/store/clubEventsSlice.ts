@@ -376,7 +376,16 @@ export const clubEventsSlice = createSlice({
                         );
                     }
                 }
-            });
+            })
+            // Automatically reset club events cache on sign out or non-club session
+            .addMatcher(
+                (action) =>
+                    action.type === "user/clearUser" ||
+                    (action.type === "user/setUser" && (action as any).payload?.accountType !== "club") ||
+                    (action.type === "user/fetchUserProfile/fulfilled" && (action as any).payload?.accountType !== "club") ||
+                    action.type === "user/fetchUserProfile/rejected",
+                () => initialState
+            );
     },
 });
 

@@ -45,6 +45,7 @@ interface TasksBoardViewProps {
     currentMember: WorkspaceMember | null;
     canCreateTasks: boolean;
     canViewAllTasks?: boolean;
+    isClubContext?: boolean;
 }
 
 export type TaskViewPreset =
@@ -77,12 +78,19 @@ export const TasksBoardView: React.FC<TasksBoardViewProps> = ({
     currentMember,
     canCreateTasks,
     canViewAllTasks = true,
+    isClubContext = false,
 }) => {
     const toast = useToast();
     const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
     const [activePreset, setActivePreset] = useState<TaskViewPreset>("all");
+
+    useEffect(() => {
+        if (isClubContext && activePreset === "my_tasks") {
+            setActivePreset("all");
+        }
+    }, [isClubContext, activePreset]);
 
     // Filters
     const [search, setSearch] = useState("");
@@ -393,16 +401,18 @@ export const TasksBoardView: React.FC<TasksBoardViewProps> = ({
                         <FolderKanban className="w-3.5 h-3.5 text-teal-500" /> Department Tasks
                     </button>
 
-                    <button
-                        onClick={() => setActivePreset("my_tasks")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition border-2 flex items-center gap-1.5 whitespace-nowrap ${
-                            activePreset === "my_tasks"
-                                ? "bg-black text-white border-black shadow-neo-xs"
-                                : "bg-white text-neutral-600 border-neutral-200 hover:border-black hover:text-black"
-                        }`}
-                    >
-                        <UserCheck className="w-3.5 h-3.5 text-indigo-500" /> My Tasks
-                    </button>
+                    {!isClubContext && (
+                        <button
+                            onClick={() => setActivePreset("my_tasks")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition border-2 flex items-center gap-1.5 whitespace-nowrap ${
+                                activePreset === "my_tasks"
+                                    ? "bg-black text-white border-black shadow-neo-xs"
+                                    : "bg-white text-neutral-600 border-neutral-200 hover:border-black hover:text-black"
+                            }`}
+                        >
+                            <UserCheck className="w-3.5 h-3.5 text-indigo-500" /> My Tasks
+                        </button>
+                    )}
 
                     <button
                         onClick={() => setActivePreset("created_by_me")}

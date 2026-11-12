@@ -39,37 +39,17 @@ async function resolveClubId(req: Request, res: Response): Promise<string | null
     const requestedClubId = (req.query.clubId as string) || req.body?.clubId || req.params?.clubId;
 
     if (requestedClubId) {
-        // Enforce rule: Club representatives/managers cannot access the club workspace from personal account
-        if (isPersonalAccount) {
-            const managerCheck = await query(
-                `SELECT 1 FROM public.verified_clubs vc
-                 LEFT JOIN public.team_workspaces tw ON tw.club_id = vc.id
-                 WHERE vc.id = $1 AND (vc.auth_user_id = $2 OR tw.owner_id = $2)
-                 LIMIT 1;`,
-                [requestedClubId, authUser.id]
-            );
-            if (managerCheck.rows.length > 0) {
-                res.status(403).json({
-                    success: false,
-                    isClubManagerBlocked: true,
-                    message: "Club managers must sign in via the Club Portal using club credentials to access this workspace.",
-                });
-                return null;
-            }
-        }
-
         // Strict tenant isolation: verify caller belongs to the requested club or workspace
         const hasAccess = await query(
             `SELECT 1 FROM public.verified_clubs vc
              LEFT JOIN public.club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
              LEFT JOIN public.team_workspaces tw ON tw.club_id = vc.id
              LEFT JOIN public.workspace_members wm ON wm.workspace_id = tw.id AND wm.user_id = $1 AND wm.membership_status = 'active' AND wm.is_suspended = false
-             LEFT JOIN public.workspace_roles r ON r.id = wm.role_id
              WHERE vc.id = $2 AND (
-                 -- Club session: full access
-                 (NOT $3 AND (vc.auth_user_id = $1 OR tw.owner_id = $1 OR cm.user_id = $1 OR wm.user_id = $1))
-                 -- Personal session: strictly subordinate roles (rank < 1000, e.g. Workspace Manager, Dept Lead, Member)
-                 OR ($3 AND wm.user_id = $1 AND r.rank < 1000 AND r.slug != 'owner')
+                 -- Club session: exclusively owns its own club workspace
+                 (NOT $3 AND vc.auth_user_id = $1)
+                 -- Personal session: active workspace member with their role (Workspace Owner, Admin, Dept Lead, Member, Guest, Observer)
+                 OR ($3 AND wm.user_id = $1)
              )
              LIMIT 1;`,
             [authUser.id, requestedClubId, isPersonalAccount]
@@ -237,8 +217,8 @@ workspaceRouter.get("/my-workspaces", authenticate, async (req: Request, res: Re
         const isClubManager = clubManagerRes.rows.length > 0;
         const managedClub = isClubManager ? clubManagerRes.rows[0] : null;
 
-        // Club managers cannot access workspaces from their personal account
-        const workspaces = isClubManager ? [] : await WorkspaceRepository.findUserWorkspaces(authUser.id);
+        // Workspaces where the personal user is an active member
+        const workspaces = await WorkspaceRepository.findUserWorkspaces(authUser.id);
 
         return res.json({
             success: true,
@@ -2135,7 +2115,10 @@ workspaceRouter.post("/channels/:channelId/messages", authenticate, async (req: 
             workspace.id,
             authUser.id,
             String(req.params.channelId),
-            req.body,
+            {
+                ...req.body,
+                senderType: authUser.accountType === "club" ? "club" : "member",
+            },
             getAuditContext(req)
         );
 
@@ -2664,6 +2647,13 @@ workspaceRouter.get("/tasks/my-tasks", authenticate, async (req: Request, res: R
         if (!clubId) return;
 
         const authUser = (req as any).user;
+        if (authUser.accountType === "club") {
+            return res.status(403).json({
+                success: false,
+                message: "My Tasks is exclusive to personal member accounts.",
+            });
+        }
+
         const workspace = await WorkspaceRepository.findByClubId(clubId);
         if (!workspace) {
             return res.status(404).json({ success: false, message: "Workspace not found." });

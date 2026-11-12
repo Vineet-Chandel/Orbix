@@ -40,6 +40,7 @@ import { AttachmentList } from "../Files/AttachmentList";
 import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 import { NeoSelect } from "../../../../components/NeoSelect";
 import { NeoDateTimePicker } from "../../../../components/NeoDateTimePicker";
+import { ConfirmationModal } from "../../../../components/ConfirmationModal";
 
 interface TaskDetailModalProps {
     isOpen: boolean;
@@ -128,6 +129,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [editStartDate, setEditStartDate] = useState("");
     const [editDueDate, setEditDueDate] = useState("");
     const [savingDetails, setSavingDetails] = useState(false);
+    const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+    const [isArchiving, setIsArchiving] = useState(false);
 
     const isOwner = currentMember?.role?.slug === "owner" || (currentMember?.role?.rank || 0) >= 1000;
 
@@ -407,16 +410,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
     // Archive task handler
     const handleArchiveTask = async () => {
-        if (!task || !window.confirm("Are you sure you want to archive this task?")) return;
+        if (!task) return;
         try {
+            setIsArchiving(true);
             const res = await workspaceApi.archiveTask(task.id, clubId);
             if (res.success) {
                 toast.success("Task archived.");
+                setIsArchiveConfirmOpen(false);
                 onTaskUpdated();
                 onClose();
             }
         } catch (err: any) {
             toast.error(err.response?.data?.message || "Failed to archive task.");
+        } finally {
+            setIsArchiving(false);
         }
     };
 
@@ -489,7 +496,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                         {/* Archive button */}
                         <button
-                            onClick={handleArchiveTask}
+                            onClick={() => setIsArchiveConfirmOpen(true)}
                             title="Archive Task"
                             className="p-2 bg-white text-neutral-500 hover:text-red-600 rounded-xl border-2 border-black hover:bg-neutral-100 transition shadow-neo-xs"
                         >
@@ -1331,6 +1338,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     </div>
                 ) : null}
             </div>
+
+            {/* Archive Task Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={isArchiveConfirmOpen}
+                onClose={() => setIsArchiveConfirmOpen(false)}
+                onConfirm={handleArchiveTask}
+                title="Archive Task?"
+                description={
+                    task
+                        ? `Are you sure you want to archive "${task.title}"? The task will be archived and hidden from the active board.`
+                        : "Are you sure you want to archive this task?"
+                }
+                confirmText="Archive Task"
+                cancelText="Cancel"
+                variant="warning"
+                isLoading={isArchiving}
+            />
         </div>
     );
 };

@@ -271,8 +271,13 @@ export const AwardHistoryView: React.FC<AwardHistoryViewProps> = ({
                                             </div>
                                             <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-600 mt-0.5">
                                                 <span>Awarded by</span>
-                                                <span className="font-bold text-black">
+                                                <span className="font-bold text-black inline-flex items-center gap-1">
                                                     {getDisplayName(entry.issuer)}
+                                                    {entry.issuer?.isClub && (
+                                                        <span className="px-1.5 py-0.2 bg-amber-100 border border-amber-500 text-amber-900 rounded text-[9px] font-black uppercase">
+                                                            🏛️ Club
+                                                        </span>
+                                                    )}
                                                 </span>
                                                 {(entry.department?.name || (entry as any).departmentName) && (
                                                     <>

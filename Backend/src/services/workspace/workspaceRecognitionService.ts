@@ -73,6 +73,9 @@ export class WorkspaceRecognitionService {
         if (!recipientMember || recipientMember.workspaceId !== workspaceId) {
             throw new Error("Recipient is not a member of this workspace.");
         }
+        if (recipientMember.user?.accountType === "club") {
+            throw new Error("Orbits recognition cannot be awarded to a club account.");
+        }
         if (recipientMember.isSuspended || recipientMember.membershipStatus !== "active") {
             throw new Error("Cannot award Orbits to a suspended or inactive member.");
         }

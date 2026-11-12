@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, optionalAuthenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
 import { query } from "../../database/client.js";
 import { ClubCredibilityService } from "../../services/club/clubCredibilityService.js";
 
@@ -27,7 +27,7 @@ async function resolveClubIdForUser(userId: string): Promise<string | null> {
  * GET /api/club/credibility
  * Returns authenticated club's credibility overview snapshot
  */
-clubCredibilityRouter.get("/credibility", authenticate, async (req: Request, res: Response) => {
+clubCredibilityRouter.get("/credibility", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -59,7 +59,7 @@ clubCredibilityRouter.get("/credibility", authenticate, async (req: Request, res
  * GET /api/club/credibility/history
  * Returns paginated credibility ledger records
  */
-clubCredibilityRouter.get("/credibility/history", authenticate, async (req: Request, res: Response) => {
+clubCredibilityRouter.get("/credibility/history", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -115,14 +115,14 @@ async function handleGetCreationEligibility(req: Request, res: Response) {
     }
 }
 
-clubCredibilityRouter.get("/credibility/creation-eligibility", authenticate, handleGetCreationEligibility);
-clubCredibilityRouter.get("/events/creation-eligibility", authenticate, handleGetCreationEligibility);
+clubCredibilityRouter.get("/credibility/creation-eligibility", authenticate, requireClubAccount, handleGetCreationEligibility);
+clubCredibilityRouter.get("/events/creation-eligibility", authenticate, requireClubAccount, handleGetCreationEligibility);
 
 /**
  * POST /api/club/credibility/preview-impact
  * Live preview calculation for CredibilityImpactModal
  */
-clubCredibilityRouter.post("/credibility/preview-impact", authenticate, async (req: Request, res: Response) => {
+clubCredibilityRouter.post("/credibility/preview-impact", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -160,7 +160,7 @@ clubCredibilityRouter.post("/credibility/preview-impact", authenticate, async (r
  * POST /api/club/credibility/appeals
  * Submit appeal against a credibility ledger penalty
  */
-clubCredibilityRouter.post("/credibility/appeals", authenticate, async (req: Request, res: Response) => {
+clubCredibilityRouter.post("/credibility/appeals", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -198,7 +198,7 @@ clubCredibilityRouter.post("/credibility/appeals", authenticate, async (req: Req
  * POST /api/club/credibility/recalculate
  * Recomputes club credibility snapshot from ledger
  */
-clubCredibilityRouter.post("/credibility/recalculate", authenticate, async (req: Request, res: Response) => {
+clubCredibilityRouter.post("/credibility/recalculate", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -227,7 +227,7 @@ clubCredibilityRouter.post("/credibility/recalculate", authenticate, async (req:
  * POST /api/club/credibility/certificates/preflight
  * Pre-issuance validation for certificates
  */
-clubCredibilityRouter.post("/credibility/certificates/preflight", authenticate, async (req: Request, res: Response) => {
+clubCredibilityRouter.post("/credibility/certificates/preflight", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {

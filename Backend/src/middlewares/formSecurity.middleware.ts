@@ -36,6 +36,23 @@ export function requireClubFormManagementPermission(action: "manage" | "publish"
                 });
             }
 
+            // Fail closed before any resource lookup: only Club Portal (or global admin) sessions may manage event forms
+            const callerAccountType = (req.user as any)?.accountType || (req.user as any)?.account_type || "personal";
+            const isAdminAccount = callerAccountType === "admin";
+            if (!isAdminAccount && callerAccountType !== "club") {
+                FormLogger.warn("FORM_SECURITY_VIOLATION" as any, "Personal session attempted club form management", {
+                    eventId: String(req.params.eventId || req.body?.eventId || ""),
+                    clubId: String(req.params.clubId || req.body?.clubId || req.query?.clubId || ""),
+                    userId,
+                    meta: { action, accountType: callerAccountType },
+                });
+                return res.status(403).json({
+                    success: false,
+                    code: "CLUB_PORTAL_AUTH_REQUIRED",
+                    message: "Club Portal login required to manage club event forms.",
+                });
+            }
+
             const eventId = String(req.params.eventId || req.body?.eventId || "");
             const directClubId = String(req.params.clubId || req.body?.clubId || req.query?.clubId || "");
 
@@ -85,7 +102,6 @@ export function requireClubFormManagementPermission(action: "manage" | "publish"
             }
 
             // Global platform administrator override
-            const isAdminAccount = (req.user as any)?.accountType === "admin" || (req.user as any)?.account_type === "admin";
             if (isAdminAccount) {
                 (req as any).clubEvent = eventRow;
                 return next();

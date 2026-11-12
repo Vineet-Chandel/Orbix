@@ -1,9 +1,10 @@
 import express, { type Request, type Response } from "express";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
 import { ClubSettingsService } from "../../services/club/clubSettingsService.js";
 import { EmailVerificationService } from "../../services/email/emailVerificationService.js";
 
 const clubSettingsRouter = express.Router();
+clubSettingsRouter.use(authenticate, requireClubAccount);
 
 /**
  * GET /api/club/settings/status
@@ -88,7 +89,11 @@ clubSettingsRouter.post("/verify-email/send", authenticate, async (req: Request,
         }
 
         const { club, user } = await ClubSettingsService.getClubAndUser(userId);
-        const email = req.body?.email || user?.gmail || club.public_email;
+        const userGmail = user?.gmail ? String(user.gmail).trim() : "";
+        const email =
+            req.body?.email ||
+            (userGmail && !userGmail.toLowerCase().endsWith("@club.orbix") ? userGmail : null) ||
+            club.public_email;
         if (!email) {
             return res.status(400).json({ success: false, message: "Valid club email address is required." });
         }

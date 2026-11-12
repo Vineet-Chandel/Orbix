@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from "express";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
 
 const clubProfileRouter = express.Router();
@@ -8,7 +8,7 @@ const clubProfileRouter = express.Router();
  * GET /api/club/profile
  * Returns the complete club profile, coordinators, achievements, stats, completion score, and permissions.
  */
-clubProfileRouter.get("/", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.get("/", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -66,7 +66,7 @@ clubProfileRouter.get("/college-clubs", authenticate, async (req: Request, res: 
  * PATCH /api/club/profile
  * Updates club profile fields, branding, about story, focus areas, and publication visibility.
  */
-clubProfileRouter.patch("/", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.patch("/", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -94,7 +94,7 @@ clubProfileRouter.patch("/", authenticate, async (req: Request, res: Response) =
  * DELETE /api/club/profile/image
  * Removes club logo or banner image asset and cleans up Cloudinary storage.
  */
-clubProfileRouter.delete("/image", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.delete("/image", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -130,7 +130,7 @@ clubProfileRouter.delete("/image", authenticate, async (req: Request, res: Respo
  * GET /api/club/profile/preview
  * Returns the exact public preview representation of the current club profile for authorized managers.
  */
-clubProfileRouter.get("/preview", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.get("/preview", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -161,7 +161,7 @@ clubProfileRouter.get("/preview", authenticate, async (req: Request, res: Respon
  * POST /api/club/profile/upload-signature
  * Generates signed direct Cloudinary upload params for logo, banner, coordinator photo, or achievement badge.
  */
-clubProfileRouter.post("/upload-signature", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.post("/upload-signature", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -196,7 +196,7 @@ clubProfileRouter.post("/upload-signature", authenticate, async (req: Request, r
 // COORDINATOR ROUTES
 // =========================================================================
 
-clubProfileRouter.post("/coordinators", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.post("/coordinators", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -220,7 +220,7 @@ clubProfileRouter.post("/coordinators", authenticate, async (req: Request, res: 
     }
 });
 
-clubProfileRouter.patch("/coordinators/:id", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.patch("/coordinators/:id", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -249,7 +249,7 @@ clubProfileRouter.patch("/coordinators/:id", authenticate, async (req: Request, 
     }
 });
 
-clubProfileRouter.delete("/coordinators/:id", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.delete("/coordinators/:id", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -277,7 +277,7 @@ clubProfileRouter.delete("/coordinators/:id", authenticate, async (req: Request,
     }
 });
 
-clubProfileRouter.post("/coordinators/reorder", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.post("/coordinators/reorder", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -304,7 +304,7 @@ clubProfileRouter.post("/coordinators/reorder", authenticate, async (req: Reques
 // ACHIEVEMENT ROUTES
 // =========================================================================
 
-clubProfileRouter.post("/achievements", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.post("/achievements", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -328,7 +328,7 @@ clubProfileRouter.post("/achievements", authenticate, async (req: Request, res: 
     }
 });
 
-clubProfileRouter.patch("/achievements/:id", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.patch("/achievements/:id", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -357,7 +357,7 @@ clubProfileRouter.patch("/achievements/:id", authenticate, async (req: Request, 
     }
 });
 
-clubProfileRouter.delete("/achievements/:id", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.delete("/achievements/:id", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -385,7 +385,7 @@ clubProfileRouter.delete("/achievements/:id", authenticate, async (req: Request,
     }
 });
 
-clubProfileRouter.post("/achievements/reorder", authenticate, async (req: Request, res: Response) => {
+clubProfileRouter.post("/achievements/reorder", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {

@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
-import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, optionalAuthenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
 import { query } from "../../database/client.js";
 import { CertificateTemplateService } from "../../services/club/certificateTemplateService.js";
 import { CertificateUploadService } from "../../services/club/certificateUploadService.js";
@@ -46,7 +46,7 @@ async function getStaffClub(userId: string, targetClubId?: string) {
  * GET /api/club/certificates/templates
  * Lists all system templates and club-owned templates
  */
-certificateRouter.get("/templates", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/templates", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -69,7 +69,7 @@ certificateRouter.get("/templates", authenticate, async (req: Request, res: Resp
  * GET /api/club/certificates/templates/:templateId
  * Retrieves a single template by ID
  */
-certificateRouter.get("/templates/:templateId", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/templates/:templateId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -92,7 +92,7 @@ certificateRouter.get("/templates/:templateId", authenticate, async (req: Reques
  * POST /api/club/certificates/templates
  * Creates a new template (blank canvas or custom)
  */
-certificateRouter.post("/templates", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/templates", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -129,7 +129,7 @@ certificateRouter.post("/templates", authenticate, async (req: Request, res: Res
  * PUT /api/club/certificates/templates/:templateId
  * Updates an existing club-owned template
  */
-certificateRouter.put("/templates/:templateId", authenticate, async (req: Request, res: Response) => {
+certificateRouter.put("/templates/:templateId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -157,7 +157,7 @@ certificateRouter.put("/templates/:templateId", authenticate, async (req: Reques
  * POST /api/club/certificates/templates/:templateId/duplicate
  * Duplicates a template (system or club) into a new club-owned editable template
  */
-certificateRouter.post("/templates/:templateId/duplicate", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/templates/:templateId/duplicate", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -183,7 +183,7 @@ certificateRouter.post("/templates/:templateId/duplicate", authenticate, async (
  * POST /api/club/certificates/templates/:templateId/rename
  * Renames a club-owned template
  */
-certificateRouter.post("/templates/:templateId/rename", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/templates/:templateId/rename", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -206,7 +206,7 @@ certificateRouter.post("/templates/:templateId/rename", authenticate, async (req
  * DELETE /api/club/certificates/templates/:templateId
  * Archives a club-owned template
  */
-certificateRouter.delete("/templates/:templateId", authenticate, async (req: Request, res: Response) => {
+certificateRouter.delete("/templates/:templateId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -232,6 +232,7 @@ certificateRouter.delete("/templates/:templateId", authenticate, async (req: Req
 certificateRouter.post(
     "/upload-background",
     authenticate,
+    requireClubAccount,
     upload.single("background"),
     async (req: Request, res: Response) => {
         try {
@@ -269,7 +270,7 @@ certificateRouter.post(
  * GET /api/club/certificates/events/:eventId/eligibility
  * Evaluates comprehensive participant eligibility for an event according to category rules (Phase 10)
  */
-certificateRouter.get("/events/:eventId/eligibility", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/events/:eventId/eligibility", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -295,7 +296,7 @@ certificateRouter.get("/events/:eventId/eligibility", authenticate, async (req: 
  * GET /api/club/certificates/recipient-directory
  * Searches authorized recipient sources with strict privacy protection (Phase 11)
  */
-certificateRouter.get("/recipient-directory", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/recipient-directory", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -318,7 +319,7 @@ certificateRouter.get("/recipient-directory", authenticate, async (req: Request,
  * POST /api/club/certificates/issue-batch
  * Comprehensive batch issuance with eligibility checks and PDF generation
  */
-certificateRouter.post("/issue-batch", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/issue-batch", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id, req.body.clubId);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -382,7 +383,7 @@ certificateRouter.post("/issue-batch", authenticate, async (req: Request, res: R
  * GET /api/club/certificates/teams/:teamId/roster
  * Retrieves authoritative team membership roster for review before issuance (Phase 12)
  */
-certificateRouter.get("/teams/:teamId/roster", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/teams/:teamId/roster", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -402,7 +403,7 @@ certificateRouter.get("/teams/:teamId/roster", authenticate, async (req: Request
  * GET /api/club/certificates/batches
  * Lists all certificate batches issued by the club
  */
-certificateRouter.get("/batches", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/batches", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -462,7 +463,7 @@ certificateRouter.get("/batches", authenticate, async (req: Request, res: Respon
  * GET /api/club/certificates/queue/metrics
  * Returns real-time telemetry metrics for asynchronous certificate generation (Phase 19)
  */
-certificateRouter.get("/queue/metrics", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/queue/metrics", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -479,7 +480,7 @@ certificateRouter.get("/queue/metrics", authenticate, async (req: Request, res: 
  * GET /api/club/certificates/batches/:batchId/progress
  * Retrieves real-time async generation progress and throughput for a batch (Phase 13)
  */
-certificateRouter.get("/batches/:batchId/progress", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/batches/:batchId/progress", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -502,7 +503,7 @@ certificateRouter.get("/batches/:batchId/progress", authenticate, async (req: Re
  * POST /api/club/certificates/batches/:batchId/retry-failed
  * Partial batch recovery: retries ONLY the failed recipients in a batch without duplicating successful ones (Phase 13)
  */
-certificateRouter.post("/batches/:batchId/retry-failed", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/batches/:batchId/retry-failed", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -525,7 +526,7 @@ certificateRouter.post("/batches/:batchId/retry-failed", authenticate, async (re
  * POST /api/club/certificates/batches/:batchId/cancel
  * Aborts an active or queued batch, preventing unprocessed recipients from issuing (Phase 14)
  */
-certificateRouter.post("/batches/:batchId/cancel", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/batches/:batchId/cancel", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -548,7 +549,7 @@ certificateRouter.post("/batches/:batchId/cancel", authenticate, async (req: Req
  * GET /api/club/certificates/batches/:batchId/errors
  * Returns detailed item-level error logs for a failed or partially completed batch (Phase 14)
  */
-certificateRouter.get("/batches/:batchId/errors", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/batches/:batchId/errors", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -567,7 +568,7 @@ certificateRouter.get("/batches/:batchId/errors", authenticate, async (req: Requ
  * GET /api/club/certificates/batches/:batchId/report
  * Exports comprehensive generation audit report (JSON or CSV download) (Phase 14)
  */
-certificateRouter.get("/batches/:batchId/report", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/batches/:batchId/report", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -596,7 +597,7 @@ certificateRouter.get("/batches/:batchId/report", authenticate, async (req: Requ
  * POST /api/club/certificates/batches/:batchId/resume
  * Resumes an interrupted batch after worker or server interruption (Phase 14)
  */
-certificateRouter.post("/batches/:batchId/resume", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/batches/:batchId/resume", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -619,7 +620,7 @@ certificateRouter.post("/batches/:batchId/resume", authenticate, async (req: Req
  * POST /api/club/certificates/batches/resume-stalled
  * System audit: Scans and resumes any stalled batches for the club (Phase 14)
  */
-certificateRouter.post("/batches/resume-stalled", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/batches/resume-stalled", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -644,6 +645,7 @@ certificateRouter.post("/batches/resume-stalled", authenticate, async (req: Requ
 certificateRouter.post(
     "/csv/reconcile",
     authenticate,
+    requireClubAccount,
     upload.single("file"),
     async (req: Request, res: Response) => {
         try {
@@ -691,7 +693,7 @@ certificateRouter.post(
  * GET /api/club/certificates/csv/sample-template
  * Downloads an official sanitized CSV or XLSX recipient template (Phase 13 & 14)
  */
-certificateRouter.get("/csv/sample-template", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/csv/sample-template", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const format = String(req.query.format || "csv").toLowerCase();
         if (format === "xlsx" || format === "excel") {
@@ -715,7 +717,7 @@ certificateRouter.get("/csv/sample-template", authenticate, async (req: Request,
  * GET /api/club/certificates/stats
  * Computes all 8 Phase 1 dashboard metrics
  */
-certificateRouter.get("/stats", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/stats", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -758,7 +760,7 @@ certificateRouter.get("/stats", authenticate, async (req: Request, res: Response
  * GET /api/club/certificates/history
  * Comprehensive search, filtering, sorting and server-side pagination of issued certificates
  */
-certificateRouter.get("/history", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/history", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -857,7 +859,7 @@ certificateRouter.get("/history", authenticate, async (req: Request, res: Respon
 /**
  * GET /api/club/certificates/settings
  */
-certificateRouter.get("/settings", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/settings", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -895,7 +897,7 @@ certificateRouter.get("/settings", authenticate, async (req: Request, res: Respo
 /**
  * PUT /api/club/certificates/settings
  */
-certificateRouter.put("/settings", authenticate, async (req: Request, res: Response) => {
+certificateRouter.put("/settings", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -948,7 +950,7 @@ certificateRouter.put("/settings", authenticate, async (req: Request, res: Respo
  * POST /api/club/certificates/preview-sample
  * Generates test PDF buffer from design + sample data for immediate visual verification
  */
-certificateRouter.post("/preview-sample", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/preview-sample", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -1309,7 +1311,7 @@ certificateRouter.get("/public/verify/:identifier", optionalAuthenticate, async 
  * POST /api/club/certificates/:certificateId/revoke
  * Officially revokes an issued certificate with mandatory reason and immutable audit log (Phase 16)
  */
-certificateRouter.post("/:certificateId/revoke", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/:certificateId/revoke", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -1338,7 +1340,7 @@ certificateRouter.post("/:certificateId/revoke", authenticate, async (req: Reque
  * POST /api/club/certificates/:certificateId/reissue
  * Reissues a certificate: creates version N+1 and supersedes old record (Phase 16)
  */
-certificateRouter.post("/:certificateId/reissue", authenticate, async (req: Request, res: Response) => {
+certificateRouter.post("/:certificateId/reissue", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -1374,7 +1376,7 @@ certificateRouter.post("/:certificateId/reissue", authenticate, async (req: Requ
  * GET /api/club/certificates/:certificateId/audit-history
  * Retrieves immutable audit history for an individual certificate
  */
-certificateRouter.get("/:certificateId/audit-history", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/:certificateId/audit-history", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -1422,7 +1424,7 @@ certificateRouter.get("/user/wallet", authenticate, async (req: Request, res: Re
  * GET /api/club/certificates/audit-logs
  * Retrieves immutable audit records for the club
  */
-certificateRouter.get("/audit-logs", authenticate, async (req: Request, res: Response) => {
+certificateRouter.get("/audit-logs", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });

@@ -19,19 +19,26 @@ import type {
     WorkspaceMember,
 } from "../../../../types/workspace";
 import { InviteMemberModal } from "../Members/InviteMemberModal";
+import { ConfirmationModal } from "../../../../components/ConfirmationModal";
 
 interface InvitationsOverviewViewProps {
     clubId: string;
     roles: WorkspaceRole[];
     departments: WorkspaceDepartment[];
+    members?: WorkspaceMember[];
     currentMember: WorkspaceMember | null;
+    isClubContext?: boolean;
+    onRefreshMembers?: () => void;
 }
 
 export const InvitationsOverviewView: React.FC<InvitationsOverviewViewProps> = ({
     clubId,
     roles,
     departments,
+    members,
     currentMember,
+    isClubContext = false,
+    onRefreshMembers,
 }) => {
     const toast = useToast();
     const toastRef = useRef(toast);
@@ -43,6 +50,7 @@ export const InvitationsOverviewView: React.FC<InvitationsOverviewViewProps> = (
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [revokingId, setRevokingId] = useState<string | null>(null);
+    const [invitationToRevoke, setInvitationToRevoke] = useState<string | null>(null);
 
     const loadInvitations = useCallback(async () => {
         try {
@@ -65,16 +73,19 @@ export const InvitationsOverviewView: React.FC<InvitationsOverviewViewProps> = (
         loadInvitations();
     }, [loadInvitations]);
 
-    const handleRevoke = async (invitationId: string) => {
-        if (!confirm("Are you sure you want to revoke this invitation token? The invite link will become invalid immediately.")) {
-            return;
-        }
+    const handleRevoke = (invitationId: string) => {
+        setInvitationToRevoke(invitationId);
+    };
+
+    const confirmRevoke = async () => {
+        if (!invitationToRevoke) return;
 
         try {
-            setRevokingId(invitationId);
-            const res = await workspaceApi.revokeInvitation(clubId, invitationId);
+            setRevokingId(invitationToRevoke);
+            const res = await workspaceApi.revokeInvitation(clubId, invitationToRevoke);
             if (res.success) {
                 toast.success(res.message || "Invitation revoked successfully");
+                setInvitationToRevoke(null);
                 await loadInvitations();
             } else {
                 toast.error(res.message || "Failed to revoke invitation");
@@ -87,7 +98,7 @@ export const InvitationsOverviewView: React.FC<InvitationsOverviewViewProps> = (
     };
 
     const actorRank = currentMember?.role?.rank ?? 0;
-    const isOwner = currentMember?.role?.slug === "owner" || actorRank === 1000;
+    const isOwner = Boolean(isClubContext) || currentMember?.role?.slug === "owner" || actorRank === 1000;
     const canInvite = isOwner || actorRank >= 800;
 
     return (
@@ -276,9 +287,26 @@ export const InvitationsOverviewView: React.FC<InvitationsOverviewViewProps> = (
                 clubId={clubId}
                 roles={roles}
                 departments={departments}
+                members={members?.filter((m) => m.user?.accountType !== "club")}
+                currentActor={currentMember}
+                isClubContext={Boolean(isClubContext)}
                 onSuccess={() => {
                     loadInvitations();
+                    onRefreshMembers?.();
                 }}
+            />
+
+            {/* Revoke Invitation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(invitationToRevoke)}
+                onClose={() => setInvitationToRevoke(null)}
+                onConfirm={confirmRevoke}
+                title="Revoke Invitation Link?"
+                description="Are you sure you want to revoke this invitation token? The invite link will become invalid immediately and cannot be used to join."
+                confirmText="Revoke Link"
+                cancelText="Keep Active"
+                variant="danger"
+                isLoading={Boolean(revokingId)}
             />
         </div>
     );

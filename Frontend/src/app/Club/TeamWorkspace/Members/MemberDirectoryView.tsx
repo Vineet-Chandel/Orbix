@@ -32,6 +32,7 @@ interface MemberDirectoryViewProps {
     departments: WorkspaceDepartment[];
     currentMember: WorkspaceMember | null;
     clubId: string;
+    isClubContext?: boolean;
     onRefresh: () => void;
     onToggleSuspension: (member: WorkspaceMember) => void;
     onNavigateToRoles?: () => void;
@@ -44,6 +45,7 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
     departments,
     currentMember,
     clubId,
+    isClubContext = false,
     onRefresh,
     onToggleSuspension,
     onNavigateToRoles,
@@ -62,28 +64,34 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
     const [recognitionUserId, setRecognitionUserId] = useState<string | null>(null);
 
     // Permission checks
+    const actorIsClub = Boolean(isClubContext);
     const actorRank = currentMember?.role?.rank ?? 0;
-    const isOwner = currentMember?.role?.slug === "owner" || actorRank === 1000;
-    const isManager = currentMember?.userId === workspace.managerUserId;
-    const canSeePrivate = isOwner || isManager || actorRank >= 800;
+    const isOwner = actorIsClub || currentMember?.role?.slug === "owner" || actorRank === 1000;
+    const isManager = !actorIsClub && currentMember?.userId === workspace.managerUserId;
+    const canSeePrivate = actorIsClub || isOwner || isManager || actorRank >= 800;
     const mgrPerms = Array.isArray(workspace.managerPermissions)
         ? workspace.managerPermissions.reduce((acc: any, p: string) => ({ ...acc, [p]: true }), {})
         : ((workspace.managerPermissions as Record<string, any>) || {});
     const canInvite =
+        actorIsClub ||
         isOwner ||
         actorRank >= 800 ||
         (isManager && !!mgrPerms.can_invite_members);
     const canManageRoles =
+        actorIsClub ||
         isOwner ||
         actorRank >= 800 ||
         (isManager && !!mgrPerms.can_manage_members);
     const canSuspend =
+        actorIsClub ||
         isOwner ||
         actorRank >= 800 ||
         (isManager && !!mgrPerms.can_manage_members);
 
+    const visibleMembers = members.filter((m) => m.user?.accountType !== "club");
+
     // Filter members
-    const filteredMembers = members.filter((m) => {
+    const filteredMembers = visibleMembers.filter((m) => {
         // Status filter
         if (statusFilter === "active" && m.isSuspended) return false;
         if (statusFilter === "suspended" && !m.isSuspended) return false;
@@ -240,9 +248,9 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                                 "Unknown";
 
                             const canModifyThisMember =
-                                !isTargetOwner &&
+                                m.user?.accountType !== "club" &&
                                 m.userId !== currentMember?.userId &&
-                                (isOwner || (actorRank > (m.role?.rank || 0)));
+                                (actorIsClub || (!isTargetOwner && (isOwner || actorRank > (m.role?.rank || 0))));
 
                             return (
                                 <tr key={m.id} className="hover:bg-neutral-50/80 transition-colors">
@@ -385,7 +393,7 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                                                 </button>
                                             )}
 
-                                            {canModifyThisMember && (isOwner || isManager || actorRank >= 800) && (
+                                            {canModifyThisMember && (actorIsClub || isOwner || isManager || actorRank >= 800) && (
                                                 <button
                                                     onClick={() => setMemberToRemove(m)}
                                                     className="p-1 text-red-600 hover:text-red-800 border border-transparent hover:border-black rounded transition"
@@ -420,6 +428,7 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                     roles={roles}
                     currentActor={currentMember}
                     clubId={clubId}
+                    isClubContext={actorIsClub}
                     onSuccess={() => {
                         onRefresh();
                         setRoleModalMember(null);
@@ -434,6 +443,9 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                 clubId={clubId}
                 roles={roles}
                 departments={departments}
+                members={visibleMembers}
+                currentActor={currentMember}
+                isClubContext={actorIsClub}
                 onSuccess={() => {
                     onRefresh();
                 }}

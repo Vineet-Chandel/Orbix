@@ -81,10 +81,12 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
     // - Workspace Manager: can award leads (rank 600) and members (rank 200). Cannot award Owner or peer managers (rank >= 800)
     // - Exclude suspended or inactive members
     const eligibleRecipients = useMemo(() => {
-        if (!currentMember) return [];
+        if (!currentMember && !isOwner) return [];
         return members.filter((m) => {
             // Cannot self-award
-            if (m.userId === currentMember.userId) return false;
+            if (currentMember && m.userId === currentMember.userId) return false;
+            // Institutional club identity accounts cannot receive personal Orbits
+            if (m.user?.accountType === "club") return false;
             // Must be active and not suspended
             if (m.isSuspended || m.membershipStatus !== "active") return false;
 
@@ -103,7 +105,7 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
             }
 
             // Regular members / leads (only if delegated)
-            return targetRank < (currentMember.role?.rank ?? 200);
+            return targetRank < (currentMember?.role?.rank ?? 200);
         });
     }, [members, currentMember, isOwner, isWorkspaceManager]);
 
@@ -177,7 +179,7 @@ export const AwardOrbitsModal: React.FC<AwardOrbitsModalProps> = ({
         setSubmitting(true);
         try {
             // Generate idempotency key for this award attempt
-            const idempotencyKey = `award_${currentMember?.userId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            const idempotencyKey = `award_${currentMember?.userId || "club-owner"}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
             const res = await workspaceApi.awardOrbits(
                 {

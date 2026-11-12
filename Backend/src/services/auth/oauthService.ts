@@ -413,6 +413,15 @@ export class OAuthService {
         if (existingResult.rows.length > 0) {
             const existingUser = existingResult.rows[0];
 
+            if (existingUser.accountType === "club") {
+                const err: any = new Error(
+                    "OAuth sign-in is only supported for Personal accounts. Please use the Club Portal to sign in with your club credentials."
+                );
+                err.statusCode = 403;
+                err.code = "ACCOUNT_TYPE_MISMATCH";
+                throw err;
+            }
+
             // If user exists, target the exact same account (canonical email identity)
             const updates: string[] = [];
             const values: any[] = [];
@@ -633,6 +642,13 @@ export class OAuthService {
         res: Response,
         deviceId?: string
     ): Promise<{ token: string; refreshToken: string; sessionId: string }> {
+        if (user?.accountType === "club" || user?.account_type === "club") {
+            const err: any = new Error("OAuth sign-in is not permitted for Club accounts.");
+            err.statusCode = 403;
+            err.code = "ACCOUNT_TYPE_MISMATCH";
+            throw err;
+        }
+
         const JWT_SECRET = this.getJWTSecret();
 
         if (deviceId) {

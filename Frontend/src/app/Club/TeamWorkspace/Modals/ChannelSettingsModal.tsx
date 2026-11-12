@@ -25,6 +25,7 @@ import type {
 } from "../../../../types/workspace";
 import { NeoSelect } from "../../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../../components/NeoCheckbox";
+import { ConfirmationModal } from "../../../../components/ConfirmationModal";
 
 interface ChannelSettingsModalProps {
     isOpen: boolean;
@@ -81,6 +82,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
 
     const [submitting, setSubmitting] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [syncing, setSyncing] = useState(false);
 
     useEffect(() => {
@@ -198,15 +200,12 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
     };
 
     const handleDeleteChannel = async () => {
-        if (!confirm(`Are you sure you want to permanently delete #${channel.name}? All messages will be lost.`)) {
-            return;
-        }
-
         try {
             setDeleting(true);
             const res = await workspaceApi.deleteChannel(channel.id, clubId);
             if (res.success) {
                 toast.success(`Channel #${channel.name} deleted.`);
+                setIsDeleteConfirmOpen(false);
                 onChannelDeleted(channel.id);
                 onClose();
             }
@@ -544,7 +543,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={handleDeleteChannel}
+                                            onClick={() => setIsDeleteConfirmOpen(true)}
                                             disabled={deleting}
                                             className="px-3.5 py-2 rounded-xl text-xs font-black bg-rose-500 hover:bg-rose-600 text-white border-2 border-black transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
                                         >
@@ -768,6 +767,19 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Delete Channel Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => setIsDeleteConfirmOpen(false)}
+                onConfirm={handleDeleteChannel}
+                title={`Delete #${channel.name}?`}
+                description="Are you sure you want to permanently delete this channel? All messages, threads, and attachments in this channel will be permanently lost."
+                confirmText="Delete Channel"
+                cancelText="Cancel"
+                variant="danger"
+                isLoading={deleting}
+            />
         </div>
     );
 };

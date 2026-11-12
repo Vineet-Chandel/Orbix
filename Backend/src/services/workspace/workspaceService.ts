@@ -39,6 +39,8 @@ export const DEFAULT_ADMIN_PERMISSIONS = [
     "files:upload",
     "files:manage",
     "audit:view",
+    "recognition:award",
+    "recognition:manage_policy",
 ];
 
 export const DEFAULT_DEPT_LEAD_PERMISSIONS = [
@@ -64,6 +66,13 @@ export const DEFAULT_MEMBER_PERMISSIONS = [
 
 export const DEFAULT_GUEST_PERMISSIONS = [
     "messages:send",
+];
+
+export const DEFAULT_OBSERVER_PERMISSIONS = [
+    "channels:view",
+    "messages:read",
+    "tasks:view",
+    "files:view",
 ];
 
 export class WorkspaceService {
@@ -218,6 +227,17 @@ export class WorkspaceService {
                 permissions: DEFAULT_GUEST_PERMISSIONS,
             });
 
+            await WorkspaceRepository.createRole(client, {
+                workspaceId: workspace.id,
+                name: "Observer",
+                slug: "observer",
+                description: "Read-only observer access to view public channels, tasks, and shared resources.",
+                rank: 50,
+                isSystem: true,
+                color: "#64748b",
+                permissions: DEFAULT_OBSERVER_PERMISSIONS,
+            });
+
             // Seed default channel category ("General")
             const catRes = await client.query(
                 `INSERT INTO public.workspace_channel_categories (workspace_id, name, display_order)
@@ -304,13 +324,42 @@ export class WorkspaceService {
             return null;
         }
 
-        const member = await WorkspaceRepository.findMember(workspaceId, userId);
+        let member = await WorkspaceRepository.findMember(workspaceId, userId);
+        if (!member) {
+            const vcRes = await query(
+                `SELECT auth_user_id FROM public.verified_clubs WHERE id = $1 LIMIT 1;`,
+                [workspace.clubId]
+            );
+            const clubAuthUserId = vcRes.rows[0]?.auth_user_id;
+            if (workspace.ownerId === userId || clubAuthUserId === userId) {
+                await this.bootstrapMemberIfAuthorized(workspace, userId);
+                member = await WorkspaceRepository.findMember(workspaceId, userId);
+            }
+        }
         if (!member || member.membershipStatus !== "active" || member.isSuspended) {
             return null;
         }
 
+        let isClubAccount = false;
+        if (member.user?.accountType === "club") {
+            if (workspace.ownerId === userId) {
+                isClubAccount = true;
+            } else {
+                const vcRes = await query(
+                    `SELECT 1 FROM public.verified_clubs WHERE id = $1 AND auth_user_id = $2 LIMIT 1;`,
+                    [workspace.clubId, userId]
+                );
+                isClubAccount = vcRes.rows.length > 0;
+            }
+            if (!isClubAccount) {
+                return null;
+            }
+        }
+
         // Resolve Permissions (check Redis first)
-        let permissions = await WorkspaceRedisService.getCachedPermissions(workspaceId, userId);
+        let permissions = isClubAccount
+            ? ["*"]
+            : await WorkspaceRedisService.getCachedPermissions(workspaceId, userId);
         if (!permissions) {
             const role = member.role || (await WorkspaceRepository.findRoleById(workspaceId, member.roleId));
             permissions = Array.isArray(role?.permissions) ? role.permissions : [];
@@ -329,18 +378,24 @@ export class WorkspaceService {
             await WorkspaceRedisService.setCachedPermissions(workspaceId, userId, permissions);
         }
 
-        const isOwner = member.role?.slug === "owner" || member.role?.rank === 1000;
+        const isOwner =
+            isClubAccount ||
+            workspace.ownerId === userId ||
+            member.role?.slug === "owner" ||
+            member.role?.rank === 1000;
         const isAdmin = isOwner || (member.role?.rank || 0) >= 800;
-        const isWorkspaceManager = workspace.managerUserId === userId;
+        const isWorkspaceManager = !isClubAccount && workspace.managerUserId === userId;
 
-        const leadDeptRes = await query(
-            `SELECT department_id as id FROM public.workspace_department_members
-             WHERE workspace_id = $1 AND user_id = $2 AND department_role IN ('lead', 'co_lead')
-             UNION
-             SELECT id FROM public.workspace_departments 
-             WHERE workspace_id = $1 AND (lead_user_id = $2 OR co_lead_user_ids @> to_jsonb($2::text));`,
-            [workspaceId, userId]
-        );
+        const leadDeptRes = isClubAccount
+            ? { rows: [] }
+            : await query(
+                `SELECT department_id as id FROM public.workspace_department_members
+                 WHERE workspace_id = $1 AND user_id = $2 AND department_role IN ('lead', 'co_lead')
+                 UNION
+                 SELECT id FROM public.workspace_departments 
+                 WHERE workspace_id = $1 AND (lead_user_id = $2 OR co_lead_user_ids @> to_jsonb($2::text));`,
+                [workspaceId, userId]
+            );
         const leadDepartmentIds = leadDeptRes.rows.map((r: any) => r.id);
 
         return {
@@ -349,6 +404,7 @@ export class WorkspaceService {
             permissions,
             isOwner,
             isAdmin,
+            isClubAccount,
             isWorkspaceManager,
             leadDepartmentIds,
         };
@@ -375,15 +431,24 @@ export class WorkspaceService {
             throw new Error("Target user is not a member of this workspace.");
         }
 
-        // Protection: Cannot suspend the workspace owner!
-        if (targetMember.role?.slug === "owner" || targetMember.role?.rank === 1000) {
+        if (targetUserId === actorUserId) {
+            throw new Error("Cannot alter your own suspension state.");
+        }
+
+        if (targetMember.user?.accountType === "club") {
+            throw new Error("The club account cannot be suspended.");
+        }
+
+        // Personal actors cannot suspend Workspace Owners; Club account holds supreme authority.
+        const isTargetOwner = targetMember.role?.slug === "owner" || (targetMember.role?.rank || 0) >= 1000;
+        if (isTargetOwner && !actorCtx.isClubAccount) {
             throw new Error("The workspace owner cannot be suspended.");
         }
 
-        // Rank Check: Actor must outrank target
+        // Rank Check: Personal actors must strictly outrank target
         const actorRank = actorCtx.member.role?.rank || 0;
         const targetRank = targetMember.role?.rank || 0;
-        if (actorRank <= targetRank && !actorCtx.isOwner) {
+        if (!actorCtx.isClubAccount && actorRank <= targetRank) {
             throw new Error("Cannot alter suspension state of a member with equal or higher rank.");
         }
 
@@ -437,15 +502,21 @@ export class WorkspaceService {
         workspace: TeamWorkspace,
         userId: string
     ): Promise<WorkspaceMember | null> {
-        // Check if user is the club owner
-        if (workspace.ownerId === userId) {
+        const vcRes = await query(
+            `SELECT auth_user_id FROM public.verified_clubs WHERE id = $1 LIMIT 1;`,
+            [workspace.clubId]
+        );
+        const clubAuthUserId = vcRes.rows[0]?.auth_user_id;
+
+        // Check if user is the club portal account or workspace owner
+        if (workspace.ownerId === userId || clubAuthUserId === userId) {
             const ownerRole = await WorkspaceRepository.findRoleBySlug(workspace.id, "owner");
             if (ownerRole) {
                 return await WorkspaceRepository.createMember(null, {
                     workspaceId: workspace.id,
                     userId,
                     roleId: ownerRole.id,
-                    roleTitle: "Club President / Owner",
+                    roleTitle: clubAuthUserId === userId ? "Club Official Account" : "Club President / Owner",
                     membershipStatus: "active",
                 });
             }

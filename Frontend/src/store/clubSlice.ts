@@ -194,7 +194,16 @@ export const clubSlice = createSlice({
             .addCase(saveClubProfile.rejected, (state, action) => {
                 state.saving = false;
                 state.error = action.payload || "Failed to save club profile";
-            });
+            })
+            // Automatically reset club portal cache whenever user signs out or switches to a personal account
+            .addMatcher(
+                (action) =>
+                    action.type === "user/clearUser" ||
+                    (action.type === "user/setUser" && (action as any).payload?.accountType !== "club") ||
+                    (action.type === "user/fetchUserProfile/fulfilled" && (action as any).payload?.accountType !== "club") ||
+                    action.type === "user/fetchUserProfile/rejected",
+                () => initialState
+            );
     },
 });
 

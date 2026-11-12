@@ -68,6 +68,7 @@ interface WorkspaceShellProps {
     onOpenMobileSidebar?: () => void;
     clubSelector?: React.ReactNode;
     initialSection?: string;
+    isClubContext?: boolean;
 }
 
 export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
@@ -75,7 +76,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     onOpenMobileSidebar,
     clubSelector,
     initialSection,
+    isClubContext: isClubContextProp,
 }) => {
+    const isClubContext =
+        isClubContextProp ??
+        (typeof window !== "undefined" && window.location.pathname.startsWith("/club"));
     const toast = useToast();
     const toastRef = useRef(toast);
     useEffect(() => {
@@ -99,9 +104,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
 
     useEffect(() => {
         if (initialSection) {
-            setActiveSection(initialSection as any);
+            if ((isClubContext || capabilities?.isClubAccount) && initialSection === "my-tasks") {
+                setActiveSection("overview");
+            } else {
+                setActiveSection(initialSection as any);
+            }
         }
-    }, [initialSection]);
+    }, [initialSection, isClubContext, capabilities?.isClubAccount]);
+
+    useEffect(() => {
+        if ((isClubContext || capabilities?.isClubAccount) && activeSection === "my-tasks") {
+            setActiveSection("overview");
+        }
+    }, [isClubContext, capabilities?.isClubAccount, activeSection]);
 
     // Phase 08 States: Search Modal
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -391,26 +406,32 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         );
     }
 
+    const effectiveIsClubContext = Boolean(isClubContext || capabilities?.isClubAccount);
+    const visibleMembers = members.filter((m) => m.user?.accountType !== "club");
     const isOwner = Boolean(
+        effectiveIsClubContext ||
         currentMember?.role?.slug === "owner" ||
         currentMember?.role?.rank === 1000 ||
         capabilities?.isOwner
     );
     const isAdmin = Boolean(
+        effectiveIsClubContext ||
         isOwner ||
         (currentMember?.role?.rank || 0) >= 800 ||
         capabilities?.isAdmin
     );
     const isWorkspaceManager = Boolean(
-        (workspace.managerUserId && workspace.managerUserId === currentMember?.userId) ||
-        capabilities?.isWorkspaceManager
+        !effectiveIsClubContext && (
+            (workspace.managerUserId && workspace.managerUserId === currentMember?.userId) ||
+            capabilities?.isWorkspaceManager
+        )
     );
     const canManageChannels = Boolean(
         isAdmin ||
         (isWorkspaceManager && Boolean((workspace.managerPermissions as any)?.can_manage_channels)) ||
         capabilities?.capabilities.channels.manage
     );
-    const managerMember = members.find((m) => m.userId === workspace.managerUserId);
+    const managerMember = visibleMembers.find((m) => m.userId === workspace.managerUserId);
 
     return (
         <div className="w-full space-y-6">
@@ -457,10 +478,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             </button>
                         )}
                         {clubSelector}
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs">
-                            <Shield className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Your Role: {currentMember?.roleTitle || "Member"}</span>
-                        </div>
+                        {!isClubContext && currentMember && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs">
+                                <Shield className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Your Role: {currentMember?.roleTitle || "Member"}</span>
+                            </div>
+                        )}
 
                         {/* Owner Workspace Manager Designation Button */}
                         {isOwner && (
@@ -538,7 +561,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                         }`}
                     >
                         <Users className="w-3.5 h-3.5" />
-                        Member Roster ({members.length})
+                        Member Roster ({visibleMembers.length})
                     </button>
 
                     {(capabilities ? capabilities.navigation.canViewInvitations : (isAdmin || isWorkspaceManager)) && (
@@ -581,17 +604,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                         </button>
                     )}
 
-                    <button
-                        onClick={() => setActiveSection("my-tasks")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "my-tasks"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        My Tasks
-                    </button>
+                    {!effectiveIsClubContext && (capabilities ? capabilities.navigation.canViewMyTasks : true) && (
+                        <button
+                            onClick={() => setActiveSection("my-tasks")}
+                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                                activeSection === "my-tasks"
+                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                            }`}
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            My Tasks
+                        </button>
+                    )}
 
                     {(capabilities ? (capabilities.navigation.canViewResources ?? true) : true) && (
                         <button
@@ -676,7 +701,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
             </div>
 
             {/* Section Access Authorization Enforcement */}
-            {capabilities && !capabilities.navigation.allowedTabs.includes(activeSection) ? (
+            {capabilities && (!capabilities.navigation.allowedTabs.includes(activeSection) || (effectiveIsClubContext && activeSection === "my-tasks")) ? (
                 <div className="bg-[#FAF6EE] border-2 border-black rounded-2xl p-8 text-center shadow-neo max-w-lg mx-auto my-8 animate-in fade-in duration-150">
                     <div className="w-14 h-14 bg-rose-100 border-2 border-black rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-neo-xs">
                         <ShieldAlert className="w-7 h-7 text-rose-600" />
@@ -700,8 +725,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     clubId={club.id}
                     departments={departments}
                     isAdmin={isAdmin}
+                    isClubContext={effectiveIsClubContext}
                     capabilities={capabilities}
-                    onNavigateToSection={(sec) => setActiveSection(sec)}
+                    onNavigateToSection={(sec) => {
+                        if (effectiveIsClubContext && sec === "my-tasks") return;
+                        setActiveSection(sec);
+                    }}
                     onSelectDepartment={() => {
                         setActiveSection("departments");
                     }}
@@ -713,7 +742,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 <DepartmentOverviewView
                     clubId={club.id}
                     departments={departments}
-                    allMembers={members}
+                    allMembers={visibleMembers}
                     isAdmin={isAdmin}
                     capabilities={capabilities}
                     onReload={() => loadWorkspace(true)}
@@ -724,11 +753,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
             {activeSection === "roster" && (
                 <MemberDirectoryView
                     workspace={workspace}
-                    members={members}
+                    members={visibleMembers}
                     roles={roles}
                     departments={departments}
                     currentMember={currentMember}
                     clubId={club.id}
+                    isClubContext={effectiveIsClubContext}
                     onRefresh={() => loadWorkspace(true)}
                     onToggleSuspension={(m) => setSuspendingMember(m)}
                     onNavigateToRoles={() => setActiveSection("roles")}
@@ -741,7 +771,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     clubId={club.id}
                     roles={roles}
                     departments={departments}
+                    members={visibleMembers}
                     currentMember={currentMember}
+                    isClubContext={effectiveIsClubContext}
+                    onRefreshMembers={() => loadWorkspace(true)}
                 />
             )}
 
@@ -768,7 +801,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             else if (sec === "overview") setActiveSection("overview");
                             else if (sec === "members") setActiveSection("roster");
                             else if (sec === "all-tasks") setActiveSection("all-tasks");
-                            else if (sec === "my-tasks") setActiveSection("my-tasks");
+                            else if (sec === "my-tasks" && !effectiveIsClubContext) setActiveSection("my-tasks");
                             else if (sec === "activity") setActiveSection("activity");
                             else if (sec === "audit") setActiveSection("audit");
                             else {
@@ -798,6 +831,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             key={activeChannel.id}
                             channel={activeChannel}
                             clubId={club.id}
+                            clubName={club.name}
+                            clubLogoUrl={club.logo_url}
+                            isClubContext={isClubContext}
                             currentMember={currentMember}
                             canManageChannels={canManageChannels}
                             members={members}
@@ -833,6 +869,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             thread={activeThread}
                             channelId={activeChannel.id}
                             clubId={club.id}
+                            clubName={club.name}
+                            isClubContext={isClubContext}
                             currentMember={currentMember}
                             canManageThreads={canManageChannels}
                             onClose={() => setActiveThread(null)}
@@ -848,22 +886,23 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     <TasksBoardView
                         clubId={club.id}
                         departments={departments}
-                        members={members}
+                        members={visibleMembers}
                         roles={roles}
                         currentMember={currentMember}
                         canCreateTasks={canManageChannels || isOwner || Boolean(currentMember?.role?.permissions.includes("tasks:create"))}
                         canViewAllTasks={capabilities ? capabilities.navigation.canViewAllTasks : true}
+                        isClubContext={effectiveIsClubContext}
                     />
                 </div>
             )}
 
             {/* SECTION 7: MY TASKS (PHASE 05) */}
-            {activeSection === "my-tasks" && (
+            {!effectiveIsClubContext && activeSection === "my-tasks" && (
                 <div className="h-[720px] max-h-[calc(100vh-200px)] flex flex-col rounded-2xl border-2 border-black overflow-hidden shadow-neo">
                     <MyTasksView
                         clubId={club.id}
                         currentMember={currentMember}
-                        allMembers={members}
+                        allMembers={visibleMembers}
                         departments={departments}
                         roles={roles}
                     />
@@ -887,7 +926,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     clubId={club.id}
                     workspaceId={workspace.id}
                     currentMember={currentMember}
-                    members={members}
+                    members={visibleMembers}
                     departments={departments}
                     tasks={[]}
                     isOwner={isOwner}
@@ -927,6 +966,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     currentMember={currentMember}
                     capabilities={capabilities}
                     isAdmin={isAdmin}
+                    isClubContext={isClubContext}
                     onRefresh={() => loadWorkspace(true)}
                 />
             )}
@@ -1085,7 +1125,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     isOpen={isManagerModalOpen}
                     onClose={() => setIsManagerModalOpen(false)}
                     workspace={workspace}
-                    members={members}
+                    members={visibleMembers}
                     clubId={club.id}
                     onSuccess={() => loadWorkspace(true)}
                 />

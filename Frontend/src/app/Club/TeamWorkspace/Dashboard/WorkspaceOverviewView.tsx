@@ -31,6 +31,7 @@ interface WorkspaceOverviewViewProps {
     clubId: string;
     departments: WorkspaceDepartment[];
     isAdmin: boolean;
+    isClubContext?: boolean;
     capabilities?: MemberCapabilityResolution | null;
     onNavigateToSection: (section: "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "activity" | "audit") => void;
     onSelectDepartment?: (departmentId: string) => void;
@@ -40,6 +41,7 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
     clubId,
     departments,
     isAdmin,
+    isClubContext = false,
     capabilities,
     onNavigateToSection,
     onSelectDepartment,
@@ -556,16 +558,18 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
                                 <ChevronRight className="w-3.5 h-3.5" />
                             </button>
 
-                            <button
-                                onClick={() => onNavigateToSection("my-tasks")}
-                                className="w-full py-2 px-3 text-xs font-black bg-white hover:bg-neutral-50 border-2 border-black rounded-lg shadow-neo-xs flex items-center justify-between text-left transition"
-                            >
-                                <span className="flex items-center gap-2">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                    My Assigned Tasks
-                                </span>
-                                <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
+                            {!isClubContext && (capabilities ? capabilities.navigation.canViewMyTasks : true) && (
+                                <button
+                                    onClick={() => onNavigateToSection("my-tasks")}
+                                    className="w-full py-2 px-3 text-xs font-black bg-white hover:bg-neutral-50 border-2 border-black rounded-lg shadow-neo-xs flex items-center justify-between text-left transition"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        My Assigned Tasks
+                                    </span>
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                            )}
 
                             <button
                                 onClick={() => onNavigateToSection("channels")}

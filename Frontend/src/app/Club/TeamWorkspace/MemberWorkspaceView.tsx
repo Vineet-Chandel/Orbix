@@ -136,10 +136,10 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
                     <Building2 className="w-8 h-8 text-black" />
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                    Club Manager Access Required
+                    Workspace Membership Not Found
                 </h2>
                 <p className="text-sm font-bold text-neutral-700 max-w-md mt-2 leading-relaxed">
-                    Club representatives and managers cannot access club workspaces through personal accounts. Please sign in with your club credentials to access your club workspace.
+                    You do not have an active member role (Owner, Admin, Lead, Member, Guest, or Observer) in this club's workspace, or you are looking to sign in using the club's institutional credentials.
                 </p>
                 <div className="flex items-center gap-3 mt-6 flex-wrap justify-center">
                     <button
@@ -147,7 +147,7 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
                         className="px-5 py-2.5 bg-[#FFE566] hover:bg-[#fedb30] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         <Building2 className="w-4 h-4 text-black" />
-                        Sign In with Club Credentials
+                        Club Portal Sign In
                     </button>
                     {workspaces.length > 0 && (
                         <button
@@ -286,6 +286,7 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
                 club={clubMeta}
                 clubSelector={clubSelectorNode}
                 initialSection={paramSection}
+                isClubContext={false}
                 onOpenMobileSidebar={onOpenMobileSidebar}
             />
         </div>

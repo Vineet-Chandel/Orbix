@@ -1,7 +1,7 @@
 import { useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import MainLanding from "./LandingPages/Main-Landing-Pages/Landing";
-import ProtectedRoute from "./ProtectedRoute";
+import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { OrbixLoadingProvider, OrbixLoader } from "./components/ui/loader";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
@@ -153,29 +153,31 @@ const App = () => {
           <Route path="/club/team-workspace/join" element={<JoinClubPage />} />
           <Route path="/join-club" element={<JoinClubPage />} />
           <Route path="/club/join" element={<JoinClubPage />} />
-          <Route path="/club/status" element={<ClubStatusPage />} />
-          <Route path="/clubs/status" element={<Navigate to="/club/status" replace />} />
-          <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />
-          <Route path="/club/dashboard" element={<ClubDashboardPage />} />
-          <Route path="/club/team" element={<ClubDashboardPage />} />
-          <Route path="/club/team-workspace" element={<ClubDashboardPage />} />
-          <Route path="/club/recruitment" element={<ClubDashboardPage />} />
-          <Route path="/club/events" element={<ClubDashboardPage />} />
-          <Route path="/club/events/:eventId" element={<ClubDashboardPage />} />
-          <Route path="/club/events/:eventId/checkin" element={<ClubDashboardPage />} />
-          <Route path="/club/analytics" element={<ClubDashboardPage />} />
-          <Route path="/club/trends" element={<Navigate to="/club/analytics" replace />} />
-          <Route path="/club/certificates" element={<ClubDashboardPage />} />
-          <Route path="/club/feedback-surveys" element={<ClubDashboardPage />} />
-          <Route path="/club/announcements" element={<ClubDashboardPage />} />
-          <Route path="/club/credibility" element={<Navigate to="/club/dashboard" replace />} />
-          <Route path="/club/profile" element={<ClubDashboardPage />} />
-          <Route path="/club/manage-profile" element={<Navigate to="/club/profile" replace />} />
-          <Route path="/club/clubs" element={<ClubDashboardPage />} />
-          <Route path="/club/campus-clubs" element={<Navigate to="/club/clubs" replace />} />
-          <Route path="/club/other-clubs" element={<Navigate to="/club/clubs" replace />} />
-          <Route path="/club/settings" element={<ClubDashboardPage />} />
-          <Route path="/club/inbox" element={<ClubDashboardPage />} />
+          <Route element={<ClubProtectedRoute />}>
+            <Route path="/club/status" element={<ClubStatusPage />} />
+            <Route path="/clubs/status" element={<Navigate to="/club/status" replace />} />
+            <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />
+            <Route path="/club/dashboard" element={<ClubDashboardPage />} />
+            <Route path="/club/team" element={<ClubDashboardPage />} />
+            <Route path="/club/team-workspace" element={<ClubDashboardPage />} />
+            <Route path="/club/recruitment" element={<ClubDashboardPage />} />
+            <Route path="/club/events" element={<ClubDashboardPage />} />
+            <Route path="/club/events/:eventId" element={<ClubDashboardPage />} />
+            <Route path="/club/events/:eventId/checkin" element={<ClubDashboardPage />} />
+            <Route path="/club/analytics" element={<ClubDashboardPage />} />
+            <Route path="/club/trends" element={<Navigate to="/club/analytics" replace />} />
+            <Route path="/club/certificates" element={<ClubDashboardPage />} />
+            <Route path="/club/feedback-surveys" element={<ClubDashboardPage />} />
+            <Route path="/club/announcements" element={<ClubDashboardPage />} />
+            <Route path="/club/credibility" element={<Navigate to="/club/dashboard" replace />} />
+            <Route path="/club/profile" element={<ClubDashboardPage />} />
+            <Route path="/club/manage-profile" element={<Navigate to="/club/profile" replace />} />
+            <Route path="/club/clubs" element={<ClubDashboardPage />} />
+            <Route path="/club/campus-clubs" element={<Navigate to="/club/clubs" replace />} />
+            <Route path="/club/other-clubs" element={<Navigate to="/club/clubs" replace />} />
+            <Route path="/club/settings" element={<ClubDashboardPage />} />
+            <Route path="/club/inbox" element={<ClubDashboardPage />} />
+          </Route>
           <Route path="/clubs/:slug" element={<PublicClubProfilePage />} />
           <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 

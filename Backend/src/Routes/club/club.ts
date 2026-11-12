@@ -4,7 +4,8 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { pool, query } from "../../database/client.js";
-import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, optionalAuthenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
+import { createSession } from "../../services/session/sessionService.js";
 import { userDetailsCache } from "../../redis/cache/cache-auth.js";
 import { failsOccursSignup } from "../../redis/rate-limiters/rate-limiters-auth.js";
 import ClubRegistrationValidator, {
@@ -433,7 +434,7 @@ clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request,
                 `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
                 [canonicalPhone]
             );
-            if (userPhoneRes.rows[0] && (!callerUserId || userPhoneRes.rows[0].id !== callerUserId)) {
+            if (userPhoneRes.rows[0]) {
                 return res.json({
                     success: true,
                     available: false,
@@ -450,7 +451,7 @@ clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request,
                  LIMIT 1;`,
                 [canonicalPhone]
             );
-            if (appPhoneRes.rows[0] && (!callerUserId || appPhoneRes.rows[0].auth_user_id !== callerUserId)) {
+            if (appPhoneRes.rows[0]) {
                 return res.json({
                     success: true,
                     available: false,
@@ -466,7 +467,7 @@ clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request,
                  LIMIT 1;`,
                 [canonicalPhone]
             );
-            if (clubPhoneRes.rows[0] && (!callerUserId || clubPhoneRes.rows[0].auth_user_id !== callerUserId)) {
+            if (clubPhoneRes.rows[0]) {
                 return res.json({
                     success: true,
                     available: false,
@@ -503,83 +504,45 @@ clubRouter.post("/verify/send-email-otp", optionalAuthenticate, async (req: Requ
         }
 
         const normalizedEmail = rawEmail.trim().toLowerCase();
-        const callerUserId = req.user?.id;
-        const callerEmail = req.user?.gmail?.toLowerCase() || req.user?.email?.toLowerCase();
 
-        // 1. Pre-check email uniqueness
-        if (callerEmail && callerEmail === normalizedEmail) {
-            // Caller is authenticated using their own email.
-            // Ensure they don't already have an active application or verified club.
-            const existingAppRes = await query(
-                `SELECT id, club_name, status FROM club_verification_requests 
-                 WHERE auth_user_id = $1 
-                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
-                 LIMIT 1;`,
-                [callerUserId]
-            );
-            if (existingAppRes.rows[0]) {
-                return res.status(409).json({
-                    success: false,
-                    message: `You already have an active club registration application for "${existingAppRes.rows[0].club_name}" (${existingAppRes.rows[0].status}).`,
-                });
-            }
-
-            const existingClubRes = await query(
-                `SELECT id, name FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
-                [callerUserId]
-            );
-            if (existingClubRes.rows[0]) {
-                return res.status(409).json({
-                    success: false,
-                    message: `You already lead the verified club "${existingClubRes.rows[0].name}".`,
-                });
-            }
-        } else {
-            // Unauthenticated guest registration: ensure no duplicate active application exists
-            const existingAppRes = await query(
-                `SELECT id FROM club_verification_requests 
-                 WHERE LOWER(contact_email) = LOWER($1) 
-                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
-                 LIMIT 1;`,
-                [normalizedEmail]
-            );
-            if (existingAppRes.rows[0]) {
-                return res.status(409).json({
-                    success: false,
-                    message: "An active club verification application already exists for this email address. Please sign in to check status.",
-                });
-            }
-
-            const existingClubRes = await query(
-                `SELECT id FROM verified_clubs WHERE LOWER(public_email) = LOWER($1) LIMIT 1;`,
-                [normalizedEmail]
-            );
-            if (existingClubRes.rows[0]) {
-                return res.status(409).json({
-                    success: false,
-                    message: "A verified club already exists with this email address.",
-                });
-            }
+        // 1. Pre-check email uniqueness against active club applications and verified clubs
+        const existingAppRes = await query(
+            `SELECT id FROM club_verification_requests 
+             WHERE LOWER(contact_email) = LOWER($1) 
+               AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+             LIMIT 1;`,
+            [normalizedEmail]
+        );
+        if (existingAppRes.rows[0]) {
+            return res.status(409).json({
+                success: false,
+                message: "An active club verification application already exists for this email address. Please sign in through the Club Portal to check status.",
+            });
         }
 
-        // 2. Pre-check username uniqueness if provided and not owned by caller or this email
+        const existingClubRes = await query(
+            `SELECT id FROM verified_clubs WHERE LOWER(public_email) = LOWER($1) LIMIT 1;`,
+            [normalizedEmail]
+        );
+        if (existingClubRes.rows[0]) {
+            return res.status(409).json({
+                success: false,
+                message: "A verified club already exists with this email address.",
+            });
+        }
+
+        // 2. Pre-check club username uniqueness globally (never share a personal username)
         if (rawUsername && typeof rawUsername === "string") {
             const normalizedUsername = rawUsername.trim().toLowerCase();
-            const callerUsername = req.user?.username?.toLowerCase();
-            if (!callerUsername || callerUsername !== normalizedUsername) {
-                const existingUsernameRes = await query(
-                    `SELECT id, email FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
-                    [normalizedUsername]
-                );
-                if (existingUsernameRes.rows[0]) {
-                    const rowEmail = existingUsernameRes.rows[0].email?.toLowerCase();
-                    if (rowEmail !== normalizedEmail) {
-                        return res.status(409).json({
-                            success: false,
-                            message: "This username is already taken. Please choose another username.",
-                        });
-                    }
-                }
+            const existingUsernameRes = await query(
+                `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+                [normalizedUsername]
+            );
+            if (existingUsernameRes.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This club username is already taken. Please choose a unique handle for your club.",
+                });
             }
         }
 
@@ -1062,12 +1025,27 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
         );
         const createdRequest = requestInsertRes.rows[0];
 
-        // Generate JWT session tokens with accountType = 'club'
+        // Create persistent session record for the dedicated club account
+        let sessionId: string | undefined;
+        try {
+            const sessionResult = await createSession({
+                userId: effectiveUserId,
+                req,
+                loginMethod: "local",
+                isMfa: false,
+            });
+            sessionId = sessionResult?.sessionId;
+        } catch (sessErr) {
+            console.warn("[Club Register] Non-fatal session creation warning:", sessErr);
+        }
+
+        // Generate JWT session tokens with accountType = 'club' and clubDedicatedEmail (NEVER personal Gmail)
         const token = jwt.sign(
             {
                 sub: effectiveUserId,
-                gmail: validated.contactEmail,
+                gmail: clubDedicatedEmail,
                 username: validated.username.toLowerCase(),
+                ...(sessionId ? { sid: sessionId } : {}),
                 accountType: "club",
             },
             JWT_SECRET as string,
@@ -1081,8 +1059,9 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
         const refreshToken = jwt.sign(
             {
                 sub: effectiveUserId,
-                gmail: validated.contactEmail,
+                gmail: clubDedicatedEmail,
                 username: validated.username.toLowerCase(),
+                ...(sessionId ? { sid: sessionId } : {}),
                 accountType: "club",
                 type: "refresh",
             },
@@ -1104,18 +1083,17 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             maxAge: REFRESH_TOKEN_EXPIRY_MS,
         });
 
-        // Cache in Redis
+        // Cache in Redis under the dedicated club identity only (never overwrite personal email cache)
         await userDetailsCache({
             id: effectiveUserId,
             firstName: validated.clubName,
             middleName: "",
             lastName: "Club",
-            gmail: validated.contactEmail,
+            gmail: clubDedicatedEmail,
             username: validated.username.toLowerCase(),
             password_hash: hashedPassword,
             termsAccepted: true,
             accountType: "club",
-            account_type: "club",
         }).catch(() => {});
 
         const safeNewUser: any = {
@@ -1123,7 +1101,8 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             username: validated.username.toLowerCase(),
             firstName: validated.clubName,
             lastName: "Club",
-            gmail: validated.contactEmail,
+            gmail: clubDedicatedEmail,
+            contactEmail: validated.contactEmail,
             accountType: "club",
         };
         await enrichUserWithClubData(safeNewUser, effectiveUserId);
@@ -1195,19 +1174,11 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
  * Authenticated endpoint for club representatives to view their own application status.
  * Internal checklist results and reviewer notes are completely excluded.
  */
-clubRouter.get("/application-status", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/application-status", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ success: false, message: "Unauthorized." });
-        }
-        const userEmail = req.user?.gmail || req.user?.email;
-
-        if (!userId && !userEmail) {
-            return res.status(401).json({
-                success: false,
-                message: "Authentication required",
-            });
         }
 
         // Check if user already has an active verified club
@@ -1220,7 +1191,7 @@ clubRouter.get("/application-status", authenticate, async (req: Request, res: Re
         );
         const verifiedClub = verifiedRes.rows[0];
 
-        // Fetch user's latest club verification request by auth_user_id or contact_email
+        // Fetch dedicated club account's latest verification request strictly by auth_user_id
         const result = await query(
             `SELECT
                 id,
@@ -1263,10 +1234,10 @@ clubRouter.get("/application-status", authenticate, async (req: Request, res: Re
                 phone_verified_at,
                 applicant_user_id
             FROM club_verification_requests
-            WHERE auth_user_id = $1 OR LOWER(contact_email) = LOWER($2)
+            WHERE auth_user_id = $1
             ORDER BY submitted_at DESC
             LIMIT 1;`,
-            [userId || null, userEmail || null]
+            [userId]
         );
 
         const application = result.rows[0];
@@ -1847,7 +1818,7 @@ clubRouter.post("/reviewer/approve/:id", authenticate, authenticateReviewer, han
  * GET /api/club/session-state
  * Resolves current user's authoritative account classification and club status.
  */
-clubRouter.get("/session-state", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/session-state", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -1920,7 +1891,7 @@ const normalizeLocationTypeForDb = (type?: string): string => {
  * GET /api/club/events
  * Authenticated endpoint for the club to fetch all its events (draft, published, cancelled).
  */
-clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/events", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -1996,7 +1967,7 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
  * GET /api/club/events/creation-eligibility
  * Returns real-time event creation eligibility, cooldowns, and score requirements
  */
-clubRouter.get("/events/creation-eligibility", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/events/creation-eligibility", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -2031,7 +2002,7 @@ clubRouter.get("/events/creation-eligibility", authenticate, async (req: Request
  * Authenticated endpoint for the club to fetch a specific event they own (draft, published, completed, cancelled).
  * Strictly enforces that ONLY the club that owns the event can access it.
  */
-clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/events/:eventId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -2118,7 +2089,7 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
  * POST /api/club/events
  * Creates a new event for the authenticated club.
  */
-clubRouter.post("/events", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -2321,7 +2292,7 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
  * PATCH /api/club/events/:eventId
  * Updates an event belonging to the authenticated club.
  */
-clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Response) => {
+clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -2677,7 +2648,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
  * DELETE /api/club/events/:eventId
  * Deletes an event belonging to the authenticated club.
  */
-clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Response) => {
+clubRouter.delete("/events/:eventId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -3788,7 +3759,7 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
  * GET /api/club/events/:eventId/applications
  * Returns all student applications for a club event in an Excel spreadsheet-compatible format for staff.
  */
-clubRouter.get("/events/:eventId/applications", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
         const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
@@ -3901,7 +3872,7 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
  * PATCH /api/club/events/:eventId/applications/:registrationId
  * Updates status of an applicant (pending, registered, attended, waitlisted, rejected, cancelled).
  */
-clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, async (req: Request, res: Response) => {
+clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const { eventId, registrationId } = req.params;
         const { status, reviewNotes } = req.body;
@@ -4058,7 +4029,7 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
  * GET /api/club/events/:eventId/applications/export
  * Downloads the applications list as an Excel-compatible RFC-4180 CSV with UTF-8 BOM.
  */
-clubRouter.get("/events/:eventId/applications/export", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/events/:eventId/applications/export", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
         const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
@@ -4294,7 +4265,7 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
  * POST /api/club/events/:eventId/checkin
  * Checks in an attendee for an event. Enforces block check.
  */
-clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/events/:eventId/checkin", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
         const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
@@ -4345,7 +4316,7 @@ clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, r
  * Returns the full user identity profile (database personal & academic info, social links,
  * plus check-in state).
  */
-clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/events/:eventId/checkin-verify", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
         const isEventUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
@@ -4562,7 +4533,7 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Req
  * Fetches conversations for the authenticated club staff.
  * Filters: 'inbox' (normal/unmuted), 'muted' (filtered), 'archived', 'all'.
  */
-clubRouter.get("/inbox", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/inbox", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden: verified club staff only." });
@@ -4622,7 +4593,7 @@ clubRouter.get("/inbox", authenticate, async (req: Request, res: Response) => {
  * GET /api/club/inbox/unread-count
  * Returns real-time unread count and muted count for the club inbox badge.
  */
-clubRouter.get("/inbox/unread-count", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/inbox/unread-count", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const requestedClubId = (req.query.clubId as string) || undefined;
         const club = await getStaffClub(req.user!.id, requestedClubId);
@@ -4661,7 +4632,7 @@ clubRouter.get("/inbox/unread-count", authenticate, async (req: Request, res: Re
  * GET /api/club/inbox/:conversationId/messages
  * Retrieves full chronological message history for a conversation and auto-marks it as read.
  */
-clubRouter.get("/inbox/:conversationId/messages", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/inbox/:conversationId/messages", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4736,7 +4707,7 @@ clubRouter.get("/inbox/:conversationId/messages", authenticate, async (req: Requ
  * POST /api/club/inbox/:conversationId/reply
  * Club staff sends reply to the user.
  */
-clubRouter.post("/inbox/:conversationId/reply", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/inbox/:conversationId/reply", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4765,7 +4736,7 @@ clubRouter.post("/inbox/:conversationId/reply", authenticate, async (req: Reques
 /**
  * PATCH /api/club/inbox/:conversationId/read
  */
-clubRouter.patch("/inbox/:conversationId/read", authenticate, async (req: Request, res: Response) => {
+clubRouter.patch("/inbox/:conversationId/read", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4787,7 +4758,7 @@ clubRouter.patch("/inbox/:conversationId/read", authenticate, async (req: Reques
 /**
  * PATCH /api/club/inbox/:conversationId/archive
  */
-clubRouter.patch("/inbox/:conversationId/archive", authenticate, async (req: Request, res: Response) => {
+clubRouter.patch("/inbox/:conversationId/archive", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4807,7 +4778,7 @@ clubRouter.patch("/inbox/:conversationId/archive", authenticate, async (req: Req
 });
 
 // Moderation Endpoints
-clubRouter.post("/moderation/mute", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/moderation/mute", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4822,7 +4793,7 @@ clubRouter.post("/moderation/mute", authenticate, async (req: Request, res: Resp
     }
 });
 
-clubRouter.post("/moderation/unmute", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/moderation/unmute", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4837,7 +4808,7 @@ clubRouter.post("/moderation/unmute", authenticate, async (req: Request, res: Re
     }
 });
 
-clubRouter.post("/moderation/block", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/moderation/block", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4852,7 +4823,7 @@ clubRouter.post("/moderation/block", authenticate, async (req: Request, res: Res
     }
 });
 
-clubRouter.post("/moderation/unblock", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/moderation/unblock", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4867,7 +4838,7 @@ clubRouter.post("/moderation/unblock", authenticate, async (req: Request, res: R
     }
 });
 
-clubRouter.get("/moderation/list", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/moderation/list", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4888,7 +4859,7 @@ clubRouter.get("/moderation/list", authenticate, async (req: Request, res: Respo
  * GET /api/club/certificates/events
  * Returns the club's events for selecting in event-based certificate issuance.
  */
-clubRouter.get("/certificates/events", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/certificates/events", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -4921,7 +4892,7 @@ clubRouter.get("/certificates/events", authenticate, async (req: Request, res: R
  * GET /api/club/certificates/event/:eventId/recipients
  * Returns all participants/attendees for a specific event with attendance and certificate status.
  */
-clubRouter.get("/certificates/event/:eventId/recipients", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/certificates/event/:eventId/recipients", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
         const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
@@ -4975,7 +4946,7 @@ clubRouter.get("/certificates/event/:eventId/recipients", authenticate, async (r
  * 3. Active club team members / coordinators
  * Enriched with credibility metrics (attended count, team role, affiliation).
  */
-clubRouter.get("/certificates/eligible-recipients", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/certificates/eligible-recipients", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -5116,7 +5087,7 @@ clubRouter.get("/certificates/eligible-recipients", authenticate, async (req: Re
  * - Creates in-app notifications in user_notifications
  * - Protected by database transactions
  */
-clubRouter.post("/certificates/issue", authenticate, async (req: Request, res: Response) => {
+clubRouter.post("/certificates/issue", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const staffUserId = req.user!.id;
         const club = await getStaffClub(staffUserId);
@@ -5376,7 +5347,7 @@ clubRouter.post("/certificates/issue", authenticate, async (req: Request, res: R
  * GET /api/club/certificates/issued
  * Returns all certificates issued by the authenticated staff's club.
  */
-clubRouter.get("/certificates/issued", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/certificates/issued", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
@@ -5416,7 +5387,7 @@ clubRouter.get("/certificates/issued", authenticate, async (req: Request, res: R
  * DELETE /api/club/certificates/:certificateId
  * Revokes or deletes an issued certificate.
  */
-clubRouter.delete("/certificates/:certificateId", authenticate, async (req: Request, res: Response) => {
+clubRouter.delete("/certificates/:certificateId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const { certificateId } = req.params;
         const club = await getStaffClub(req.user!.id);

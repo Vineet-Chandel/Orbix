@@ -62,10 +62,11 @@ export class WorkspaceCapabilityService {
             color: ctx.member.role?.color || "#16a34a",
         };
 
+        const isClubAccount = Boolean(ctx.isClubAccount || ctx.member.user?.accountType === "club");
         const highestRank = effectiveRole.rank;
         // Role hierarchy rule: Actor can only manage users with rank strictly below their own,
-        // unless they are the Owner (who can manage everyone except other owners).
-        const highestManageableRank = ctx.isOwner ? 1000 : Math.max(0, highestRank - 1);
+        // Personal Workspace Owners can manage rank < 1000, while Club account holds supreme authority (0..1000).
+        const highestManageableRank = isClubAccount ? 1001 : ctx.isOwner ? 1000 : Math.max(0, highestRank - 1);
 
         const leadDepartmentIds = ctx.leadDepartmentIds || [];
         const memberDepartmentIds = (ctx.member.departments || []).map((d) => d.id);
@@ -234,7 +235,7 @@ export class WorkspaceCapabilityService {
             },
             tasks: {
                 viewAll: canViewAllTasks,
-                viewAssigned: true,
+                viewAssigned: !isClubAccount,
                 create: canCreateTasks,
                 assign: canAssignTasks,
                 review: canReviewTasks,
@@ -250,6 +251,13 @@ export class WorkspaceCapabilityService {
             },
             audit: {
                 view: canViewAuditLogs,
+            },
+            recognition: {
+                view: true,
+                award: ctx.isOwner || ctx.isWorkspaceManager || (ctx.isAdmin && !ctx.isOwner) || hasPerm("recognition:award"),
+                reverse: ctx.isOwner,
+                managePolicy: ctx.isOwner || ctx.isWorkspaceManager || ctx.isAdmin || hasPerm("recognition:manage_policy"),
+                manageBudgets: ctx.isOwner || ctx.isWorkspaceManager || ctx.isAdmin || hasPerm("recognition:manage_policy"),
             },
         };
 
@@ -272,10 +280,15 @@ export class WorkspaceCapabilityService {
         const canViewAllTasksNav = capabilities.tasks.viewAll || leadDepartmentIds.length > 0;
         if (canViewAllTasksNav) allowedTabs.push("all-tasks");
 
-        allowedTabs.push("my-tasks");
+        if (!isClubAccount) {
+            allowedTabs.push("my-tasks");
+        }
 
         const canViewResources = capabilities.assets.view;
         if (canViewResources) allowedTabs.push("resources");
+
+        const canViewRecognition = capabilities.recognition?.view ?? true;
+        if (canViewRecognition) allowedTabs.push("recognition");
 
         allowedTabs.push("activity");
 
@@ -293,8 +306,10 @@ export class WorkspaceCapabilityService {
             canViewRoles,
             canViewChannels: true,
             canViewAllTasks: canViewAllTasksNav,
-            canViewMyTasks: true,
+            canViewMyTasks: !isClubAccount,
             canViewResources,
+            canViewRecognition,
+            canAwardRecognition: capabilities.recognition?.award ?? false,
             canViewActivity: true,
             canViewAuditLogs,
             canViewSettings: canManageSettings,
@@ -309,6 +324,7 @@ export class WorkspaceCapabilityService {
             highestManageableRank,
             isOwner: ctx.isOwner,
             isAdmin: ctx.isAdmin,
+            isClubAccount,
             isWorkspaceManager: ctx.isWorkspaceManager,
             leadDepartmentIds,
             memberDepartmentIds,
@@ -437,6 +453,10 @@ export class WorkspaceCapabilityService {
         const canManageFiles = hasWildcard || isAdminRole || hasPerm("files:manage");
         const canViewAuditLogs = hasWildcard || isAdminRole || hasPerm("audit:view") || hasPerm("audit:read");
 
+        const canAwardRecognition = hasWildcard || isOwnerRole || isAdminRole || hasPerm("recognition:award");
+        const canManageRecognitionPolicy = hasWildcard || isOwnerRole || isAdminRole || hasPerm("recognition:manage_policy");
+        const canReverseRecognition = hasWildcard || isOwnerRole;
+
         const capabilities: WorkspaceModuleCapabilities = {
             workspace: { view: true, manageSettings: canManageSettings, manageRoles: canManageRoles, viewAuditLogs: canViewAuditLogs },
             departments: {
@@ -464,7 +484,17 @@ export class WorkspaceCapabilityService {
             },
             assets: { view: true, upload: hasWildcard || hasPerm("files:upload"), download: true, manage: canManageFiles },
             audit: { view: canViewAuditLogs },
+            recognition: {
+                view: true,
+                award: canAwardRecognition,
+                reverse: canReverseRecognition,
+                managePolicy: canManageRecognitionPolicy,
+                manageBudgets: canManageRecognitionPolicy,
+            },
         };
+
+        const canViewResources = capabilities.assets.view;
+        const canViewRecognition = true;
 
         const allowedTabs: string[] = ["overview"];
         if (capabilities.departments.viewAll || capabilities.departments.viewAssigned) allowedTabs.push("departments");
@@ -473,6 +503,8 @@ export class WorkspaceCapabilityService {
         allowedTabs.push("channels");
         if (canViewAllTasks) allowedTabs.push("all-tasks");
         allowedTabs.push("my-tasks");
+        if (canViewResources) allowedTabs.push("resources");
+        if (canViewRecognition) allowedTabs.push("recognition");
         allowedTabs.push("activity");
         if (canViewAuditLogs) allowedTabs.push("audit");
         if (canManageSettings) allowedTabs.push("settings");
@@ -487,6 +519,9 @@ export class WorkspaceCapabilityService {
             canViewChannels: true,
             canViewAllTasks,
             canViewMyTasks: true,
+            canViewResources,
+            canViewRecognition,
+            canAwardRecognition,
             canViewActivity: true,
             canViewAuditLogs,
             canViewSettings: canManageSettings,
@@ -551,6 +586,7 @@ export class WorkspaceCapabilityService {
             },
             assets: { view: false, upload: false, download: false, manage: false },
             audit: { view: false },
+            recognition: { view: false, award: false, reverse: false, managePolicy: false, manageBudgets: false },
         };
     }
 
@@ -564,6 +600,9 @@ export class WorkspaceCapabilityService {
             canViewChannels: false,
             canViewAllTasks: false,
             canViewMyTasks: false,
+            canViewResources: false,
+            canViewRecognition: false,
+            canAwardRecognition: false,
             canViewActivity: false,
             canViewAuditLogs: false,
             canViewSettings: false,
