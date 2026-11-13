@@ -1,4 +1,5 @@
 // Backend/src/services/workspace/workspaceChannelService.ts
+import crypto from "crypto";
 import { EventEmitter } from "events";
 import { query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
@@ -434,15 +435,30 @@ export class WorkspaceChannelService {
             }
         }
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "channel_created",
             targetType: "channel",
             targetId: channel.id,
-            details: { name: channel.name, slug: channel.slug, isPrivate: channel.isPrivate },
+            correlationId,
+            details: { name: channel.name, slug: channel.slug, isPrivate: channel.isPrivate, departmentId: channel.departmentId || null },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: channel.departmentId || null,
+            actorId: actorUserId,
+            eventType: "channel:created",
+            resourceType: "channel",
+            resourceId: channel.id,
+            title: channel.name,
+            isRestricted: Boolean(channel.isPrivate),
+            correlationId,
+            metadata: { name: channel.name, slug: channel.slug, isPrivate: channel.isPrivate },
         });
 
         this.broadcastEvent(workspaceId, "channel:created", { channel });
@@ -494,15 +510,30 @@ export class WorkspaceChannelService {
         const updated = await WorkspaceRepository.updateChannel(workspaceId, channelId, data);
         if (!updated) throw new Error("Failed to update channel.");
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "channel_updated",
             targetType: "channel",
             targetId: channelId,
-            details: data,
+            correlationId,
+            details: { name: updated.name, departmentId: updated.departmentId || null, ...data },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: updated.departmentId || null,
+            actorId: actorUserId,
+            eventType: "channel:updated",
+            resourceType: "channel",
+            resourceId: channelId,
+            title: updated.name,
+            isRestricted: Boolean(updated.isPrivate),
+            correlationId,
+            metadata: { name: updated.name },
         });
 
         this.broadcastEvent(workspaceId, "channel:updated", { channel: updated });
@@ -526,15 +557,29 @@ export class WorkspaceChannelService {
 
         const success = await WorkspaceRepository.deleteChannel(workspaceId, channelId);
         if (success) {
+            const correlationId = crypto.randomUUID();
             await WorkspaceRepository.logAudit(null, {
                 workspaceId,
                 actorId: actorUserId,
                 action: "channel_deleted",
                 targetType: "channel",
                 targetId: channelId,
-                details: {},
+                correlationId,
+                details: { name: existing.name, departmentId: existing.departmentId || null },
                 ipAddress: reqMeta.ipAddress || null,
                 userAgent: reqMeta.userAgent || null,
+            });
+            await WorkspaceRepository.recordActivityEvent({
+                workspaceId,
+                departmentId: existing.departmentId || null,
+                actorId: actorUserId,
+                eventType: "channel:deleted",
+                resourceType: "channel",
+                resourceId: channelId,
+                title: existing.name,
+                isRestricted: Boolean(existing.isPrivate),
+                correlationId,
+                metadata: { name: existing.name },
             });
             this.broadcastEvent(workspaceId, "channel:deleted", { channelId });
         }

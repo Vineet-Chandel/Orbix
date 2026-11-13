@@ -268,6 +268,25 @@ export class WorkspaceTaskService {
                 );
             }
 
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: task.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: "task:created",
+                    resourceType: "task",
+                    resourceId: task.id,
+                    title: task.title,
+                    isRestricted: Boolean(task.isRestricted),
+                    metadata: {
+                        title: task.title,
+                        priority: task.priority,
+                        assigneeCount: (data.assigneeUserIds || []).length,
+                    },
+                },
+                client
+            );
+
             await client.query("COMMIT;");
 
             this.broadcastEvent(workspaceId, "task:created", { task });
@@ -638,6 +657,25 @@ export class WorkspaceTaskService {
                 ]
             );
 
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: updated.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: "task:status_changed",
+                    resourceType: "task",
+                    resourceId: taskId,
+                    title: updated.title,
+                    isRestricted: Boolean(updated.isRestricted),
+                    metadata: {
+                        title: updated.title,
+                        fromStatus: currentStatus,
+                        toStatus: targetStatus,
+                    },
+                },
+                client
+            );
+
             await client.query("COMMIT;");
 
             this.broadcastEvent(workspaceId, "task:status_changed", {
@@ -707,6 +745,24 @@ export class WorkspaceTaskService {
                 taskId,
                 assigneeUserIds,
                 actorUserId
+            );
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: updated.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: "task:assigned",
+                    resourceType: "task",
+                    resourceId: taskId,
+                    title: updated.title,
+                    isRestricted: Boolean(updated.isRestricted),
+                    metadata: {
+                        title: updated.title,
+                        assigneeUserIds,
+                    },
+                },
+                client
             );
 
             await client.query("COMMIT;");
@@ -810,6 +866,24 @@ export class WorkspaceTaskService {
                 expectedVersion
             );
 
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: updatedTask.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: "task:submitted",
+                    resourceType: "task",
+                    resourceId: taskId,
+                    title: updatedTask.title,
+                    isRestricted: Boolean(updatedTask.isRestricted),
+                    metadata: {
+                        title: updatedTask.title,
+                        submissionId: submission.id,
+                    },
+                },
+                client
+            );
+
             await client.query("COMMIT;");
 
             this.broadcastEvent(workspaceId, "task:submitted", {
@@ -904,6 +978,25 @@ export class WorkspaceTaskService {
                 taskId,
                 { status: nextStatus },
                 expectedVersion
+            );
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: updatedTask.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: decision === "approved" ? "task:approved" : "task:changes_requested",
+                    resourceType: "task",
+                    resourceId: taskId,
+                    title: updatedTask.title,
+                    isRestricted: Boolean(updatedTask.isRestricted),
+                    metadata: {
+                        title: updatedTask.title,
+                        submissionId,
+                        decision,
+                    },
+                },
+                client
             );
 
             await client.query("COMMIT;");
@@ -1014,6 +1107,24 @@ export class WorkspaceTaskService {
                         hasAttachments: attachments.length > 0,
                     }),
                 ]
+            );
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: task.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: "task:comment",
+                    resourceType: "task",
+                    resourceId: taskId,
+                    title: task.title,
+                    isRestricted: Boolean(task.isRestricted),
+                    metadata: {
+                        title: task.title,
+                        commentId: comment.id,
+                    },
+                },
+                client
             );
 
             await client.query("COMMIT;");
@@ -1223,6 +1334,21 @@ export class WorkspaceTaskService {
             await client.query("BEGIN;");
 
             const archived = await WorkspaceRepository.archiveTask(client, workspaceId, taskId, actorUserId);
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: archived.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: "task:archived",
+                    resourceType: "task",
+                    resourceId: taskId,
+                    title: archived.title,
+                    isRestricted: Boolean(archived.isRestricted),
+                    metadata: { title: archived.title },
+                },
+                client
+            );
 
             await client.query("COMMIT;");
 

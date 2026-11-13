@@ -64,15 +64,34 @@ export class WorkspaceMemberService {
 
         this.broadcastEvent(workspaceId, "member:manager_appointed", { managerUserId, permissions });
 
+        const correlationId = crypto.randomUUID();
+        const managerName = member.user
+            ? `${member.user.firstName || ""} ${member.user.lastName || ""}`.trim() || member.user.username
+            : "Workspace Member";
+
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "workspace_manager_appointed",
             targetType: "workspace_manager",
             targetId: managerUserId,
-            details: { managerUserId, permissions },
+            correlationId,
+            details: { managerUserId, targetName: managerName, permissions },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: member.departmentId || null,
+            actorId: actorUserId,
+            eventType: "member:manager_updated",
+            resourceType: "member",
+            resourceId: member.id,
+            title: `Appointed ${managerName} as Workspace Manager`,
+            isRestricted: false,
+            correlationId,
+            metadata: { targetUserId: managerUserId, targetName: managerName },
         });
 
         return updated;
@@ -105,14 +124,29 @@ export class WorkspaceMemberService {
 
         this.broadcastEvent(workspaceId, "member:manager_revoked", { previousManagerId });
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "workspace_manager_revoked",
             targetType: "workspace_manager",
             targetId: previousManagerId,
+            correlationId,
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: null,
+            actorId: actorUserId,
+            eventType: "member:manager_updated",
+            resourceType: "workspace",
+            resourceId: workspaceId,
+            title: "Revoked Workspace Manager designation",
+            isRestricted: false,
+            correlationId,
+            metadata: { previousManagerId },
         });
 
         return updated;
@@ -204,14 +238,21 @@ export class WorkspaceMemberService {
         });
 
         const isPromotion = targetNewRole.rank > currentTargetRank;
+        const correlationId = crypto.randomUUID();
+        const targetName = targetMember.user
+            ? `${targetMember.user.firstName || ""} ${targetMember.user.lastName || ""}`.trim() || targetMember.user.username
+            : "Workspace Member";
+
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: isPromotion ? "member_promoted" : "member_demoted",
             targetType: "member",
             targetId: targetMember.id,
+            correlationId,
             details: {
                 targetUserId,
+                targetName,
                 previousRoleId: targetMember.roleId,
                 previousRole: targetMember.role?.name,
                 newRoleId,
@@ -220,6 +261,24 @@ export class WorkspaceMemberService {
             },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: targetMember.departmentId || null,
+            actorId: actorUserId,
+            eventType: "member:role_updated",
+            resourceType: "member",
+            resourceId: targetMember.id,
+            title: `${targetName} -> ${targetNewRole.name}`,
+            isRestricted: false,
+            correlationId,
+            metadata: {
+                targetUserId,
+                targetName,
+                newRoleName: targetNewRole.name,
+                newRole: targetNewRole.name,
+            },
         });
 
         return updated;
@@ -307,20 +366,40 @@ export class WorkspaceMemberService {
             userId: targetUserId,
         });
 
-        // 4. Audit log
+        // 4. Audit log + correlated activity
+        const correlationId = crypto.randomUUID();
+        const removedName = targetMember.user
+            ? `${targetMember.user.firstName || ""} ${targetMember.user.lastName || ""}`.trim() || targetMember.user.username
+            : "Workspace Member";
+
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "member_removed",
             targetType: "member",
             targetId: targetMember.id,
+            correlationId,
             details: {
                 targetUserId,
+                targetName: removedName,
                 targetRole: targetMember.role?.name,
                 targetRank,
             },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: targetMember.departmentId || null,
+            actorId: actorUserId,
+            eventType: "member:removed",
+            resourceType: "member",
+            resourceId: targetMember.id,
+            title: removedName,
+            isRestricted: false,
+            correlationId,
+            metadata: { targetUserId, targetName: removedName },
         });
 
         return (delRes.rowCount || 0) > 0;
@@ -394,27 +473,16 @@ export class WorkspaceMemberService {
             if (!dept) throw new Error("Selected department does not exist.");
         }
 
-        // Rule: Club managers cannot be invited to join other club workspaces with any role
-        const managerEmailRes = await query(
-            `SELECT vc.id, vc.name FROM public.verified_clubs vc
-             JOIN public.users u ON u.id = vc.auth_user_id
-             JOIN public.team_workspaces tw ON tw.club_id = vc.id
-             WHERE (LOWER(u.email) = LOWER($1) OR LOWER(vc.public_email) = LOWER($1))
-               AND vc.is_active = true
-               AND tw.id != $2
-             LIMIT 1;`,
-            [email, workspaceId]
-        );
-        if (managerEmailRes.rows.length > 0) {
-            throw new Error("Club managers are not permitted to join other club workspaces with any role.");
-        }
-
-        // Check if user already exists in workspace
+        // Check if target email belongs to an existing Orbix user (personal accounts only; club accounts cannot be invited)
         const existingUserRes = await query(
-            `SELECT id FROM public.users WHERE LOWER(email) = $1 LIMIT 1;`,
+            `SELECT id, account_type FROM public.users WHERE LOWER(email) = $1 LIMIT 1;`,
             [email]
         );
-        const existingUserId = existingUserRes.rows[0]?.id || null;
+        const existingUser = existingUserRes.rows[0] || null;
+        if (existingUser?.account_type === "club") {
+            throw new Error("Club portal accounts cannot be invited as personal workspace members.");
+        }
+        const existingUserId = existingUser?.id || null;
 
         if (existingUserId) {
             const managerUserRes = await query(
@@ -424,7 +492,7 @@ export class WorkspaceMemberService {
                 [existingUserId, workspaceId]
             );
             if (managerUserRes.rows.length > 0) {
-                throw new Error("Club managers are not permitted to join other club workspaces with any role.");
+                throw new Error("Club portal accounts are not permitted to join other club workspaces.");
             }
 
             const alreadyMember = await WorkspaceRepository.findMember(workspaceId, existingUserId);
@@ -450,15 +518,30 @@ export class WorkspaceMemberService {
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         });
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "invitation_created",
             targetType: "invitation",
             targetId: invitation.id,
+            correlationId,
             details: { email, roleId: data.roleId, departmentId: data.departmentId },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: data.departmentId || null,
+            actorId: actorUserId,
+            eventType: "member:invited",
+            resourceType: "invitation",
+            resourceId: invitation.id,
+            title: email,
+            isRestricted: false,
+            correlationId,
+            metadata: { email, roleId: data.roleId, departmentId: data.departmentId || null },
         });
 
         return { invitation, rawToken };
@@ -489,15 +572,30 @@ export class WorkspaceMemberService {
         });
 
         if (revoked) {
+            const correlationId = crypto.randomUUID();
             await WorkspaceRepository.logAudit(null, {
                 workspaceId,
                 actorId: actorUserId,
                 action: "invitation_revoked",
                 targetType: "invitation",
                 targetId: invitationId,
+                correlationId,
                 details: { email: invitation.email },
                 ipAddress: reqMeta.ipAddress || null,
                 userAgent: reqMeta.userAgent || null,
+            });
+
+            await WorkspaceRepository.recordActivityEvent({
+                workspaceId,
+                departmentId: invitation.departmentId || null,
+                actorId: actorUserId,
+                eventType: "member:invitation_revoked",
+                resourceType: "invitation",
+                resourceId: invitationId,
+                title: invitation.email,
+                isRestricted: false,
+                correlationId,
+                metadata: { email: invitation.email },
             });
         }
 
@@ -644,13 +742,15 @@ export class WorkspaceMemberService {
                 );
             }
 
-            // 4. Log audit record
+            // 4. Log correlated audit + operational activity records inside transaction
+            const correlationId = crypto.randomUUID();
             await WorkspaceRepository.logAudit(client, {
                 workspaceId: workspace.id,
                 actorId: acceptingUserId,
                 action: "invitation_accepted",
                 targetType: "member",
                 targetId: member.id,
+                correlationId,
                 details: {
                     invitationId: invitation.id,
                     email: invitation.email,
@@ -660,6 +760,25 @@ export class WorkspaceMemberService {
                 ipAddress: reqMeta.ipAddress || null,
                 userAgent: reqMeta.userAgent || null,
             });
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId: workspace.id,
+                    departmentId: invitation.departmentId || null,
+                    actorId: acceptingUserId,
+                    eventType: "member:joined",
+                    resourceType: "member",
+                    resourceId: member.id,
+                    title: invitation.role?.name || "Joined workspace",
+                    isRestricted: false,
+                    correlationId,
+                    metadata: {
+                        roleName: invitation.role?.name || "Member",
+                        departmentId: invitation.departmentId || null,
+                    },
+                },
+                client
+            );
 
             await client.query("COMMIT;");
 
@@ -876,15 +995,30 @@ export class WorkspaceMemberService {
 
         const role = await WorkspaceRepository.createRole(null, rolePayload);
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "role_created",
             targetType: "role",
             targetId: role.id,
+            correlationId,
             details: { name: role.name, rank: role.rank, permissions: role.permissions },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: null,
+            actorId: actorUserId,
+            eventType: "role:created",
+            resourceType: "role",
+            resourceId: role.id,
+            title: role.name,
+            isRestricted: false,
+            correlationId,
+            metadata: { name: role.name, rank: role.rank },
         });
 
         return role;
@@ -942,15 +1076,30 @@ export class WorkspaceMemberService {
         await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
         this.broadcastEvent(workspaceId, "role:updated", { roleId, data });
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "role_updated",
             targetType: "role",
             targetId: roleId,
-            details: data,
+            correlationId,
+            details: { name: updated.name, ...data },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: null,
+            actorId: actorUserId,
+            eventType: "role:updated",
+            resourceType: "role",
+            resourceId: roleId,
+            title: updated.name,
+            isRestricted: false,
+            correlationId,
+            metadata: { name: updated.name },
         });
 
         return updated;
@@ -990,15 +1139,30 @@ export class WorkspaceMemberService {
             await WorkspaceRedisService.invalidateOnSecurityChange(workspaceId);
             this.broadcastEvent(workspaceId, "role:deleted", { roleId });
 
+            const correlationId = crypto.randomUUID();
             await WorkspaceRepository.logAudit(null, {
                 workspaceId,
                 actorId: actorUserId,
                 action: "role_deleted",
                 targetType: "role",
                 targetId: roleId,
+                correlationId,
                 details: { name: role.name, fallbackRoleId: defaultMemberRole.id },
                 ipAddress: reqMeta.ipAddress || null,
                 userAgent: reqMeta.userAgent || null,
+            });
+
+            await WorkspaceRepository.recordActivityEvent({
+                workspaceId,
+                departmentId: null,
+                actorId: actorUserId,
+                eventType: "role:deleted",
+                resourceType: "role",
+                resourceId: roleId,
+                title: role.name,
+                isRestricted: false,
+                correlationId,
+                metadata: { name: role.name },
             });
         }
 

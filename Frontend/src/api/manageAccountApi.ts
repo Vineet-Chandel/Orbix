@@ -35,6 +35,7 @@ export interface PendingOperation {
 
 export interface ManageAccountsStatus {
     success: boolean;
+    accountType?: "personal" | "club";
     primaryEmail: string;
     isEmailVerified: boolean;
     emailVerifiedAt: string | null;

@@ -1085,6 +1085,63 @@ export const testDatabaseConnection = async () => {
                 CREATE INDEX IF NOT EXISTS idx_user_projects_user_order ON public.user_projects(user_id, display_order ASC, created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_user_projects_published ON public.user_projects(user_id, is_published);
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_projects_user_slug ON public.user_projects(user_id, slug);
+
+                -- Migration 039: Club Event Team Registrations, Member Rosters & Invitations
+                ALTER TABLE public.club_events 
+                    ADD COLUMN IF NOT EXISTS is_team_event BOOLEAN NOT NULL DEFAULT false,
+                    ADD COLUMN IF NOT EXISTS min_team_size INTEGER NOT NULL DEFAULT 1,
+                    ADD COLUMN IF NOT EXISTS max_team_size INTEGER NOT NULL DEFAULT 4;
+
+                CREATE TABLE IF NOT EXISTS public.club_event_teams (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    name VARCHAR(100) NOT NULL,
+                    code VARCHAR(20) NOT NULL UNIQUE,
+                    leader_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    status VARCHAR(30) NOT NULL DEFAULT 'forming',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_club_event_teams_event_name_lower 
+                    ON public.club_event_teams (event_id, LOWER(name));
+                CREATE INDEX IF NOT EXISTS idx_club_event_teams_event_leader 
+                    ON public.club_event_teams (event_id, leader_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_event_team_members (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    team_id UUID NOT NULL REFERENCES public.club_event_teams(id) ON DELETE CASCADE,
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    role VARCHAR(20) NOT NULL DEFAULT 'member',
+                    joined_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_club_event_team_members_event_user 
+                    ON public.club_event_team_members (event_id, user_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_team_members_team 
+                    ON public.club_event_team_members (team_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_event_team_invitations (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    team_id UUID NOT NULL REFERENCES public.club_event_teams(id) ON DELETE CASCADE,
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    inviter_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    invitee_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    responded_at TIMESTAMPTZ
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_team_invites_invitee 
+                    ON public.club_event_team_invitations (invitee_user_id, status);
+                CREATE INDEX IF NOT EXISTS idx_club_event_team_invites_team 
+                    ON public.club_event_team_invitations (team_id, status);
+
+                ALTER TABLE public.club_event_registrations 
+                    ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES public.club_event_teams(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS team_role VARCHAR(20) DEFAULT NULL;
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

@@ -100,13 +100,6 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
                 </p>
                 <div className="flex items-center gap-3 mt-6 flex-wrap justify-center">
                     <button
-                        onClick={() => navigate("/auth/signin?tab=club")}
-                        className="px-5 py-2.5 bg-[#FFE566] hover:bg-[#fedb30] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
-                    >
-                        <Building2 className="w-4 h-4 text-black" />
-                        Login with Club Credentials
-                    </button>
-                    <button
                         onClick={() => navigate("/clubs")}
                         className="px-5 py-2.5 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
                     >
@@ -139,16 +132,9 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
                     Workspace Membership Not Found
                 </h2>
                 <p className="text-sm font-bold text-neutral-700 max-w-md mt-2 leading-relaxed">
-                    You do not have an active member role (Owner, Admin, Lead, Member, Guest, or Observer) in this club's workspace, or you are looking to sign in using the club's institutional credentials.
+                    You do not have an active member role (Owner, Admin, Lead, Member, Guest, or Observer) in this club's workspace.
                 </p>
                 <div className="flex items-center gap-3 mt-6 flex-wrap justify-center">
-                    <button
-                        onClick={() => navigate("/auth/signin?tab=club")}
-                        className="px-5 py-2.5 bg-[#FFE566] hover:bg-[#fedb30] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
-                    >
-                        <Building2 className="w-4 h-4 text-black" />
-                        Club Portal Sign In
-                    </button>
                     {workspaces.length > 0 && (
                         <button
                             onClick={() => navigate(`/workspace/${workspaces[0].clubId}`)}

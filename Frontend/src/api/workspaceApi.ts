@@ -1,5 +1,5 @@
 // Frontend/src/api/workspaceApi.ts
-import { apiClient } from "./apiClient";
+import { apiClient, buildApiUrl, getAuthHeaders } from "./apiClient";
 import type {
     WorkspaceApiResponse,
     WorkspaceMembersApiResponse,
@@ -34,6 +34,11 @@ import type {
     WorkspaceDepartmentInsight,
     WorkspaceActivityEvent,
     WorkspaceAuditLogEntry,
+    WorkspaceHistoryItem,
+    WorkspaceHistoryRecordType,
+    WorkspaceHistoryResponse,
+    WorkspaceHistoryScope,
+    WorkspaceHistorySource,
     WorkspaceSearchResponse,
     WorkspaceTemplateDefinition,
     MemberCapabilityResolution,
@@ -1061,6 +1066,97 @@ export const workspaceApi = {
             success: boolean;
             data: { logs: WorkspaceAuditLogEntry[]; total: number };
         }>("/club/workspace/audit-logs", { params: options }),
+
+    /**
+     * Unified chronological workspace history (Activity Log + Administrative Audit Trail)
+     */
+    getHistory: (options?: {
+        clubId?: string;
+        scope?: WorkspaceHistoryScope;
+        recordType?: WorkspaceHistoryRecordType;
+        category?: string;
+        departmentId?: string;
+        actorId?: string;
+        targetType?: string;
+        search?: string;
+        startDate?: string;
+        endDate?: string;
+        cursor?: string;
+        limit?: number;
+    }) =>
+        apiClient.get<{
+            success: boolean;
+            data: WorkspaceHistoryResponse;
+        }>("/club/workspace/history", { params: options }),
+
+    /**
+     * Retrieves complete authorized inspection payload for one history entry
+     */
+    inspectHistoryItem: (
+        itemId: string,
+        source: WorkspaceHistorySource,
+        clubId?: string
+    ) =>
+        apiClient.get<{
+            success: boolean;
+            data: WorkspaceHistoryItem;
+        }>(`/club/workspace/history/${itemId}/inspect`, {
+            params: { source, clubId },
+        }),
+
+    /**
+     * Downloads filtered CSV/JSON export for authorized administrative/compliance users
+     */
+    exportHistory: async (
+        format: "csv" | "json",
+        options?: {
+            clubId?: string;
+            scope?: WorkspaceHistoryScope;
+            recordType?: WorkspaceHistoryRecordType;
+            category?: string;
+            departmentId?: string;
+            actorId?: string;
+            targetType?: string;
+            search?: string;
+            startDate?: string;
+            endDate?: string;
+        }
+    ): Promise<void> => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("format", format);
+        if (options) {
+            for (const [k, v] of Object.entries(options)) {
+                if (v !== undefined && v !== null && v !== "") {
+                    searchParams.set(k, String(v));
+                }
+            }
+        }
+        const url = `${buildApiUrl("/club/workspace/history/export")}?${searchParams.toString()}`;
+        const response = await fetch(url, {
+            method: "GET",
+            headers: getAuthHeaders(),
+            credentials: "include",
+        });
+        if (!response.ok) {
+            let errMessage = `Export failed (${response.status})`;
+            try {
+                const body = await response.json();
+                errMessage = body.message || body.error || errMessage;
+            } catch {
+                // ignore JSON parse failure on non-JSON response
+            }
+            throw new Error(errMessage);
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = `workspace-history-${new Date().toISOString().slice(0, 10)}.${format}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    },
 
     /**
      * Unified permission-filtered workspace search across channels, messages, members, departments, tasks, files

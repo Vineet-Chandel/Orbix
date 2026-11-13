@@ -481,6 +481,13 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                     </>
                                 )}
                             </span>
+
+                            {ev.isTeamEvent && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
+                                    <Users className="w-2.5 h-2.5" />
+                                    Team ({ev.minTeamSize || 1}-{ev.maxTeamSize || 4})
+                                </span>
+                            )}
                         </div>
                     </div>
 

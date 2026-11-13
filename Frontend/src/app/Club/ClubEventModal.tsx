@@ -13,6 +13,8 @@ import {
     Check,
     Globe2,
     GraduationCap,
+    Users,
+    User,
 } from "lucide-react";
 import { NeoSelect } from "../../components/NeoSelect";
 import { NeoImageDropzone } from "../../components/NeoImageDropzone";
@@ -68,6 +70,9 @@ interface FormState {
     coverImageUrl: string;
     status: ClubEventStatus;
     scope: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent: boolean;
+    minTeamSize: number;
+    maxTeamSize: number;
 }
 
 interface FormErrors {
@@ -76,6 +81,7 @@ interface FormErrors {
     endsAt?: string;
     registrationUrl?: string;
     venueOrLocation?: string;
+    teamSize?: string;
 }
 
 const URL_REGEX = /^(https?:\/\/)([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?(\?.*)?$/i;
@@ -168,6 +174,9 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         coverImageUrl: "",
         status: initialStatus,
         scope: editingEvent?.scope || selectedScope || "CAMPUS",
+        isTeamEvent: Boolean(editingEvent?.isTeamEvent),
+        minTeamSize: editingEvent?.minTeamSize || 1,
+        maxTeamSize: editingEvent?.maxTeamSize || 4,
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -218,6 +227,9 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     coverImageUrl: editingEvent.coverImageUrl || "",
                     status: editingEvent.status || "published",
                     scope: editingEvent.scope || selectedScope || "CAMPUS",
+                    isTeamEvent: Boolean(editingEvent.isTeamEvent),
+                    minTeamSize: editingEvent.minTeamSize || 1,
+                    maxTeamSize: editingEvent.maxTeamSize || 4,
                 });
             } else {
                 const defaultBanner = getRandomPresetBanner().dataUrl;
@@ -234,6 +246,9 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     coverImageUrl: defaultBanner,
                     status: initialStatus,
                     scope: selectedScope || "CAMPUS",
+                    isTeamEvent: false,
+                    minTeamSize: 1,
+                    maxTeamSize: 4,
                 });
                 setFormStructure({
                     sections: [
@@ -324,6 +339,19 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         if (currentForm.status === "published" && (currentForm.locationType === "in_person" || currentForm.locationType === "hybrid")) {
             if (!currentForm.venueOrLocation.trim()) {
                 errs.venueOrLocation = "Venue / campus room is recommended for published in-person sessions.";
+            }
+        }
+
+        // 6. Team size validation if team event enabled
+        if (currentForm.isTeamEvent) {
+            const min = Number(currentForm.minTeamSize) || 1;
+            const max = Number(currentForm.maxTeamSize) || 4;
+            if (min < 1) {
+                errs.teamSize = "Minimum team size must be at least 1.";
+            } else if (max < min) {
+                errs.teamSize = `Maximum team size cannot be smaller than minimum (${min}).`;
+            } else if (max > 50) {
+                errs.teamSize = "Maximum team size cannot exceed 50.";
             }
         }
 
@@ -467,6 +495,9 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             coverImageUrl: effectiveBanner,
             status: form.status,
             scope: form.scope,
+            isTeamEvent: form.isTeamEvent,
+            minTeamSize: form.minTeamSize,
+            maxTeamSize: form.maxTeamSize,
             initialFormStructure: formStructure,
             initialFormSettings: formSettings,
             initialFormTheme: formTheme,
@@ -822,6 +853,183 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                         />
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Registration Format & Team Dynamics */}
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
+                                <div className="flex items-center justify-between pb-2 border-b border-black/10">
+                                    <div className="flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-neutral-800" />
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                            Registration Format
+                                        </h4>
+                                    </div>
+                                    <span
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] ${
+                                            form.isTeamEvent ? "bg-[#a2ff86] text-black" : "bg-[#FAF6EE] text-neutral-700"
+                                        }`}
+                                    >
+                                        {form.isTeamEvent ? "Team Event" : "Solo / Individual"}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm((prev) => ({ ...prev, isTeamEvent: false }))}
+                                        className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-1 ${
+                                            !form.isTeamEvent
+                                                ? "bg-[#FAF6EE] border-black shadow-[2px_2px_0px_#000] ring-2 ring-black"
+                                                : "bg-white border-black/30 hover:border-black text-neutral-600"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            <User className="w-4 h-4 text-black" />
+                                            <span className="text-xs font-black text-black">Sole Registration</span>
+                                        </div>
+                                        <span className="text-[10px] text-neutral-500 font-medium">
+                                            Individual attendee registration (1 person per application)
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm((prev) => ({ ...prev, isTeamEvent: true }))}
+                                        className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-1 ${
+                                            form.isTeamEvent
+                                                ? "bg-[#a2ff86]/30 border-black shadow-[2px_2px_0px_#000] ring-2 ring-black"
+                                                : "bg-white border-black/30 hover:border-black text-neutral-600"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            <Users className="w-4 h-4 text-black" />
+                                            <span className="text-xs font-black text-black">Team Registration</span>
+                                        </div>
+                                        <span className="text-[10px] text-neutral-500 font-medium">
+                                            Participants either create or join teams via code / invite
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {form.isTeamEvent && (
+                                    <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black text-black uppercase tracking-wider">
+                                                Team Member Capacity
+                                            </span>
+                                            <span className="text-[11px] font-bold text-neutral-600">
+                                                {form.minTeamSize} to {form.maxTeamSize} Members per Team
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[11px] font-black uppercase text-black mb-1">
+                                                    Min Team Size
+                                                </label>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setForm((prev) => ({
+                                                                ...prev,
+                                                                minTeamSize: Math.max(1, prev.minTeamSize - 1),
+                                                            }))
+                                                        }
+                                                        className="w-8 h-8 rounded-lg bg-white border-2 border-black font-black text-sm flex items-center justify-center hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={form.maxTeamSize}
+                                                        value={form.minTeamSize}
+                                                        onChange={(e) => {
+                                                            const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                                            setForm((prev) => ({
+                                                                ...prev,
+                                                                minTeamSize: val,
+                                                                maxTeamSize: Math.max(val, prev.maxTeamSize),
+                                                            }));
+                                                        }}
+                                                        className="w-full h-8 px-2 text-center rounded-lg bg-white border-2 border-black text-xs font-black text-black"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setForm((prev) => ({
+                                                                ...prev,
+                                                                minTeamSize: Math.min(prev.maxTeamSize, prev.minTeamSize + 1),
+                                                            }))
+                                                        }
+                                                        className="w-8 h-8 rounded-lg bg-white border-2 border-black font-black text-sm flex items-center justify-center hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[11px] font-black uppercase text-black mb-1">
+                                                    Max Team Size
+                                                </label>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setForm((prev) => ({
+                                                                ...prev,
+                                                                maxTeamSize: Math.max(prev.minTeamSize, prev.maxTeamSize - 1),
+                                                            }))
+                                                        }
+                                                        className="w-8 h-8 rounded-lg bg-white border-2 border-black font-black text-sm flex items-center justify-center hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <input
+                                                        type="number"
+                                                        min={form.minTeamSize}
+                                                        max={50}
+                                                        value={form.maxTeamSize}
+                                                        onChange={(e) => {
+                                                            const val = Math.max(form.minTeamSize, parseInt(e.target.value, 10) || form.minTeamSize);
+                                                            setForm((prev) => ({
+                                                                ...prev,
+                                                                maxTeamSize: val,
+                                                            }));
+                                                        }}
+                                                        className="w-full h-8 px-2 text-center rounded-lg bg-white border-2 border-black text-xs font-black text-black"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setForm((prev) => ({
+                                                                ...prev,
+                                                                maxTeamSize: Math.min(50, prev.maxTeamSize + 1),
+                                                            }))
+                                                        }
+                                                        className="w-8 h-8 rounded-lg bg-white border-2 border-black font-black text-sm flex items-center justify-center hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {errors.teamSize && (
+                                            <p className="text-[10px] font-bold text-rose-600 flex items-center gap-1">
+                                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                                <span>{errors.teamSize}</span>
+                                            </p>
+                                        )}
+
+                                        <p className="text-[10px] text-neutral-600 font-medium flex items-center gap-1.5">
+                                            <Info className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
+                                            <span>Leaders can search members by <span className="font-mono font-bold">@username</span> or share their team code. Joining & roster locking freeze automatically when the event starts.</span>
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

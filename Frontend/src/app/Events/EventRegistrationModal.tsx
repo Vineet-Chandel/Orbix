@@ -6,12 +6,17 @@ import {
     MapPin,
     Ticket,
     ShieldAlert,
+    Users,
+    Crown,
+    KeyRound,
+    Info,
 } from "lucide-react";
 import { OrbixButton } from "../../components/ui/loader";
 import { NeoSelect } from "../../components/NeoSelect";
 import { NeoCheckbox } from "../../components/NeoCheckbox";
 import { useToast } from "../../context/ToastContext";
 import { applyForEvent, type CollegeEventItem } from "../../api/collegeEventsApi";
+import { clubEventTeamApi } from "../../api/clubEventTeamApi";
 import { useAppSelector } from "../../store";
 
 export interface EventRegistrationModalProps {
@@ -44,6 +49,11 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
     const [guardianPhone, setGuardianPhone] = useState("");
     const [guardianRelationship, setGuardianRelationship] = useState("Parent");
 
+    // Team states for team registration events
+    const [teamAction, setTeamAction] = useState<"create" | "join">("create");
+    const [teamName, setTeamName] = useState("");
+    const [teamCode, setTeamCode] = useState("");
+
     // Submission Status
     const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
@@ -64,6 +74,9 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
             setGuardianEmail("");
             setGuardianPhone("");
             setGuardianRelationship("Parent");
+            setTeamAction("create");
+            setTeamName("");
+            setTeamCode("");
             setSubmittedSuccess(false);
         }
     }, [isOpen, event, user]);
@@ -79,6 +92,20 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
         if (!applicantEmail.trim()) {
             toast.error("Please enter your email address.");
             return;
+        }
+
+        if (event.isTeamEvent) {
+            if (teamAction === "create") {
+                if (!teamName.trim() || teamName.trim().length < 2) {
+                    toast.error("Please enter a team name (at least 2 characters).");
+                    return;
+                }
+            } else {
+                if (!teamCode.trim() || teamCode.trim().length < 4) {
+                    toast.error("Please enter the team join code provided by your leader.");
+                    return;
+                }
+            }
         }
 
         try {
@@ -117,8 +144,25 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 guardianRelationship: isAttendeeUnder18 ? guardianRelationship.trim() : undefined,
             });
 
+            // Process team creation or joining if this is a team event
+            let teamCreatedOrJoined: any = null;
+            if (event.isTeamEvent) {
+                if (teamAction === "create") {
+                    const teamRes = await clubEventTeamApi.createTeam(event.id, teamName.trim());
+                    teamCreatedOrJoined = teamRes.team;
+                } else {
+                    const teamRes = await clubEventTeamApi.joinTeamByCode(event.id, teamCode.trim().toUpperCase());
+                    teamCreatedOrJoined = teamRes.team;
+                }
+            }
+
             setSubmittedSuccess(true);
-            toast.success(`Application submitted for ${event.title}!`, { title: "Application Forwarded" });
+            toast.success(
+                event.isTeamEvent && teamCreatedOrJoined
+                    ? `Registered in team "${teamCreatedOrJoined.name}" for ${event.title}!`
+                    : `Application submitted for ${event.title}!`,
+                { title: "Registration Received" }
+            );
 
             onSuccess({
                 ...event,
@@ -127,6 +171,8 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 registrationStatus: "pending",
                 ticketCode: null,
                 totalApplicationsCount: (event.totalApplicationsCount || 0) + 1,
+                teamId: teamCreatedOrJoined?.id || null,
+                teamRole: teamAction === "create" ? "leader" : "member",
             });
         } catch (err: any) {
             toast.error(err.message || "Failed to submit application for this event.");
@@ -297,6 +343,100 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 ) : (
                     /* Registration Form */
                     <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[65vh]">
+                        {event.isTeamEvent && (
+                            <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                                <div className="flex items-center justify-between pb-2 border-b border-black/10">
+                                    <div className="flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-black" />
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                            Team Registration ({event.minTeamSize || 1} to {event.maxTeamSize || 4} Members)
+                                        </h4>
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] text-black">
+                                        Required
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTeamAction("create")}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-0.5 ${
+                                            teamAction === "create"
+                                                ? "bg-[#a2ff86] border-black shadow-[2px_2px_0px_#000]"
+                                                : "bg-white border-black/30 hover:border-black text-neutral-600"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            <Crown className="w-3.5 h-3.5 text-black" />
+                                            <span className="text-xs font-black text-black">Create a Team</span>
+                                        </div>
+                                        <span className="text-[10px] text-neutral-600 font-medium">
+                                            Become the Team Leader
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setTeamAction("join")}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-0.5 ${
+                                            teamAction === "join"
+                                                ? "bg-[#a2ff86] border-black shadow-[2px_2px_0px_#000]"
+                                                : "bg-white border-black/30 hover:border-black text-neutral-600"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            <KeyRound className="w-3.5 h-3.5 text-black" />
+                                            <span className="text-xs font-black text-black">Join with Code</span>
+                                        </div>
+                                        <span className="text-[10px] text-neutral-600 font-medium">
+                                            Enter 6-char team code
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {teamAction === "create" ? (
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                            Team Name *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={teamName}
+                                            onChange={(e) => setTeamName(e.target.value)}
+                                            placeholder="e.g. Code Ninjas, Cloud Titans..."
+                                            maxLength={60}
+                                            className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                                        />
+                                        <p className="text-[10px] text-neutral-600 font-medium mt-1 flex items-center gap-1">
+                                            <Info className="w-3 h-3 text-neutral-500 shrink-0" />
+                                            <span>As Team Leader, you can invite members via <span className="font-mono font-bold">@username</span> or share your join code.</span>
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                            Team Join Code *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={teamCode}
+                                            onChange={(e) => setTeamCode(e.target.value.toUpperCase())}
+                                            placeholder="e.g. X9K2B4"
+                                            maxLength={10}
+                                            className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-mono font-black text-black uppercase tracking-wider focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                                        />
+                                        <p className="text-[10px] text-neutral-600 font-medium mt-1 flex items-center gap-1">
+                                            <Info className="w-3 h-3 text-neutral-500 shrink-0" />
+                                            <span>Enter the 6-character code provided by your team leader.</span>
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <div>
                                 <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">

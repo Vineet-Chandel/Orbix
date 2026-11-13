@@ -839,17 +839,21 @@ export class ClubTeamService {
             throw err;
         }
 
-        // 1. Resolve invited user
+        // 1. Resolve invited personal user (club portal accounts cannot be invited as team members)
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetUsernameOrId);
         const userRes = isUuid
             ? await query(
                   `SELECT id, username, firstname, lastname, email FROM public.users
-                   WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1;`,
+                   WHERE (id = $1 OR LOWER(username) = LOWER($2))
+                     AND COALESCE(account_type, 'personal') != 'club'
+                   LIMIT 1;`,
                   [targetUsernameOrId, targetUsernameOrId]
               )
             : await query(
                   `SELECT id, username, firstname, lastname, email FROM public.users
-                   WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+                   WHERE LOWER(username) = LOWER($1)
+                     AND COALESCE(account_type, 'personal') != 'club'
+                   LIMIT 1;`,
                   [targetUsernameOrId]
               );
 

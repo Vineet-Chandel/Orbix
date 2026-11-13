@@ -33,7 +33,7 @@ interface WorkspaceOverviewViewProps {
     isAdmin: boolean;
     isClubContext?: boolean;
     capabilities?: MemberCapabilityResolution | null;
-    onNavigateToSection: (section: "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "activity" | "audit") => void;
+    onNavigateToSection: (section: "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "history") => void;
     onSelectDepartment?: (departmentId: string) => void;
 }
 
@@ -212,11 +212,11 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
                     </button>
                     {isAdmin && (
                         <button
-                            onClick={() => onNavigateToSection("audit")}
+                            onClick={() => onNavigateToSection("history")}
                             className="px-3 py-1.5 text-xs font-black bg-neutral-900 text-white hover:bg-black border-2 border-black rounded-lg shadow-neo-xs flex items-center gap-1.5 transition"
                         >
                             <Shield className="w-3.5 h-3.5" />
-                            <span>Audit Logs</span>
+                            <span>Workspace History</span>
                         </button>
                     )}
                 </div>
@@ -491,10 +491,10 @@ export const WorkspaceOverviewView: React.FC<WorkspaceOverviewViewProps> = ({
                             <h3 className="text-base font-black text-black">Recent Activity Stream</h3>
                         </div>
                         <button
-                            onClick={() => onNavigateToSection("activity")}
+                            onClick={() => onNavigateToSection("history")}
                             className="text-xs font-black text-neutral-800 hover:text-black flex items-center gap-1 group"
                         >
-                            <span>Full Activity Feed</span>
+                            <span>Full Workspace History</span>
                             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
                         </button>
                     </div>

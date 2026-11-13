@@ -107,12 +107,12 @@ authRouter.post('/signup/send-email-otp', async (req: Request, res: Response) =>
             }
         }
 
-        // 2b. Pre-check: If phone number provided, is it taken?
+        // 2b. Pre-check: If phone number provided, is it taken by another personal account?
         const rawPhone = req.body?.phone;
         if (rawPhone && typeof rawPhone === "string" && rawPhone.trim()) {
             const normalizedPhone = rawPhone.trim();
             const existingPhoneResult = await query(
-                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) AND COALESCE(account_type, 'personal') != 'club' LIMIT 1;`,
                 [normalizedPhone]
             );
             if (existingPhoneResult.rows.length > 0) {

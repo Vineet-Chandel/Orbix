@@ -836,6 +836,40 @@ export interface WorkspaceNotificationPreferences {
 // ============================================================================
 
 export type WorkspaceActivityEventType =
+    | "task:created"
+    | "task:assigned"
+    | "task:status_changed"
+    | "task:submitted"
+    | "task:approved"
+    | "task:changes_requested"
+    | "task:comment"
+    | "task:archived"
+    | "member:joined"
+    | "member:invited"
+    | "member:invitation_revoked"
+    | "member:role_updated"
+    | "member:removed"
+    | "member:suspended"
+    | "member:unsuspended"
+    | "member:manager_updated"
+    | "role:created"
+    | "role:updated"
+    | "role:deleted"
+    | "department:created"
+    | "department:updated"
+    | "department:archived"
+    | "department:restored"
+    | "department:member_added"
+    | "department:member_removed"
+    | "channel:created"
+    | "channel:updated"
+    | "channel:deleted"
+    | "document:uploaded"
+    | "file:uploaded"
+    | "file:updated"
+    | "file:removed"
+    | "recognition:awarded"
+    | "recognition:reversed"
     | "member_joined"
     | "role_changed"
     | "department_created"
@@ -846,7 +880,8 @@ export type WorkspaceActivityEventType =
     | "task_approved"
     | "task_comment"
     | "document_shared"
-    | "discussion_started";
+    | "discussion_started"
+    | (string & {});
 
 export interface WorkspaceActivityEvent {
     id: string;
@@ -925,6 +960,7 @@ export interface WorkspaceAuditLogEntry {
     action: string;
     targetType: string;
     targetId: string | null;
+    correlationId?: string | null;
     details: Record<string, any>;
     ipAddress: string | null;
     userAgent: string | null;
@@ -936,6 +972,69 @@ export interface WorkspaceAuditLogEntry {
         lastName: string;
         avatarUrl?: string | null;
     } | null;
+}
+
+export type WorkspaceHistorySource = "activity" | "audit";
+export type WorkspaceHistoryScope = "workspace" | "department" | "personal";
+export type WorkspaceHistoryRecordType = "all" | "activity" | "audit";
+
+export interface WorkspaceHistoryItem {
+    id: string;
+    source: WorkspaceHistorySource;
+    sources?: WorkspaceHistorySource[];
+    correlationId?: string | null;
+    eventType: string;
+    category: string;
+    isRestricted?: boolean;
+    actor: {
+        id: string | null;
+        name: string;
+        username?: string;
+        avatarUrl?: string | null;
+    };
+    target?: {
+        id: string | null;
+        type: string;
+        label?: string;
+    };
+    department?: {
+        id: string;
+        name: string;
+        icon?: string;
+        color?: string;
+    };
+    title?: string;
+    summary: string;
+    createdAt: string;
+    permissions: {
+        canInspect: boolean;
+        canNavigate: boolean;
+    };
+    activityDetails?: {
+        resourceType: string;
+        resourceId: string;
+        description?: string | null;
+        metadata?: Record<string, unknown>;
+    };
+    auditDetails?: {
+        auditId?: string;
+        action: string;
+        ipAddress?: string | null;
+        userAgent?: string | null;
+        details?: Record<string, unknown>;
+    };
+}
+
+export interface WorkspaceHistoryResponse {
+    items: WorkspaceHistoryItem[];
+    nextCursor: string | null;
+    hasMore: boolean;
+    totalCount?: number;
+    permissions: {
+        canViewAudit: boolean;
+        canExport: boolean;
+        scope: "global" | "department" | "personal";
+    };
 }
 
 export type WorkspaceSearchResultType =
@@ -1070,6 +1169,8 @@ export interface WorkspaceNavigationCapabilities {
     canViewMyTasks: boolean;
     canViewActivity: boolean;
     canViewAuditLogs: boolean;
+    canViewHistory?: boolean;
+    canExportHistory?: boolean;
     canViewSettings: boolean;
     canViewResources?: boolean;
     canViewRecognition?: boolean;

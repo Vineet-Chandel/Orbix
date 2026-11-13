@@ -772,7 +772,10 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                 Current Active Email
                             </span>
                             <div className="font-mono text-sm sm:text-base font-black text-black break-all">
-                                {statusData?.primaryEmail || user?.email}
+                                {statusData?.primaryEmail ||
+                                    (user?.email && !String(user.email).toLowerCase().endsWith("@club.orbix")
+                                        ? user.email
+                                        : "Not set")}
                             </div>
                         </div>
 

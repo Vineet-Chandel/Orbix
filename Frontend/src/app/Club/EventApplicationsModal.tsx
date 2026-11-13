@@ -469,6 +469,13 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                                                         <div className="text-[10px] font-mono text-neutral-500 truncate">
                                                             @{app.username}
                                                         </div>
+                                                        {app.teamName && (
+                                                            <div className="flex items-center gap-1 mt-0.5">
+                                                                <span className="px-1.5 py-0.2 bg-[#a2ff86]/40 text-black font-black text-[9px] uppercase border border-black rounded" title={`Team Code: ${app.teamCode || 'N/A'}`}>
+                                                                    Team: {app.teamName} ({app.teamRole || "member"})
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>

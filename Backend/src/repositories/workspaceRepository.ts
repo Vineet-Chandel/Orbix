@@ -1,5 +1,17 @@
 // Backend/src/repositories/workspaceRepository.ts
 import { pool, query } from "../database/client.js";
+import {
+    sanitizeHistoryPayload,
+    decodeHistoryCursor,
+    encodeHistoryCursor,
+    expandTargetTypeFilter,
+    deriveHistoryCategory,
+    formatActorName,
+    formatHistorySummary,
+    canNavigateForResource,
+    deriveTargetLabel,
+    normalizeTargetType,
+} from "../services/workspace/workspaceHistoryHelpers.js";
 import type {
     TeamWorkspace,
     WorkspaceRole,
@@ -44,6 +56,10 @@ import type {
     WorkspaceOverviewMetrics,
     WorkspaceDepartmentInsight,
     WorkspaceAuditLogEntry,
+    WorkspaceHistoryItem,
+    WorkspaceHistoryRecordType,
+    WorkspaceHistoryScope,
+    WorkspaceHistorySource,
     WorkspaceSearchResultItem,
     WorkspaceSearchResultType,
     WorkspaceSearchResponse,
@@ -1484,12 +1500,14 @@ export class WorkspaceRepository {
             action: string;
             targetType: string;
             targetId?: string | null;
+            correlationId?: string | null;
             details?: Record<string, any>;
             ipAddress?: string | null;
             userAgent?: string | null;
         }
     ): Promise<WorkspaceAuditLog> {
         const targetQuery = clientOrQuery?.query ? clientOrQuery : { query };
+        const sanitizedDetails = sanitizeHistoryPayload(log.details || {});
         const res = await targetQuery.query(
             `INSERT INTO public.workspace_audit_logs (
                 workspace_id,
@@ -1497,12 +1515,13 @@ export class WorkspaceRepository {
                 action,
                 target_type,
                 target_id,
+                correlation_id,
                 details,
                 ip_address,
                 user_agent,
                 created_at
             ) VALUES (
-                $1, $2, $3, $4, $5, $6::jsonb, $7, $8, NOW()
+                $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, NOW()
             )
             RETURNING
                 id,
@@ -1511,6 +1530,7 @@ export class WorkspaceRepository {
                 action,
                 target_type AS "targetType",
                 target_id AS "targetId",
+                correlation_id AS "correlationId",
                 details,
                 ip_address AS "ipAddress",
                 user_agent AS "userAgent",
@@ -1521,7 +1541,8 @@ export class WorkspaceRepository {
                 log.action,
                 log.targetType,
                 log.targetId || null,
-                JSON.stringify(log.details || {}),
+                log.correlationId || null,
+                JSON.stringify(sanitizedDetails),
                 log.ipAddress || null,
                 log.userAgent || null,
             ]
@@ -6089,11 +6110,13 @@ export class WorkspaceRepository {
             title: string;
             description?: string | null;
             isRestricted?: boolean;
+            correlationId?: string | null;
             metadata?: Record<string, any>;
         },
         clientOrNull?: any
     ): Promise<WorkspaceActivityEvent> {
-        const executor = clientOrNull || { query };
+        const executor = clientOrNull?.query ? clientOrNull : { query };
+        const sanitizedMetadata = sanitizeHistoryPayload(params.metadata || {});
         const res = await executor.query(
             `INSERT INTO public.workspace_activity_feed (
                 workspace_id,
@@ -6105,8 +6128,9 @@ export class WorkspaceRepository {
                 title,
                 description,
                 is_restricted,
+                correlation_id,
                 metadata
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
             RETURNING
                 id,
                 workspace_id AS "workspaceId",
@@ -6118,6 +6142,7 @@ export class WorkspaceRepository {
                 title,
                 description,
                 is_restricted AS "isRestricted",
+                correlation_id AS "correlationId",
                 metadata,
                 created_at AS "createdAt";`,
             [
@@ -6130,7 +6155,8 @@ export class WorkspaceRepository {
                 params.title,
                 params.description || null,
                 Boolean(params.isRestricted),
-                JSON.stringify(params.metadata || {}),
+                params.correlationId || null,
+                JSON.stringify(sanitizedMetadata),
             ]
         );
         return res.rows[0];
@@ -6181,9 +6207,16 @@ export class WorkspaceRepository {
         }
 
         if (options?.eventType) {
-            conditions.push(`a.event_type = $${paramIdx}`);
-            params.push(options.eventType);
-            paramIdx++;
+            const evtFilter = options.eventType.trim();
+            if (evtFilter.includes(":") || evtFilter.includes("_")) {
+                conditions.push(`a.event_type = $${paramIdx}`);
+                params.push(evtFilter);
+                paramIdx++;
+            } else {
+                conditions.push(`(a.event_type = $${paramIdx} OR a.event_type LIKE $${paramIdx + 1} OR a.event_type LIKE $${paramIdx + 2})`);
+                params.push(evtFilter, `${evtFilter}:%`, `${evtFilter}_%`);
+                paramIdx += 3;
+            }
         }
 
         const whereClause = conditions.join(" AND ");
@@ -6468,15 +6501,18 @@ export class WorkspaceRepository {
         }
 
         if (options?.action) {
-            conditions.push(`l.action = $${idx}`);
-            params.push(options.action);
+            conditions.push(`l.action ILIKE $${idx}`);
+            params.push(`%${options.action.trim()}%`);
             idx++;
         }
 
         if (options?.targetType) {
-            conditions.push(`l.target_type = $${idx}`);
-            params.push(options.targetType);
-            idx++;
+            const expandedTargets = expandTargetTypeFilter(options.targetType);
+            if (expandedTargets && expandedTargets.length > 0) {
+                conditions.push(`l.target_type = ANY($${idx}::text[])`);
+                params.push(expandedTargets);
+                idx++;
+            }
         }
 
         const whereClause = conditions.join(" AND ");
@@ -6520,6 +6556,603 @@ export class WorkspaceRepository {
             logs: listRes.rows,
             total,
         };
+    }
+
+    /**
+     * Unified permission-filtered chronological history across
+     * `workspace_activity_feed` (operational) and `workspace_audit_logs` (administrative/security).
+     * Never exposes audit records or forensic metadata when `canViewAudit` is false.
+     */
+    static async getWorkspaceHistory(
+        workspaceId: string,
+        options: {
+            allowedDepartmentIds: string[] | null;
+            canViewAudit: boolean;
+            scope?: WorkspaceHistoryScope;
+            recordType?: WorkspaceHistoryRecordType;
+            category?: string;
+            departmentId?: string;
+            actorId?: string;
+            targetType?: string;
+            search?: string;
+            startDate?: string;
+            endDate?: string;
+            cursor?: string;
+            limit?: number;
+            includeAuditDetails?: boolean;
+        }
+    ): Promise<{
+        items: WorkspaceHistoryItem[];
+        nextCursor: string | null;
+        hasMore: boolean;
+        totalCount?: number;
+    }> {
+        const limit = Math.min(Math.max(options.limit ?? 25, 1), 250);
+        const canViewAudit = Boolean(options.canViewAudit);
+        const recordType: WorkspaceHistoryRecordType =
+            options.recordType === "audit" || options.recordType === "activity"
+                ? options.recordType
+                : "all";
+
+        // Enforce audit boundary in repository as defense-in-depth
+        const includeActivity = recordType === "all" || recordType === "activity";
+        const includeAudit = canViewAudit && (recordType === "all" || recordType === "audit");
+
+        if (!includeActivity && !includeAudit) {
+            return { items: [], nextCursor: null, hasMore: false, totalCount: 0 };
+        }
+
+        const params: any[] = [workspaceId];
+        let paramIdx = 2;
+        const addParam = (val: any) => {
+            params.push(val);
+            return `$${paramIdx++}`;
+        };
+
+        const activityConditions: string[] = ["a.workspace_id = $1"];
+        const auditConditions: string[] = ["l.workspace_id = $1"];
+
+        // Permission scoping on activity branch
+        if (options.allowedDepartmentIds !== null) {
+            if (options.allowedDepartmentIds.length > 0) {
+                const pDepts = addParam(options.allowedDepartmentIds);
+                activityConditions.push(
+                    `((a.department_id IS NULL AND a.is_restricted = false) OR a.department_id = ANY(${pDepts}::uuid[]))`
+                );
+            } else {
+                activityConditions.push("(a.department_id IS NULL AND a.is_restricted = false)");
+            }
+        }
+
+        // Correlated deduplication: when viewing combined stream with audit rights,
+        // fold the activity row into its linked audit entry so one action is shown cleanly.
+        if (canViewAudit && recordType === "all" && includeActivity && includeAudit) {
+            activityConditions.push(
+                `(a.correlation_id IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM public.workspace_audit_logs al_corr
+                    WHERE al_corr.workspace_id = a.workspace_id
+                      AND al_corr.correlation_id = a.correlation_id
+                ))`
+            );
+        }
+
+        // Department filter or Department scope
+        if (options.departmentId) {
+            const pDept = addParam(options.departmentId);
+            activityConditions.push(`a.department_id = ${pDept}::uuid`);
+            auditConditions.push(
+                `COALESCE(
+                    af.department_id,
+                    CASE
+                        WHEN l.target_type IN ('department', 'workspace_department') THEN l.target_id
+                        WHEN (l.details->>'departmentId') ~* '^[0-9a-f-]{36}$' THEN (l.details->>'departmentId')::uuid
+                        ELSE NULL
+                    END
+                ) = ${pDept}::uuid`
+            );
+        } else if (options.scope === "department") {
+            activityConditions.push(`a.department_id IS NOT NULL`);
+            auditConditions.push(
+                `COALESCE(
+                    af.department_id,
+                    CASE
+                        WHEN l.target_type IN ('department', 'workspace_department') THEN l.target_id
+                        WHEN (l.details->>'departmentId') ~* '^[0-9a-f-]{36}$' THEN (l.details->>'departmentId')::uuid
+                        ELSE NULL
+                    END
+                ) IS NOT NULL`
+            );
+        }
+
+        if (options.actorId) {
+            const pActor = addParam(options.actorId);
+            activityConditions.push(`a.actor_id = ${pActor}::uuid`);
+            auditConditions.push(`l.actor_id = ${pActor}::uuid`);
+        }
+
+        if (options.targetType) {
+            const expandedTargets = expandTargetTypeFilter(options.targetType);
+            if (expandedTargets && expandedTargets.length > 0) {
+                const pTargets = addParam(expandedTargets);
+                activityConditions.push(`a.resource_type = ANY(${pTargets}::text[])`);
+                auditConditions.push(`l.target_type = ANY(${pTargets}::text[])`);
+            }
+        }
+
+        if (options.startDate) {
+            const pStart = addParam(options.startDate);
+            activityConditions.push(`a.created_at >= ${pStart}::timestamptz`);
+            auditConditions.push(`l.created_at >= ${pStart}::timestamptz`);
+        }
+
+        if (options.endDate) {
+            const pEnd = addParam(options.endDate);
+            activityConditions.push(`a.created_at <= ${pEnd}::timestamptz`);
+            auditConditions.push(`l.created_at <= ${pEnd}::timestamptz`);
+        }
+
+        if (options.search && options.search.trim()) {
+            const pSearch = addParam(`%${options.search.trim()}%`);
+            activityConditions.push(
+                `(
+                    a.title ILIKE ${pSearch}
+                    OR COALESCE(a.description, '') ILIKE ${pSearch}
+                    OR a.event_type ILIKE ${pSearch}
+                    OR a.resource_type ILIKE ${pSearch}
+                    OR COALESCE(a.resource_id, '') ILIKE ${pSearch}
+                    OR (COALESCE(ua.firstname, '') || ' ' || COALESCE(ua.lastname, '')) ILIKE ${pSearch}
+                    OR COALESCE(ua.username, '') ILIKE ${pSearch}
+                    OR COALESCE(da.name, '') ILIKE ${pSearch}
+                )`
+            );
+            auditConditions.push(
+                `(
+                    l.action ILIKE ${pSearch}
+                    OR l.target_type ILIKE ${pSearch}
+                    OR COALESCE(l.target_id::text, '') ILIKE ${pSearch}
+                    OR l.details::text ILIKE ${pSearch}
+                    OR COALESCE(af.title, '') ILIKE ${pSearch}
+                    OR (COALESCE(ul.firstname, '') || ' ' || COALESCE(ul.lastname, '')) ILIKE ${pSearch}
+                    OR COALESCE(ul.username, '') ILIKE ${pSearch}
+                    OR COALESCE(dl.name, '') ILIKE ${pSearch}
+                )`
+            );
+        }
+
+        if (options.category && options.category.trim()) {
+            const cat = options.category.trim().toLowerCase();
+            const actPredMap: Record<string, string> = {
+                task: `(a.event_type LIKE 'task:%' OR a.event_type LIKE 'task_%' OR a.resource_type IN ('task', 'workspace_task'))`,
+                member: `(a.event_type LIKE 'member:%' OR a.event_type IN ('member_joined', 'role_changed') OR a.resource_type IN ('member', 'workspace_member', 'invitation', 'workspace_manager'))`,
+                role: `(a.event_type LIKE 'role:%' OR a.event_type = 'role_changed' OR a.resource_type IN ('role', 'workspace_role'))`,
+                department: `(a.event_type LIKE 'department:%' OR a.event_type = 'department_created' OR a.resource_type IN ('department', 'workspace_department', 'department_member'))`,
+                channel: `(a.event_type LIKE 'channel:%' OR a.event_type IN ('channel_created', 'discussion_started') OR a.resource_type IN ('channel', 'workspace_channel', 'channel_category', 'thread', 'message'))`,
+                document: `(a.event_type LIKE 'document:%' OR a.event_type = 'document_shared' OR a.resource_type = 'document')`,
+                file: `(a.event_type LIKE 'file:%' OR a.event_type LIKE 'document:%' OR a.event_type = 'document_shared' OR a.resource_type IN ('file', 'workspace_file', 'document'))`,
+                recognition: `(a.event_type LIKE 'recognition:%' OR a.resource_type = 'recognition')`,
+                workspace: `(a.event_type LIKE 'workspace:%' OR a.resource_type = 'workspace')`,
+                security: `(a.event_type LIKE 'security:%' OR a.event_type IN ('member:suspended', 'member:unsuspended', 'member:role_updated') OR a.event_type LIKE 'role:%')`,
+            };
+            const auditPredMap: Record<string, string> = {
+                task: `(l.action LIKE 'task_%' OR l.target_type IN ('task', 'workspace_task'))`,
+                member: `(l.action LIKE 'member_%' OR l.action LIKE 'invitation_%' OR l.action LIKE 'workspace_manager_%' OR l.target_type IN ('member', 'workspace_member', 'invitation', 'workspace_manager'))`,
+                role: `(l.action LIKE 'role_%' OR l.action LIKE 'roles_%' OR l.target_type IN ('role', 'workspace_role'))`,
+                department: `(l.action LIKE 'department_%' OR l.action LIKE 'departments_%' OR l.target_type IN ('department', 'workspace_department', 'department_member'))`,
+                channel: `(l.action LIKE 'channel_%' OR l.action LIKE 'channels_%' OR l.action LIKE '%override%' OR l.target_type IN ('channel', 'workspace_channel', 'channel_category', 'thread', 'message'))`,
+                document: `(l.action LIKE 'document_%' OR COALESCE(af.event_type, '') LIKE 'document:%' OR l.target_type = 'document')`,
+                file: `(l.action LIKE 'file_%' OR COALESCE(af.event_type, '') LIKE 'document:%' OR l.target_type IN ('file', 'workspace_file', 'document'))`,
+                recognition: `(l.action LIKE 'recognition_%' OR l.target_type = 'recognition')`,
+                workspace: `(l.action LIKE 'workspace_%' OR l.action = 'template_applied' OR l.target_type = 'workspace')`,
+                security: `(l.action LIKE 'role_%' OR l.action LIKE 'roles_%' OR l.action LIKE '%override%' OR l.action IN ('member_promoted', 'member_demoted', 'member_suspended', 'member_unsuspended', 'member_removed', 'member_custom_permissions_updated', 'workspace_manager_appointed', 'workspace_manager_revoked'))`,
+            };
+            if (actPredMap[cat] && auditPredMap[cat]) {
+                activityConditions.push(actPredMap[cat]);
+                auditConditions.push(auditPredMap[cat]);
+            } else {
+                const pCatExact = addParam(`${cat}%`);
+                activityConditions.push(`a.event_type ILIKE ${pCatExact}`);
+                auditConditions.push(`l.action ILIKE ${pCatExact}`);
+            }
+        }
+
+        const activitySelect = `
+            SELECT
+                a.id AS id,
+                'activity'::text AS source,
+                0::int AS source_rank,
+                a.correlation_id AS correlation_id,
+                a.event_type AS event_type,
+                NULL::text AS audit_action,
+                a.resource_type AS target_type,
+                a.resource_id::text AS target_id,
+                a.title AS title,
+                a.description AS description,
+                a.is_restricted AS is_restricted,
+                a.department_id AS department_id,
+                da.name AS department_name,
+                da.icon AS department_icon,
+                da.color AS department_color,
+                a.actor_id AS actor_id,
+                ua.username AS actor_username,
+                ua.firstname AS actor_firstname,
+                ua.lastname AS actor_lastname,
+                COALESCE(ua.photo_url, ua.avatar_url) AS actor_avatar_url,
+                a.metadata AS details,
+                NULL::text AS ip_address,
+                NULL::text AS user_agent,
+                NULL::uuid AS linked_activity_id,
+                NULL::text AS linked_event_type,
+                NULL::text AS linked_resource_type,
+                NULL::text AS linked_resource_id,
+                a.created_at AS created_at,
+                to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_ts
+            FROM public.workspace_activity_feed a
+            LEFT JOIN public.users ua ON ua.id = a.actor_id
+            LEFT JOIN public.workspace_departments da ON da.id = a.department_id
+            WHERE ${activityConditions.join(" AND ")}
+        `;
+
+        const auditSelect = `
+            SELECT
+                l.id AS id,
+                'audit'::text AS source,
+                1::int AS source_rank,
+                l.correlation_id AS correlation_id,
+                COALESCE(af.event_type, l.action) AS event_type,
+                l.action AS audit_action,
+                l.target_type AS target_type,
+                l.target_id::text AS target_id,
+                af.title AS title,
+                af.description AS description,
+                COALESCE(af.is_restricted, false) AS is_restricted,
+                dl.id AS department_id,
+                dl.name AS department_name,
+                dl.icon AS department_icon,
+                dl.color AS department_color,
+                l.actor_id AS actor_id,
+                ul.username AS actor_username,
+                ul.firstname AS actor_firstname,
+                ul.lastname AS actor_lastname,
+                COALESCE(ul.photo_url, ul.avatar_url) AS actor_avatar_url,
+                COALESCE(l.details, '{}'::jsonb) AS details,
+                l.ip_address AS ip_address,
+                l.user_agent AS user_agent,
+                af.id AS linked_activity_id,
+                af.event_type AS linked_event_type,
+                af.resource_type AS linked_resource_type,
+                af.resource_id::text AS linked_resource_id,
+                l.created_at AS created_at,
+                to_char(l.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_ts
+            FROM public.workspace_audit_logs l
+            LEFT JOIN public.users ul ON ul.id = l.actor_id
+            LEFT JOIN LATERAL (
+                SELECT af0.id, af0.department_id, af0.event_type, af0.resource_type, af0.resource_id, af0.title, af0.description, af0.is_restricted
+                FROM public.workspace_activity_feed af0
+                WHERE l.correlation_id IS NOT NULL
+                  AND af0.workspace_id = l.workspace_id
+                  AND af0.correlation_id = l.correlation_id
+                ORDER BY af0.created_at DESC
+                LIMIT 1
+            ) af ON true
+            LEFT JOIN public.workspace_departments dl ON dl.id = COALESCE(
+                af.department_id,
+                CASE
+                    WHEN l.target_type IN ('department', 'workspace_department') THEN l.target_id
+                    WHEN (l.details->>'departmentId') ~* '^[0-9a-f-]{36}$' THEN (l.details->>'departmentId')::uuid
+                    ELSE NULL
+                END
+            )
+            WHERE ${auditConditions.join(" AND ")}
+        `;
+
+        const unionSql =
+            includeActivity && includeAudit
+                ? `${activitySelect} UNION ALL ${auditSelect}`
+                : includeAudit
+                ? auditSelect
+                : activitySelect;
+
+        const decodedCursor = decodeHistoryCursor(options.cursor);
+
+        // Efficient first-page total count (avoid scanning full UNION on deep cursor pages)
+        let totalCount: number | undefined = undefined;
+        if (!decodedCursor) {
+            const countRes = await query(
+                `SELECT COUNT(*)::int AS count FROM (${unionSql}) unified_count;`,
+                params
+            );
+            totalCount = Number(countRes.rows[0]?.count || 0);
+        }
+
+        const pageParams = [...params];
+        let cursorWhere = "";
+        if (decodedCursor) {
+            const cDateIdx = pageParams.push(decodedCursor.createdAt);
+            const cRankIdx = pageParams.push(decodedCursor.sourceRank);
+            const cIdIdx = pageParams.push(decodedCursor.id);
+            cursorWhere = `WHERE (
+                h.created_at < $${cDateIdx}::timestamptz
+                OR (
+                    h.created_at = $${cDateIdx}::timestamptz
+                    AND (
+                        h.source_rank < $${cRankIdx}::int
+                        OR (h.source_rank = $${cRankIdx}::int AND h.id < $${cIdIdx}::uuid)
+                    )
+                )
+            )`;
+        }
+
+        const limitParamIdx = pageParams.push(limit + 1);
+        const rowsRes = await query(
+            `SELECT * FROM (${unionSql}) h
+             ${cursorWhere}
+             ORDER BY h.created_at DESC, h.source_rank DESC, h.id DESC
+             LIMIT $${limitParamIdx};`,
+            pageParams
+        );
+
+        const hasMore = rowsRes.rows.length > limit;
+        const pageRows = hasMore ? rowsRes.rows.slice(0, limit) : rowsRes.rows;
+
+        const items: WorkspaceHistoryItem[] = pageRows.map((row) =>
+            this.mapUnifiedHistoryRow(row, canViewAudit, options.includeAuditDetails !== false)
+        );
+
+        let nextCursor: string | null = null;
+        if (hasMore && pageRows.length > 0) {
+            const last = pageRows[pageRows.length - 1];
+            nextCursor = encodeHistoryCursor({
+                createdAt: last.cursor_ts,
+                sourceRank: Number(last.source_rank) === 1 ? 1 : 0,
+                id: last.id,
+            });
+        }
+
+        return {
+            items,
+            nextCursor,
+            hasMore,
+            ...(totalCount !== undefined ? { totalCount } : {}),
+        };
+    }
+
+    /**
+     * Fetches a single authorized history record for inspection, enforcing strict
+     * department/restricted checks and audit privileges.
+     */
+    static async inspectHistoryItem(
+        workspaceId: string,
+        itemId: string,
+        source: WorkspaceHistorySource,
+        allowedDepartmentIds: string[] | null,
+        canViewAudit: boolean
+    ): Promise<WorkspaceHistoryItem | null> {
+        if (source === "audit") {
+            if (!canViewAudit) return null;
+            const res = await query(
+                `SELECT
+                    l.id AS id,
+                    'audit'::text AS source,
+                    1::int AS source_rank,
+                    l.correlation_id AS correlation_id,
+                    COALESCE(af.event_type, l.action) AS event_type,
+                    l.action AS audit_action,
+                    l.target_type AS target_type,
+                    l.target_id::text AS target_id,
+                    af.title AS title,
+                    af.description AS description,
+                    COALESCE(af.is_restricted, false) AS is_restricted,
+                    dl.id AS department_id,
+                    dl.name AS department_name,
+                    dl.icon AS department_icon,
+                    dl.color AS department_color,
+                    l.actor_id AS actor_id,
+                    ul.username AS actor_username,
+                    ul.firstname AS actor_firstname,
+                    ul.lastname AS actor_lastname,
+                    COALESCE(ul.photo_url, ul.avatar_url) AS actor_avatar_url,
+                    COALESCE(l.details, '{}'::jsonb) AS details,
+                    l.ip_address AS ip_address,
+                    l.user_agent AS user_agent,
+                    af.id AS linked_activity_id,
+                    af.event_type AS linked_event_type,
+                    af.resource_type AS linked_resource_type,
+                    af.resource_id::text AS linked_resource_id,
+                    l.created_at AS created_at
+                 FROM public.workspace_audit_logs l
+                 LEFT JOIN public.users ul ON ul.id = l.actor_id
+                 LEFT JOIN LATERAL (
+                    SELECT af0.id, af0.department_id, af0.event_type, af0.resource_type, af0.resource_id, af0.title, af0.description, af0.is_restricted
+                    FROM public.workspace_activity_feed af0
+                    WHERE l.correlation_id IS NOT NULL
+                      AND af0.workspace_id = l.workspace_id
+                      AND af0.correlation_id = l.correlation_id
+                    ORDER BY af0.created_at DESC
+                    LIMIT 1
+                 ) af ON true
+                 LEFT JOIN public.workspace_departments dl ON dl.id = COALESCE(
+                    af.department_id,
+                    CASE
+                        WHEN l.target_type IN ('department', 'workspace_department') THEN l.target_id
+                        WHEN (l.details->>'departmentId') ~* '^[0-9a-f-]{36}$' THEN (l.details->>'departmentId')::uuid
+                        ELSE NULL
+                    END
+                 )
+                 WHERE l.workspace_id = $1 AND l.id = $2
+                 LIMIT 1;`,
+                [workspaceId, itemId]
+            );
+            if (!res.rows[0]) return null;
+            return this.mapUnifiedHistoryRow(res.rows[0], true, true);
+        }
+
+        // Operational activity source
+        const params: any[] = [workspaceId, itemId];
+        let scopePredicate = "";
+        if (allowedDepartmentIds !== null) {
+            if (allowedDepartmentIds.length > 0) {
+                params.push(allowedDepartmentIds);
+                scopePredicate = `AND ((a.department_id IS NULL AND a.is_restricted = false) OR a.department_id = ANY($3::uuid[]))`;
+            } else {
+                scopePredicate = `AND (a.department_id IS NULL AND a.is_restricted = false)`;
+            }
+        }
+
+        const res = await query(
+            `SELECT
+                a.id AS id,
+                'activity'::text AS source,
+                0::int AS source_rank,
+                a.correlation_id AS correlation_id,
+                a.event_type AS event_type,
+                ${canViewAudit ? "al.action" : "NULL::text"} AS audit_action,
+                a.resource_type AS target_type,
+                a.resource_id::text AS target_id,
+                a.title AS title,
+                a.description AS description,
+                a.is_restricted AS is_restricted,
+                a.department_id AS department_id,
+                da.name AS department_name,
+                da.icon AS department_icon,
+                da.color AS department_color,
+                a.actor_id AS actor_id,
+                ua.username AS actor_username,
+                ua.firstname AS actor_firstname,
+                ua.lastname AS actor_lastname,
+                COALESCE(ua.photo_url, ua.avatar_url) AS actor_avatar_url,
+                ${canViewAudit ? "COALESCE(al.details, a.metadata)" : "a.metadata"} AS details,
+                ${canViewAudit ? "al.ip_address" : "NULL::text"} AS ip_address,
+                ${canViewAudit ? "al.user_agent" : "NULL::text"} AS user_agent,
+                ${canViewAudit ? "al.id" : "NULL::uuid"} AS linked_audit_id,
+                a.metadata AS activity_metadata,
+                a.created_at AS created_at
+             FROM public.workspace_activity_feed a
+             LEFT JOIN public.users ua ON ua.id = a.actor_id
+             LEFT JOIN public.workspace_departments da ON da.id = a.department_id
+             ${canViewAudit ? `LEFT JOIN LATERAL (
+                SELECT al0.id, al0.action, al0.details, al0.ip_address, al0.user_agent
+                FROM public.workspace_audit_logs al0
+                WHERE a.correlation_id IS NOT NULL
+                  AND al0.workspace_id = a.workspace_id
+                  AND al0.correlation_id = a.correlation_id
+                ORDER BY al0.created_at DESC
+                LIMIT 1
+             ) al ON true` : ""}
+             WHERE a.workspace_id = $1 AND a.id = $2 ${scopePredicate}
+             LIMIT 1;`,
+            params
+        );
+        if (!res.rows[0]) return null;
+        return this.mapUnifiedHistoryRow(res.rows[0], canViewAudit, true);
+    }
+
+    private static mapUnifiedHistoryRow(
+        row: any,
+        canViewAudit: boolean,
+        includeAuditDetails: boolean
+    ): WorkspaceHistoryItem {
+        const source: WorkspaceHistorySource = row.source === "audit" ? "audit" : "activity";
+        const sanitizedDetails = sanitizeHistoryPayload(row.details || {});
+        const sanitizedActMeta = row.activity_metadata
+            ? sanitizeHistoryPayload(row.activity_metadata)
+            : sanitizedDetails;
+
+        const hasLinkedActivity = Boolean(row.linked_activity_id);
+        const hasLinkedAudit = canViewAudit && Boolean(row.linked_audit_id);
+        const sources: WorkspaceHistorySource[] =
+            source === "audit"
+                ? hasLinkedActivity
+                    ? ["audit", "activity"]
+                    : ["audit"]
+                : hasLinkedAudit
+                ? ["activity", "audit"]
+                : ["activity"];
+
+        const navResourceType = row.linked_resource_type || row.target_type;
+        const navResourceId = row.linked_resource_id || row.target_id;
+        const normalizedTargetType = normalizeTargetType(navResourceType);
+
+        const actorName = formatActorName({
+            firstName: row.actor_firstname,
+            lastName: row.actor_lastname,
+            username: row.actor_username,
+        });
+
+        const summary = formatHistorySummary({
+            source,
+            eventType: row.event_type,
+            title: row.title,
+            description: row.description,
+            targetType: row.target_type,
+            details: sanitizedDetails,
+        });
+
+        const targetLabel = deriveTargetLabel(normalizedTargetType, row.title, sanitizedDetails);
+
+        const item: WorkspaceHistoryItem = {
+            id: row.id,
+            source,
+            sources,
+            correlationId: row.correlation_id || null,
+            eventType: row.event_type,
+            category: deriveHistoryCategory(row.event_type, row.target_type),
+            isRestricted: Boolean(row.is_restricted),
+            actor: {
+                id: row.actor_id || null,
+                name: actorName,
+                username: row.actor_username || undefined,
+                avatarUrl: row.actor_avatar_url || null,
+            },
+            ...(row.target_type
+                ? {
+                      target: {
+                          id: navResourceId || null,
+                          type: normalizedTargetType,
+                          ...(targetLabel ? { label: targetLabel } : {}),
+                      },
+                  }
+                : {}),
+            ...(row.department_id
+                ? {
+                      department: {
+                          id: row.department_id,
+                          name: row.department_name || "Department",
+                          icon: row.department_icon || undefined,
+                          color: row.department_color || undefined,
+                      },
+                  }
+                : {}),
+            ...(row.title ? { title: row.title } : {}),
+            summary,
+            createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+            permissions: {
+                canInspect: true,
+                canNavigate: canNavigateForResource(navResourceType, navResourceId),
+            },
+            ...(source === "activity" || hasLinkedActivity
+                ? {
+                      activityDetails: {
+                          resourceType: normalizedTargetType,
+                          resourceId: navResourceId || "",
+                          description: row.description || null,
+                          metadata: sanitizedActMeta,
+                      },
+                  }
+                : {}),
+        };
+
+        // Strict security guard: NEVER attach auditDetails unless user is authorized
+        if (canViewAudit && includeAuditDetails && (source === "audit" || hasLinkedAudit)) {
+            item.auditDetails = {
+                auditId: source === "audit" ? row.id : row.linked_audit_id,
+                action: row.audit_action || row.event_type,
+                ipAddress: row.ip_address || null,
+                userAgent: row.user_agent || null,
+                details: sanitizedDetails,
+            };
+        }
+
+        return item;
     }
 
     /**

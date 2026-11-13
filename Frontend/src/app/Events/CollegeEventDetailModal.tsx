@@ -317,6 +317,18 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                     </div>
                                 </div>
 
+                                {event.isTeamEvent && (
+                                    <div className="p-3 rounded-xl bg-[#a2ff86]/30 border-2 border-black space-y-1">
+                                        <div className="flex items-center gap-1.5 font-black text-black text-xs">
+                                            <Users className="w-4 h-4 text-black shrink-0" />
+                                            <span>Team Registration Event ({event.minTeamSize || 1} to {event.maxTeamSize || 4} Members)</span>
+                                        </div>
+                                        <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
+                                            Register as a Team Leader to invite members via @username, or join an existing squad with their 6-character team code before the event starts.
+                                        </p>
+                                    </div>
+                                )}
+
                                 {event.scope === "PAN_INDIA" && (
                                     <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/40 text-xs space-y-1">
                                         <div className="flex items-center gap-1.5 font-black text-black">

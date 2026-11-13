@@ -234,6 +234,33 @@ export class WorkspaceRecognitionService {
                 client
             );
 
+            const recipientName = recipientMember.user
+                ? `${recipientMember.user.firstName || ""} ${recipientMember.user.lastName || ""}`.trim() || recipientMember.user.username
+                : "Workspace Member";
+            const awardDeptId = dto.departmentId || recipientMember.departmentId || ((recipientMember as any).departments?.[0]?.id ?? null);
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: awardDeptId,
+                    actorId: issuerUserId,
+                    eventType: "recognition:awarded",
+                    resourceType: "recognition",
+                    resourceId: ledgerEntry.id,
+                    title: `${category.name} (+${amount} Orbits)`,
+                    description: trimmedReason,
+                    isRestricted: dto.visibility === "private",
+                    metadata: {
+                        awardId: ledgerEntry.id,
+                        recipientId: dto.recipientUserId,
+                        recipientName,
+                        amount,
+                        categoryName: category.name,
+                    },
+                },
+                client
+            );
+
             await client.query("COMMIT;");
 
             // 14. Realtime Leaderboard Projection & Outbox Processing
@@ -359,6 +386,26 @@ export class WorkspaceRecognitionService {
                 dto.idempotencyKey || null,
                 reqMeta.ipAddress || null,
                 reqMeta.userAgent || null
+            );
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: original.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: "recognition:reversed",
+                    resourceType: "recognition",
+                    resourceId: result.reversalEntry.id,
+                    title: `Reversed ${original.pointsDelta} Orbits award`,
+                    description: reversalReason,
+                    isRestricted: original.visibility === "private",
+                    metadata: {
+                        originalAwardId: awardId,
+                        reversalId: result.reversalEntry.id,
+                        pointsDelta: -original.pointsDelta,
+                    },
+                },
+                client
             );
 
             await client.query("COMMIT;");

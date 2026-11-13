@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, Award, Building2, KeyRound, UserPlus } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, Award, UserPlus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
@@ -90,7 +90,6 @@ export const Sidebar = ({
     });
 
     const [clubWorkspaces, setClubWorkspaces] = useState<UserClubWorkspaceSummary[]>([]);
-    const [isClubManager, setIsClubManager] = useState(false);
     const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
     const [isJoinClubModalOpen, setIsJoinClubModalOpen] = useState(false);
 
@@ -100,9 +99,6 @@ export const Sidebar = ({
             const res = await workspaceApi.getMyWorkspaces();
             if (res.success) {
                 setClubWorkspaces(res.workspaces || []);
-                if (res.isClubManager !== undefined) {
-                    setIsClubManager(Boolean(res.isClubManager));
-                }
             }
         } catch (err) {
             console.warn("[Sidebar] Failed to load user workspaces:", err);
@@ -678,65 +674,10 @@ export const Sidebar = ({
                     </AnimatePresence>
                 </div>
 
-                {/* Divider between Events & Documentation */}
+                {/* Divider between Events & Workspaces */}
                 <div className={`my-1.5 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
-                {/* Section 3: Documentation Dropdown Accordion (Blogs, Docs) */}
-                <div className="space-y-1 overflow-x-hidden">
-                    {(!isExpanded && openSection === "documentation") ? null : (
-                        <button
-                            type="button"
-                            onClick={() => handleToggleSection("documentation")}
-                            className={`flex items-center transition-all group select-none cursor-pointer ${
-                                isExpanded
-                                    ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
-                                    : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
-                            } ${openSection === "documentation" ? "bg-black/[0.04]" : ""}`}
-                            title={!isExpanded ? "Documentation" : undefined}
-                            aria-expanded={openSection === "documentation"}
-                        >
-                            <div className={`flex items-center min-w-0 ${isExpanded ? "" : "justify-center"}`}>
-                                {!isExpanded && openSection !== "documentation" && (
-                                    <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                        <BookOpen className="w-4.5 h-4.5 text-neutral-700 group-hover:text-black stroke-[2.2] flex-shrink-0" />
-                                    </span>
-                                )}
-                                {isExpanded && (
-                                    <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
-                                        Documentation
-                                    </span>
-                                )}
-                            </div>
-                            {isExpanded && (
-                                <ChevronDown
-                                    className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
-                                        openSection === "documentation" ? "rotate-180" : ""
-                                    }`}
-                                />
-                            )}
-                        </button>
-                    )}
-
-                    <AnimatePresence initial={false}>
-                        {openSection === "documentation" && (
-                            <motion.div
-                                key="documentation-items"
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                                className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
-                            >
-                                {documentationItems.map(renderNavItem)}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-
-                {/* Divider between Documentation & Workspaces */}
-                <div className={`my-1.5 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
-
-                {/* Section 4: Club Workspaces Accordion (Direct Member Workspaces) */}
+                {/* Section 3: Club Workspaces Accordion (Direct Member Workspaces) */}
                 <div className="space-y-1 overflow-x-hidden">
                     {(!isExpanded && openSection === "workspaces") ? null : (
                         <button
@@ -855,7 +796,7 @@ export const Sidebar = ({
                                             );
                                         })}
 
-                                        {/* Quick Actions: Join Another Club & Login with Club Credentials */}
+                                        {/* Quick Actions: Join Another Club */}
                                         <div className="pt-1 mt-1 border-t border-black/10 space-y-1">
                                             <button
                                                 type="button"
@@ -872,24 +813,6 @@ export const Sidebar = ({
                                                     )}
                                                 </div>
                                             </button>
-
-                                            <Link
-                                                to="/auth/signin?tab=club"
-                                                className={`flex items-center rounded-xl text-xs transition-all duration-150 group cursor-pointer w-full bg-[#FFE566] hover:bg-[#fedb30] text-black border-2 border-black shadow-[2px_2px_0px_#000] font-black ${
-                                                    isExpanded ? "px-2.5 py-1.5 justify-between" : "w-11 h-11 justify-center mx-auto"
-                                                }`}
-                                                title={!isExpanded ? "Login with Club Credentials" : undefined}
-                                            >
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <Building2 className="w-3.5 h-3.5 text-black flex-shrink-0" />
-                                                    {isExpanded && (
-                                                        <div className="min-w-0 flex-1 truncate text-left">
-                                                            <p className="truncate text-[11px] font-black text-black">Login to Club</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {isExpanded && <KeyRound className="w-3 h-3 text-black flex-shrink-0" />}
-                                            </Link>
                                         </div>
                                     </>
                                 ) : (
@@ -917,15 +840,6 @@ export const Sidebar = ({
                                                         <span>Join Club</span>
                                                     </button>
                                                 </div>
-                                                {isClubManager && (
-                                                    <Link
-                                                        to="/auth/signin?tab=club"
-                                                        className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-neutral-600 hover:text-black hover:underline transition"
-                                                    >
-                                                        <Building2 className="w-3 h-3 text-neutral-500" />
-                                                        <span>Login to Club Portal</span>
-                                                    </Link>
-                                                )}
                                             </div>
                                         ) : (
                                             <div className="flex flex-col items-center gap-1.5 py-1">
@@ -948,6 +862,61 @@ export const Sidebar = ({
                                         )}
                                     </div>
                                 )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Divider between Workspaces & Documentation */}
+                <div className={`my-1.5 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
+
+                {/* Section 4: Documentation Dropdown Accordion (Blogs, Docs) */}
+                <div className="space-y-1 overflow-x-hidden">
+                    {(!isExpanded && openSection === "documentation") ? null : (
+                        <button
+                            type="button"
+                            onClick={() => handleToggleSection("documentation")}
+                            className={`flex items-center transition-all group select-none cursor-pointer ${
+                                isExpanded
+                                    ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                    : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
+                            } ${openSection === "documentation" ? "bg-black/[0.04]" : ""}`}
+                            title={!isExpanded ? "Documentation" : undefined}
+                            aria-expanded={openSection === "documentation"}
+                        >
+                            <div className={`flex items-center min-w-0 ${isExpanded ? "" : "justify-center"}`}>
+                                {!isExpanded && openSection !== "documentation" && (
+                                    <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                        <BookOpen className="w-4.5 h-4.5 text-neutral-700 group-hover:text-black stroke-[2.2] flex-shrink-0" />
+                                    </span>
+                                )}
+                                {isExpanded && (
+                                    <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
+                                        Documentation
+                                    </span>
+                                )}
+                            </div>
+                            {isExpanded && (
+                                <ChevronDown
+                                    className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
+                                        openSection === "documentation" ? "rotate-180" : ""
+                                    }`}
+                                />
+                            )}
+                        </button>
+                    )}
+
+                    <AnimatePresence initial={false}>
+                        {openSection === "documentation" && (
+                            <motion.div
+                                key="documentation-items"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
+                            >
+                                {documentationItems.map(renderNavItem)}
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -1134,15 +1103,6 @@ export const Sidebar = ({
                         >
                             <Settings className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                             <span className="truncate">Settings</span>
-                        </Link>
-
-                        <Link
-                            to="/auth/signin?tab=club"
-                            onClick={() => setIsProfileMenuOpen(false)}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-[#FFE566]/50 transition-colors"
-                        >
-                            <Building2 className="w-3.5 h-3.5 text-black flex-shrink-0" />
-                            <span className="truncate font-black">Login to Club Portal</span>
                         </Link>
 
                         <div className="my-1.5 border-t-2 border-black/15" />

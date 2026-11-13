@@ -39,6 +39,7 @@ import { ClubEventFormService } from "../../services/club/clubEventFormService.j
 import { sendGuardianConsentEmail, OnboardingEmailService } from "../../services/email/resendService.js";
 import { ClubCredibilityService } from "../../services/club/clubCredibilityService.js";
 import { ClubCredibilityEngine } from "../../scoring/clubCredibilityEngine.js";
+import { sendSoleRegistrationEmail } from "../../services/email/eventRegistrationEmailService.js";
 
 const clubRouter = express.Router();
 
@@ -429,9 +430,9 @@ clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request,
             }
             const canonicalPhone = norm.canonical;
 
-            // Check users
+            // Check club user accounts only (personal accounts remain independent)
             const userPhoneRes = await query(
-                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) AND account_type = 'club' LIMIT 1;`,
                 [canonicalPhone]
             );
             if (userPhoneRes.rows[0]) {
@@ -439,7 +440,7 @@ clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request,
                     success: true,
                     available: false,
                     field: "phone",
-                    message: "This mobile phone number is already registered to another Orbix account."
+                    message: "This mobile phone number is already registered to another Orbix club account."
                 });
             }
 
@@ -1930,6 +1931,9 @@ clubRouter.get("/events", authenticate, requireClubAccount, async (req: Request,
                 e.summary,
                 e.description,
                 COALESCE(e.scope, 'CAMPUS') AS "scope",
+                COALESCE(e.is_team_event, false) AS "isTeamEvent",
+                COALESCE(e.min_team_size, 1) AS "minTeamSize",
+                COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -2047,6 +2051,9 @@ clubRouter.get("/events/:eventId", authenticate, requireClubAccount, async (req:
                 e.summary,
                 e.description,
                 COALESCE(e.scope, 'CAMPUS') AS "scope",
+                COALESCE(e.is_team_event, false) AS "isTeamEvent",
+                COALESCE(e.min_team_size, 1) AS "minTeamSize",
+                COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -2117,6 +2124,9 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
             coverImageUrl,
             status = "draft",
             scope = "CAMPUS",
+            isTeamEvent = false,
+            minTeamSize = 1,
+            maxTeamSize = 4,
             initialFormStructure,
             initialFormSettings,
             initialFormTheme,
@@ -2202,9 +2212,12 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                 status,
                 scope,
                 published_at,
+                is_team_event,
+                min_team_size,
+                max_team_size,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
             RETURNING
                 id,
                 club_id AS "clubId",
@@ -2213,6 +2226,9 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                 summary,
                 description,
                 scope,
+                COALESCE(is_team_event, false) AS "isTeamEvent",
+                COALESCE(min_team_size, 1) AS "minTeamSize",
+                COALESCE(max_team_size, 4) AS "maxTeamSize",
                 starts_at AS "startsAt",
                 ends_at AS "endsAt",
                 timezone,
@@ -2239,6 +2255,9 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                 finalStatus,
                 finalScope,
                 publishedAt,
+                Boolean(isTeamEvent),
+                Math.max(1, parseInt(String(minTeamSize), 10) || 1),
+                Math.max(1, parseInt(String(maxTeamSize), 10) || 4),
             ]
         );
 
@@ -2335,6 +2354,9 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
             coverImageUrl,
             status,
             scope,
+            isTeamEvent,
+            minTeamSize,
+            maxTeamSize,
         } = req.body;
 
         const current = existingEvent.rows[0];
@@ -2457,8 +2479,11 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                 status = COALESCE($11, status),
                 scope = COALESCE($12, scope),
                 published_at = $13,
+                is_team_event = COALESCE($14, is_team_event),
+                min_team_size = COALESCE($15, min_team_size),
+                max_team_size = COALESCE($16, max_team_size),
                 updated_at = NOW()
-             WHERE id = $14 AND club_id = $15
+             WHERE id = $17 AND club_id = $18
              RETURNING id;`,
             [
                 title ? title.trim() : null,
@@ -2474,6 +2499,9 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                 status || null,
                 scope || null,
                 publishedAt,
+                isTeamEvent !== undefined ? Boolean(isTeamEvent) : null,
+                minTeamSize !== undefined ? Math.max(1, parseInt(String(minTeamSize), 10) || 1) : null,
+                maxTeamSize !== undefined ? Math.max(1, parseInt(String(maxTeamSize), 10) || 4) : null,
                 eventId,
                 clubId,
             ]
@@ -2488,6 +2516,9 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                 e.summary,
                 e.description,
                 COALESCE(e.scope, 'CAMPUS') AS "scope",
+                COALESCE(e.is_team_event, false) AS "isTeamEvent",
+                COALESCE(e.min_team_size, 1) AS "minTeamSize",
+                COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -3067,6 +3098,9 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
                 e.summary,
                 e.description,
                 COALESCE(e.scope, 'CAMPUS') AS "scope",
+                COALESCE(e.is_team_event, false) AS "isTeamEvent",
+                COALESCE(e.min_team_size, 1) AS "minTeamSize",
+                COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -3163,6 +3197,9 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 e.summary,
                 e.description,
                 COALESCE(e.scope, 'CAMPUS') AS "scope",
+                COALESCE(e.is_team_event, false) AS "isTeamEvent",
+                COALESCE(e.min_team_size, 1) AS "minTeamSize",
+                COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -3186,6 +3223,8 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status = 'pending') ELSE false END AS "isPending",
                 CASE WHEN $2::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
                 CASE WHEN $2::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
+                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_id FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamId",
+                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_role FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamRole",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount"
             FROM club_events e
@@ -3483,6 +3522,17 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                         existingReg.rows[0].id,
                     ]
                 );
+                sendSoleRegistrationEmail({
+                    to: finalEmail,
+                    userName: finalName,
+                    eventTitle: event.title,
+                    clubName: event.clubName,
+                    venueOrLocation: event.venue_or_location || undefined,
+                    startsAt: event.starts_at,
+                    eventId: event.id,
+                    status: "pending",
+                }).catch((emailErr) => console.error("[Registration] Failed to send sole registration email on reactivation:", emailErr));
+
                 return res.json({
                     success: true,
                     message: `Application submitted for review for ${event.title}!`,
@@ -3650,6 +3700,17 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
             });
         }
 
+        sendSoleRegistrationEmail({
+            to: finalEmail,
+            userName: finalName,
+            eventTitle: event.title,
+            clubName: event.clubName,
+            venueOrLocation: event.venue_or_location || undefined,
+            startsAt: event.starts_at,
+            eventId: event.id,
+            status: "pending",
+        }).catch((emailErr) => console.error("[Registration] Failed to send sole registration email:", emailErr));
+
         return res.status(201).json({
             success: true,
             message: `Application submitted for ${event.title}! The club coordinators will review your application.`,
@@ -3733,6 +3794,14 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
                 e.venue_or_location AS "venueOrLocation",
                 e.cover_image_url AS "coverImageUrl",
                 e.status AS "eventStatus",
+                COALESCE(e.is_team_event, false) AS "isTeamEvent",
+                COALESCE(e.min_team_size, 1) AS "minTeamSize",
+                COALESCE(e.max_team_size, 4) AS "maxTeamSize",
+                r.team_id AS "teamId",
+                r.team_role AS "teamRole",
+                t.name AS "teamName",
+                t.code AS "teamCode",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_team_members tm WHERE tm.team_id = r.team_id), 0) AS "teamMembersCount",
                 vc.name AS "clubName",
                 vc.slug AS "clubSlug",
                 COALESCE(vc.logo_url, '') AS "clubLogoUrl",
@@ -3740,6 +3809,7 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
              FROM club_event_registrations r
              JOIN club_events e ON e.id = r.event_id
              JOIN verified_clubs vc ON vc.id = r.club_id
+             LEFT JOIN club_event_teams t ON t.id = r.team_id
              WHERE r.user_id = $1
              ORDER BY r.registered_at DESC;`,
             [userId]
@@ -3822,9 +3892,14 @@ clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount
                 r.guardian_consent_verified_at AS "guardianConsentVerifiedAt",
                 r.answers,
                 r.form_response AS "formResponse",
-                r.file_attachments AS "fileAttachments"
+                r.file_attachments AS "fileAttachments",
+                r.team_id AS "teamId",
+                r.team_role AS "teamRole",
+                t.name AS "teamName",
+                t.code AS "teamCode"
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
+             LEFT JOIN club_event_teams t ON t.id = r.team_id
              WHERE r.event_id = $1 AND r.club_id = $2
              ORDER BY r.registered_at DESC;`,
             [eventId, event.club_id]

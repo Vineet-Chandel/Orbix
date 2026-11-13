@@ -290,9 +290,8 @@ export class WorkspaceCapabilityService {
         const canViewRecognition = capabilities.recognition?.view ?? true;
         if (canViewRecognition) allowedTabs.push("recognition");
 
-        allowedTabs.push("activity");
+        allowedTabs.push("history");
 
-        if (canViewAuditLogs) allowedTabs.push("audit");
         if (canManageSettings) allowedTabs.push("settings");
 
         const canViewRoles = canManageRoles || canCreateRoles || ctx.isAdmin || ctx.isOwner || hasPerm("roles:view");
@@ -312,6 +311,8 @@ export class WorkspaceCapabilityService {
             canAwardRecognition: capabilities.recognition?.award ?? false,
             canViewActivity: true,
             canViewAuditLogs,
+            canViewHistory: true,
+            canExportHistory: canViewAuditLogs,
             canViewSettings: canManageSettings,
             allowedTabs,
         };
@@ -505,8 +506,7 @@ export class WorkspaceCapabilityService {
         allowedTabs.push("my-tasks");
         if (canViewResources) allowedTabs.push("resources");
         if (canViewRecognition) allowedTabs.push("recognition");
-        allowedTabs.push("activity");
-        if (canViewAuditLogs) allowedTabs.push("audit");
+        allowedTabs.push("history");
         if (canManageSettings) allowedTabs.push("settings");
         if (canManageRoles || canCreateRoles) allowedTabs.push("roles");
 
@@ -524,6 +524,8 @@ export class WorkspaceCapabilityService {
             canAwardRecognition,
             canViewActivity: true,
             canViewAuditLogs,
+            canViewHistory: true,
+            canExportHistory: canViewAuditLogs,
             canViewSettings: canManageSettings,
             allowedTabs,
         };
@@ -605,6 +607,8 @@ export class WorkspaceCapabilityService {
             canAwardRecognition: false,
             canViewActivity: false,
             canViewAuditLogs: false,
+            canViewHistory: false,
+            canExportHistory: false,
             canViewSettings: false,
             allowedTabs: [],
         };

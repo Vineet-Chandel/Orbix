@@ -16,6 +16,9 @@ export interface ClubEvent {
     coverImageUrl: string | null;
     status: "draft" | "published" | "completed" | "cancelled";
     scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
     publishedAt: string | null;
     createdAt: string;
     updatedAt?: string;
@@ -40,6 +43,9 @@ export interface CreateClubEventPayload {
     coverImageUrl?: string | null;
     status: "draft" | "published" | "completed" | "cancelled";
     scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
     initialFormStructure?: any;
     initialFormSettings?: any;
     initialFormTheme?: any;

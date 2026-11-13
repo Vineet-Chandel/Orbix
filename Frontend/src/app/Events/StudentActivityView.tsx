@@ -15,6 +15,9 @@ import {
     X,
     Printer,
     AlertTriangle,
+    Users,
+    CheckCircle2,
+    XCircle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -26,6 +29,8 @@ import {
     fetchStudentCertificates,
     type CertificateItem,
 } from "../../api/clubCertificatesApi";
+import { clubEventTeamApi } from "../../api/clubEventTeamApi";
+import { EventTeamManagementModal } from "./EventTeamManagementModal";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { OrbixLoader } from "../../components/ui/loader";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -64,10 +69,40 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     // QR Pass Modal state
     const [activePassApp, setActivePassApp] = useState<StudentApplicationItem | null>(null);
 
+    // Team management modal state & invitations
+    const [managingTeamApp, setManagingTeamApp] = useState<StudentApplicationItem | null>(null);
+    const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+    const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null);
+
     const { handleBackdropClick: handlePassBackdropClick } = useModalDismiss({
         isOpen: Boolean(activePassApp),
         onClose: () => setActivePassApp(null),
     });
+
+    // Load Invitations
+    const loadInvitations = async () => {
+        try {
+            const res = await clubEventTeamApi.getMyPendingInvitations();
+            setPendingInvitations(res.invitations || []);
+        } catch {
+            // Ignore error
+        }
+    };
+
+    // Respond to invitation
+    const handleRespondInvitation = async (invitationId: string, action: "accept" | "decline") => {
+        try {
+            setRespondingInviteId(invitationId);
+            const res = await clubEventTeamApi.respondToInvitation(invitationId, action);
+            toast.success(res.message || (action === "accept" ? "Joined team!" : "Invitation declined."));
+            loadInvitations();
+            loadApplications();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to respond to invitation.");
+        } finally {
+            setRespondingInviteId(null);
+        }
+    };
 
     // Load Applications
     const loadApplications = async () => {
@@ -96,6 +131,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     useEffect(() => {
         loadApplications();
         loadCertificates();
+        loadInvitations();
     }, []);
 
     const handleCopyTicket = (code?: string | null) => {
@@ -373,6 +409,62 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         </div>
 
+                        {/* Pending Team Invitations Banner */}
+                        {pendingInvitations.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-[#a2ff86]/25 border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-black" />
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                        Pending Team Invitations ({pendingInvitations.length})
+                                    </h4>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {pendingInvitations.map((inv) => (
+                                        <div
+                                            key={inv.id}
+                                            className="p-3 bg-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                        >
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-black text-black">
+                                                        {inv.teamName}
+                                                    </span>
+                                                    <span className="text-[10px] font-mono text-neutral-500">
+                                                        (Code: {inv.teamCode})
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-neutral-600 font-medium">
+                                                    Invited by <span className="font-bold text-black">{inv.leaderName}</span> (@{inv.leaderUsername}) for <span className="font-bold text-black">{inv.eventTitle}</span>
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 self-end sm:self-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRespondInvitation(inv.id, "decline")}
+                                                    disabled={respondingInviteId === inv.id}
+                                                    className="px-3 py-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1"
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5 text-neutral-600" />
+                                                    <span>Decline</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRespondInvitation(inv.id, "accept")}
+                                                    disabled={respondingInviteId === inv.id}
+                                                    className="px-3.5 py-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#86ef6c] text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1"
+                                                >
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    <span>{respondingInviteId === inv.id ? "Joining..." : "Accept & Join"}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Applications List */}
                         {loadingApps ? (
                             <div className="p-16 text-center space-y-3">
@@ -458,6 +550,21 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                             · {app.collegeName || "Campus Event"}
                                                         </span>
                                                     </div>
+                                                    {app.isTeamEvent && (
+                                                        <div className="flex items-center gap-1.5 pt-1">
+                                                            {app.teamName ? (
+                                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                                    <Users className="w-3 h-3 text-black" />
+                                                                    <span>Team: {app.teamName} ({app.teamRole === "leader" ? "Leader" : "Member"}) · {app.teamMembersCount} Members</span>
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FAF6EE] text-neutral-700 border border-black/40 inline-flex items-center gap-1">
+                                                                    <Users className="w-3 h-3 text-neutral-500" />
+                                                                    <span>Team Event ({app.minTeamSize || 1}-{app.maxTeamSize || 4} Members)</span>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="text-left sm:text-right flex flex-col sm:items-end gap-1">
@@ -530,7 +637,17 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
                                             {/* Action Controls */}
                                             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-black/10">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {app.teamId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setManagingTeamApp(app)}
+                                                            className="px-3 py-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#86ef6c] text-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                        >
+                                                            <Users className="w-3.5 h-3.5" />
+                                                            <span>Manage Team Roster</span>
+                                                        </button>
+                                                    )}
                                                     {app.status === "registered" || app.status === "attended" ? (
                                                         <button
                                                             onClick={() => setActivePassApp(app)}
@@ -953,6 +1070,20 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 requiredInputText="WITHDRAW"
                 inputPlaceholder='Type "WITHDRAW" to confirm'
             />
+
+            {/* Event Team Management Modal */}
+            {managingTeamApp && managingTeamApp.teamId && (
+                <EventTeamManagementModal
+                    isOpen={Boolean(managingTeamApp)}
+                    onClose={() => setManagingTeamApp(null)}
+                    eventId={managingTeamApp.eventId}
+                    teamId={managingTeamApp.teamId}
+                    eventTitle={managingTeamApp.eventTitle}
+                    eventStartsAt={managingTeamApp.startsAt}
+                    onTeamUpdated={loadApplications}
+                    onTeamLeft={loadApplications}
+                />
+            )}
         </section>
     );
 };

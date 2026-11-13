@@ -66,6 +66,13 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
 }) => {
     const toast = useToast();
 
+    const resolvedClubEmail =
+        (club.public_email && !club.public_email.toLowerCase().endsWith("@club.orbix")
+            ? club.public_email
+            : user?.gmail && !String(user.gmail).toLowerCase().endsWith("@club.orbix")
+                ? user.gmail
+                : club.public_email || "");
+
     // -------------------------------------------------------------------------
     // PASSWORD AND SECURITY STATE
     // -------------------------------------------------------------------------
@@ -96,7 +103,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
     const handleSendVerificationCode = async () => {
         setIsSendingVerifyOtp(true);
         try {
-            const email = user?.gmail || club.public_email || "";
+            const email = resolvedClubEmail;
             const res = await sendClubEmailVerificationOtp(email);
             setShowOtpInput(true);
             setVerifyCooldown(res?.cooldownSeconds || 60);
@@ -138,7 +145,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
     const [helpSubject, setHelpSubject] = useState("");
     const [helpDescription, setHelpDescription] = useState("");
     const [helpPriority, setHelpPriority] = useState<"normal" | "urgent" | "event_day">("normal");
-    const [helpContactEmail, setHelpContactEmail] = useState(user?.gmail || club.public_email || "");
+    const [helpContactEmail, setHelpContactEmail] = useState(resolvedClubEmail);
     const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
     const [submittedTicketNumber, setSubmittedTicketNumber] = useState<string | null>(null);
     const [clubFaqSearch, setClubFaqSearch] = useState("");
@@ -229,7 +236,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                     subject: helpSubject.trim(),
                     description: helpDescription.trim(),
                     priority: helpPriority === "event_day" ? "urgent" : helpPriority,
-                    contactEmail: helpContactEmail.trim() || user?.gmail || club.public_email || "",
+                    contactEmail: helpContactEmail.trim() || resolvedClubEmail,
                 }),
             });
             const data = await res.json().catch(() => null);
@@ -344,7 +351,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                 <div className="space-y-0.5 min-w-0">
                                     <p className="text-xs font-black text-black">Registered Address</p>
                                     <p className="text-sm font-mono font-bold text-neutral-700 truncate">
-                                        {user?.gmail || club.public_email || "Not configured"}
+                                        {resolvedClubEmail || "Not configured"}
                                     </p>
                                 </div>
 
@@ -368,7 +375,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                             Enter 6-Digit Verification Code
                                         </h4>
                                         <p className="text-xs text-neutral-600 font-medium">
-                                            A confirmation code was sent to <strong className="text-black">{user?.gmail || club.public_email}</strong>.
+                                            A confirmation code was sent to <strong className="text-black">{resolvedClubEmail}</strong>.
                                         </p>
                                     </div>
 
@@ -523,7 +530,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                                         Ticket #{submittedTicketNumber} Created
                                                     </p>
                                                     <p className="text-[11px] text-neutral-700 font-medium">
-                                                        Our campus operations desk will respond to {helpContactEmail || user?.gmail || club.public_email} within 24 business hours.
+                                                        Our campus operations desk will respond to {helpContactEmail || resolvedClubEmail} within 24 business hours.
                                                     </p>
                                                 </div>
                                                 <button

@@ -6,7 +6,6 @@ import {
     Shield,
     Activity,
     AlertTriangle,
-    Radio,
     RefreshCw,
     FolderKanban,
     Mail,
@@ -19,6 +18,7 @@ import {
     Menu,
     FolderArchive,
     Sparkles,
+    History,
 } from "lucide-react";
 import { workspaceApi } from "../../../api/workspaceApi";
 import { useToast } from "../../../context/ToastContext";
@@ -33,6 +33,7 @@ import type {
     WorkspaceThread,
     WorkspaceSearchResultItem,
     MemberCapabilityResolution,
+    WorkspaceHistoryRecordType,
 } from "../../../types/workspace";
 import { DepartmentOverviewView } from "./Departments/DepartmentOverviewView";
 import { MemberDirectoryView } from "./Members/MemberDirectoryView";
@@ -49,8 +50,8 @@ import { TasksBoardView } from "./Tasks/TasksBoardView";
 import { MyTasksView } from "./Tasks/MyTasksView";
 import { NotificationBell } from "./Notifications/NotificationBell";
 import { WorkspaceOverviewView } from "./Dashboard/WorkspaceOverviewView";
-import { ActivityFeedView } from "./Activity/ActivityFeedView";
-import { AuditLogView } from "./Audit/AuditLogView";
+import { WorkspaceHistoryView } from "./WorkspaceHistory/WorkspaceHistoryView";
+import { WorkspaceSectionSwitcher, type WorkspaceSectionNavItem } from "./Navigation/WorkspaceSectionSwitcher";
 import { WorkspaceSearchModal } from "./Search/WorkspaceSearchModal";
 import { RolesPermissionsView } from "./Roles/RolesPermissionsView";
 import { WorkspaceSettingsView } from "./Settings/WorkspaceSettingsView";
@@ -98,16 +99,45 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     const [refreshing, setRefreshing] = useState(false);
 
     // Active Navigation Sub-tab
-    const [activeSection, setActiveSection] = useState<
-        "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "resources" | "recognition" | "activity" | "audit" | "roles" | "settings"
-    >(() => (initialSection as any) || "overview");
+    type ActiveWorkspaceSection =
+        | "overview"
+        | "departments"
+        | "roster"
+        | "invitations"
+        | "channels"
+        | "all-tasks"
+        | "my-tasks"
+        | "resources"
+        | "recognition"
+        | "history"
+        | "roles"
+        | "settings";
+
+    const normalizeSection = (sec?: string): ActiveWorkspaceSection => {
+        if (sec === "activity" || sec === "audit" || sec === "history") return "history";
+        if (sec === "members") return "roster";
+        if (sec === "files") return "resources";
+        return (sec as ActiveWorkspaceSection) || "overview";
+    };
+
+    const [historyInitialRecordType, setHistoryInitialRecordType] =
+        useState<WorkspaceHistoryRecordType>(() =>
+            initialSection === "audit" ? "audit" : initialSection === "activity" ? "activity" : "all"
+        );
+
+    const [activeSection, setActiveSection] = useState<ActiveWorkspaceSection>(() =>
+        normalizeSection(initialSection)
+    );
 
     useEffect(() => {
         if (initialSection) {
             if ((isClubContext || capabilities?.isClubAccount) && initialSection === "my-tasks") {
                 setActiveSection("overview");
             } else {
-                setActiveSection(initialSection as any);
+                if (initialSection === "audit") setHistoryInitialRecordType("audit");
+                else if (initialSection === "activity") setHistoryInitialRecordType("activity");
+                else if (initialSection === "history") setHistoryInitialRecordType("all");
+                setActiveSection(normalizeSection(initialSection));
             }
         }
     }, [initialSection, isClubContext, capabilities?.isClubAccount]);
@@ -431,274 +461,172 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         (isWorkspaceManager && Boolean((workspace.managerPermissions as any)?.can_manage_channels)) ||
         capabilities?.capabilities.channels.manage
     );
-    const managerMember = visibleMembers.find((m) => m.userId === workspace.managerUserId);
+    const navItems: WorkspaceSectionNavItem[] = [
+        {
+            id: "overview",
+            label: "Workspace Overview",
+            icon: <Activity className="w-3.5 h-3.5" />,
+        },
+        {
+            id: "departments",
+            label: "Departments",
+            count: departments.length,
+            icon: <FolderKanban className="w-3.5 h-3.5" />,
+        },
+        {
+            id: "roster",
+            label: "Member Roster",
+            count: visibleMembers.length,
+            icon: <Users className="w-3.5 h-3.5" />,
+        },
+        ...((capabilities ? capabilities.navigation.canViewInvitations : (isAdmin || isWorkspaceManager))
+            ? [
+                  {
+                      id: "invitations",
+                      label: "Invitations",
+                      icon: <Mail className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        {
+            id: "channels",
+            label: "Channels & Chat",
+            icon: <Hash className="w-3.5 h-3.5" />,
+        },
+        ...((capabilities ? capabilities.navigation.canViewAllTasks : true)
+            ? [
+                  {
+                      id: "all-tasks",
+                      label: "All Tasks",
+                      icon: <ListTodo className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        ...(!effectiveIsClubContext && (capabilities ? capabilities.navigation.canViewMyTasks : true)
+            ? [
+                  {
+                      id: "my-tasks",
+                      label: "My Tasks",
+                      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        ...((capabilities ? (capabilities.navigation.canViewResources ?? true) : true)
+            ? [
+                  {
+                      id: "resources",
+                      label: "Files & Resources",
+                      icon: <FolderArchive className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        {
+            id: "recognition",
+            label: "Recognition",
+            icon: <Sparkles className="w-3.5 h-3.5" />,
+        },
+        {
+            id: "history",
+            label: "Workspace History",
+            icon: <History className="w-3.5 h-3.5" />,
+        },
+        ...((capabilities ? (capabilities.navigation.canViewRoles || capabilities.capabilities.roles.view) : true)
+            ? [
+                  {
+                      id: "roles",
+                      label: "Roles & Permissions",
+                      icon: <ShieldAlert className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        ...((capabilities ? capabilities.navigation.canViewSettings : isAdmin)
+            ? [
+                  {
+                      id: "settings",
+                      label: "Settings",
+                      icon: <UserCog className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+    ];
 
     return (
-        <div className="w-full space-y-6">
-            {/* Top Workspace Header Card */}
-            <div className="bg-white border-2 border-black rounded-2xl p-6 shadow-neo">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-xl border-2 border-black bg-[#A6FF70] flex items-center justify-center font-black text-2xl shadow-neo-sm overflow-hidden">
-                            {club.logo_url ? (
-                                <img src={club.logo_url} alt={workspace.name} className="w-full h-full object-cover" />
-                            ) : (
-                                workspace.name.charAt(0)
-                            )}
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                                <h1 className="text-2xl font-black text-black tracking-tight">{workspace.name}</h1>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-black bg-emerald-100 text-emerald-800 border border-black rounded-full">
-                                    <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-                                    Active Workspace
-                                </span>
-                                {managerMember && (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-black bg-yellow-100 text-yellow-800 border border-black rounded-full">
-                                        <UserCog className="w-3 h-3 text-yellow-700" />
-                                        Manager: @{managerMember.user?.username}
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-xs text-neutral-600 mt-1 font-medium">
-                                Chapter: <strong className="text-black">{club.name}</strong> • College: {club.college_name || "Campus Chapter"}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-                        {onOpenMobileSidebar && (
-                            <button
-                                onClick={onOpenMobileSidebar}
-                                className="lg:hidden px-2.5 py-1.5 bg-white hover:bg-neutral-100 text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
-                                title="Open Navigation Menu"
-                            >
-                                <Menu className="w-3.5 h-3.5" />
-                                <span>Menu</span>
-                            </button>
-                        )}
-                        {clubSelector}
-                        {!isClubContext && currentMember && (
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs">
-                                <Shield className="w-3.5 h-3.5 text-blue-600" />
-                                <span>Your Role: {currentMember?.roleTitle || "Member"}</span>
-                            </div>
-                        )}
-
-                        {/* Owner Workspace Manager Designation Button */}
-                        {isOwner && (
-                            <button
-                                onClick={() => setIsManagerModalOpen(true)}
-                                className="px-3 py-1.5 bg-yellow-200 hover:bg-yellow-300 text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
-                                title="Appoint or configure Workspace Manager"
-                            >
-                                <UserCog className="w-3.5 h-3.5" />
-                                <span>Workspace Manager</span>
-                            </button>
-                        )}
-
-                        {/* Quick Search */}
+        <div className="w-full space-y-4">
+            {/* Compact Workspace Utility Controls (No Club Heading / Divider Line) */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {onOpenMobileSidebar && (
                         <button
-                            onClick={() => setIsSearchOpen(true)}
-                            className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs transition-all flex items-center gap-1.5"
-                            title="Search Workspace (⌘K)"
+                            onClick={onOpenMobileSidebar}
+                            className="lg:hidden px-2.5 py-1.5 bg-white hover:bg-neutral-100 text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
+                            title="Open Navigation Menu"
                         >
-                            <Search className="w-3.5 h-3.5 text-neutral-600" />
-                            <span className="hidden sm:inline">Search</span>
-                            <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-white border border-neutral-300 rounded text-neutral-600">
-                                ⌘K
-                            </kbd>
+                            <Menu className="w-3.5 h-3.5" />
+                            <span>Menu</span>
                         </button>
-
-                        {/* Notification Bell */}
-                        <div className="bg-neutral-900 border-2 border-black rounded-xl shadow-neo-xs flex items-center justify-center">
-                            <NotificationBell clubId={club.id} />
+                    )}
+                    {clubSelector}
+                    {!isClubContext && currentMember && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs">
+                            <Shield className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Your Role: {currentMember?.roleTitle || "Member"}</span>
                         </div>
-
-                        <button
-                            onClick={() => loadWorkspace(true)}
-                            disabled={refreshing}
-                            className="p-2 bg-neutral-100 hover:bg-neutral-200 border-2 border-black rounded-xl shadow-neo-xs transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                            title="Refresh Workspace"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-                        </button>
-                    </div>
+                    )}
                 </div>
 
-                {/* Sub-Navigation Tabs */}
-                <div className="flex items-center gap-2 mt-6 pt-5 border-t-2 border-black flex-wrap">
-                    <button
-                        onClick={() => setActiveSection("overview")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "overview"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <Activity className="w-3.5 h-3.5" />
-                        Workspace Overview
-                    </button>
-
-                    <button
-                        onClick={() => setActiveSection("departments")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "departments"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <FolderKanban className="w-3.5 h-3.5" />
-                        Departments ({departments.length})
-                    </button>
-
-                    <button
-                        onClick={() => setActiveSection("roster")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "roster"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <Users className="w-3.5 h-3.5" />
-                        Member Roster ({visibleMembers.length})
-                    </button>
-
-                    {(capabilities ? capabilities.navigation.canViewInvitations : (isAdmin || isWorkspaceManager)) && (
+                <div className="flex items-center gap-2.5 flex-wrap ml-auto">
+                    {/* Owner Workspace Manager Designation Button */}
+                    {isOwner && (
                         <button
-                            onClick={() => setActiveSection("invitations")}
-                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                                activeSection === "invitations"
-                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                            }`}
-                        >
-                            <Mail className="w-3.5 h-3.5" />
-                            Invitations
-                        </button>
-                    )}
-
-                    <button
-                        onClick={() => setActiveSection("channels")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "channels"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <Hash className="w-3.5 h-3.5" />
-                        Channels & Chat
-                    </button>
-
-                    {(capabilities ? capabilities.navigation.canViewAllTasks : true) && (
-                        <button
-                            onClick={() => setActiveSection("all-tasks")}
-                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                                activeSection === "all-tasks"
-                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                            }`}
-                        >
-                            <ListTodo className="w-3.5 h-3.5" />
-                            All Tasks
-                        </button>
-                    )}
-
-                    {!effectiveIsClubContext && (capabilities ? capabilities.navigation.canViewMyTasks : true) && (
-                        <button
-                            onClick={() => setActiveSection("my-tasks")}
-                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                                activeSection === "my-tasks"
-                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                            }`}
-                        >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            My Tasks
-                        </button>
-                    )}
-
-                    {(capabilities ? (capabilities.navigation.canViewResources ?? true) : true) && (
-                        <button
-                            onClick={() => setActiveSection("resources")}
-                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                                activeSection === "resources"
-                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                            }`}
-                        >
-                            <FolderArchive className="w-3.5 h-3.5" />
-                            Files & Resources
-                        </button>
-                    )}
-
-                    <button
-                        onClick={() => setActiveSection("recognition")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "recognition"
-                                ? "bg-[#FFE566] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <Sparkles className="w-3.5 h-3.5 fill-black" />
-                        Recognition
-                    </button>
-
-                    <button
-                        onClick={() => setActiveSection("activity")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "activity"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <Activity className="w-3.5 h-3.5" />
-                        Activity Log
-                    </button>
-
-                    {(capabilities ? capabilities.navigation.canViewAuditLogs : isAdmin) && (
-                        <button
-                            onClick={() => setActiveSection("audit")}
-                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                                activeSection === "audit"
-                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                            }`}
-                        >
-                            <Shield className="w-3.5 h-3.5" />
-                            Audit Trail
-                        </button>
-                    )}
-
-                    {(capabilities ? (capabilities.navigation.canViewRoles || capabilities.capabilities.roles.view) : true) && (
-                        <button
-                            onClick={() => setActiveSection("roles")}
-                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                                activeSection === "roles"
-                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                            }`}
-                        >
-                            <ShieldAlert className="w-3.5 h-3.5" />
-                            Roles & Permissions
-                        </button>
-                    )}
-
-                    {(capabilities ? capabilities.navigation.canViewSettings : isAdmin) && (
-                        <button
-                            onClick={() => setActiveSection("settings")}
-                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                                activeSection === "settings"
-                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                            }`}
+                            onClick={() => setIsManagerModalOpen(true)}
+                            className="px-3 py-1.5 bg-[#FFE566] hover:bg-[#fbd83a] text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
+                            title="Appoint or configure Workspace Manager"
                         >
                             <UserCog className="w-3.5 h-3.5" />
-                            Settings
+                            <span>Workspace Manager</span>
                         </button>
                     )}
+
+                    {/* Quick Search */}
+                    <button
+                        onClick={() => setIsSearchOpen(true)}
+                        className="px-3 py-1.5 bg-white hover:bg-neutral-100 text-neutral-900 border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs transition-all flex items-center gap-1.5"
+                        title="Search Workspace (⌘K)"
+                    >
+                        <Search className="w-3.5 h-3.5 text-neutral-600" />
+                        <span className="hidden sm:inline">Search</span>
+                        <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-[#FAF6EE] border border-black/30 rounded text-neutral-700">
+                            ⌘K
+                        </kbd>
+                    </button>
+
+                    {/* Notification Bell */}
+                    <div className="bg-neutral-900 border-2 border-black rounded-xl shadow-neo-xs flex items-center justify-center">
+                        <NotificationBell clubId={club.id} />
+                    </div>
+
+                    <button
+                        onClick={() => loadWorkspace(true)}
+                        disabled={refreshing}
+                        className="p-2 bg-white hover:bg-neutral-100 border-2 border-black rounded-xl shadow-neo-xs transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                        title="Refresh Workspace"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                    </button>
                 </div>
             </div>
+
+            {/* Full-Width Black Toggle Navigation Dock with Animated White Slider */}
+            <WorkspaceSectionSwitcher
+                items={navItems}
+                activeSection={activeSection}
+                onSelect={(sectionId) => {
+                    if (sectionId === "history") {
+                        setHistoryInitialRecordType("all");
+                    }
+                    setActiveSection(sectionId as ActiveWorkspaceSection);
+                }}
+            />
 
             {/* Section Access Authorization Enforcement */}
             {capabilities && (!capabilities.navigation.allowedTabs.includes(activeSection) || (effectiveIsClubContext && activeSection === "my-tasks")) ? (
@@ -729,7 +657,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                     capabilities={capabilities}
                     onNavigateToSection={(sec) => {
                         if (effectiveIsClubContext && sec === "my-tasks") return;
-                        setActiveSection(sec);
+                        if (sec === "history") setHistoryInitialRecordType("all");
+                        setActiveSection(normalizeSection(sec));
                     }}
                     onSelectDepartment={() => {
                         setActiveSection("departments");
@@ -802,9 +731,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                             else if (sec === "members") setActiveSection("roster");
                             else if (sec === "all-tasks") setActiveSection("all-tasks");
                             else if (sec === "my-tasks" && !effectiveIsClubContext) setActiveSection("my-tasks");
-                            else if (sec === "activity") setActiveSection("activity");
-                            else if (sec === "audit") setActiveSection("audit");
-                            else {
+                            else if (sec === "history" || sec === "activity" || sec === "audit") {
+                                setHistoryInitialRecordType(
+                                    sec === "audit" ? "audit" : sec === "activity" ? "activity" : "all"
+                                );
+                                setActiveSection("history");
+                            } else {
                                 setActiveSection("overview");
                             }
                         }}
@@ -935,24 +867,24 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 />
             )}
 
-            {/* SECTION 8: ACTIVITY FEED (PHASE 08) */}
-            {activeSection === "activity" && (
-                <ActivityFeedView
+            {/* SECTION 8: UNIFIED WORKSPACE HISTORY (ACTIVITY + AUDIT) */}
+            {activeSection === "history" && (
+                <WorkspaceHistoryView
                     clubId={club.id}
                     departments={departments}
-                    members={members}
+                    members={visibleMembers}
                     currentMember={currentMember}
-                    onNavigate={(url) => {
-                        window.location.href = url;
+                    capabilities={capabilities}
+                    isAdmin={isAdmin}
+                    isClubContext={effectiveIsClubContext}
+                    initialRecordType={historyInitialRecordType}
+                    onNavigateSection={(sec) => {
+                        if (effectiveIsClubContext && sec === "my-tasks") {
+                            setActiveSection("all-tasks");
+                            return;
+                        }
+                        setActiveSection(sec);
                     }}
-                />
-            )}
-
-            {/* SECTION 9: AUDIT LOG VIEWER (PHASE 08) */}
-            {activeSection === "audit" && (
-                <AuditLogView
-                    clubId={club.id}
-                    isAdmin={capabilities ? capabilities.navigation.canViewAuditLogs : isAdmin}
                 />
             )}
 

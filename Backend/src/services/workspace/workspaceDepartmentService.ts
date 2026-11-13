@@ -1,4 +1,5 @@
 // Backend/src/services/workspace/workspaceDepartmentService.ts
+import crypto from "crypto";
 import { query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
@@ -181,15 +182,30 @@ export class WorkspaceDepartmentService {
             }
         }
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "department_created",
             targetType: "department",
             targetId: created.id,
+            correlationId,
             details: { name: created.name, slug: created.slug },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: created.id,
+            actorId: actorUserId,
+            eventType: "department:created",
+            resourceType: "department",
+            resourceId: created.id,
+            title: created.name,
+            isRestricted: false,
+            correlationId,
+            metadata: { name: created.name, slug: created.slug },
         });
 
         return created;
@@ -248,15 +264,30 @@ export class WorkspaceDepartmentService {
             }
         }
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "department_updated",
             targetType: "department",
             targetId: departmentId,
-            details: updates,
+            correlationId,
+            details: { name: updated.name, ...updates },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId,
+            actorId: actorUserId,
+            eventType: "department:updated",
+            resourceType: "department",
+            resourceId: departmentId,
+            title: updated.name,
+            isRestricted: false,
+            correlationId,
+            metadata: { name: updated.name },
         });
 
         await WorkspaceRedisService.invalidateAllWorkspaceCapabilities(workspaceId);
@@ -281,14 +312,30 @@ export class WorkspaceDepartmentService {
         const updated = await WorkspaceRepository.setDepartmentStatus(workspaceId, departmentId, "archived");
         if (!updated) throw new Error("Department not found or already archived.");
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "department_archived",
             targetType: "department",
             targetId: departmentId,
+            correlationId,
+            details: { name: updated.name },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId,
+            actorId: actorUserId,
+            eventType: "department:archived",
+            resourceType: "department",
+            resourceId: departmentId,
+            title: updated.name,
+            isRestricted: false,
+            correlationId,
+            metadata: { name: updated.name },
         });
 
         return updated;
@@ -311,14 +358,30 @@ export class WorkspaceDepartmentService {
         const updated = await WorkspaceRepository.setDepartmentStatus(workspaceId, departmentId, "active");
         if (!updated) throw new Error("Department not found.");
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "department_restored",
             targetType: "department",
             targetId: departmentId,
+            correlationId,
+            details: { name: updated.name },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId,
+            actorId: actorUserId,
+            eventType: "department:restored",
+            resourceType: "department",
+            resourceId: departmentId,
+            title: updated.name,
+            isRestricted: false,
+            correlationId,
+            metadata: { name: updated.name },
         });
 
         return updated;
@@ -405,15 +468,30 @@ export class WorkspaceDepartmentService {
             assignedBy: actorUserId,
         });
 
+        const correlationId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "department_member_added",
             targetType: "department_member",
             targetId: assigned.id,
-            details: { departmentId, memberId, role },
+            correlationId,
+            details: { departmentId, departmentName: dept.name, memberId, role },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId,
+            actorId: actorUserId,
+            eventType: "department:member_added",
+            resourceType: "department",
+            resourceId: departmentId,
+            title: `Added member to ${dept.name}`,
+            isRestricted: false,
+            correlationId,
+            metadata: { departmentId, departmentName: dept.name, memberId, role },
         });
 
         // Invalidate capabilities and directory caches for target member
@@ -467,14 +545,29 @@ export class WorkspaceDepartmentService {
 
         const removed = await WorkspaceRepository.removeDepartmentMember(workspaceId, departmentId, memberId);
         if (removed) {
+            const correlationId = crypto.randomUUID();
             await WorkspaceRepository.logAudit(null, {
                 workspaceId,
                 actorId: actorUserId,
                 action: "department_member_removed",
                 targetType: "department_member",
-                details: { departmentId, memberId },
+                correlationId,
+                details: { departmentId, departmentName: dept.name, memberId },
                 ipAddress: reqMeta.ipAddress || null,
                 userAgent: reqMeta.userAgent || null,
+            });
+
+            await WorkspaceRepository.recordActivityEvent({
+                workspaceId,
+                departmentId,
+                actorId: actorUserId,
+                eventType: "department:member_removed",
+                resourceType: "department",
+                resourceId: departmentId,
+                title: `Removed member from ${dept.name}`,
+                isRestricted: false,
+                correlationId,
+                metadata: { departmentId, departmentName: dept.name, memberId },
             });
 
             // Target member user id lookup

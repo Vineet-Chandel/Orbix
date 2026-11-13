@@ -722,8 +722,7 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                                             { id: "my-tasks", label: "My Tasks" },
                                             { id: "resources", label: "Files & Resources" },
                                             { id: "recognition", label: "Recognition" },
-                                            { id: "activity", label: "Activity Log" },
-                                            { id: "audit", label: "Audit Trail" },
+                                            { id: "history", label: "Workspace History" },
                                             { id: "roles", label: "Roles & Permissions" },
                                             { id: "settings", label: "Settings" },
                                         ];
@@ -733,7 +732,8 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                                                 activePreview.navigation.allowedTabs.includes(tabId) ||
                                                 (tabId === "roster" && (activePreview.navigation.allowedTabs.includes("members") || activePreview.navigation.canViewMembers)) ||
                                                 (tabId === "resources" && (activePreview.navigation.allowedTabs.includes("files") || activePreview.navigation.canViewResources)) ||
-                                                (tabId === "recognition" && (activePreview.navigation.allowedTabs.includes("recognition") || activePreview.navigation.canViewRecognition))
+                                                (tabId === "recognition" && (activePreview.navigation.allowedTabs.includes("recognition") || activePreview.navigation.canViewRecognition)) ||
+                                                (tabId === "history" && (activePreview.navigation.allowedTabs.includes("history") || activePreview.navigation.canViewHistory !== false))
                                             );
                                         };
 

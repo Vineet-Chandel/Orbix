@@ -330,22 +330,47 @@ export class WorkspaceFileService {
                 );
             }
 
-            // Record Workspace Audit Log
+            // Record Correlated Workspace Audit Log & Operational Activity Event
+            const fileCorrelationId = crypto.randomUUID();
+            const isDocMime = /pdf|msword|officedocument|text\/plain|markdown/i.test(file.mimeType || "");
             await WorkspaceRepository.logAudit(client, {
                 workspaceId,
                 actorId: actorUserId,
                 action: "file_uploaded",
                 targetType: "workspace_file",
                 targetId: file.id,
+                correlationId: fileCorrelationId,
                 details: {
                     fileName: file.fileName,
                     fileSizeBytes: file.fileSizeBytes,
+                    departmentId: file.departmentId || null,
                     parentResourceType: file.parentResourceType,
                     parentResourceId: file.parentResourceId,
                 },
                 ipAddress: "127.0.0.1",
                 userAgent: "Orbix API",
             });
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: file.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: isDocMime ? "document:uploaded" : "file:uploaded",
+                    resourceType: isDocMime ? "document" : "file",
+                    resourceId: file.id,
+                    title: file.fileName,
+                    isRestricted: false,
+                    correlationId: fileCorrelationId,
+                    metadata: {
+                        filename: file.fileName,
+                        fileName: file.fileName,
+                        mimeType: file.mimeType,
+                        fileSizeBytes: file.fileSizeBytes,
+                    },
+                },
+                client
+            );
 
             await client.query("COMMIT;");
 
@@ -500,6 +525,47 @@ export class WorkspaceFileService {
                     ]
                 );
             }
+
+            const directCorrelationId = crypto.randomUUID();
+            const isDirectDoc = /pdf|msword|officedocument|text\/plain|markdown/i.test(file.mimeType || "");
+            await WorkspaceRepository.logAudit(client, {
+                workspaceId,
+                actorId: actorUserId,
+                action: "file_uploaded",
+                targetType: "workspace_file",
+                targetId: file.id,
+                correlationId: directCorrelationId,
+                details: {
+                    fileName: file.fileName,
+                    fileSizeBytes: file.fileSizeBytes,
+                    departmentId: file.departmentId || null,
+                    parentResourceType: file.parentResourceType,
+                    parentResourceId: file.parentResourceId,
+                },
+                ipAddress: "127.0.0.1",
+                userAgent: "Orbix API",
+            });
+
+            await WorkspaceRepository.recordActivityEvent(
+                {
+                    workspaceId,
+                    departmentId: file.departmentId || null,
+                    actorId: actorUserId,
+                    eventType: isDirectDoc ? "document:uploaded" : "file:uploaded",
+                    resourceType: isDirectDoc ? "document" : "file",
+                    resourceId: file.id,
+                    title: file.fileName,
+                    isRestricted: false,
+                    correlationId: directCorrelationId,
+                    metadata: {
+                        filename: file.fileName,
+                        fileName: file.fileName,
+                        mimeType: file.mimeType,
+                        fileSizeBytes: file.fileSizeBytes,
+                    },
+                },
+                client
+            );
 
             await client.query("COMMIT;");
             return this.enrichFileWithDeliveryUrls(file);
@@ -771,16 +837,31 @@ export class WorkspaceFileService {
             );
         }
 
-        // 4. Audit log
+        // 4. Audit log + correlated activity
+        const deleteCorrId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "file_deleted",
             targetType: "workspace_file",
             targetId: fileId,
-            details: { fileName: file.fileName },
+            correlationId: deleteCorrId,
+            details: { fileName: file.fileName, departmentId: file.departmentId || null },
             ipAddress: "127.0.0.1",
             userAgent: "Orbix API",
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: file.departmentId || null,
+            actorId: actorUserId,
+            eventType: "file:removed",
+            resourceType: "file",
+            resourceId: fileId,
+            title: file.fileName,
+            isRestricted: false,
+            correlationId: deleteCorrId,
+            metadata: { fileName: file.fileName },
         });
 
         return success;
@@ -842,16 +923,31 @@ export class WorkspaceFileService {
             throw new Error("Failed to update file name.");
         }
 
-        // Audit log
+        // Audit log + correlated activity
+        const renameCorrId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "file_renamed",
             targetType: "workspace_file",
             targetId: fileId,
-            details: { oldFileName: file.fileName, newFileName: finalName },
+            correlationId: renameCorrId,
+            details: { oldFileName: file.fileName, newFileName: finalName, departmentId: file.departmentId || null },
             ipAddress: "127.0.0.1",
             userAgent: "Orbix API",
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: file.departmentId || null,
+            actorId: actorUserId,
+            eventType: "file:updated",
+            resourceType: "file",
+            resourceId: fileId,
+            title: finalName,
+            isRestricted: false,
+            correlationId: renameCorrId,
+            metadata: { oldFileName: file.fileName, newFileName: finalName },
         });
 
         return this.enrichFileWithDeliveryUrls(updated);
@@ -974,21 +1070,40 @@ export class WorkspaceFileService {
             );
         }
 
-        // 7. Audit log
+        // 7. Audit log + correlated activity
+        const replaceCorrId = crypto.randomUUID();
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: "file_replaced",
             targetType: "workspace_file",
             targetId: fileId,
+            correlationId: replaceCorrId,
             details: {
                 previousFileName: file.fileName,
                 previousSizeBytes: file.fileSizeBytes,
                 newFileName: metadata.originalFilename,
                 newSizeBytes: fileBuffer.length,
+                departmentId: file.departmentId || null,
             },
             ipAddress: "127.0.0.1",
             userAgent: "Orbix API",
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: file.departmentId || null,
+            actorId: actorUserId,
+            eventType: "file:updated",
+            resourceType: "file",
+            resourceId: fileId,
+            title: metadata.originalFilename,
+            isRestricted: false,
+            correlationId: replaceCorrId,
+            metadata: {
+                previousFileName: file.fileName,
+                newFileName: metadata.originalFilename,
+            },
         });
 
         return this.enrichFileWithDeliveryUrls(updated);

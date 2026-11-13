@@ -68,14 +68,21 @@ export class ClubSettingsService {
 
         // Fetch counts for club events and team members
         const [eventsRes, membersRes, unreadRes] = await Promise.all([
-            query(`SELECT COUNT(*)::int AS count FROM club_events WHERE club_id = $1;`, [club.id]),
-            query(`SELECT COUNT(*)::int AS count FROM club_memberships WHERE club_id = $1 AND status = 'active';`, [club.id]),
-            query(`SELECT COUNT(*)::int AS count FROM club_inbox_messages WHERE club_id = $1 AND is_read = false AND sender_type = 'student';`, [club.id]),
+            query(`SELECT COUNT(*)::int AS count FROM club_events WHERE club_id = $1;`, [club.id]).catch(() => ({ rows: [{ count: 0 }] })),
+            query(`SELECT COUNT(*)::int AS count FROM club_memberships WHERE club_id = $1 AND status = 'active';`, [club.id]).catch(() => ({ rows: [{ count: 0 }] })),
+            query(`SELECT COUNT(*)::int AS count FROM club_inbox_messages WHERE club_id = $1 AND is_read = false AND sender_type = 'student';`, [club.id]).catch(() => ({ rows: [{ count: 0 }] })),
         ]);
 
         const eventsCount = eventsRes.rows[0]?.count || 0;
         const teamMembersCount = membersRes.rows[0]?.count || 0;
         const unreadInboxCount = unreadRes.rows[0]?.count || 0;
+
+        const resolvedPrimaryEmail =
+            club.public_email && !String(club.public_email).toLowerCase().endsWith("@club.orbix")
+                ? club.public_email
+                : user?.gmail && !String(user.gmail).toLowerCase().endsWith("@club.orbix")
+                    ? user.gmail
+                    : club.public_email || "";
 
         return {
             club: {
@@ -85,7 +92,7 @@ export class ClubSettingsService {
             user: {
                 ...user,
                 displayName: club.name,
-                primaryEmail: user?.gmail || club.public_email || "",
+                primaryEmail: resolvedPrimaryEmail,
             },
             verification: {
                 isVerifiedClub: Boolean(club.is_active),

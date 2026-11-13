@@ -1,4 +1,5 @@
 // Backend/src/Routes/workspace/workspaceRoutes.ts
+import crypto from "crypto";
 import { Router, type Request, type Response } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { WorkspaceService } from "../../services/workspace/workspaceService.js";
@@ -207,17 +208,22 @@ workspaceRouter.get("/my-workspaces", authenticate, async (req: Request, res: Re
             return res.status(401).json({ success: false, message: "Authentication required." });
         }
 
-        // Check if user is a club manager of an active verified club
-        const clubManagerRes = await query(
-            `SELECT vc.id, vc.name, vc.slug FROM public.verified_clubs vc
-             WHERE vc.auth_user_id = $1 AND vc.is_active = true
-             LIMIT 1;`,
-            [authUser.id]
-        );
-        const isClubManager = clubManagerRes.rows.length > 0;
-        const managedClub = isClubManager ? clubManagerRes.rows[0] : null;
+        // Strictly decouple personal accounts from club portal metadata
+        const isClubSession = authUser.accountType === "club";
+        let isClubManager = false;
+        let managedClub: any = null;
+        if (isClubSession) {
+            const clubManagerRes = await query(
+                `SELECT vc.id, vc.name, vc.slug FROM public.verified_clubs vc
+                 WHERE vc.auth_user_id = $1 AND vc.is_active = true
+                 LIMIT 1;`,
+                [authUser.id]
+            );
+            isClubManager = clubManagerRes.rows.length > 0;
+            managedClub = isClubManager ? clubManagerRes.rows[0] : null;
+        }
 
-        // Workspaces where the personal user is an active member
+        // Workspaces where the user is an active member
         const workspaces = await WorkspaceRepository.findUserWorkspaces(authUser.id);
 
         return res.json({
@@ -1409,11 +1415,21 @@ workspaceRouter.post("/invitations/accept", authenticate, async (req: Request, r
                     message: result.message,
                 });
             } else {
+                if (authUser.accountType === "club") {
+                    return res.status(403).json({
+                        success: false,
+                        message: "Club accounts cannot accept personal workspace member invitations.",
+                    });
+                }
+
                 // Workspace invitation acceptance by ID
                 const invRes = await query(
-                    `SELECT id, workspace_id, role_id, department_id, inviter_id, email, expires_at, status
-                     FROM public.workspace_invitations
-                     WHERE id = $1 LIMIT 1;`,
+                    `SELECT wi.id, wi.workspace_id, wi.role_id, wi.department_id, wi.inviter_id,
+                            wi.invited_user_id, wi.email, wi.expires_at, wi.status,
+                            r.name AS "roleName"
+                     FROM public.workspace_invitations wi
+                     LEFT JOIN public.workspace_roles r ON r.id = wi.role_id
+                     WHERE wi.id = $1 LIMIT 1;`,
                     [invitationId]
                 );
                 const inv = invRes.rows[0];
@@ -1421,14 +1437,24 @@ workspaceRouter.post("/invitations/accept", authenticate, async (req: Request, r
                 if (inv.status !== "pending") return res.status(400).json({ success: false, message: `Invitation already ${inv.status}.` });
                 if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ success: false, message: "Invitation has expired." });
 
+                const callerEmail = (authUser.email || authUser.gmail || "").toLowerCase().trim();
+                const matchesRecipient =
+                    inv.invited_user_id === authUser.id ||
+                    (inv.email && callerEmail && inv.email.toLowerCase().trim() === callerEmail);
+                if (!matchesRecipient) {
+                    return res.status(403).json({ success: false, message: "This invitation is not addressed to your account." });
+                }
+
                 const workspace = await WorkspaceRepository.findById(inv.workspace_id);
                 if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
 
+                const roleTitle = inv.roleName || "Member";
                 const member = await WorkspaceRepository.createMember(null, {
                     workspaceId: workspace.id,
                     userId: authUser.id,
                     roleId: inv.role_id,
                     departmentId: inv.department_id || null,
+                    roleTitle,
                     membershipStatus: "active",
                     invitedBy: inv.inviter_id,
                 });
@@ -1454,11 +1480,46 @@ workspaceRouter.post("/invitations/accept", authenticate, async (req: Request, r
                     await query(
                         `INSERT INTO public.club_memberships
                             (club_id, user_id, club_role, access_role, title, status, invited_by, joined_at)
-                         VALUES ($1, $2, 'member', 'member', 'Member', 'active', $3, NOW())
+                         VALUES ($1, $2, 'member', 'member', $3, 'active', $4, NOW())
                          ON CONFLICT (club_id, user_id) DO UPDATE SET status = 'active', updated_at = NOW();`,
-                        [workspace.clubId, authUser.id, inv.inviter_id]
+                        [workspace.clubId, authUser.id, roleTitle, inv.inviter_id]
                     );
                 }
+
+                const acceptCorrelationId = crypto.randomUUID();
+                await WorkspaceRepository.logAudit(null, {
+                    workspaceId: workspace.id,
+                    actorId: authUser.id,
+                    action: "invitation_accepted",
+                    targetType: "member",
+                    targetId: member.id,
+                    correlationId: acceptCorrelationId,
+                    details: {
+                        invitationId: inv.id,
+                        email: inv.email,
+                        roleId: inv.role_id,
+                        departmentId: inv.department_id,
+                    },
+                    ...getAuditContext(req),
+                });
+
+                await WorkspaceRepository.recordActivityEvent({
+                    workspaceId: workspace.id,
+                    departmentId: inv.department_id || null,
+                    actorId: authUser.id,
+                    eventType: "member:joined",
+                    resourceType: "member",
+                    resourceId: member.id,
+                    title: roleTitle,
+                    isRestricted: false,
+                    correlationId: acceptCorrelationId,
+                    metadata: {
+                        roleName: roleTitle,
+                        departmentId: inv.department_id || null,
+                    },
+                });
+
+                await WorkspaceRedisService.invalidateOnSecurityChange(workspace.id, authUser.id);
 
                 return res.json({
                     success: true,
@@ -3661,6 +3722,43 @@ workspaceRouter.get("/audit-logs", authenticate, async (req: Request, res: Respo
 });
 
 /**
+ * GET /api/club/workspace/history
+ * Unified Workspace History (Activity Log + Administrative Audit Trail)
+ */
+workspaceRouter.get("/history", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.getHistory(req, res);
+});
+
+/**
+ * GET /api/club/workspace/history/export
+ */
+workspaceRouter.get("/history/export", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.exportHistory(req, res);
+});
+
+/**
+ * GET /api/club/workspace/history/:itemId/inspect
+ */
+workspaceRouter.get("/history/:itemId/inspect", authenticate, async (req: Request, res: Response) => {
+    const clubId = await resolveClubId(req, res);
+    if (!clubId) return;
+    const workspace = await WorkspaceRepository.findByClubId(clubId);
+    if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+    req.params.workspaceId = workspace.id;
+    return WorkspaceDashboardController.inspectHistoryItem(req, res);
+});
+
+/**
  * GET /api/club/workspace/search
  */
 workspaceRouter.get("/search", authenticate, async (req: Request, res: Response) => {
@@ -3673,12 +3771,15 @@ workspaceRouter.get("/search", authenticate, async (req: Request, res: Response)
 });
 
 /**
- * Parameterized dashboard, activity, audit & search routes
+ * Parameterized dashboard, activity, audit, history & search routes
  */
 workspaceRouter.get("/:workspaceId/dashboard/overview", authenticate, WorkspaceDashboardController.getOverview);
 workspaceRouter.get("/:workspaceId/dashboard/departments/:departmentId", authenticate, WorkspaceDashboardController.getDepartmentInsight);
 workspaceRouter.get("/:workspaceId/activity", authenticate, WorkspaceDashboardController.getActivityFeed);
 workspaceRouter.get("/:workspaceId/audit-logs", authenticate, WorkspaceDashboardController.getAuditLogs);
+workspaceRouter.get("/:workspaceId/history/export", authenticate, WorkspaceDashboardController.exportHistory);
+workspaceRouter.get("/:workspaceId/history/:itemId/inspect", authenticate, WorkspaceDashboardController.inspectHistoryItem);
+workspaceRouter.get("/:workspaceId/history", authenticate, WorkspaceDashboardController.getHistory);
 workspaceRouter.get("/:workspaceId/search", authenticate, WorkspaceDashboardController.search);
 
 // =========================================================================

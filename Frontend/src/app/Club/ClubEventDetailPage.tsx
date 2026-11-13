@@ -84,6 +84,9 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
     // Event & loading state
     const [event, setEvent] = useState<ClubEvent | null>(null);
+    const isPanIndia = Boolean(
+        event?.scope === "PAN_INDIA" || (event as any)?.isPanIndia === true || (event as any)?.is_pan_india === true
+    );
     const [clubInfo, setClubInfo] = useState<{
         id: string;
         name: string;
@@ -156,6 +159,14 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [stateFilter, setStateFilter] = useState<string>("all");
     const [updatingApplicantId, setUpdatingApplicantId] = useState<string | null>(null);
     const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+    // Reset institution and state filters if event is campus-bounded
+    useEffect(() => {
+        if (!isPanIndia) {
+            setInstitutionFilter("all");
+            setStateFilter("all");
+        }
+    }, [isPanIndia]);
 
     // Check authentication and load event from backend
     const loadEventDetails = async () => {
@@ -524,9 +535,9 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         );
     };
 
-    // Unique institutions and states across all registered applications for filtering
+    // Unique institutions and states across all registered applications for filtering (Pan-India events only)
     const uniqueInstitutions = useMemo(() => {
-        if (!appsData?.applications) return [];
+        if (!isPanIndia || !appsData?.applications) return [];
         const set = new Set<string>();
         appsData.applications.forEach((a: any) => {
             if (a.institutionName && a.institutionName.trim()) {
@@ -534,10 +545,10 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             }
         });
         return Array.from(set).sort();
-    }, [appsData]);
+    }, [isPanIndia, appsData]);
 
     const uniqueStates = useMemo(() => {
-        if (!appsData?.applications) return [];
+        if (!isPanIndia || !appsData?.applications) return [];
         const set = new Set<string>();
         appsData.applications.forEach((a: any) => {
             if (a.institutionState && a.institutionState.trim()) {
@@ -545,15 +556,15 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             }
         });
         return Array.from(set).sort();
-    }, [appsData]);
+    }, [isPanIndia, appsData]);
 
     // Filtered Applications for Roster Tab
     const filteredApplications = useMemo(() => {
         if (!appsData?.applications) return [];
         return appsData.applications.filter((a: any) => {
             const matchesStatus = statusFilter === "all" || a.status === statusFilter;
-            const matchesInstitution = institutionFilter === "all" || a.institutionName === institutionFilter;
-            const matchesState = stateFilter === "all" || a.institutionState === stateFilter;
+            const matchesInstitution = !isPanIndia || institutionFilter === "all" || a.institutionName === institutionFilter;
+            const matchesState = !isPanIndia || stateFilter === "all" || a.institutionState === stateFilter;
             const query = searchQuery.trim().toLowerCase();
             if (!query) return matchesStatus && matchesInstitution && matchesState;
 
@@ -582,7 +593,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
             return matchesStatus && matchesInstitution && matchesState && matchesQuery;
         });
-    }, [appsData, statusFilter, institutionFilter, stateFilter, searchQuery]);
+    }, [appsData, statusFilter, institutionFilter, stateFilter, searchQuery, isPanIndia]);
 
     // Analytics Breakdown computations
     const analytics = useMemo(() => {
@@ -893,7 +904,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                 <GraduationCap className="w-3 h-3" />
                                 {collegeAffiliation}
                             </span>
-                            {event.scope === "PAN_INDIA" ? (
+                            {isPanIndia ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FF9933] text-black border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
                                     <Globe2 className="w-3 h-3 stroke-[2.3]" />
                                     Pan India Reach
@@ -1141,7 +1152,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     })}
                                 </div>
 
-                                {uniqueInstitutions.length > 0 && (
+                                {isPanIndia && uniqueInstitutions.length > 0 && (
                                     <NeoSelect
                                         value={institutionFilter}
                                         onChange={(val) => setInstitutionFilter(val)}
@@ -1154,7 +1165,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     />
                                 )}
 
-                                {uniqueStates.length > 0 && (
+                                {isPanIndia && uniqueStates.length > 0 && (
                                     <NeoSelect
                                         value={stateFilter}
                                         onChange={(val) => setStateFilter(val)}

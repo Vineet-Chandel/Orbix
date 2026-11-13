@@ -143,7 +143,13 @@ export const ClubAccountCenterView: React.FC<ClubAccountCenterViewProps> = ({
                                 {club.college_name}
                             </span>
                             <span>•</span>
-                            <span>{user?.gmail || club.public_email || "Organization Email"}</span>
+                            <span>
+                                {club.public_email && !club.public_email.toLowerCase().endsWith("@club.orbix")
+                                    ? club.public_email
+                                    : user?.gmail && !String(user.gmail).toLowerCase().endsWith("@club.orbix")
+                                        ? user.gmail
+                                        : club.public_email || "Organization Email"}
+                            </span>
                         </div>
                     </div>
                 </div>

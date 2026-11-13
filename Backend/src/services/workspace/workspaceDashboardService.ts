@@ -1,6 +1,7 @@
 // Backend/src/services/workspace/workspaceDashboardService.ts
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
+import { WorkspaceCapabilityService } from "./workspaceCapabilityService.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import { query } from "../../database/client.js";
 import type {
@@ -8,9 +9,30 @@ import type {
     WorkspaceDepartmentInsight,
     WorkspaceActivityEvent,
     WorkspaceAuditLogEntry,
+    WorkspaceHistoryItem,
+    WorkspaceHistoryRecordType,
+    WorkspaceHistoryResponse,
+    WorkspaceHistoryScope,
+    WorkspaceHistorySource,
     WorkspaceSearchResponse,
     WorkspaceSearchResultType,
 } from "../../types/workspaceTypes.js";
+
+const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function escapeCsvCell(raw: unknown): string {
+    if (raw === null || raw === undefined) return "";
+    let str = typeof raw === "string" ? raw : JSON.stringify(raw);
+    // Guard against spreadsheet formula injection
+    if (/^[=+\-@\t\r]/.test(str)) {
+        str = `'${str}`;
+    }
+    if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+}
 
 export class WorkspaceDashboardService {
     /**
@@ -165,6 +187,293 @@ export class WorkspaceDashboardService {
         }
 
         return WorkspaceRepository.listAuditLogs(workspaceId, options);
+    }
+
+    /**
+     * Resolves canonical workspace context + capability flags for history access.
+     */
+    private static async resolveHistoryAccess(workspaceId: string, actorUserId: string) {
+        const context = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!context || (!context.member && !context.isOwner)) {
+            throw new Error("Unauthorized: You are not an active member of this workspace.");
+        }
+        if (context.member && (context.member.isSuspended || context.member.membershipStatus !== "active")) {
+            throw new Error("Forbidden: Active workspace membership is required.");
+        }
+
+        const capabilities = await WorkspaceCapabilityService.resolveMemberCapabilities(workspaceId, actorUserId);
+        const isGlobal = Boolean(
+            context.isClubAccount ||
+            context.isOwner ||
+            context.isAdmin ||
+            context.isWorkspaceManager
+        );
+        const canViewAudit = Boolean(
+            context.isClubAccount ||
+            context.isOwner ||
+            context.isAdmin ||
+            capabilities.navigation.canViewAuditLogs
+        );
+
+        let allowedDepartmentIds: string[] | null = null;
+        if (!isGlobal) {
+            const deptIds = new Set<string>();
+            if (context.member?.departmentId) deptIds.add(context.member.departmentId);
+            (context.leadDepartmentIds || []).forEach((id) => deptIds.add(id));
+            (capabilities.capabilities.departments.memberDepartmentIds || []).forEach((id) => deptIds.add(id));
+            allowedDepartmentIds = Array.from(deptIds);
+        }
+
+        return { context, capabilities, isGlobal, canViewAudit, allowedDepartmentIds };
+    }
+
+    /**
+     * Unified, strictly permission-filtered workspace history (Activity + Audit).
+     */
+    static async getWorkspaceHistory(
+        workspaceId: string,
+        actorUserId: string,
+        options?: {
+            scope?: WorkspaceHistoryScope;
+            recordType?: WorkspaceHistoryRecordType;
+            category?: string;
+            departmentId?: string;
+            actorId?: string;
+            targetType?: string;
+            search?: string;
+            startDate?: string;
+            endDate?: string;
+            cursor?: string;
+            limit?: number;
+            includeAuditDetails?: boolean;
+        }
+    ): Promise<WorkspaceHistoryResponse> {
+        const auth = await this.resolveHistoryAccess(workspaceId, actorUserId);
+
+        const scope: WorkspaceHistoryScope =
+            options?.scope === "department" || options?.scope === "personal"
+                ? options.scope
+                : "workspace";
+
+        const recordType: WorkspaceHistoryRecordType =
+            options?.recordType === "audit" || options?.recordType === "activity"
+                ? options.recordType
+                : "all";
+
+        // Enforce audit boundary server-side
+        if (recordType === "audit" && !auth.canViewAudit) {
+            throw new Error("Forbidden: Only authorized administrators may view administrative audit records.");
+        }
+
+        // Validate UUID filters when supplied
+        if (options?.departmentId) {
+            if (!UUID_REGEX.test(options.departmentId)) {
+                throw new Error("Bad Request: Invalid departmentId format.");
+            }
+            if (!auth.isGlobal && (!auth.allowedDepartmentIds || !auth.allowedDepartmentIds.includes(options.departmentId))) {
+                throw new Error("Forbidden: You cannot view history for this restricted department.");
+            }
+        }
+
+        if (options?.actorId && !UUID_REGEX.test(options.actorId)) {
+            throw new Error("Bad Request: Invalid actorId format.");
+        }
+
+        if (options?.startDate && Number.isNaN(Date.parse(options.startDate))) {
+            throw new Error("Bad Request: Invalid startDate parameter.");
+        }
+        if (options?.endDate && Number.isNaN(Date.parse(options.endDate))) {
+            throw new Error("Bad Request: Invalid endDate parameter.");
+        }
+
+        // Personal scope strictly locks actor filter to authenticated caller
+        const effectiveActorId = scope === "personal" ? actorUserId : options?.actorId;
+
+        // Avoid sending full heavy audit payloads on list rows; Inspect fetches full payload on demand
+        const includeAuditDetails = Boolean(options?.includeAuditDetails && auth.canViewAudit);
+
+        const result = await WorkspaceRepository.getWorkspaceHistory(workspaceId, {
+            allowedDepartmentIds: auth.allowedDepartmentIds,
+            canViewAudit: auth.canViewAudit,
+            scope,
+            recordType,
+            ...(options?.category !== undefined ? { category: options.category } : {}),
+            ...(options?.departmentId !== undefined ? { departmentId: options.departmentId } : {}),
+            ...(effectiveActorId !== undefined ? { actorId: effectiveActorId } : {}),
+            ...(options?.targetType !== undefined ? { targetType: options.targetType } : {}),
+            ...(options?.search !== undefined ? { search: options.search } : {}),
+            ...(options?.startDate !== undefined ? { startDate: options.startDate } : {}),
+            ...(options?.endDate !== undefined ? { endDate: options.endDate } : {}),
+            ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
+            limit: Math.min(Math.max(options?.limit ?? 25, 1), 100),
+            includeAuditDetails,
+        });
+
+        return {
+            ...result,
+            permissions: {
+                canViewAudit: auth.canViewAudit,
+                canExport: auth.canViewAudit,
+                scope: auth.isGlobal ? "global" : scope === "personal" ? "personal" : "department",
+            },
+        };
+    }
+
+    /**
+     * Retrieves complete authorized inspection payload for one history record.
+     */
+    static async inspectHistoryItem(
+        workspaceId: string,
+        actorUserId: string,
+        itemId: string,
+        source: WorkspaceHistorySource
+    ): Promise<WorkspaceHistoryItem> {
+        if (!UUID_REGEX.test(itemId)) {
+            throw new Error("Bad Request: Invalid history record ID.");
+        }
+        if (source !== "activity" && source !== "audit") {
+            throw new Error("Bad Request: Invalid history source.");
+        }
+
+        const auth = await this.resolveHistoryAccess(workspaceId, actorUserId);
+
+        if (source === "audit" && !auth.canViewAudit) {
+            throw new Error("Forbidden: Only authorized administrators may inspect audit records.");
+        }
+
+        const item = await WorkspaceRepository.inspectHistoryItem(
+            workspaceId,
+            itemId,
+            source,
+            auth.allowedDepartmentIds,
+            auth.canViewAudit
+        );
+
+        if (!item) {
+            throw new Error("Forbidden: History record not found or access denied.");
+        }
+
+        return item;
+    }
+
+    /**
+     * Streams filtered history export (CSV or JSON) for authorized administrators/compliance users.
+     */
+    static async exportWorkspaceHistory(
+        workspaceId: string,
+        actorUserId: string,
+        format: "csv" | "json",
+        options: {
+            scope?: WorkspaceHistoryScope;
+            recordType?: WorkspaceHistoryRecordType;
+            category?: string;
+            departmentId?: string;
+            actorId?: string;
+            targetType?: string;
+            search?: string;
+            startDate?: string;
+            endDate?: string;
+        },
+        writeChunk: (chunk: string) => void
+    ): Promise<{ count: number }> {
+        const auth = await this.resolveHistoryAccess(workspaceId, actorUserId);
+        if (!auth.canViewAudit) {
+            throw new Error("Forbidden: You do not have permission to export workspace history.");
+        }
+
+        if (options.departmentId && !UUID_REGEX.test(options.departmentId)) {
+            throw new Error("Bad Request: Invalid departmentId format.");
+        }
+        if (options.actorId && !UUID_REGEX.test(options.actorId)) {
+            throw new Error("Bad Request: Invalid actorId format.");
+        }
+        if (options.startDate && Number.isNaN(Date.parse(options.startDate))) {
+            throw new Error("Bad Request: Invalid startDate parameter.");
+        }
+        if (options.endDate && Number.isNaN(Date.parse(options.endDate))) {
+            throw new Error("Bad Request: Invalid endDate parameter.");
+        }
+
+        const scope: WorkspaceHistoryScope =
+            options.scope === "department" || options.scope === "personal" ? options.scope : "workspace";
+        const effectiveActorId = scope === "personal" ? actorUserId : options.actorId;
+        const recordType: WorkspaceHistoryRecordType =
+            options.recordType === "audit" || options.recordType === "activity" ? options.recordType : "all";
+
+        if (format === "csv") {
+            writeChunk(
+                "Timestamp,Source,Sources,Category,EventType,ActorName,ActorUsername,Department,TargetType,TargetId,TargetLabel,Summary,IpAddress,UserAgent,Details\n"
+            );
+        } else {
+            writeChunk("{\n  \"exportedAt\": " + JSON.stringify(new Date().toISOString()) + ",\n  \"items\": [\n");
+        }
+
+        let cursor: string | undefined = undefined;
+        let hasMore = true;
+        let count = 0;
+        let firstJson = true;
+        const maxExportRows = 10000;
+
+        while (hasMore && count < maxExportRows) {
+            const batch = await WorkspaceRepository.getWorkspaceHistory(workspaceId, {
+                allowedDepartmentIds: auth.allowedDepartmentIds,
+                canViewAudit: true,
+                scope,
+                recordType,
+                ...(options.category !== undefined ? { category: options.category } : {}),
+                ...(options.departmentId !== undefined ? { departmentId: options.departmentId } : {}),
+                ...(effectiveActorId !== undefined ? { actorId: effectiveActorId } : {}),
+                ...(options.targetType !== undefined ? { targetType: options.targetType } : {}),
+                ...(options.search !== undefined ? { search: options.search } : {}),
+                ...(options.startDate !== undefined ? { startDate: options.startDate } : {}),
+                ...(options.endDate !== undefined ? { endDate: options.endDate } : {}),
+                ...(cursor !== undefined ? { cursor } : {}),
+                limit: 200,
+                includeAuditDetails: true,
+            });
+
+            for (const item of batch.items) {
+                if (count >= maxExportRows) break;
+                count++;
+
+                if (format === "csv") {
+                    const row = [
+                        item.createdAt,
+                        item.source.toUpperCase(),
+                        (item.sources || [item.source]).join("+"),
+                        item.category,
+                        item.eventType,
+                        item.actor.name,
+                        item.actor.username || "",
+                        item.department?.name || "",
+                        item.target?.type || "",
+                        item.target?.id || "",
+                        item.target?.label || "",
+                        item.summary,
+                        item.auditDetails?.ipAddress || "",
+                        item.auditDetails?.userAgent || "",
+                        item.auditDetails?.details || item.activityDetails?.metadata || {},
+                    ]
+                        .map(escapeCsvCell)
+                        .join(",");
+                    writeChunk(row + "\n");
+                } else {
+                    const prefix = firstJson ? "    " : ",\n    ";
+                    firstJson = false;
+                    writeChunk(prefix + JSON.stringify(item));
+                }
+            }
+
+            hasMore = batch.hasMore;
+            cursor = batch.nextCursor || undefined;
+            if (!cursor) break;
+        }
+
+        if (format === "json") {
+            writeChunk(`\n  ],\n  "count": ${count}\n}\n`);
+        }
+
+        return { count };
     }
 
     /**

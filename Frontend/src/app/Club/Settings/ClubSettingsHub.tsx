@@ -24,6 +24,7 @@ interface ClubSettingsHubProps {
         slug: string;
         college_name: string;
         logo_url: string | null;
+        public_email?: string | null;
         is_active?: boolean;
     };
     user: any;
@@ -336,7 +337,16 @@ export const ClubSettingsHub: React.FC<ClubSettingsHubProps> = ({
                                 Log Out
                             </p>
                             <p className="text-[11px] text-neutral-600 font-medium truncate">
-                                Sign out of @{club.slug} on this device {user?.gmail ? `(${user.gmail})` : ""}
+                                Sign out of @{club.slug} on this device{" "}
+                                {(() => {
+                                    const displayEmail =
+                                        club.public_email && !club.public_email.toLowerCase().endsWith("@club.orbix")
+                                            ? club.public_email
+                                            : user?.gmail && !String(user.gmail).toLowerCase().endsWith("@club.orbix")
+                                                ? user.gmail
+                                                : "";
+                                    return displayEmail ? `(${displayEmail})` : "";
+                                })()}
                             </p>
                         </div>
                     </div>

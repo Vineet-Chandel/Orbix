@@ -32,6 +32,7 @@ export interface MonthlyQuotaResult {
 }
 
 export interface ManageAccountsStatusResult {
+    accountType?: "personal" | "club";
     primaryEmail: string;
     isEmailVerified: boolean;
     emailVerifiedAt: string | null;
@@ -112,31 +113,102 @@ export class ManageAccountsService {
         return crypto.createHmac("sha256", JWT_SECRET).update(otp.trim()).digest("hex");
     }
 
+    static isSyntheticClubEmail(email?: string | null): boolean {
+        return typeof email === "string" && email.trim().toLowerCase().endsWith("@club.orbix");
+    }
+
     /**
-     * Retrieves the authoritative Manage Accounts status for the authenticated user.
+     * Resolves authoritative database identity for both personal and club portal accounts.
+     * For club accounts, extracts the club's real contact email and handle from verified_clubs,
+     * users, and club_verification_requests instead of surfacing synthetic @club.orbix shadow keys.
      */
-    static async getStatus(userId: string): Promise<ManageAccountsStatusResult> {
-        const userRes = await query(
+    static async resolveAccountIdentity(userId: string) {
+        const res = await query(
             `SELECT
-                id,
-                email,
-                username,
-                COALESCE(is_email_verified, false) AS "isEmailVerified",
-                email_verified_at AS "emailVerifiedAt",
-                username_updated_at AS "usernameUpdatedAt",
-                pending_email AS "pendingEmail",
-                pending_email_operation_id AS "pendingEmailOperationId"
-             FROM users
-             WHERE id = $1;`,
+                u.id,
+                u.email AS "authEmail",
+                u.username AS "userUsername",
+                u.firstname AS "firstName",
+                u.lastname AS "lastName",
+                u.avatar_url AS "avatarUrl",
+                u.photo_url AS "photoUrl",
+                u.password,
+                COALESCE(u.account_type, 'personal') AS "rawAccountType",
+                COALESCE(u.is_email_verified, false) AS "isEmailVerified",
+                u.email_verified_at AS "emailVerifiedAt",
+                u.username_updated_at AS "usernameUpdatedAt",
+                u.pending_email AS "pendingEmail",
+                u.pending_email_operation_id AS "pendingEmailOperationId",
+                vc.id AS "clubId",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                vc.public_email AS "clubPublicEmail",
+                cvr.contact_email AS "verificationContactEmail",
+                cvr.college_official_email AS "collegeOfficialEmail"
+             FROM users u
+             LEFT JOIN verified_clubs vc ON vc.auth_user_id = u.id
+             LEFT JOIN LATERAL (
+                 SELECT r.contact_email, r.college_official_email
+                 FROM club_verification_requests r
+                 WHERE r.verified_club_id = vc.id
+                    OR (r.verified_club_id IS NULL AND LOWER(r.club_name) = LOWER(vc.name))
+                 ORDER BY (r.verified_club_id = vc.id) DESC, r.submitted_at DESC
+                 LIMIT 1
+             ) cvr ON vc.id IS NOT NULL
+             WHERE u.id = $1
+             LIMIT 1;`,
             [userId]
         );
 
-        const user = userRes.rows[0];
-        if (!user) {
+        const row = res.rows[0];
+        if (!row) {
             const err: any = new Error("User account not found");
             err.statusCode = 404;
             throw err;
         }
+
+        const isClub = row.rawAccountType === "club" || Boolean(row.clubId);
+        const accountType: "personal" | "club" = isClub ? "club" : "personal";
+
+        let effectiveEmail = (row.authEmail || "").trim();
+        if (isClub) {
+            const candidates = [
+                row.clubPublicEmail,
+                row.authEmail,
+                row.verificationContactEmail,
+                row.collegeOfficialEmail,
+            ]
+                .map((value) => (typeof value === "string" ? value.trim() : ""))
+                .filter(Boolean);
+
+            const nonSynthetic = candidates.find((email) => !this.isSyntheticClubEmail(email));
+            effectiveEmail = nonSynthetic || candidates[0] || "";
+        }
+
+        const effectiveUsername = isClub
+            ? (row.userUsername || row.clubSlug || "").trim()
+            : (row.userUsername || "").trim();
+
+        const displayName = isClub
+            ? (row.clubName || row.firstName || effectiveUsername || "Club")
+            : (row.firstName || effectiveUsername || "Developer");
+
+        return {
+            ...row,
+            accountType,
+            isClub,
+            effectiveEmail,
+            effectiveUsername,
+            displayName,
+            hasRealEmail: Boolean(effectiveEmail) && !this.isSyntheticClubEmail(effectiveEmail),
+        };
+    }
+
+    /**
+     * Retrieves the authoritative Manage Accounts status for the authenticated user.
+     */
+    static async getStatus(userId: string): Promise<ManageAccountsStatusResult> {
+        const user = await this.resolveAccountIdentity(userId);
 
         // Check for active pending operation
         let activeOp: any = null;
@@ -219,8 +291,8 @@ export class ManageAccountsService {
 
         // Unverified primary email cooldown
         let unverifiedPrimaryCooldownSeconds = 0;
-        if (!user.isEmailVerified && redis && redis.status === "ready") {
-            const primaryTtl = await redis.ttl(`otp:email_cooldown:${user.email?.toLowerCase()}`);
+        if (!user.isEmailVerified && user.hasRealEmail && redis && redis.status === "ready") {
+            const primaryTtl = await redis.ttl(`otp:email_cooldown:${user.effectiveEmail.toLowerCase()}`);
             if (primaryTtl > 0) unverifiedPrimaryCooldownSeconds = primaryTtl;
         }
 
@@ -241,19 +313,25 @@ export class ManageAccountsService {
             emailState = "email_verification_required";
         }
 
+        const sanitizedActiveOpCurrent =
+            activeOp?.currentValue && this.isSyntheticClubEmail(activeOp.currentValue) && user.hasRealEmail
+                ? user.effectiveEmail
+                : activeOp?.currentValue;
+
         return {
-            primaryEmail: user.email,
+            accountType: user.accountType,
+            primaryEmail: user.effectiveEmail,
             isEmailVerified: user.isEmailVerified,
             emailVerifiedAt: user.emailVerifiedAt ? new Date(user.emailVerifiedAt).toISOString() : null,
             emailState,
-            username: user.username,
+            username: user.effectiveUsername,
             usernameUpdatedAt: user.usernameUpdatedAt ? new Date(user.usernameUpdatedAt).toISOString() : null,
             pendingEmail: user.pendingEmail || null,
             pendingOperation: activeOp ? {
                 id: activeOp.id,
                 changeType: activeOp.changeType,
                 stage: activeOp.stage,
-                currentValue: activeOp.currentValue,
+                currentValue: sanitizedActiveOpCurrent,
                 requestedValue: activeOp.requestedValue,
                 expiresAt: new Date(activeOp.expiresAt).toISOString(),
                 cooldownRemainingSeconds,
@@ -300,36 +378,47 @@ export class ManageAccountsService {
             throw err;
         }
 
-        // 3. Fetch Current User
-        const userRes = await query(
-            `SELECT id, email, username, firstname, is_email_verified
-             FROM users WHERE id = $1;`,
-            [userId]
-        );
-        const user = userRes.rows[0];
-        if (!user) {
-            const err: any = new Error("User account not found.");
-            err.statusCode = 404;
+        // 3. Fetch Current User & Authoritative Identity
+        const user = await this.resolveAccountIdentity(userId);
+        if (!user.hasRealEmail) {
+            const err: any = new Error("No real contact email address is configured for this account.");
+            err.statusCode = 400;
             throw err;
         }
 
-        const currentEmail = user.email.trim().toLowerCase();
+        const currentEmail = user.effectiveEmail.trim().toLowerCase();
         if (currentEmail === normalizedNewEmail) {
             const err: any = new Error("The requested email is already your current primary email address.");
             err.statusCode = 400;
             throw err;
         }
 
-        // 4. Enforce Database Uniqueness Constraint
-        const conflictRes = await query(
-            `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2 LIMIT 1;`,
-            [normalizedNewEmail, userId]
-        );
-        if (conflictRes.rows[0]) {
-            const err: any = new Error("This email address is already in use by another account.");
-            err.statusCode = 409;
-            err.code = "EMAIL_ALREADY_EXISTS";
-            throw err;
+        // 4. Enforce Database Uniqueness Constraint (segmented for personal vs club accounts)
+        if (user.isClub) {
+            const clubConflictRes = await query(
+                `SELECT 1 FROM verified_clubs WHERE LOWER(public_email) = LOWER($1) AND auth_user_id != $2
+                 UNION ALL
+                 SELECT 1 FROM users WHERE LOWER(email) = LOWER($1) AND COALESCE(account_type, 'personal') = 'club' AND id != $2
+                 LIMIT 1;`,
+                [normalizedNewEmail, userId]
+            );
+            if (clubConflictRes.rows[0]) {
+                const err: any = new Error("This email address is already in use by another club account.");
+                err.statusCode = 409;
+                err.code = "EMAIL_ALREADY_EXISTS";
+                throw err;
+            }
+        } else {
+            const conflictRes = await query(
+                `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2 LIMIT 1;`,
+                [normalizedNewEmail, userId]
+            );
+            if (conflictRes.rows[0]) {
+                const err: any = new Error("This email address is already in use by another account.");
+                err.statusCode = 409;
+                err.code = "EMAIL_ALREADY_EXISTS";
+                throw err;
+            }
         }
 
         // 5. Rate limit: check if user recently requested start
@@ -410,7 +499,7 @@ export class ManageAccountsService {
         }
 
         // 10. Send Authorization Email to Old Address via Resend
-        const displayName = user.firstname || user.username || "Developer";
+        const displayName = user.displayName;
         const sendResult = await sendSecurityNotificationEmail({
             to: currentEmail,
             name: displayName,
@@ -735,23 +824,53 @@ export class ManageAccountsService {
         }
 
         // 5. ATOMIC DATABASE TRANSACTION
+        const identity = await this.resolveAccountIdentity(userId);
         const client = await pool.connect();
-        const oldEmail = op.current_value;
+        const oldEmail = this.isSyntheticClubEmail(op.current_value) && identity.hasRealEmail
+            ? identity.effectiveEmail
+            : op.current_value;
         const newEmail = op.requested_value;
 
         try {
             await client.query("BEGIN;");
 
             // 5a. Row-level Lock & Recheck uniqueness of new email
-            const conflictCheck = await client.query(
-                `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2 FOR UPDATE;`,
-                [newEmail, userId]
-            );
-            if (conflictCheck.rows[0]) {
-                await client.query("ROLLBACK;");
-                const err: any = new Error("This email address was recently registered to another account. Email change blocked.");
-                err.statusCode = 409;
-                throw err;
+            let updateUsersEmailColumn = !identity.isClub;
+            if (identity.isClub) {
+                const clubConflict = await client.query(
+                    `SELECT id FROM verified_clubs WHERE LOWER(public_email) = LOWER($1) AND auth_user_id != $2 FOR UPDATE;`,
+                    [newEmail, userId]
+                );
+                const clubUserConflict = await client.query(
+                    `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND COALESCE(account_type, 'personal') = 'club' AND id != $2 FOR UPDATE;`,
+                    [newEmail, userId]
+                );
+                if (clubConflict.rows[0] || clubUserConflict.rows[0]) {
+                    await client.query("ROLLBACK;");
+                    const err: any = new Error("This email address was recently registered to another club account. Email change blocked.");
+                    err.statusCode = 409;
+                    throw err;
+                }
+
+                // Preserve synthetic @club.orbix key in users.email so personal & club accounts remain segmented
+                if (!this.isSyntheticClubEmail(identity.authEmail)) {
+                    const anyUserConflict = await client.query(
+                        `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2 FOR UPDATE;`,
+                        [newEmail, userId]
+                    );
+                    updateUsersEmailColumn = !anyUserConflict.rows[0];
+                }
+            } else {
+                const conflictCheck = await client.query(
+                    `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2 FOR UPDATE;`,
+                    [newEmail, userId]
+                );
+                if (conflictCheck.rows[0]) {
+                    await client.query("ROLLBACK;");
+                    const err: any = new Error("This email address was recently registered to another account. Email change blocked.");
+                    err.statusCode = 409;
+                    throw err;
+                }
             }
 
             // 5b. Atomically recheck monthly limit
@@ -769,20 +888,33 @@ export class ManageAccountsService {
                 throw err;
             }
 
-            // 5c. Update authoritative user email and verification status
-            const userUpdateRes = await client.query(
-                `UPDATE users
-                 SET email = $1,
-                     is_email_verified = true,
-                     email_verified_at = CURRENT_TIMESTAMP,
-                     is_verified_coder = true,
-                     pending_email = NULL,
-                     pending_email_operation_id = NULL
-                 WHERE id = $2
-                 RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl", is_email_verified AS "isEmailVerified", is_verified_coder AS "isVerifiedCoder";`,
-                [newEmail, userId]
-            );
+            // 5c. Update authoritative user email (or preserve synthetic shadow key for club accounts) and verification status
+            const userUpdateRes = updateUsersEmailColumn
+                ? await client.query(
+                    `UPDATE users
+                     SET email = $1,
+                         is_email_verified = true,
+                         email_verified_at = CURRENT_TIMESTAMP,
+                         is_verified_coder = true,
+                         pending_email = NULL,
+                         pending_email_operation_id = NULL
+                     WHERE id = $2
+                     RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl", is_email_verified AS "isEmailVerified", is_verified_coder AS "isVerifiedCoder";`,
+                    [newEmail, userId]
+                )
+                : await client.query(
+                    `UPDATE users
+                     SET is_email_verified = true,
+                         email_verified_at = CURRENT_TIMESTAMP,
+                         is_verified_coder = true,
+                         pending_email = NULL,
+                         pending_email_operation_id = NULL
+                     WHERE id = $1
+                     RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl", is_email_verified AS "isEmailVerified", is_verified_coder AS "isVerifiedCoder";`,
+                    [userId]
+                );
             const updatedUser = userUpdateRes.rows[0];
+            const persistedAuthEmail = updatedUser?.gmail || identity.authEmail;
 
             // 5d. Record in audit history
             await client.query(
@@ -819,32 +951,38 @@ export class ManageAccountsService {
                 [userId]
             ).catch(() => {});
 
-            await client.query(
-                `UPDATE verified_clubs SET public_email = $1 WHERE auth_user_id = $2;`,
-                [newEmail, userId]
-            ).catch(() => {});
+            if (identity.isClub) {
+                await client.query(
+                    `UPDATE verified_clubs SET public_email = $1, updated_at = CURRENT_TIMESTAMP WHERE auth_user_id = $2;`,
+                    [newEmail, userId]
+                );
+            }
 
             await client.query("COMMIT;");
 
             // 6. Cache Invalidation & Update
-            await deleteUserDetailsCache(oldEmail);
+            await deleteUserDetailsCache(identity.authEmail);
+            if (oldEmail && oldEmail !== identity.authEmail) {
+                await deleteUserDetailsCache(oldEmail);
+            }
             await deleteUserDetailsCache(newEmail);
             await userDetailsCache({
                 id: userId,
-                firstName: updatedUser?.firstName,
+                firstName: updatedUser?.firstName || identity.displayName,
                 lastName: updatedUser?.lastName,
-                gmail: newEmail,
+                gmail: persistedAuthEmail,
                 username: updatedUser?.username,
                 termsAccepted: true,
-                accountType: "personal",
+                accountType: identity.accountType,
             });
 
-            // 7. Issue Fresh Access & Refresh Tokens
+            // 7. Issue Fresh Access & Refresh Tokens preserving accountType
             const token = jwt.sign(
                 {
                     sub: userId,
-                    gmail: newEmail,
+                    gmail: persistedAuthEmail,
                     username: updatedUser?.username,
+                    accountType: identity.accountType,
                 },
                 JWT_SECRET,
                 {
@@ -857,8 +995,9 @@ export class ManageAccountsService {
             const refreshToken = jwt.sign(
                 {
                     sub: userId,
-                    gmail: newEmail,
+                    gmail: persistedAuthEmail,
                     username: updatedUser?.username,
+                    accountType: identity.accountType,
                     type: "refresh",
                 },
                 JWT_SECRET,
@@ -869,11 +1008,10 @@ export class ManageAccountsService {
                 }
             );
 
-            // 8. Transactional Security Notifications to BOTH addresses concurrently
-            const displayName = updatedUser?.firstName || updatedUser?.username || "Developer";
-
-            const [oldNoticeRes, newNoticeRes] = await Promise.allSettled([
-                sendSecurityNotificationEmail({
+            // 8. Transactional Security Notifications
+            const displayName = identity.displayName;
+            const sendOldNotice = oldEmail && !this.isSyntheticClubEmail(oldEmail)
+                ? sendSecurityNotificationEmail({
                     to: oldEmail,
                     name: displayName,
                     subject: "Security Alert: Primary Email Address Changed",
@@ -882,7 +1020,11 @@ export class ManageAccountsService {
                     message: `The primary email for your Orbix account (@${updatedUser?.username}) was successfully changed to <strong>${newEmail}</strong>. If you made this change, no further action is required.`,
                     isWarning: true,
                     footerNotice: "If you did NOT authorize this change, someone has gained unauthorized access to your account. Please contact support immediately."
-                }),
+                })
+                : Promise.resolve({ success: true } as any);
+
+            const [oldNoticeRes, newNoticeRes] = await Promise.allSettled([
+                sendOldNotice,
                 sendSecurityNotificationEmail({
                     to: newEmail,
                     name: displayName,
@@ -910,7 +1052,12 @@ export class ManageAccountsService {
                 isEmailVerified: true,
                 token,
                 refreshToken,
-                user: updatedUser,
+                user: {
+                    ...updatedUser,
+                    gmail: newEmail,
+                    email: newEmail,
+                    accountType: identity.accountType,
+                },
             };
 
         } catch (dbErr) {
@@ -1004,7 +1151,11 @@ export class ManageAccountsService {
 
         const expectedStage = step === "old" ? "old_email_authorization_pending" : "new_email_verification_pending";
         const challengeType = step === "old" ? "old_email_auth" : "new_email_verify";
-        const destination = step === "old" ? op.current_value : op.requested_value;
+        const identity = await this.resolveAccountIdentity(userId);
+        const destination =
+            step === "old"
+                ? (this.isSyntheticClubEmail(op.current_value) && identity.hasRealEmail ? identity.effectiveEmail : op.current_value)
+                : op.requested_value;
 
         if (op.stage !== expectedStage) {
             const err: any = new Error(`Cannot resend code for step '${step}' while in stage '${op.stage}'.`);
@@ -1065,11 +1216,8 @@ export class ManageAccountsService {
             await redis.set(cooldownKey, "1", "EX", COOLDOWN_SECONDS);
         }
 
-        // Fetch user name
-        const userRes = await query(`SELECT firstname, username FROM users WHERE id = $1;`, [userId]);
-        const displayName = userRes.rows[0]?.firstname || userRes.rows[0]?.username || "Developer";
-
         // Dispatch Email
+        const displayName = identity.displayName;
         const isOld = step === "old";
         const sendResult = await sendSecurityNotificationEmail({
             to: destination,
@@ -1200,22 +1348,12 @@ export class ManageAccountsService {
 
         const normalizedUsername = newUsername.trim().toLowerCase();
 
-        // 3. Fetch user
-        const userRes = await query(
-            `SELECT id, email, username, firstname, is_email_verified FROM users WHERE id = $1;`,
-            [userId]
-        );
-        const user = userRes.rows[0];
-        if (!user) {
-            const err: any = new Error("User account not found.");
-            err.statusCode = 404;
-            throw err;
-        }
+        // 3. Fetch authoritative identity (handles personal & club portal accounts)
+        const user = await this.resolveAccountIdentity(userId);
+        const currentUsername = user.effectiveUsername;
 
-        const currentUsername = user.username;
-
-        // 4. If email is verified, issue step-up OTP challenge via email
-        if (user.is_email_verified) {
+        // 4. If real verified email exists, issue step-up OTP challenge via email
+        if (user.isEmailVerified && user.hasRealEmail) {
             // Cancel previous active username change operations
             await query(
                 `UPDATE account_change_operations
@@ -1241,6 +1379,7 @@ export class ManageAccountsService {
 
             const otp = this.generateSecureOtp();
             const otpHash = this.hashOtp(otp);
+            const targetEmail = user.effectiveEmail;
 
             await query(
                 `INSERT INTO account_change_challenges (
@@ -1254,17 +1393,16 @@ export class ManageAccountsService {
                     user_agent,
                     expires_at
                 ) VALUES ($1, $2, 'username_change_auth', $3, $4, 'pending', $5, $6, $7);`,
-                [operationId, userId, user.email, otpHash, ipAddress, userAgent, expiresAt]
+                [operationId, userId, targetEmail, otpHash, ipAddress, userAgent, expiresAt]
             );
 
             if (redis && redis.status === "ready") {
                 await redis.set(`otp:acct_change_cooldown:${operationId}:username_change_auth`, "1", "EX", COOLDOWN_SECONDS);
             }
 
-            const displayName = user.firstname || user.username || "Developer";
             const sendResult = await sendSecurityNotificationEmail({
-                to: user.email,
-                name: displayName,
+                to: targetEmail,
+                name: user.displayName,
                 subject: `Authorize Username Change: ${otp}`,
                 badgeText: "Security Step-Up",
                 headline: "Authorize Changing Your Username",
@@ -1281,7 +1419,7 @@ export class ManageAccountsService {
                 success: true,
                 stepUpType: "email_otp",
                 operationId,
-                message: `Verification code sent to your verified email (${user.email}) to authorize username change.`,
+                message: `Verification code sent to your verified email (${targetEmail}) to authorize username change.`,
                 newUsername: normalizedUsername,
                 cooldownSeconds: COOLDOWN_SECONDS,
                 expiresAt: expiresAt.toISOString(),
@@ -1319,20 +1457,9 @@ export class ManageAccountsService {
 
         const normalizedUsername = (newUsername || "").trim().toLowerCase();
 
-        // 1. Fetch user
-        const userRes = await query(
-            `SELECT id, email, username, password, firstname, lastname, avatar_url, photo_url, is_email_verified
-             FROM users WHERE id = $1;`,
-            [userId]
-        );
-        const user = userRes.rows[0];
-        if (!user) {
-            const err: any = new Error("User account not found.");
-            err.statusCode = 404;
-            throw err;
-        }
-
-        const oldUsername = user.username;
+        // 1. Fetch authoritative identity (personal or club)
+        const user = await this.resolveAccountIdentity(userId);
+        const oldUsername = user.effectiveUsername;
 
         // 2. Validate Step-Up Authentication
         let challengeIdToConsume: string | null = null;
@@ -1507,24 +1634,28 @@ export class ManageAccountsService {
 
             await client.query("COMMIT;");
 
-            // 4. Invalidate and update Redis user caches
-            await deleteUserDetailsCache(user.email);
+            // 4. Invalidate and update Redis user caches (preserve authEmail cache key & accountType)
+            await deleteUserDetailsCache(user.authEmail);
+            if (user.hasRealEmail && user.effectiveEmail !== user.authEmail) {
+                await deleteUserDetailsCache(user.effectiveEmail);
+            }
             await userDetailsCache({
                 id: userId,
-                firstName: updatedUser?.firstName,
+                firstName: updatedUser?.firstName || user.displayName,
                 lastName: updatedUser?.lastName,
-                gmail: user.email,
+                gmail: user.authEmail,
                 username: normalizedUsername,
                 termsAccepted: true,
-                accountType: "personal",
+                accountType: user.accountType,
             });
 
-            // 5. Issue updated tokens
+            // 5. Issue updated tokens preserving accountType
             const token = jwt.sign(
                 {
                     sub: userId,
-                    gmail: user.email,
+                    gmail: user.authEmail,
                     username: normalizedUsername,
+                    accountType: user.accountType,
                 },
                 JWT_SECRET,
                 {
@@ -1537,8 +1668,9 @@ export class ManageAccountsService {
             const refreshToken = jwt.sign(
                 {
                     sub: userId,
-                    gmail: user.email,
+                    gmail: user.authEmail,
                     username: normalizedUsername,
+                    accountType: user.accountType,
                     type: "refresh",
                 },
                 JWT_SECRET,
@@ -1549,17 +1681,19 @@ export class ManageAccountsService {
                 }
             );
 
-            // 6. Security Notification Email
-            sendSecurityNotificationEmail({
-                to: user.email,
-                name: updatedUser?.firstName || normalizedUsername,
-                subject: `Orbix Username Updated: @${normalizedUsername}`,
-                badgeText: "Username Updated",
-                headline: "Your Username Has Been Changed",
-                message: `The username for your Orbix account was changed from <strong>@${oldUsername}</strong> to <strong>@${normalizedUsername}</strong>. Public links to your profile now resolve to your new username.`,
-                isWarning: false,
-                footerNotice: "If you did not make this change, please contact support immediately."
-            }).catch(e => console.error("[Security Notification Error] Username change notice failed:", e.message));
+            // 6. Security Notification Email (never dispatch to synthetic @club.orbix addresses)
+            if (user.hasRealEmail) {
+                sendSecurityNotificationEmail({
+                    to: user.effectiveEmail,
+                    name: user.displayName,
+                    subject: `Orbix Username Updated: @${normalizedUsername}`,
+                    badgeText: "Username Updated",
+                    headline: "Your Username Has Been Changed",
+                    message: `The username for your Orbix account was changed from <strong>@${oldUsername}</strong> to <strong>@${normalizedUsername}</strong>. Public links to your profile now resolve to your new username.`,
+                    isWarning: false,
+                    footerNotice: "If you did not make this change, please contact support immediately."
+                }).catch(e => console.error("[Security Notification Error] Username change notice failed:", e.message));
+            }
 
             return {
                 success: true,
@@ -1568,7 +1702,12 @@ export class ManageAccountsService {
                 newUsername: normalizedUsername,
                 token,
                 refreshToken,
-                user: updatedUser,
+                user: {
+                    ...updatedUser,
+                    gmail: user.hasRealEmail ? user.effectiveEmail : updatedUser?.gmail,
+                    email: user.hasRealEmail ? user.effectiveEmail : updatedUser?.gmail,
+                    accountType: user.accountType,
+                },
             };
 
         } catch (dbErr) {

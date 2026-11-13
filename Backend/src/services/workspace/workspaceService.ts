@@ -1,4 +1,5 @@
 // Backend/src/services/workspace/workspaceService.ts
+import crypto from "crypto";
 import { pool, query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
@@ -477,19 +478,40 @@ export class WorkspaceService {
             timestamp: new Date().toISOString(),
         });
 
-        // Audit Log
+        // Correlated Audit + Operational Activity Log
+        const correlationId = crypto.randomUUID();
+        const targetName = targetMember.user
+            ? `${targetMember.user.firstName || ""} ${targetMember.user.lastName || ""}`.trim() || targetMember.user.username
+            : "Workspace Member";
+
         await WorkspaceRepository.logAudit(null, {
             workspaceId,
             actorId: actorUserId,
             action: suspend ? "member_suspended" : "member_unsuspended",
             targetType: "member",
             targetId: targetMember.id,
+            correlationId,
             details: {
                 targetUserId,
+                targetName,
                 reason: reason || null,
             },
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRepository.recordActivityEvent({
+            workspaceId,
+            departmentId: targetMember.departmentId || null,
+            actorId: actorUserId,
+            eventType: suspend ? "member:suspended" : "member:unsuspended",
+            resourceType: "member",
+            resourceId: targetMember.id,
+            title: targetName,
+            description: reason || null,
+            isRestricted: false,
+            correlationId,
+            metadata: { targetUserId, targetName, reason: reason || null },
         });
 
         return updated;

@@ -14,6 +14,11 @@ export interface CollegeEventItem {
     coverImageUrl: string | null;
     status: "published" | "completed" | "draft" | "cancelled";
     scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
+    teamId?: string | null;
+    teamRole?: "leader" | "member" | null;
     publishedAt: string | null;
     createdAt: string;
     clubName: string;
@@ -96,6 +101,14 @@ export interface StudentApplicationItem {
     coverImageUrl: string | null;
     eventStatus: string;
     scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
+    teamId?: string | null;
+    teamRole?: "leader" | "member" | null;
+    teamName?: string | null;
+    teamCode?: string | null;
+    teamMembersCount?: number;
     clubName: string;
     clubSlug: string;
     clubLogoUrl: string;
@@ -114,6 +127,10 @@ export interface ClubEventApplicantRow {
     rollNumber: string;
     phoneNumber: string;
     ticketCode: string;
+    teamId?: string | null;
+    teamRole?: "leader" | "member" | null;
+    teamName?: string | null;
+    teamCode?: string | null;
     status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled";
     registeredAt: string;
     checkedInAt: string | null;
