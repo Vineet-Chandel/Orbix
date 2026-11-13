@@ -8,6 +8,52 @@ export interface SendSmsOptions {
     to: string; // phone number (e.g. "+919389205207" or "9389205207")
     otp: string;
     clubName?: string | undefined;
+    fetchImpl?: typeof fetch | undefined;
+}
+
+const SMS_PLACEHOLDER_PATTERNS = [
+    "your_twilio_",
+    "your_account_sid",
+    "your_auth_token",
+    "your_phone_number",
+    "+10000000000",
+    "placeholder",
+    "example",
+];
+
+function isPlaceholderCredential(val: string | undefined): boolean {
+    if (!val || !val.trim()) return true;
+    const lower = val.trim().toLowerCase();
+    return SMS_PLACEHOLDER_PATTERNS.some((p) => lower.includes(p));
+}
+
+function resolveTwilioConfig():
+    | { configured: true; accountSid: string; authToken: string; fromPhone: string }
+    | { configured: false; missing: string[] } {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+    const fromPhone = process.env.TWILIO_PHONE_NUMBER?.trim();
+
+    const missing: string[] = [];
+    if (isPlaceholderCredential(accountSid)) missing.push("TWILIO_ACCOUNT_SID");
+    if (isPlaceholderCredential(authToken)) missing.push("TWILIO_AUTH_TOKEN");
+    if (isPlaceholderCredential(fromPhone)) missing.push("TWILIO_PHONE_NUMBER");
+
+    if (missing.length > 0) {
+        return { configured: false, missing };
+    }
+
+    return {
+        configured: true,
+        accountSid: accountSid!,
+        authToken: authToken!,
+        fromPhone: fromPhone!,
+    };
+}
+
+function sanitizeSmsError(rawMsg: unknown, otp: string): string {
+    const base = typeof rawMsg === "string" && rawMsg.trim() ? rawMsg.trim() : "SMS provider dispatch failed";
+    return otp ? base.split(otp).join("[REDACTED]") : base;
 }
 
 export interface SendSmsResult {
@@ -82,12 +128,14 @@ export function normalizePhoneNumber(raw: string): NormalizedPhone {
  * Dispatches an SMS verification code via configured carrier or simulated fallback.
  */
 export async function sendVerificationSms(options: SendSmsOptions): Promise<SendSmsResult> {
-    const { to, otp, clubName } = options;
+    const { to, otp, clubName, fetchImpl } = options;
     const phone = normalizePhoneNumber(to);
+    const isProduction = process.env.NODE_ENV === "production";
 
     if (!phone.isValid) {
         return {
             success: false,
+            simulated: false,
             error: "Please provide a valid 10-digit mobile phone number.",
         };
     }
@@ -96,26 +144,22 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
         ? `Your Orbix verification code for ${clubName} is: ${otp}. Valid for 10 minutes. Do not share.`
         : `Your Orbix verification code is: ${otp}. Valid for 10 minutes. Do not share.`;
 
-    let lastProviderError: string | undefined;
+    const twilioConfig = resolveTwilioConfig();
 
-    // Primary mobile verification is handled via Firebase Phone Authentication on the client SDK.
-    // Carrier fallback for auxiliary transactional notifications:
-    // Check Twilio Gateway
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-    const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-
-    if (twilioSid && twilioAuth && twilioFrom && !twilioSid.includes("your_twilio_sid")) {
+    // 1. Configured Twilio Gateway (fail closed on ANY provider/network/response failure)
+    if (twilioConfig.configured) {
+        const activeFetch = fetchImpl || globalThis.fetch;
         try {
-            const authHeader = "Basic " + Buffer.from(`${twilioSid.trim()}:${twilioAuth.trim()}`).toString("base64");
+            const authHeader =
+                "Basic " + Buffer.from(`${twilioConfig.accountSid}:${twilioConfig.authToken}`).toString("base64");
             const bodyParams = new URLSearchParams({
                 To: phone.canonical,
-                From: twilioFrom.trim(),
+                From: twilioConfig.fromPhone,
                 Body: messageText,
             });
 
-            const twilioRes = await fetch(
-                `https://api.twilio.com/2010-04-01/Accounts/${twilioSid.trim()}/Messages.json`,
+            const twilioRes = await activeFetch(
+                `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`,
                 {
                     method: "POST",
                     headers: {
@@ -126,38 +170,67 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
                 }
             );
 
-            const twilioData: any = await twilioRes.json();
-            if (twilioRes.ok && twilioData?.sid) {
+            let twilioData: any = null;
+            try {
+                twilioData = await twilioRes.json();
+            } catch {
+                twilioData = null;
+            }
+
+            if (twilioRes.ok && typeof twilioData?.sid === "string" && twilioData.sid.trim().length > 0) {
                 console.log(`[Twilio SMS] Verification code dispatched to ${phone.formatted} (SID: ${twilioData.sid})`);
                 return {
                     success: true,
+                    simulated: false,
                     messageId: twilioData.sid,
                 };
-            } else {
-                console.warn("[Twilio SMS] Error:", twilioData?.message);
-                lastProviderError = twilioData?.message || "Twilio dispatch failed";
             }
+
+            const safeProviderError = sanitizeSmsError(
+                twilioData?.message || `Twilio rejected SMS request with HTTP ${twilioRes.status}`,
+                otp
+            );
+            console.error("[Twilio SMS] Delivery failed:", {
+                status: twilioRes.status,
+                error: safeProviderError,
+            });
+            return {
+                success: false,
+                simulated: false,
+                providerError: safeProviderError,
+                error: safeProviderError,
+            };
         } catch (twErr: any) {
-            console.error("[Twilio SMS] Dispatch error:", twErr.message);
-            lastProviderError = twErr.message;
+            const safeProviderError = sanitizeSmsError(twErr?.message || "Network error contacting SMS provider", otp);
+            console.error("[Twilio SMS] Dispatch error:", safeProviderError);
+            return {
+                success: false,
+                simulated: false,
+                providerError: safeProviderError,
+                error: safeProviderError,
+            };
         }
     }
 
-    // 3. Dev / Test Simulation Fallback
-    console.log(`\n======================================================`);
-    console.log(`[ORBIX SMS SERVICE] 💬 Verification Code for ${phone.formatted}:`);
-    console.log(`>>> SMS OTP: ${otp} <<<`);
-    if (lastProviderError) {
-        console.log(`⚠️ SMS Provider Notice: ${lastProviderError}`);
+    // 2. Production MUST fail closed when SMS provider credentials are absent
+    if (isProduction) {
+        const missingList = twilioConfig.missing.join(", ");
+        console.error(`[Twilio SMS] Production SMS delivery failed: missing required credentials (${missingList}).`);
+        return {
+            success: false,
+            simulated: false,
+            error: "SMS verification delivery service is not configured for production.",
+        };
     }
-    console.log(`======================================================\n`);
 
-    const isDev = process.env.NODE_ENV !== "production";
+    // 3. Explicit non-production simulation fallback (NEVER logs raw OTP)
+    console.log(
+        `[ORBIX SMS SERVICE] Non-production simulated SMS dispatch for ${phone.formatted} (OTP redacted from logs).`
+    );
 
     return {
         success: true,
         simulated: true,
-        providerError: lastProviderError,
         messageId: `sim_sms_${Date.now()}`,
     };
 }

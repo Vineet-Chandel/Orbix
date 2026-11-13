@@ -13,6 +13,8 @@ export const DEFAULT_RESUME_FOLDER = process.env.CLOUDINARY_RESUME_FOLDER || "or
 export const DEFAULT_RESUME_MAX_BYTES = 5 * 1024 * 1024; // 5 MB strict limit
 export const ALLOWED_RESUME_FORMATS = ["pdf"] as const;
 
+export const DEFAULT_VERIFICATION_FOLDER = process.env.CLOUDINARY_VERIFICATION_FOLDER || "orbix/college_verifications";
+
 /**
  * Returns true if all essential Cloudinary credentials are configured
  */
@@ -20,7 +22,16 @@ export function isCloudinaryConfigured(): boolean {
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
     const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
     const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
-    return Boolean(cloudName && apiKey && apiSecret);
+    const ok = Boolean(cloudName && apiKey && apiSecret);
+    if (ok) {
+        cloudinary.config({
+            cloud_name: cloudName!,
+            api_key: apiKey!,
+            api_secret: apiSecret!,
+            secure: true,
+        });
+    }
+    return ok;
 }
 
 /**

@@ -14,9 +14,9 @@ async function applyPhase6Migration() {
 
     // Verify columns exist
     const colCheck = await query(`
-        SELECT column_name, data_type 
-        FROM information_schema.columns 
-        WHERE table_name = 'user_projects' 
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_name = 'user_projects'
         AND column_name IN (
             'short_description',
             'repository_provider',
@@ -34,8 +34,8 @@ async function applyPhase6Migration() {
 
     // Verify RLS is enabled
     const rlsCheck = await query(`
-        SELECT relname, relrowsecurity 
-        FROM pg_class 
+        SELECT relname, relrowsecurity
+        FROM pg_class
         WHERE relname IN ('user_projects', 'user_github_installations');
     `);
     console.log("Verified Row Level Security status:", rlsCheck.rows);

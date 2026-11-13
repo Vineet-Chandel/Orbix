@@ -22,6 +22,8 @@ export interface PublicProfilePayload {
     isEmailVerified?: boolean;
     isVerifiedCoder?: boolean;
     isVerified?: boolean;
+    isCollegeVerified?: boolean;
+    collegeVerificationStatus?: string;
     isOpenToWork?: boolean;
     isHireable?: boolean;
     resumeUrl?: string | null;

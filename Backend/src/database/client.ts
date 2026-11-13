@@ -1,5 +1,5 @@
 
-if (typeof process.loadEnvFile === 'function') {
+if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
   try {
     process.loadEnvFile();
   } catch {}
@@ -9,27 +9,30 @@ import { performance } from "node:perf_hooks";
 
 const { Pool } = pg;
 
-const DATABASE_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+import {
+    resolveDatabaseConfig,
+    type ResolvedDatabaseConfig,
+    sanitizeDatabaseError,
+} from "./config.js";
 
-if (!DATABASE_URL) {
-    throw new Error("SUPABASE_DB_URL (or DATABASE_URL) is not configured");
-}
+// Centralized, fail-closed database identity validation
+export const activeDbConfig: ResolvedDatabaseConfig = resolveDatabaseConfig();
 
 export const pool = new Pool({
-    connectionString: DATABASE_URL,
+    connectionString: activeDbConfig.connectionString,
     connectionTimeoutMillis: 20000,
     idleTimeoutMillis: 60000,
     max: 20,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
-    ssl: { rejectUnauthorized: false },
+    ssl: activeDbConfig.ssl,
 });
 
 // Detect unexpected errors on idle pooled connections.
 pool.on("error", (error) => {
     console.error(
         "Unexpected PostgreSQL pool error:",
-        error.message || error
+        sanitizeDatabaseError(error.message || String(error))
     );
 });
 
@@ -1144,11 +1147,83 @@ export const testDatabaseConnection = async () => {
                     ADD COLUMN IF NOT EXISTS team_role VARCHAR(20) DEFAULT NULL;
             END $$;
         `);
+        
+        // College Verification (Migration 031)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS public.college_verifications (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                college_id UUID NOT NULL REFERENCES public.institutions(id) ON DELETE CASCADE,
+                status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (
+                    status IN ('NOT_VERIFIED', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'INVALIDATED')
+                ),
+                document_type VARCHAR(50) NOT NULL,
+                document_paths JSONB NOT NULL DEFAULT '[]'::jsonb,
+                extracted_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                student_name VARCHAR(255) NULL,
+                enrollment_number VARCHAR(100) NULL,
+                course_name VARCHAR(255) NULL,
+                academic_year VARCHAR(100) NULL,
+                institution_email VARCHAR(255) NULL,
+                email_verified_at TIMESTAMPTZ NULL,
+                phone_number VARCHAR(30) NULL,
+                phone_verified_at TIMESTAMPTZ NULL,
+                ocr_confidence NUMERIC(5,2) DEFAULT 0.00,
+                reviewed_by UUID NULL REFERENCES public.users(id) ON DELETE SET NULL,
+                reviewed_at TIMESTAMPTZ NULL,
+                rejection_reason TEXT NULL,
+                reviewer_notes TEXT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_college_verifications_active_user 
+                ON public.college_verifications(user_id) 
+                WHERE status IN ('PENDING', 'PROCESSING');
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_college_verifications_approved_user 
+                ON public.college_verifications(user_id) 
+                WHERE status = 'APPROVED';
+
+            CREATE INDEX IF NOT EXISTS idx_college_verifications_user ON public.college_verifications(user_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_college_verifications_college ON public.college_verifications(college_id);
+            CREATE INDEX IF NOT EXISTS idx_college_verifications_status_created ON public.college_verifications(status, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS public.college_verification_email_tokens (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                verification_id UUID NULL REFERENCES public.college_verifications(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                institution_email VARCHAR(255) NOT NULL,
+                token_hash VARCHAR(64) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'expired')),
+                expires_at TIMESTAMPTZ NOT NULL,
+                verified_at TIMESTAMPTZ NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS public.college_verification_phone_otps (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                verification_id UUID NULL REFERENCES public.college_verifications(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                phone VARCHAR(30) NOT NULL,
+                otp_hash VARCHAR(64) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'expired')),
+                attempts INT DEFAULT 0,
+                expires_at TIMESTAMPTZ NOT NULL,
+                verified_at TIMESTAMPTZ NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            ALTER TABLE public.users 
+                ADD COLUMN IF NOT EXISTS is_college_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS college_verified_at TIMESTAMPTZ NULL;
+        `);
+
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
-    } catch (error) {
+    } catch (error: any) {
         console.error(
-            "❌ Supabase PostgreSQL connection failed:",
-            error
+            "❌ PostgreSQL connection failed:",
+            sanitizeDatabaseError(error.message || String(error))
         );
         throw error;
     }

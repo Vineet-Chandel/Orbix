@@ -74,6 +74,8 @@ export interface User {
     } | null;
     collegeUpdatedAt?: string | null;
     canChangeCollege?: boolean;
+    isCollegeVerified?: boolean;
+    collegeVerificationStatus?: string;
     collegeLockRemainingMs?: number;
     nextAllowedCollegeChangeAt?: string | null;
 }

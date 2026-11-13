@@ -14,18 +14,18 @@ async function applyMigration() {
 
     // Verify columns exist
     const colCheck = await query(`
-        SELECT column_name, data_type 
-        FROM information_schema.columns 
-        WHERE table_name = 'user_projects' 
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_name = 'user_projects'
         AND column_name IN (
-            'project_type', 
-            'development_status', 
-            'full_overview', 
-            'story', 
-            'categorized_technologies', 
-            'contribution', 
-            'additional_details', 
-            'api_doc_url', 
+            'project_type',
+            'development_status',
+            'full_overview',
+            'story',
+            'categorized_technologies',
+            'contribution',
+            'additional_details',
+            'api_doc_url',
             'figma_url'
         );
     `);

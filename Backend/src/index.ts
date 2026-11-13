@@ -1,5 +1,4 @@
-
-if (typeof process.loadEnvFile === 'function') {
+if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
   try {
     process.loadEnvFile();
   } catch {}
@@ -22,6 +21,7 @@ import {
 } from './Routes/relationships/relationshipRoutes.js';
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
+import { studentCollegeVerificationRouter, founderCollegeVerificationRouter } from './Routes/verification/collegeVerificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
 import blogRouter from './Routes/blog/blogRoutes.js';
 import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
@@ -149,6 +149,11 @@ apiRouter.use('/account/sessions', sessionRouter);
 apiRouter.use('/account', sessionRouter);
 apiRouter.use('/account', manageAccountsRouter);
 
+// College Institutional Verification (Stage 4.4 - 4.6)
+apiRouter.use('/verification/college', studentCollegeVerificationRouter);
+apiRouter.use('/college-verification', studentCollegeVerificationRouter);
+apiRouter.use('/internal/college-verifications', founderCollegeVerificationRouter);
+
 // Support & Help Desk
 apiRouter.use('/help', helpRouter);
 
@@ -173,6 +178,14 @@ app.get('/health', (req: Request, res: Response) => {
         timestamp: new Date().toISOString()
     });
 });
+
+// Legacy root fallback aliases for backwards compatibility
+app.use('/auth', oauthRouter);
+app.use('/profile', profileRouter);
+app.use('/relationships', relationshipRouter);
+app.use('/blocks', blockRouter);
+app.use('/help', helpRouter);
+app.use('/clubs', clubRouter);
 
 app.get('/', (req: Request, res: Response) => {
     res.status(200).json({

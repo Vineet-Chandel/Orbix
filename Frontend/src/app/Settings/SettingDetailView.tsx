@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
+    ArrowRight,
     Bookmark,
     UserX,
     MessageSquare,
@@ -22,6 +23,9 @@ import {
     FileText,
     Check,
     Globe,
+    Clock,
+    XCircle,
+    AlertTriangle,
 } from "lucide-react";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import type { SettingsViewKey } from "./types";
@@ -30,6 +34,7 @@ import { NeoToggle } from "../../components/NeoToggle";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { useAppDispatch, useAppSelector, setUser } from "../../store";
+import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
 import {
     fetchBlockedUsersThunk,
     unblockUserThunk,
@@ -449,7 +454,95 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             case "verify-account":
                 return (
                     <div className="space-y-6">
-                        {/* Primary Email Verification Centralized Hub Card */}
+                        {/* 1. Official College Affiliation & Student Verification Card */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#FFE566] text-black text-xs font-black uppercase border border-black shadow-[1px_1px_0px_#000]">
+                                        <GraduationCap className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Collegiate Enrollment & Verification</span>
+                                    </div>
+                                    <h3 className="text-xl font-black text-black">
+                                        College / University Verification
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Confirm your institutional student enrollment via document upload (OCR-assisted ID or ERP), institutional email, phone OTP, and founder review to unlock official college ranking badges.
+                                    </p>
+                                </div>
+                                {user?.isCollegeVerified ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase border-2 border-black shrink-0 shadow-[2px_2px_0px_#000] bg-[#a2ff86] text-black">
+                                        <VerifiedBadge size="xs" />
+                                        Verified
+                                    </span>
+                                ) : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase border-2 border-black shrink-0 shadow-[2px_2px_0px_#000] bg-amber-100 text-amber-950 border border-black">
+                                        <Clock className="w-3.5 h-3.5 text-amber-800" />
+                                        Under Review
+                                    </span>
+                                ) : user?.collegeVerificationStatus === "REJECTED" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase border-2 border-black shrink-0 shadow-[2px_2px_0px_#000] bg-rose-100 text-rose-950 border border-black">
+                                        <XCircle className="w-3.5 h-3.5 text-rose-800" />
+                                        Rejected
+                                    </span>
+                                ) : user?.collegeVerificationStatus === "INVALIDATED" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase border-2 border-black shrink-0 shadow-[2px_2px_0px_#000] bg-amber-100 text-amber-950 border border-black">
+                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-800" />
+                                        Re-verification Required
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold uppercase border-2 border-black shrink-0 shadow-[2px_2px_0px_#000] bg-neutral-100 text-neutral-700">
+                                        Unverified
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1 min-w-0">
+                                    <p className="text-[11px] font-black uppercase text-neutral-500 font-bold">Affiliated Institution</p>
+                                    <p className="text-sm font-black text-black truncate">
+                                        {user?.college?.officialName || "No college affiliated yet"}
+                                    </p>
+                                    {user?.college && (
+                                        <p className="text-[11px] text-neutral-600 font-medium truncate">
+                                            {[user.college.city, user.college.state].filter(Boolean).join(", ")}
+                                            {user.college.aisheCode ? ` · AISHE: ${user.college.aisheCode}` : ""}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                                    {user?.collegeId || user?.college?.id ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => openCollegeVerificationModal()}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                        >
+                                            <GraduationCap className="w-4 h-4 stroke-[2.5]" />
+                                            <span>
+                                                {user?.isCollegeVerified
+                                                    ? "View Verification Details"
+                                                    : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING"
+                                                    ? "View Application Status"
+                                                    : user?.collegeVerificationStatus === "REJECTED"
+                                                    ? "Resubmit Application"
+                                                    : user?.collegeVerificationStatus === "INVALIDATED"
+                                                    ? "Re-verify Affiliation"
+                                                    : "Verify College Affiliation"}
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        <Link
+                                            to="/profile"
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
+                                        >
+                                            <span>Select College in Profile</span>
+                                            <ArrowRight className="w-4 h-4" />
+                                        </Link>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Primary Email Verification Centralized Hub Card */}
                         <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="space-y-1">

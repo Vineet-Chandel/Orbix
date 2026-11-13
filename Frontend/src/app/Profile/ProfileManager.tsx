@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock } from "lucide-react";
+import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock, GraduationCap, Clock, XCircle, AlertTriangle } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile, getInstitutionById, updateResumeVisibility, type InstitutionItem } from "../../utils/profileApi";
 import { CollegeAutocomplete } from "../../components/CollegeAutocomplete";
 import { CollegeChangeWarningModal } from "../../components/CollegeChangeWarningModal";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
+import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
@@ -102,6 +105,7 @@ export default function ProfileManager() {
     const [savingProfile, setSavingProfile] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isCollegeConfirmModalOpen, setIsCollegeConfirmModalOpen] = useState(false);
+    const [isPostCollegeChangeModalOpen, setIsPostCollegeChangeModalOpen] = useState(false);
     const [hasConfirmedCollegeSave, setHasConfirmedCollegeSave] = useState(false);
 
     // Connected Platforms from localStorage / sync
@@ -765,6 +769,98 @@ export default function ProfileManager() {
                                                 collegeLockRemainingMs={user?.collegeLockRemainingMs}
                                                 nextAllowedCollegeChangeAt={user?.nextAllowedCollegeChangeAt}
                                             />
+
+                                            {/* College Verification Entry Point Card */}
+                                            {selectedCollege?.id ? (
+                                                <div className="mt-3 p-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="w-7 h-7 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                                                <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
+                                                                    Enrollment Verification
+                                                                </span>
+                                                                <h4 className="text-xs font-black text-black truncate">
+                                                                    {selectedCollege.officialName}
+                                                                </h4>
+                                                            </div>
+                                                        </div>
+
+                                                        {user?.isCollegeVerified ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
+                                                                <VerifiedBadge size="xs" />
+                                                                Verified
+                                                            </span>
+                                                        ) : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING" ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
+                                                                <Clock className="w-3 h-3 text-amber-800" />
+                                                                Under Review
+                                                            </span>
+                                                        ) : user?.collegeVerificationStatus === "INVALIDATED" ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 border border-black text-[10px] font-black text-orange-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
+                                                                <AlertTriangle className="w-3 h-3 text-orange-800" />
+                                                                Re-Verification Required
+                                                            </span>
+                                                        ) : user?.collegeVerificationStatus === "REJECTED" ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 border border-black text-[10px] font-black text-rose-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
+                                                                <XCircle className="w-3 h-3 text-rose-800" />
+                                                                Rejected
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-100 border border-black text-[10px] font-bold text-neutral-700 uppercase shrink-0">
+                                                                Unverified
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
+                                                        {user?.isCollegeVerified
+                                                            ? "Your student enrollment is verified by Orbix founders. The College Verified badge is displayed on your public profile."
+                                                            : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING"
+                                                            ? "Your verification application has been submitted and is currently in the founder review queue."
+                                                            : user?.collegeVerificationStatus === "INVALIDATED"
+                                                            ? "Your college affiliation has changed. Please verify your new college to reinstate the College Verified badge."
+                                                            : user?.collegeVerificationStatus === "REJECTED"
+                                                            ? "Your previous verification was rejected. You can resubmit with a clearer student ID or ERP screenshot."
+                                                            : "Upload your student ID card or ERP profile screenshot to receive the official College Verified badge on your profile and leaderboards."}
+                                                    </p>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openCollegeVerificationModal({
+                                                            collegeId: selectedCollege?.id || user?.collegeId || user?.college?.id,
+                                                            collegeName: selectedCollege?.officialName || user?.college?.officialName,
+                                                        })}
+                                                        className="w-full py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                                                    >
+                                                        {user?.isCollegeVerified
+                                                            ? "View Verification Details"
+                                                            : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING"
+                                                            ? "View Application Status"
+                                                            : user?.collegeVerificationStatus === "INVALIDATED"
+                                                            ? "Verify New College Affiliation"
+                                                            : user?.collegeVerificationStatus === "REJECTED"
+                                                            ? "Resubmit Verification Application"
+                                                            : "Verify College Affiliation"}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="mt-3 p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-dashed border-black/40 space-y-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0">
+                                                            <GraduationCap className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                                        </div>
+                                                        <span className="text-xs font-black uppercase tracking-wider text-black">
+                                                            College Affiliation Required
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
+                                                        Select your college or university from the verified directory above to unlock student enrollment verification and earn the College Verified badge on your profile and leaderboards.
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Dynamic Links Section */}
@@ -1040,6 +1136,29 @@ export default function ProfileManager() {
                 isLocked={user?.canChangeCollege === false}
                 remainingMs={user?.collegeLockRemainingMs}
                 nextAllowedDate={user?.nextAllowedCollegeChangeAt}
+            />
+
+            {/* Post-College-Change Verification Warning Modal */}
+            <ConfirmationModal
+                isOpen={isPostCollegeChangeModalOpen}
+                onClose={() => setIsPostCollegeChangeModalOpen(false)}
+                onConfirm={() => {
+                    setIsPostCollegeChangeModalOpen(false);
+                    openCollegeVerificationModal({
+                        collegeId: selectedCollege?.id || user?.collegeId || user?.college?.id,
+                        collegeName: selectedCollege?.officialName || user?.college?.officialName,
+                    });
+                }}
+                title="College verification required"
+                description={
+                    <span>
+                        Your college has been changed successfully. Your previous college verification is no longer valid. Please verify your new college to receive the <strong className="text-black font-black">College Verified badge</strong> again.
+                    </span>
+                }
+                confirmText="Verify My College"
+                cancelText="Maybe Later"
+                variant="warning"
+                icon={<GraduationCap className="w-5 h-5 text-amber-700 stroke-[2.5]" />}
             />
         </div>
     );

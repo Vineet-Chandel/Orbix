@@ -597,7 +597,9 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                             {channel.name}
                         </h2>
                         {channel.isPrivate && (
-                            <Lock className="w-3.5 h-3.5 text-neutral-600 shrink-0" title="Private Channel" />
+                            <span title="Private Channel">
+                                <Lock className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
+                            </span>
                         )}
                     </div>
 
@@ -842,7 +844,9 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                             <span className="text-[10px] text-neutral-400 italic">(edited)</span>
                                         )}
                                         {msg.isPinned && (
-                                            <Pin className="w-3 h-3 text-black shrink-0" title="Pinned" />
+                                            <span title="Pinned">
+                                                <Pin className="w-3 h-3 text-black shrink-0" />
+                                            </span>
                                         )}
                                     </div>
 

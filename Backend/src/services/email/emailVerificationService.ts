@@ -173,7 +173,7 @@ export class EmailVerificationService {
         });
 
         if (!sendResult.success) {
-            if (sendResult.sandboxRestricted) {
+            if (sendResult.sandboxRestricted && process.env.NODE_ENV !== "production") {
                 return {
                     success: true,
                     message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Configure SMTP in Backend/.env for live delivery).`,
@@ -502,7 +502,7 @@ export class EmailVerificationService {
         });
 
         if (!sendResult.success) {
-            if (sendResult.sandboxRestricted) {
+            if (sendResult.sandboxRestricted && process.env.NODE_ENV !== "production") {
                 return {
                     success: true,
                     message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Configure SMTP in Backend/.env for live delivery).`,

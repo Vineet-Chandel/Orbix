@@ -5,6 +5,8 @@ import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { OrbixLoadingProvider, OrbixLoader } from "./components/ui/loader";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
+import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
+import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
 
 // Code-split other routes & showcases to keep initial homepage bundle ultra-lean
 const SignInPage = lazy(() => import('./LandingPages/Auth-Pages/Signin/Landing'));
@@ -35,6 +37,7 @@ const PublicClubProfilePage = lazy(() => import("./app/Club/PublicClubProfilePag
 const PrivacyPolicyPage = lazy(() => import("./LandingPages/Legal/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./LandingPages/Legal/TermsConditionsPage"));
 const GuardianConsentPage = lazy(() => import("./LandingPages/Legal/GuardianConsentPage"));
+const FounderCollegeVerificationsPage = lazy(() => import("./app/Internal/FounderCollegeVerificationsPage"));
 const PublicEventRegistrationPage = lazy(() => import("./app/Events/PublicEventRegistrationPage"));
 const PublicCertificateVerifyPage = lazy(() => import("./app/Certificates/PublicCertificateVerifyPage"));
 const JoinClubPage = lazy(() => import("./app/Club/JoinClubPage"));
@@ -79,6 +82,10 @@ const App = () => {
     <OrbixLoadingProvider>
       <ToastProvider>
         <BrowserRouter>
+          {/* Authoritative Single Institutional Email Token Listener & Single Global Verification Modal Host */}
+          <CollegeEmailVerificationListener />
+          <GlobalCollegeVerificationModal />
+
           <Suspense
             fallback={
               <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center text-black">
@@ -188,6 +195,9 @@ const App = () => {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+            {/* Internal Founder College Verification Review Console */}
+            <Route path="/internal/college-verifications" element={<FounderCollegeVerificationsPage />} />
+            <Route path="/internal/college-verification" element={<Navigate to="/internal/college-verifications" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/clubs" element={<Dashboard />} />
             <Route path="/college-events" element={<Dashboard />} />

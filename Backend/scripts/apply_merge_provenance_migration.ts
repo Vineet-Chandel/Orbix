@@ -14,13 +14,13 @@ async function applyMigration() {
 
     // Verify columns exist
     const colCheck = await query(`
-        SELECT column_name, data_type 
-        FROM information_schema.columns 
-        WHERE table_name = 'user_projects' 
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_name = 'user_projects'
         AND column_name IN (
-            'raw_extracted_data', 
-            'field_overrides', 
-            'last_synced_at', 
+            'raw_extracted_data',
+            'field_overrides',
+            'last_synced_at',
             'sync_metadata'
         );
     `);

@@ -321,6 +321,13 @@ export const PrivacyPolicyPage: React.FC = () => {
                       IP addresses, browser user-agent strings, session identifiers, authentication timestamps, and persistent security logs utilized strictly to defend against account takeover, brute-force attacks, and abusive scraping.
                     </p>
                   </div>
+
+                  <div className="border-2 border-black p-3.5 rounded bg-[#FAF6EE]">
+                    <h3 className="font-black text-xs uppercase text-black mb-1">F. Student College Verification Documents & OCR Metadata</h3>
+                    <p className="text-xs text-zinc-600">
+                      Physical student ID card images (front and back), official institutional ERP profile screenshots, institutional email addresses, phone verification records, and structured text extracted via automated Optical Character Recognition (OCR) (including student name, enrollment/registration number, branch/degree, and academic validity). Verification documents are encrypted and maintained in authenticated private cloud storage, accessible strictly to authorized Orbix founders for human identity verification, and are never made public, indexed, or shared with third parties.
+                    </p>
+                  </div>
                 </div>
               </div>
             </article>
@@ -434,8 +441,8 @@ export const PrivacyPolicyPage: React.FC = () => {
                       </tr>
                       <tr>
                         <td className="p-2.5 font-bold">Cloudinary</td>
-                        <td className="p-2.5">Optimized developer avatar images and collegiate club banners</td>
-                        <td className="p-2.5">Secure CDN distribution; retryable purge queue</td>
+                        <td className="p-2.5">Optimized developer avatar images, collegiate club banners, and private authenticated student verification documents</td>
+                        <td className="p-2.5">Secure CDN distribution; authenticated private storage for verification documents</td>
                       </tr>
                       <tr>
                         <td className="p-2.5 font-bold">Resend / SMTP</td>

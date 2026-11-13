@@ -302,7 +302,9 @@ export const CreateEditRoleModal: React.FC<CreateEditRoleModalProps> = ({
                         <div className="space-y-1">
                             <label className="text-xs font-black uppercase text-black flex items-center gap-1.5">
                                 Hierarchy Rank (1–{maxRankAllowed})
-                                <Info className="w-3 h-3 text-neutral-500" title="Higher rank grants authority over lower ranks. Cannot exceed your rank." />
+                                <span title="Higher rank grants authority over lower ranks. Cannot exceed your rank.">
+                                    <Info className="w-3 h-3 text-neutral-500" />
+                                </span>
                             </label>
                             <input
                                 type="number"

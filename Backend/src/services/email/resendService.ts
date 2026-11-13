@@ -1,4 +1,11 @@
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
+
+
+export const DEFAULT_SYSTEM_FROM = process.env.RESEND_FROM_EMAIL || "team@vineetchandel.in";
+export const DEFAULT_FOUNDER_FROM = process.env.FOUNDER_FROM_EMAIL || "Vineet <vineet@vineetchandel.in>";
+export const DEFAULT_FOUNDER_REPLY_TO = process.env.FOUNDER_REPLY_EMAIL || "vineet@vineetchandel.in";
 
 export interface SendVerificationEmailOptions {
   to: string;
@@ -24,24 +31,113 @@ export interface SendEmailResult {
   simulated?: boolean;
   messageId?: string;
   error?: string;
-  provider?: "resend" | "simulation";
+  provider?: "resend" | "smtp" | "simulation";
   sandboxRestricted?: boolean;
 }
 
+export interface EmailDispatchDeps {
+  resendClient?: {
+    emails: {
+      send: (payload: any) => Promise<{ data?: any; error?: any }>;
+    };
+  } | null;
+  smtpTransporter?: Pick<Transporter, "sendMail"> | null;
+}
+
 let resendClientInstance: Resend | null = null;
+let cachedResendApiKey: string | null = null;
+let smtpTransporterInstance: Transporter | null = null;
+let cachedSmtpConfigKey: string | null = null;
+
+function isPlaceholderEmailValue(val: string | undefined, extraPatterns: string[] = []): boolean {
+  if (!val || !val.trim()) return true;
+  const lower = val.trim().toLowerCase();
+  const basePatterns = ["your_resend_api_key", "yourdomain.com", "your_email@gmail.com", "placeholder"];
+  return [...basePatterns, ...extraPatterns].some((p) => lower.includes(p));
+}
+
+function isVerifiedProductionResendSender(fromEmail: string | undefined): boolean {
+  if (!fromEmail || !fromEmail.trim()) return false;
+  const lower = fromEmail.trim().toLowerCase();
+  if (!lower.includes("@")) return false;
+  if (lower.includes("@resend.dev") || lower.includes("@yourdomain.com") || lower.includes("your_")) {
+    return false;
+  }
+  return true;
+}
 
 /**
  * Returns an authenticated Resend client instance if RESEND_API_KEY is configured.
  */
 export function getResendClient(): Resend | null {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey || apiKey.trim() === "" || apiKey.includes("your_resend_api_key")) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (isPlaceholderEmailValue(apiKey)) {
+    resendClientInstance = null;
+    cachedResendApiKey = null;
     return null;
   }
-  if (!resendClientInstance) {
-    resendClientInstance = new Resend(apiKey.trim());
+  if (!resendClientInstance || cachedResendApiKey !== apiKey) {
+    resendClientInstance = new Resend(apiKey);
+    cachedResendApiKey = apiKey!;
   }
   return resendClientInstance;
+}
+
+/**
+ * Returns a configured Nodemailer SMTP transporter if SMTP credentials are provided.
+ * Supports standard SMTP (Gmail App Passwords, SendGrid, Amazon SES, Brevo, custom SMTP).
+ */
+export function getSmtpTransporter(): Transporter | null {
+  const user = process.env.SMTP_USER?.trim();
+  const pass = (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD)?.trim();
+  const explicitHost = process.env.SMTP_HOST?.trim();
+  const fromEmail = (process.env.SMTP_FROM_EMAIL || user)?.trim();
+
+  if (
+    !user ||
+    !pass ||
+    isPlaceholderEmailValue(user) ||
+    isPlaceholderEmailValue(pass, ["xxxx"]) ||
+    !fromEmail ||
+    !fromEmail.includes("@")
+  ) {
+    smtpTransporterInstance = null;
+    cachedSmtpConfigKey = null;
+    return null;
+  }
+
+  const isGmail = user.toLowerCase().includes("@gmail.com");
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction && !explicitHost && !isGmail) {
+    smtpTransporterInstance = null;
+    cachedSmtpConfigKey = null;
+    return null;
+  }
+
+  const host = explicitHost || (isGmail ? "smtp.gmail.com" : "localhost");
+  const port = Number(process.env.SMTP_PORT) || 465;
+  const secure = process.env.SMTP_SECURE !== undefined
+    ? process.env.SMTP_SECURE === "true"
+    : port === 465;
+
+  const configKey = `${host}|${port}|${secure}|${user}|${pass}|${fromEmail}`;
+  if (!smtpTransporterInstance || cachedSmtpConfigKey !== configKey) {
+    smtpTransporterInstance = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: {
+        user,
+        pass: pass.replace(/\s+/g, ""), // clean accidental spaces in app passwords
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+    cachedSmtpConfigKey = configKey;
+  }
+
+  return smtpTransporterInstance;
 }
 
 /**
@@ -57,112 +153,204 @@ function isResendSandboxError(errorMsg?: string): boolean {
   );
 }
 
-export const DEFAULT_SYSTEM_FROM = process.env.RESEND_FROM_EMAIL || "team@vineetchandel.in";
-export const DEFAULT_FOUNDER_FROM = process.env.FOUNDER_FROM_EMAIL || "Vineet <vineet@vineetchandel.in>";
-export const DEFAULT_FOUNDER_REPLY_TO = process.env.FOUNDER_REPLY_EMAIL || "vineet@vineetchandel.in";
+/**
+ * Sends an email using Nodemailer SMTP transporter.
+ */
+async function sendViaSmtp(
+  transporter: Pick<Transporter, "sendMail">,
+  options: { to: string; subject: string; html: string; text: string; fromName: string }
+): Promise<SendEmailResult> {
+  const { to, subject, html, text, fromName } = options;
+  const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+  const fromHeader = `"${fromName}" <${fromEmail}>`;
 
-export interface DispatchEmailPayload {
+  try {
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to,
+      subject,
+      html,
+      text,
+    });
+
+    console.log(`[SMTP Transporter] Email dispatched successfully to ${to} (MessageId: ${info.messageId})`);
+    return {
+      success: true,
+      simulated: false,
+      provider: "smtp",
+      messageId: info.messageId,
+    };
+  } catch (smtpErr: any) {
+    console.error(`[SMTP Error] Failed sending email to ${to}:`, smtpErr?.message || "SMTP dispatch error");
+    return {
+      success: false,
+      simulated: false,
+      provider: "smtp",
+      error: smtpErr?.message || "Failed to dispatch email via SMTP",
+    };
+  }
+}
+
+interface DispatchEmailPayload {
   to: string;
   subject: string;
   html: string;
   text: string;
+  fromName: string;
+  defaultFromEmail: string;
   logContext: string;
-  from?: string;
-  customFrom?: string;
-  replyTo?: string;
-  fromName?: string;
-  defaultFromEmail?: string;
 }
 
 /**
- * Unified Resend Email Dispatcher.
- * Dispatches live transactional emails via Resend API, with robust local dev simulation.
+ * Unified Multi-Provider Email Dispatcher.
+ * Intelligently chooses between Resend API, SMTP, and non-production simulation.
+ * Fails closed in production when no verified provider is configured or when delivery fails.
  */
-export async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailResult> {
-  const { to, subject, html, text, logContext, replyTo, customFrom, from: payloadFrom } = payload;
+export async function dispatchEmail(
+  payload: DispatchEmailPayload,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
+  const { to, subject, html, text, fromName, defaultFromEmail, logContext } = payload;
   const normalizedTo = to.trim().toLowerCase();
+  const isProduction = process.env.NODE_ENV === "production";
 
-  const resendClient = getResendClient();
+  const resendClient = deps?.resendClient !== undefined ? deps.resendClient : getResendClient();
+  const smtpTransporter = deps?.smtpTransporter !== undefined ? deps.smtpTransporter : getSmtpTransporter();
+  const providerPref = (process.env.EMAIL_PROVIDER || "auto").toLowerCase();
 
-  // 0. Simulation Mode: When RESEND_API_KEY is unset (e.g. local dev / automated test suite)
-  if (!resendClient) {
-    console.log(`\n======================================================`);
-    console.log(`[EMAIL DISPATCHER] ℹ️ Resend API key unset or mock mode.`);
-    console.log(`[DEV MODE SIMULATION] ${logContext} to ${normalizedTo}: ${subject}`);
-    if (replyTo) {
-      console.log(`[DEV MODE SIMULATION] Reply-To: ${replyTo}`);
-    }
-    console.log(`======================================================\n`);
+  const customFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
+  const isCustomDomain = isVerifiedProductionResendSender(customFromEmail);
+  const resendUsable = Boolean(resendClient && (!isProduction || isCustomDomain));
 
-    return {
-      success: true,
-      simulated: true,
-      provider: "simulation",
-      messageId: `simulated_${Date.now()}`,
-    };
-  }
-
-  // 1. Resend API Flow
-  // Strict compliance with sender rules:
-  // - Founder emails are dispatched directly from Vineet <vineet@vineetchandel.in>
-  // - All other transactional & system emails strictly use team@vineetchandel.in
-  const from = payloadFrom || customFrom || process.env.RESEND_FROM_EMAIL || "team@vineetchandel.in";
-  try {
-    const sendOptions: any = {
-      from,
-      to: [normalizedTo],
-      subject,
-      html,
-      text,
-    };
-    if (replyTo) {
-      sendOptions.reply_to = replyTo;
-    }
-
-    const { data, error } = await resendClient.emails.send(sendOptions);
-
-    if (error) {
-      const errorMsg = error.message || "Failed to dispatch via Resend";
-      console.error(`[Resend API Error]:`, error);
-
-      if (isResendSandboxError(errorMsg)) {
-        console.warn(`\n======================================================`);
-        console.warn(`[EMAIL DELIVERY LIMITATION: RESEND SANDBOX MODE]`);
-        console.warn(`Recipient: ${normalizedTo}`);
-        console.warn(`Reason: Resend test sandbox only permits sending to the account owner email.`);
-        console.warn(`To deliver live emails to any recipient in production:`);
-        console.warn(`Verify domain at resend.com/domains and configure RESEND_FROM_EMAIL.`);
-        console.warn(`======================================================\n`);
-
-        return {
-          success: false,
-          sandboxRestricted: true,
-          provider: "resend",
-          error: errorMsg,
-        };
-      }
-
+  // 0. No usable provider configured
+  if (
+    (!resendUsable && !smtpTransporter) ||
+    (providerPref === "smtp" && !smtpTransporter) ||
+    (providerPref === "resend" && !resendUsable)
+  ) {
+    if (isProduction) {
+      const reason =
+        resendClient && !isCustomDomain
+          ? "RESEND_FROM_EMAIL must be configured with a verified custom sender domain in production (sandbox @resend.dev or placeholder senders are rejected)."
+          : "No verified production email provider (Resend with verified sender domain or SMTP) is configured.";
+      console.error(`[EMAIL DISPATCHER] Production email delivery blocked for ${logContext}: ${reason}`);
       return {
         success: false,
-        provider: "resend",
-        error: errorMsg,
+        simulated: false,
+        sandboxRestricted: Boolean(resendClient && !isCustomDomain),
+        error: reason,
       };
     }
 
-    console.log(`[Resend API] ${logContext} sent successfully to ${normalizedTo} (ID: ${data?.id})`);
-    return {
-      success: true,
-      provider: "resend",
-      messageId: data?.id,
-    };
-  } catch (resendEx: any) {
-    console.error(`[Resend Exception]:`, resendEx);
-    return {
-      success: false,
-      provider: "resend",
-      error: resendEx.message || "Internal error sending email via Resend",
-    };
+    // Explicit non-production simulation ONLY when no provider is selected/usable
+    if (!resendClient && !smtpTransporter) {
+      console.log(
+        `[DEV MODE SIMULATION] Non-production email simulation for ${logContext} to ${normalizedTo} (content redacted).`
+      );
+
+      return {
+        success: true,
+        simulated: true,
+        provider: "simulation",
+        messageId: `simulated_${Date.now()}`,
+      };
+    }
   }
+
+  // 1. Explicit SMTP preference
+  if (providerPref === "smtp" && smtpTransporter) {
+    return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+  }
+
+  // 2. Resend API Flow
+  if (resendClient && providerPref !== "smtp") {
+    const isResendInternalTestAddress = normalizedTo.endsWith("@resend.dev");
+
+    // In production, never dispatch through unverified sandbox sender; route directly to SMTP if configured.
+    if (!isCustomDomain && !isResendInternalTestAddress && smtpTransporter) {
+      console.log(`[Email Dispatcher] Resend custom sender unconfigured for ${normalizedTo}. Routing via SMTP...`);
+      return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+    }
+
+    if (resendUsable) {
+      try {
+        const from = customFromEmail
+          ? (customFromEmail.includes("<") ? customFromEmail : `${fromName} <${customFromEmail}>`)
+          : `${fromName} <${defaultFromEmail}>`;
+        const { data, error } = await resendClient.emails.send({
+          from,
+          to: [normalizedTo],
+          subject,
+          html,
+          text,
+        });
+
+        if (error) {
+          const errorMsg = error.message || "Failed to dispatch via Resend";
+          console.error(`[Resend API Error] Delivery failed for ${logContext}:`, errorMsg);
+
+          if (isResendSandboxError(errorMsg)) {
+            if (smtpTransporter && providerPref !== "resend") {
+              console.log(`[Email Dispatcher] Resend sandbox restriction encountered. Failing over to SMTP...`);
+              return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+            }
+
+            return {
+              success: false,
+              simulated: false,
+              sandboxRestricted: true,
+              provider: "resend",
+              error: errorMsg,
+            };
+          }
+
+          if (smtpTransporter && providerPref !== "resend") {
+            console.log(`[Email Dispatcher] Resend delivery error. Attempting failover to SMTP...`);
+            return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+          }
+
+          return {
+            success: false,
+            simulated: false,
+            provider: "resend",
+            error: errorMsg,
+          };
+        }
+
+        console.log(`[Resend API] ${logContext} sent successfully to ${normalizedTo} (ID: ${data?.id})`);
+        return {
+          success: true,
+          simulated: false,
+          provider: "resend",
+          messageId: data?.id,
+        };
+      } catch (resendEx: any) {
+        const safeErr = resendEx?.message || "Internal error sending email via Resend";
+        console.error(`[Resend Exception] Delivery failed for ${logContext}:`, safeErr);
+        if (smtpTransporter && providerPref !== "resend") {
+          console.log(`[Email Dispatcher] Resend exception. Failing over to SMTP...`);
+          return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+        }
+        return {
+          success: false,
+          simulated: false,
+          provider: "resend",
+          error: safeErr,
+        };
+      }
+    }
+  }
+
+  // 3. SMTP-Only Flow
+  if (smtpTransporter) {
+    return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+  }
+
+  return {
+    success: false,
+    simulated: false,
+    error: "No usable email transport configured.",
+  };
 }
 
 /**
@@ -468,7 +656,10 @@ function generateSecurityNotificationHtml(options: {
 /**
  * Sends an email verification code using the multi-provider dispatcher (Resend / SMTP).
  */
-export async function sendVerificationEmail(options: SendVerificationEmailOptions): Promise<SendEmailResult> {
+export async function sendVerificationEmail(
+  options: SendVerificationEmailOptions,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
   const { to, name = "Developer", otp } = options;
   const html = generateVerificationEmailHtml({ name, otp, email: to });
   const text = `Hello ${name},\n\nYour Orbix account verification code is: ${otp}\n\nThis code expires in 10 minutes.`;
@@ -478,8 +669,10 @@ export async function sendVerificationEmail(options: SendVerificationEmailOption
     subject: `Orbix Verification Code: ${otp}`,
     html,
     text,
+    fromName: "Orbix Team",
+    defaultFromEmail: "onboarding@resend.dev",
     logContext: "Verification email",
-  });
+  }, deps);
 }
 
 /**
@@ -518,61 +711,9 @@ export async function sendSecurityNotificationEmail(options: SendSecurityNotific
     subject,
     html,
     text,
+    fromName: "Orbix Security",
+    defaultFromEmail: "onboarding@resend.dev",
     logContext: "Security notification",
-  });
-}
-
-export interface SendPasswordResetOtpEmailOptions {
-  to: string;
-  name?: string;
-  otp: string;
-  accountType?: string;
-}
-
-/**
- * Dispatches a high-security OTP email for password reset verification.
- */
-export async function sendPasswordResetOtpEmail(options: SendPasswordResetOtpEmailOptions): Promise<SendEmailResult> {
-  const { to, name = "Developer", otp, accountType = "personal" } = options;
-  const isClub = accountType === "club";
-  const entityLabel = isClub ? "Club Account" : "Orbix Account";
-
-  return sendSecurityNotificationEmail({
-    to,
-    name,
-    subject: `Your Orbix Password Reset Code: ${otp}`,
-    badgeText: isClub ? "Club Account Recovery" : "Account Recovery",
-    headline: `Reset your ${entityLabel} password`,
-    message: `We received a request to reset the password for your ${entityLabel}. Use the 6-digit verification code below to verify your identity and set a new secure password.`,
-    otp,
-    otpLabel: "6-Digit Verification Code",
-    isWarning: true,
-    footerNotice: "This verification code will expire in 10 minutes. If you did not make this request, your account is still secure — no password change can occur without this code. You may safely ignore this email.",
-  });
-}
-
-/**
- * Dispatches an account security confirmation email after successful password change.
- */
-export async function sendPasswordResetSuccessEmail(options: {
-  to: string;
-  name?: string;
-  accountType?: string;
-  ipAddressMasked?: string;
-}): Promise<SendEmailResult> {
-  const { to, name = "Developer", accountType = "personal", ipAddressMasked = "Unknown IP" } = options;
-  const isClub = accountType === "club";
-  const entityLabel = isClub ? "Club Account" : "Personal Account";
-
-  return sendSecurityNotificationEmail({
-    to,
-    name,
-    subject: `Security Alert: Your Orbix Password Was Changed`,
-    badgeText: "Security Alert",
-    headline: `Password Changed Successfully`,
-    message: `The password for your Orbix ${entityLabel} (${to}) was successfully reset from ${ipAddressMasked}. For your security, all other existing active sessions and devices have been logged out.`,
-    isWarning: false,
-    footerNotice: "If you did not perform this password reset, please contact Orbix security immediately at support@orbix.dev to protect your account.",
   });
 }
 
@@ -672,8 +813,196 @@ export async function sendGuardianConsentEmail(options: SendGuardianConsentEmail
     subject,
     html,
     text,
+    fromName: "Orbix Minor Protection",
+    defaultFromEmail: "onboarding@resend.dev",
     logContext: "Guardian consent verification",
   });
+}
+
+export interface SendPasswordResetOtpEmailOptions {
+  to: string;
+  name?: string;
+  otp: string;
+  accountType?: string;
+}
+
+/**
+ * Dispatches a high-security OTP email for password reset verification.
+ */
+export async function sendPasswordResetOtpEmail(options: SendPasswordResetOtpEmailOptions): Promise<SendEmailResult> {
+  const { to, name = "Developer", otp, accountType = "personal" } = options;
+  const isClub = accountType === "club";
+  const entityLabel = isClub ? "Club Account" : "Orbix Account";
+
+  return sendSecurityNotificationEmail({
+    to,
+    name,
+    subject: `Your Orbix Password Reset Code: ${otp}`,
+    badgeText: isClub ? "Club Account Recovery" : "Account Recovery",
+    headline: `Reset your ${entityLabel} password`,
+    message: `We received a request to reset the password for your ${entityLabel}. Use the 6-digit verification code below to verify your identity and set a new secure password.`,
+    otp,
+    otpLabel: "6-Digit Verification Code",
+    isWarning: true,
+    footerNotice: "This verification code will expire in 10 minutes. If you did not make this request, your account is still secure — no password change can occur without this code. You may safely ignore this email.",
+  });
+}
+
+/**
+ * Dispatches an account security confirmation email after successful password change.
+ */
+export async function sendPasswordResetSuccessEmail(options: {
+  to: string;
+  name?: string;
+  accountType?: string;
+  ipAddressMasked?: string;
+}): Promise<SendEmailResult> {
+  const { to, name = "Developer", accountType = "personal", ipAddressMasked = "Unknown IP" } = options;
+  const isClub = accountType === "club";
+  const entityLabel = isClub ? "Club Account" : "Personal Account";
+
+  return sendSecurityNotificationEmail({
+    to,
+    name,
+    subject: `Security Alert: Your Orbix Password Was Changed`,
+    badgeText: "Security Alert",
+    headline: `Password Changed Successfully`,
+    message: `The password for your Orbix ${entityLabel} (${to}) was successfully reset from ${ipAddressMasked}. For your security, all other existing active sessions and devices have been logged out.`,
+    isWarning: false,
+    footerNotice: "If you did not perform this password reset, please contact Orbix security immediately at support@orbix.dev to protect your account.",
+  });
+}
+
+
+
+
+export interface SendCollegeVerificationEmailOptions {
+  to: string;
+  studentName?: string;
+  collegeName: string;
+  verificationLink: string;
+  expiresInHours?: number;
+}
+
+function escapeHtml(str: string): string {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * Builds the template for institutional college verification email.
+ */
+export function buildCollegeVerificationEmailTemplate(options: SendCollegeVerificationEmailOptions): {
+  subject: string;
+  headline: string;
+  html: string;
+  text: string;
+  safeLink: string;
+} {
+  const {
+    studentName = "Student",
+    collegeName,
+    verificationLink,
+    expiresInHours = 24,
+  } = options;
+
+  const safeStudent = escapeHtml(studentName);
+  const safeCollege = escapeHtml(collegeName);
+  const safeLink = verificationLink.replace(/"/g, "%22");
+
+  const subject = `Verify your institutional email for ${collegeName} — Orbix`;
+  const headline = `Verify your ${collegeName} Email`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F4F0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F4F4F0; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #FAF6EE; border: 3px solid #000000; box-shadow: 6px 6px 0px 0px #000000; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #000000; padding: 20px 24px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td>
+                    <span style="font-size: 20px; font-weight: 900; letter-spacing: 1.5px; color: #FFE566; text-transform: uppercase;">ORBIX</span>
+                  </td>
+                  <td align="right">
+                    <span style="background-color: #FFE566; color: #000000; padding: 4px 10px; border-radius: 999px; border: 1.5px solid #000000; font-size: 11px; font-weight: 900; text-transform: uppercase;">College Verification</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 24px;">
+              <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 900; color: #000000;">${headline}</h1>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">Hello <strong>${safeStudent}</strong>,</p>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">
+                You requested to verify this institutional email address as part of your college verification application for <strong>${safeCollege}</strong> on Orbix.
+              </p>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">
+                Verifying your institutional email helps confirm your active academic affiliation and expedites review by Orbix founders for your <strong>College Verified</strong> profile badge.
+              </p>
+
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="${safeLink}" style="display: inline-block; background-color: #FFE566; color: #000000; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; text-decoration: none; padding: 14px 28px; border: 2.5px solid #000000; border-radius: 6px; box-shadow: 4px 4px 0px 0px #000000;">Verify My College Email</a>
+              </div>
+
+              <div style="background-color: #FFFFFF; border: 2px solid #000000; padding: 14px 16px; margin: 20px 0; border-radius: 6px; box-shadow: 3px 3px 0px 0px #000000;">
+                <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; color: #000000;">Can't click the button? Copy and paste this link into your browser:</p>
+                <p style="margin: 0; font-size: 11px; word-break: break-all; color: #555555; font-family: monospace;">${safeLink}</p>
+              </div>
+
+              <p style="font-size: 12px; line-height: 1.5; color: #666666; border-top: 1px solid #DDDDDD; padding-top: 16px; margin-top: 24px;">
+                This single-use link will expire in <strong>${expiresInHours} hours</strong>. If you did not initiate this college verification request, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px; background-color: #F0EDE6; border-top: 2px solid #000000; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #777777;">Orbix Platform • Digital Identity & Collegiate Chapter Network</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const text = `Hello ${safeStudent},\n\nYou requested to verify your institutional email address for ${safeCollege} on Orbix.\n\nPlease verify your email by opening the following link within ${expiresInHours} hours:\n\n${verificationLink}\n\nIf you did not request this, please ignore this email.\n\nOrbix Platform`;
+
+  return { subject, headline, html, text, safeLink };
+}
+
+/**
+ * Sends a single-use institutional email verification link for student college verification.
+ */
+export async function sendCollegeVerificationEmail(
+  options: SendCollegeVerificationEmailOptions,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
+  const { to } = options;
+  const template = buildCollegeVerificationEmailTemplate(options);
+
+  return dispatchEmail({
+    to,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    fromName: "Orbix College Verification",
+    defaultFromEmail: "onboarding@resend.dev",
+    logContext: "College institutional email verification",
+  }, deps);
 }
 
 export { OnboardingEmailService } from "./onboardingEmailService.js";
