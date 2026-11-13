@@ -50,6 +50,7 @@ import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
 import { CredibilityImpactModal } from "../../components/credibility/CredibilityImpactModal";
 import { EventLiveListingCard } from "../../components/EventLiveListingCard";
+import { EventActionRow } from "../../components/events/EventActionRow";
 import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import { IssuanceConsoleView } from "./CertificateStudio/IssuanceConsoleView";
@@ -763,10 +764,14 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             : "Cancelled"}
                     </span>
 
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-950 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
-                        <Heart className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
-                        <span>{(event as any).likesCount || 0} Likes</span>
-                    </span>
+                    <EventActionRow
+                        eventId={event.id}
+                        eventTitle={event.title}
+                        eventSummary={event.summary || undefined}
+                        initialLikeCount={(event as any).likesCount}
+                        initialShareCount={(event as any).sharesCount}
+                        size="md"
+                    />
 
                     <button
                         type="button"
@@ -844,10 +849,14 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     Campus Only
                                 </span>
                             )}
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-950 border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
-                                <Heart className="w-3 h-3 text-rose-600 fill-rose-600" />
-                                <span>{(event as any).likesCount || 0} Likes</span>
-                            </span>
+                            <EventActionRow
+                                eventId={event.id}
+                                eventTitle={event.title}
+                                eventSummary={event.summary || undefined}
+                                initialLikeCount={(event as any).likesCount}
+                                initialShareCount={(event as any).sharesCount}
+                                size="md"
+                            />
                         </div>
 
                         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tight leading-tight">

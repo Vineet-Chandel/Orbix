@@ -41,6 +41,7 @@ import { ClubCredibilityService } from "../../services/club/clubCredibilityServi
 import { ClubCredibilityEngine } from "../../scoring/clubCredibilityEngine.js";
 import { sendSoleRegistrationEmail } from "../../services/email/eventRegistrationEmailService.js";
 import { EventStageService } from "../../services/events/eventStageService.js";
+import { toggleEventLike } from "../../services/events/eventEngagementService.js";
 
 const clubRouter = express.Router();
 
@@ -3140,6 +3141,7 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
                 vc.college_name AS "collegeName",
                 vc.category AS "clubCategory",
                 (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likesCount",
+                (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = e.id) AS "sharesCount",
                 CASE WHEN $1::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $1::uuid) ELSE false END AS "hasLiked",
                 CASE WHEN $1::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status IN ('registered', 'attended')) ELSE false END AS "isRegistered",
                 CASE WHEN $1::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status = 'pending') ELSE false END AS "isPending",
@@ -3239,6 +3241,7 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 vc.college_name AS "collegeName",
                 vc.category AS "clubCategory",
                 (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likesCount",
+                (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = e.id) AS "sharesCount",
                 CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $2::uuid) ELSE false END AS "hasLiked",
                 CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended')) ELSE false END AS "isRegistered",
                 CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status = 'pending') ELSE false END AS "isPending",
@@ -3268,57 +3271,23 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
 
 /**
  * POST /api/club/events/:eventId/like
- * Toggles student heart / appreciation for an event.
+ * Toggles student heart / appreciation for an event with Redis acceleration.
  */
 clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         const userId = req.user!.id;
-
-        const checkEvent = await query(
-            `SELECT id FROM club_events WHERE ($1::boolean = true AND id = $2::uuid) OR slug = $3 LIMIT 1;`,
-            [isUuid, isUuid ? eventId : null, eventId]
-        );
-        if (!checkEvent.rows[0]) {
-            return res.status(404).json({ success: false, message: "Event not found." });
-        }
-        const targetEventId = checkEvent.rows[0].id;
-
-        const existing = await query(
-            `SELECT id FROM club_event_likes WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
-            [targetEventId, userId]
-        );
-
-        let liked = false;
-        if (existing.rows[0]) {
-            await query(
-                `DELETE FROM club_event_likes WHERE event_id = $1 AND user_id = $2;`,
-                [targetEventId, userId]
-            );
-            liked = false;
-        } else {
-            await query(
-                `INSERT INTO club_event_likes (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
-                [targetEventId, userId]
-            );
-            liked = true;
-        }
-
-        const countRes = await query(
-            `SELECT COUNT(*)::int AS count FROM club_event_likes WHERE event_id = $1;`,
-            [targetEventId]
-        );
-        const likesCount = countRes.rows[0]?.count || 0;
+        const result = await toggleEventLike(eventId, userId);
 
         return res.json({
             success: true,
-            liked,
-            likesCount,
+            liked: result.likedByViewer,
+            likesCount: result.likeCount,
+            data: result,
         });
     } catch (err: any) {
         console.error("Event like toggle error:", err);
-        return res.status(500).json({ success: false, message: "Failed to update appreciation." });
+        return res.status(500).json({ success: false, message: err.message || "Failed to update appreciation." });
     }
 });
 

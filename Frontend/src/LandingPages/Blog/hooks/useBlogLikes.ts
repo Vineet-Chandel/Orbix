@@ -11,16 +11,49 @@ export interface BlogLikesState {
     toggleLike: () => Promise<void>;
 }
 
-// In-memory cache to share like state across chapter navigation and components
+// In-memory cache to share like state across chapter navigation and mounted components
 const publicationStateCache = new Map<string, { likeCount: number; likedByViewer: boolean; timestamp: number }>();
 const stateListeners = new Map<string, Set<(state: { likeCount: number; likedByViewer: boolean }) => void>>();
 
-function getCacheKey(hoster: string, blogName: string): string {
-    return `${String(hoster || "").trim().toLowerCase()}::${String(blogName || "").trim().toLowerCase()}`;
+function getCacheKey(cleanHoster: string, cleanBlogName: string): string {
+    return `${cleanHoster}::${cleanBlogName}`;
 }
 
-function notifyListeners(key: string, state: { likeCount: number; likedByViewer: boolean }) {
+function getStoredState(cleanHoster: string, cleanBlogName: string): { likeCount: number; likedByViewer: boolean } | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = sessionStorage.getItem(`orbix_blog_likes_${cleanHoster}::${cleanBlogName}`);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (typeof parsed?.likeCount === "number" && typeof parsed?.likedByViewer === "boolean") {
+                return {
+                    likeCount: parsed.likeCount,
+                    likedByViewer: parsed.likedByViewer,
+                };
+            }
+        }
+    } catch {
+        // Safe to ignore storage read errors
+    }
+    return null;
+}
+
+function persistState(cleanHoster: string, cleanBlogName: string, state: { likeCount: number; likedByViewer: boolean }) {
+    if (typeof window === "undefined") return;
+    try {
+        sessionStorage.setItem(
+            `orbix_blog_likes_${cleanHoster}::${cleanBlogName}`,
+            JSON.stringify({ ...state, timestamp: Date.now() })
+        );
+    } catch {
+        // Safe to ignore storage write errors
+    }
+}
+
+function notifyListeners(cleanHoster: string, cleanBlogName: string, state: { likeCount: number; likedByViewer: boolean }) {
+    const key = getCacheKey(cleanHoster, cleanBlogName);
     publicationStateCache.set(key, { ...state, timestamp: Date.now() });
+    persistState(cleanHoster, cleanBlogName, state);
     const listeners = stateListeners.get(key);
     if (listeners) {
         listeners.forEach((listener) => listener(state));
@@ -36,11 +69,18 @@ export function useBlogLikes(hoster: string, blogName: string): BlogLikesState {
     const cleanBlogName = String(blogName || "").trim().toLowerCase();
     const cacheKey = getCacheKey(cleanHoster, cleanBlogName);
 
-    const cached = publicationStateCache.get(cacheKey);
+    // Stale-While-Revalidate: check in-memory cache first, then sessionStorage
+    const initialCached = publicationStateCache.get(cacheKey) || getStoredState(cleanHoster, cleanBlogName);
 
-    const [likeCount, setLikeCount] = useState<number>(cached ? cached.likeCount : 0);
-    const [likedByViewer, setLikedByViewer] = useState<boolean>(cached ? cached.likedByViewer : false);
-    const [loading, setLoading] = useState<boolean>(!cached);
+    // Prime in-memory cache if found in sessionStorage
+    if (initialCached && !publicationStateCache.has(cacheKey)) {
+        publicationStateCache.set(cacheKey, { ...initialCached, timestamp: Date.now() });
+    }
+
+    const [likeCount, setLikeCount] = useState<number>(initialCached ? initialCached.likeCount : 0);
+    const [likedByViewer, setLikedByViewer] = useState<boolean>(initialCached ? initialCached.likedByViewer : false);
+    // When cached data is available, loading starts as false so the count displays immediately
+    const [loading, setLoading] = useState<boolean>(!initialCached);
     const [isToggling, setIsToggling] = useState<boolean>(false);
 
     const isTogglingRef = useRef(false);
@@ -88,7 +128,7 @@ export function useBlogLikes(hoster: string, blogName: string): BlogLikesState {
             if (response.ok) {
                 const data = await response.json();
                 if (data?.data) {
-                    // Do not allow an in-flight mutation to be overwritten by a stale background GET
+                    // Do not allow an in-flight mutation to be overwritten by a background GET
                     if (isTogglingRef.current) return;
 
                     const authoritativeLiked =
@@ -102,8 +142,7 @@ export function useBlogLikes(hoster: string, blogName: string): BlogLikesState {
                     };
                     setLikeCount(freshState.likeCount);
                     setLikedByViewer(freshState.likedByViewer);
-                    publicationStateCache.set(cacheKey, { ...freshState, timestamp: Date.now() });
-                    notifyListeners(cacheKey, freshState);
+                    notifyListeners(cleanHoster, cleanBlogName, freshState);
                 }
             }
         } catch (err) {
@@ -133,7 +172,7 @@ export function useBlogLikes(hoster: string, blogName: string): BlogLikesState {
 
             setLikedByViewer(nextLiked);
             setLikeCount(nextCount);
-            notifyListeners(cacheKey, { likeCount: nextCount, likedByViewer: nextLiked });
+            notifyListeners(cleanHoster, cleanBlogName, { likeCount: nextCount, likedByViewer: nextLiked });
 
             try {
                 const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
@@ -176,21 +215,21 @@ export function useBlogLikes(hoster: string, blogName: string): BlogLikesState {
                     };
                     setLikeCount(serverState.likeCount);
                     setLikedByViewer(serverState.likedByViewer);
-                    notifyListeners(cacheKey, serverState);
+                    notifyListeners(cleanHoster, cleanBlogName, serverState);
                 }
             } catch (err: any) {
                 // Rollback on failure
                 console.error("[useBlogLikes] Like toggle failed, rolling back:", err);
                 setLikedByViewer(previousLiked);
                 setLikeCount(previousCount);
-                notifyListeners(cacheKey, { likeCount: previousCount, likedByViewer: previousLiked });
+                notifyListeners(cleanHoster, cleanBlogName, { likeCount: previousCount, likedByViewer: previousLiked });
                 toast.error(err.message || "Failed to update like. Please try again.");
             } finally {
                 isTogglingRef.current = false;
                 setIsToggling(false);
             }
         },
-        [likedByViewer, likeCount, cacheKey, cleanHoster, cleanBlogName, toast]
+        [likedByViewer, likeCount, cleanHoster, cleanBlogName, toast]
     );
 
     // Auto-execute pending like action after returning from successful login
@@ -258,4 +297,3 @@ export function useBlogLikes(hoster: string, blogName: string): BlogLikesState {
         toggleLike,
     };
 }
-

@@ -29,6 +29,7 @@ export interface CollegeEventItem {
     collegeId?: string | null;
     clubCategory?: string;
     likesCount: number;
+    sharesCount?: number;
     hasLiked: boolean;
     isRegistered: boolean;
     isPending?: boolean;

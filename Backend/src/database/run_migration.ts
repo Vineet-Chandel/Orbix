@@ -157,6 +157,9 @@ export const MIGRATION_SIGNATURES: Record<string, { tables?: string[]; columns?:
         tables: ["college_verifications", "college_verification_email_tokens", "college_verification_phone_otps"],
         columns: ["users.is_college_verified", "users.college_verified_at"],
     },
+    "061_club_event_shares.sql": {
+        tables: ["club_event_shares"],
+    },
 };
 
 /**

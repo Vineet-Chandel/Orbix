@@ -5,6 +5,7 @@ import {
     getBatchPublicationLikes,
     likePublication,
     unlikePublication,
+    invalidatePublicationLikeCache,
 } from "../src/services/blog/blogLikeService.js";
 
 async function runTests() {
@@ -44,6 +45,8 @@ async function runTests() {
 
         // Clean any existing test rows for test publications
         await query(`DELETE FROM blog_likes WHERE hoster IN ($1, $2);`, [testHosterA, testHosterB]);
+        await invalidatePublicationLikeCache(testHosterA, testBlogA);
+        await invalidatePublicationLikeCache(testHosterB, testBlogB);
 
         // Test 1: Guest retrieval on empty publication
         console.log("\n2. Testing Guest retrieval on empty publication...");
@@ -150,6 +153,7 @@ async function runTests() {
         // Test 11: Cascading deletion on user delete
         console.log("\n12. Testing Foreign Key ON DELETE CASCADE...");
         await query(`DELETE FROM users WHERE id = $1;`, [testUser2Id]);
+        await invalidatePublicationLikeCache(testHosterA, testBlogA);
         const countAfterUserDelete = await getPublicationLikeInfo(testHosterA, testBlogA, null);
         if (countAfterUserDelete.likeCount !== 0) {
             throw new Error(`Test 11 Failed: Expected count 0 after user deletion, got ${countAfterUserDelete.likeCount}`);

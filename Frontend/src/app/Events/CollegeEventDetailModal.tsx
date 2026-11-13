@@ -7,8 +7,6 @@ import {
     Clock,
     MapPin,
     Users,
-    Heart,
-    Share2,
     CheckCircle2,
     ExternalLink,
     Building2,
@@ -27,6 +25,7 @@ import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
 import { ClubMarkdownRenderer } from "../Club/Profile/ClubMarkdownRenderer";
 import { EventPublicTimelineView } from "./EventPublicTimelineView";
+import { EventActionRow } from "../../components/events/EventActionRow";
 
 interface CollegeEventDetailModalProps {
     event: CollegeEventItem | null;
@@ -41,11 +40,9 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
     isOpen,
     onClose,
     onApply,
-    onToggleHeart,
 }) => {
     const toast = useToast();
     const [copiedCode, setCopiedCode] = useState(false);
-    const [copiedShareLink, setCopiedShareLink] = useState(false);
 
     if (!isOpen || !event) return null;
 
@@ -64,10 +61,10 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
 
     const formattedEndTime = event.endsAt
         ? new Date(event.endsAt).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-          })
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        })
         : null;
 
     const isCompleted = event.status === "completed" || new Date(event.endsAt || event.startsAt).getTime() < Date.now();
@@ -84,14 +81,6 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
         setTimeout(() => setCopiedCode(false), 2000);
     };
 
-    const handleCopyShareLink = () => {
-        const url = `${window.location.origin}/college-events?event=${event.id}`;
-        navigator.clipboard.writeText(url);
-        setCopiedShareLink(true);
-        toast.success("Event link copied to clipboard!");
-        setTimeout(() => setCopiedShareLink(false), 2000);
-    };
-
     if (typeof document === "undefined") return null;
 
     return createPortal(
@@ -100,9 +89,8 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1 ${
-                            event.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#a2ff86] text-black"
-                        }`}>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1 ${event.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#a2ff86] text-black"
+                            }`}>
                             {event.scope === "PAN_INDIA" ? (
                                 <>
                                     <Globe2 className="w-3 h-3" />
@@ -146,13 +134,12 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                 />
                                 <div className="absolute top-3 left-3 flex items-center gap-2">
                                     <span
-                                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] ${
-                                            isCompleted
-                                                ? "bg-neutral-200 text-neutral-800"
-                                                : isLiveNow
+                                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] ${isCompleted
+                                            ? "bg-neutral-200 text-neutral-800"
+                                            : isLiveNow
                                                 ? "bg-emerald-300 text-black animate-pulse"
                                                 : "bg-[#a2ff86] text-black"
-                                        }`}
+                                            }`}
                                     >
                                         {isCompleted ? "Completed" : isLiveNow ? "Live Now" : "Upcoming"}
                                     </span>
@@ -165,36 +152,16 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                 <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-tight flex-1">
                                     {event.title}
                                 </h1>
-                                <div className="flex items-center gap-2 shrink-0 pt-0.5">
-                                    {onToggleHeart && (
-                                        <button
-                                            type="button"
-                                            onClick={() => onToggleHeart(event)}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer ${
-                                                event.hasLiked
-                                                    ? "bg-rose-100 text-rose-700"
-                                                    : "bg-white hover:bg-neutral-100 text-neutral-800"
-                                            }`}
-                                            title={event.hasLiked ? "Remove heart" : "Appreciate event"}
-                                        >
-                                            <Heart
-                                                className={`w-3.5 h-3.5 ${
-                                                    event.hasLiked ? "fill-rose-600 text-rose-600" : "text-black"
-                                                }`}
-                                            />
-                                            <span>{event.likesCount || 0}</span>
-                                        </button>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyShareLink}
-                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
-                                        title="Share event link"
-                                    >
-                                        {copiedShareLink ? <Check className="w-3.5 h-3.5 text-green-700" /> : <Share2 className="w-3.5 h-3.5" />}
-                                        <span className="hidden sm:inline">{copiedShareLink ? "Copied" : "Share"}</span>
-                                    </button>
+                                <div className="flex items-center shrink-0 pt-0.5">
+                                    <EventActionRow
+                                        eventId={event.id}
+                                        eventTitle={event.title}
+                                        eventSummary={event.summary || undefined}
+                                        initialLikeCount={event.likesCount}
+                                        initialLiked={event.hasLiked}
+                                        initialShareCount={(event as any).sharesCount}
+                                        size="md"
+                                    />
                                 </div>
                             </div>
                             {event.summary && (
@@ -298,8 +265,8 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                                     (event.locationType === "virtual"
                                                         ? "Virtual Session (Online Link)"
                                                         : event.locationType === "hybrid"
-                                                        ? "Hybrid Campus & Online"
-                                                        : "Campus Hall")}
+                                                            ? "Hybrid Campus & Online"
+                                                            : "Campus Hall")}
                                             </div>
                                             <div className="text-[11px] text-neutral-500 font-medium">
                                                 Mode: <span className="capitalize">{event.locationType || "In-Person"}</span>
