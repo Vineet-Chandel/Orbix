@@ -26,6 +26,7 @@ import {
 import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
 import { ClubMarkdownRenderer } from "../Club/Profile/ClubMarkdownRenderer";
+import { EventPublicTimelineView } from "./EventPublicTimelineView";
 
 interface CollegeEventDetailModalProps {
     event: CollegeEventItem | null;
@@ -444,7 +445,14 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                         </div>
 
                         {/* RIGHT COLUMN: Full Description & Agenda (7 cols) */}
-                        <div className="lg:col-span-7">
+                        <div className="lg:col-span-7 space-y-4">
+                            {/* Interactive Event Timeline & Deliverables Pipeline */}
+                            <EventPublicTimelineView
+                                eventId={event.id}
+                                isRegistered={Boolean(event.isRegistered || event.registrationStatus === "registered")}
+                                registrationStatus={event.registrationStatus || undefined}
+                            />
+
                             <div className="p-5 sm:p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
                                 <div className="flex items-center gap-2 border-b-2 border-black/10 pb-3">
                                     <BookOpen className="w-5 h-5 text-black" />

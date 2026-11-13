@@ -1,10 +1,10 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     X,
     Award,
     Copy,
-    Printer,
+    Download,
     Share2,
     ShieldCheck,
     Calendar,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import type { CertificateItem } from "../../api/clubCertificatesApi";
+import { OrbixLogo } from "../../components/OrbixLogo";
+import { downloadPassPdf } from "../../utils/passPdfGenerator";
 
 interface CertificateModalProps {
     certificate: CertificateItem | null;
@@ -40,8 +42,33 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
         toast.success("Verification link copied to clipboard!");
     };
 
-    const handlePrint = () => {
-        window.print();
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadCertificatePdf = async () => {
+        if (!certificate || isDownloading) return;
+        const safeTitle = (certificate.title || certificate.eventTitle || "Certificate").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `Orbix-Certificate-${safeTitle}.pdf`;
+
+        try {
+            await downloadPassPdf({
+                elementId: "official-certificate-frame",
+                filename,
+                backgroundColor: "#fffdf9",
+                pixelRatio: 2.5,
+                onStart: () => setIsDownloading(true),
+                onSuccess: () => {
+                    setIsDownloading(false);
+                    toast.success("Certificate PDF downloaded successfully!");
+                },
+                onError: (err) => {
+                    setIsDownloading(false);
+                    console.error("Certificate PDF generation error:", err);
+                    toast.error("Could not download certificate PDF. Please try again.");
+                },
+            });
+        } catch {
+            setIsDownloading(false);
+        }
     };
 
     const formattedDate = new Date(certificate.issueDate).toLocaleDateString("en-US", {
@@ -97,16 +124,17 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                             <span className="hidden sm:inline">Share Link</span>
                         </button>
                         <button
-                            onClick={handlePrint}
-                            title="Print or Save PDF"
-                            className="px-2.5 py-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                            onClick={handleDownloadCertificatePdf}
+                            disabled={isDownloading}
+                            title="Download Certificate as PDF"
+                            className="px-2.5 py-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-60 cursor-pointer"
                         >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Print / PDF</span>
+                            <Download className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{isDownloading ? "Generating..." : "Download PDF"}</span>
                         </button>
                         <button
                             onClick={onClose}
-                            className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 shadow-[2px_2px_0px_#000] transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                            className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 shadow-[2px_2px_0px_#000] transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -115,6 +143,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
 
                 {/* Printable Certificate Frame */}
                 <div
+                    id="official-certificate-frame"
                     ref={certRef}
                     className="p-6 sm:p-10 bg-[#fffdf9] border-[10px] border-double border-black m-4 sm:m-6 rounded-xl relative shadow-inner overflow-hidden select-text"
                 >
@@ -157,8 +186,8 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                             </div>
 
                             <div className="text-right flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg border-2 border-black bg-black text-[#a2ff86] flex items-center justify-center font-black text-xs">
-                                    OX
+                                <div className="w-7 h-7 rounded-lg border-2 border-black bg-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
+                                    <OrbixLogo className="w-4 h-4 text-white" />
                                 </div>
                                 <div className="text-left sm:text-right">
                                     <div className="text-[11px] font-black uppercase tracking-wider text-black">

@@ -22,7 +22,6 @@ import {
     Heart,
     ThumbsUp,
     Award,
-    Printer,
     Download,
     RotateCcw,
     Clock,
@@ -60,6 +59,7 @@ import { useToast } from "../../../context/ToastContext";
 import { OrbixLoader } from "../../../components/ui/loader";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
 import { downloadPassPdf } from "../../../utils/passPdfGenerator";
+import { OrbixLogo } from "../../../components/OrbixLogo";
 
 export interface StudentFormRendererProps {
     form: ClubEventFormRecord;
@@ -796,8 +796,34 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 id="application-pass-card"
                 className="w-full max-w-xl mx-auto rounded-3xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 text-left space-y-4 animate-in fade-in duration-200 print:shadow-none print:border-2 print:p-6 print:rounded-2xl print:bg-white print:max-w-full"
             >
+                {/* 1. Official Orbix Brand Header & Authenticity Stamp */}
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center text-white border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <OrbixLogo className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-1.5 leading-none">
+                                <span className="font-black text-sm sm:text-base text-black tracking-tight uppercase">ORBIX</span>
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                    Verified Pass
+                                </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-neutral-500 block leading-tight mt-1">
+                                Collegiate Ecosystem • Official Admission Pass
+                            </span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase tracking-wider block">Security Hash</span>
+                        <span className="text-xs font-mono font-black text-black">
+                            {submittedRegistration.id ? submittedRegistration.id.slice(0, 8).toUpperCase() : "VERIFIED"}
+                        </span>
+                    </div>
+                </div>
+
                 {/* Top Pass Status & Metadata Header */}
-                <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-black/15">
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b-2 border-black/15">
                     {/* Status Pill */}
                     {isApproved ? (
                         <span className="px-3.5 py-1 rounded-full text-black bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black inline-flex items-center gap-1.5 uppercase tracking-wide">
@@ -812,7 +838,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     )}
 
                     {/* Registration ID & Copy */}
-                    <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-neutral-800 bg-white/80 px-2.5 py-1 rounded-xl border border-black/20 shadow-[1px_1px_0px_#000]">
+                    <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-black bg-white px-3 py-1 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
                         <span className="text-[10px] uppercase font-black text-neutral-500 font-sans">Pass ID:</span>
                         <span className="text-black font-black truncate max-w-[120px] sm:max-w-[170px]" title={submittedRegistration.id}>
                             {submittedRegistration.id}
@@ -824,7 +850,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             title="Copy ID"
                             data-no-print="true"
                         >
-                            {copiedRegId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                            {copiedRegId ? <Check className="w-3 h-3 text-emerald-600 stroke-[3]" /> : <Copy className="w-3 h-3" />}
                         </button>
                     </div>
                 </div>
@@ -834,7 +860,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
                         {event?.title || form.title}
                     </h2>
-                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
+                    <p className="text-xs text-neutral-700 font-bold leading-relaxed">
                         {isApproved
                             ? form.settings?.confirmationMessage || "Your registration has been confirmed! Present your pass code at event check-in."
                             : "Thank you! Your registration has been submitted successfully and is awaiting review from the club organizers."}
@@ -842,31 +868,50 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 </div>
 
                 {/* Event Logistics (Date, Venue, Organizer) - Integrated without repeated boxes */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-bold text-neutral-800 py-2.5 border-y border-black/10">
-                    {formattedDate && (
-                        <span className="inline-flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                            <span>{formattedDate} {formattedTime ? `• ${formattedTime}` : ""}</span>
-                        </span>
-                    )}
-                    <span className="inline-flex items-center gap-1.5 truncate">
-                        <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                        <span>{event?.venueOrLocation || "Campus"}</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 truncate text-neutral-600 sm:ml-auto">
-                        <School className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                        <span>Hosted by <strong className="text-black font-black">{club?.name || "Verified Club"}</strong></span>
-                    </span>
+                <div className="p-3.5 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-xl bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000] shrink-0">
+                            <Calendar className="w-3.5 h-3.5 text-black" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[9px] font-black uppercase text-neutral-500 block leading-tight">Session Timing</span>
+                            <span className="truncate block font-bold text-black text-[11px] mt-0.5">
+                                {formattedDate ? `${formattedDate}${formattedTime ? ` • ${formattedTime}` : ""}` : "Check event schedule"}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-xl bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000] shrink-0">
+                            <MapPin className="w-3.5 h-3.5 text-black" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[9px] font-black uppercase text-neutral-500 block leading-tight">Location & Venue</span>
+                            <span className="truncate block font-bold text-black text-[11px] mt-0.5">
+                                {event?.venueOrLocation || "Campus Venue"}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-xl bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000] shrink-0">
+                            <School className="w-3.5 h-3.5 text-black" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[9px] font-black uppercase text-neutral-500 block leading-tight">Host Club</span>
+                            <span className="truncate block font-black text-black text-[11px] mt-0.5">
+                                {club?.name || "Verified Club"}
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Ticket Perforation Dashed Line */}
-                <div className="relative py-1">
-                    <div className="border-b-2 border-dashed border-black/25 w-full"></div>
+                <div className="relative py-1 flex items-center">
+                    <div className="border-b-2 border-dashed border-black/30 w-full" />
                 </div>
 
                 {/* Entry Clearance Section */}
                 {isApproved && submittedRegistration.ticketCode ? (
-                    <div className="p-4 rounded-2xl bg-white border border-black/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
                         <div className="space-y-0.5">
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 flex items-center gap-1">
                                 <Ticket className="w-3.5 h-3.5 text-black" />
@@ -875,7 +920,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             <div className="font-mono text-2xl font-black text-black tracking-widest">
                                 {submittedRegistration.ticketCode}
                             </div>
-                            <span className="text-[11px] text-neutral-600 font-medium block">
+                            <span className="text-[11px] text-neutral-600 font-bold block">
                                 Present this ticket code or pass during entry check-in.
                             </span>
                         </div>
@@ -886,18 +931,23 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             data-no-print="true"
                             title="Copy Pass Code"
                         >
-                            {copiedTicket ? <Check className="w-3.5 h-3.5 text-black" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedTicket ? <Check className="w-3.5 h-3.5 text-black stroke-[3]" /> : <Copy className="w-3.5 h-3.5" />}
                             <span>{copiedTicket ? "Copied" : "Copy Code"}</span>
                         </button>
                     </div>
                 ) : (
-                    <div className="p-3.5 rounded-2xl bg-amber-50/90 border-l-4 border-amber-500 text-left space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-amber-900">
-                            <Ticket className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span>Entry Pass Pending Organizer Review</span>
+                    <div className="p-4 rounded-2xl bg-[#FFFBEB] border-2 border-black shadow-[3px_3px_0px_#000] text-left space-y-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FFE566] border border-black font-black text-[10px] uppercase tracking-wider text-black shadow-[1px_1px_0px_#000]">
+                                <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Entry Pass Pending Organizer Review</span>
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-amber-950 bg-amber-100 px-2 py-0.5 rounded border border-amber-800">
+                                Pass Issuance Pending
+                            </span>
                         </div>
-                        <p className="text-xs text-neutral-700 font-medium leading-relaxed">
-                            Your entry pass number and check-in QR pass will be issued once your registration is approved by <strong className="text-black">{club?.name || "the club organizers"}</strong>. You will receive an in-app notification immediately upon acceptance.
+                        <p className="text-xs text-neutral-800 font-bold leading-relaxed">
+                            Your entry pass number and check-in QR pass will be issued once your registration is approved by <strong className="text-black font-black">{club?.name || "the club organizers"}</strong>. You will receive an in-app notification immediately upon acceptance.
                         </p>
                     </div>
                 )}
@@ -907,19 +957,19 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     <button
                         type="button"
                         onClick={() => setShowAnswersSummary((prev) => !prev)}
-                        className="w-full py-2 flex items-center justify-between text-xs font-black uppercase tracking-wider text-black border-b border-black/15 cursor-pointer hover:text-neutral-700 transition-colors print:hidden no-print"
+                        className="w-full p-3 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between text-xs font-black uppercase tracking-wider text-black cursor-pointer hover:bg-neutral-50 transition-all print:hidden no-print"
                         data-no-print="true"
                     >
-                        <span className="flex items-center gap-1.5">
-                            <ClipboardList className="w-3.5 h-3.5" />
-                            Submitted Registration Details
+                        <span className="flex items-center gap-2">
+                            <ClipboardList className="w-4 h-4 stroke-[2.5]" />
+                            <span>Submitted Registration Details</span>
                         </span>
                         {showAnswersSummary ? <ChevronUp className="w-4 h-4 stroke-[2.5]" /> : <ChevronDown className="w-4 h-4 stroke-[2.5]" />}
                     </button>
 
                     {/* Registration response details */}
                     <div className={`space-y-3 pt-3 text-xs ${showAnswersSummary ? "block" : "hidden print:block"}`}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pb-2.5 border-b border-black/10 text-[11px]">
+                        <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
                                 <span className="text-neutral-500 font-black uppercase block text-[10px]">Applicant Name</span>
                                 <p className="font-bold text-black">{submittedRegistration.applicantName || effectiveProfile.fullName}</p>
@@ -948,15 +998,15 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
                         {/* Question answers list */}
                         {allQuestions.length > 0 && (
-                            <div className="space-y-2 max-h-60 overflow-y-auto print:max-h-none print:overflow-visible pr-1">
+                            <div className="space-y-2.5 max-h-60 overflow-y-auto print:max-h-none print:overflow-visible pr-1">
                                 {allQuestions.map((q) => {
                                     const submittedAns = submittedRegistration.answers?.[q.id];
                                     if (submittedAns === undefined || submittedAns === null || submittedAns === "") return null;
 
                                     return (
-                                        <div key={q.id} className="p-2.5 rounded-xl bg-white/70 border border-black/10 space-y-0.5">
-                                            <span className="font-bold text-[10px] uppercase text-neutral-500 block">{q.title}</span>
-                                            <p className="font-bold text-black text-xs whitespace-pre-wrap">
+                                        <div key={q.id} className="p-3 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-1 text-left">
+                                            <span className="font-black text-[10px] uppercase tracking-wide text-neutral-600 block">{q.title}</span>
+                                            <p className="font-bold text-black text-xs whitespace-pre-wrap leading-relaxed">
                                                 {typeof submittedAns === "object"
                                                     ? Array.isArray(submittedAns)
                                                         ? submittedAns.join(", ")
@@ -974,20 +1024,20 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             <div className="space-y-1.5 pt-1">
                                 <span className="text-[10px] font-black uppercase text-neutral-500">Uploaded Files</span>
                                 {submittedRegistration.fileAttachments.map((f: FileAttachmentMeta, idx: number) => (
-                                    <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-white/70 border border-black/10 text-xs">
+                                    <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs">
                                         <div className="flex items-center gap-2 truncate">
-                                            <Paperclip className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                                            <span className="font-bold text-black truncate">{f.fileName}</span>
+                                            <Paperclip className="w-4 h-4 text-black shrink-0" />
+                                            <span className="font-black text-black truncate">{f.fileName}</span>
                                         </div>
                                         <a
                                             href={f.fileUrl}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-[11px] font-black text-black hover:underline shrink-0 flex items-center gap-1 print:hidden no-print"
+                                            className="px-2.5 py-1 rounded-lg bg-[#FFE566] text-black font-black text-[11px] border border-black hover:bg-[#FACC15] shrink-0 flex items-center gap-1 print:hidden no-print"
                                             data-no-print="true"
                                         >
                                             <span>View</span>
-                                            <ExternalLink className="w-3 h-3" />
+                                            <ExternalLink className="w-3 h-3 stroke-[2.5]" />
                                         </a>
                                     </div>
                                 ))}
@@ -1089,42 +1139,51 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     </div>
                 )}
 
-                {/* Action Buttons Toolbar (Strictly hidden when printing or exporting PDF) */}
+                {/* Official Footer Verification Strip */}
+                <div className="pt-2.5 border-t-2 border-black/15 flex flex-wrap items-center justify-between gap-2 text-[10px] text-neutral-600 font-bold">
+                    <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-black shrink-0" />
+                        <span>Verified Event Admission Pass • Orbix ID: <strong className="text-black font-mono">{submittedRegistration.id}</strong></span>
+                    </div>
+                    <span className="font-mono text-[9px] text-neutral-400">orbix.in/verify</span>
+                </div>
+
+                {/* Action Buttons Toolbar (Strictly hidden when exporting PDF) */}
                 <div
-                    className="flex flex-wrap items-center justify-center gap-2.5 pt-3 border-t border-black/15 print:hidden no-print"
+                    className="flex flex-wrap items-center justify-center gap-2.5 pt-3 border-t-2 border-black/20 print:hidden no-print"
                     data-no-print="true"
                 >
-                    {/* Download PDF Pass */}
+                    {/* Download Official Pass (PDF) */}
                     <button
                         type="button"
                         onClick={handleDownloadPdf}
                         disabled={isDownloadingPdf}
-                        className="px-4 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-60"
-                        title="Download Pass as PDF"
+                        className="px-5 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-60"
+                        title="Download Pass as Official PDF"
                     >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>{isDownloadingPdf ? "Generating PDF..." : "Download PDF Pass"}</span>
-                    </button>
-
-                    {/* Print Pass Receipt */}
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                        title="Print Pass Receipt"
-                    >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>Print Pass Receipt</span>
+                        <Download className="w-4 h-4 stroke-[2.5]" />
+                        <span>{isDownloadingPdf ? "Generating PDF..." : "Download Pass (PDF)"}</span>
                     </button>
 
                     {/* View My Applications */}
                     <Link
                         to="/applications"
-                        className="px-4 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         <span>My Applications</span>
                         <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
                     </Link>
+
+                    {/* Done / Close Button */}
+                    {onCancel && (
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        >
+                            Done
+                        </button>
+                    )}
 
                     {/* Edit Response (if allowed) */}
                     {form.settings?.allowEditResponse && (

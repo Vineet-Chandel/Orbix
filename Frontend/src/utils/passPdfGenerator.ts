@@ -4,17 +4,22 @@ import { PDFDocument } from "pdf-lib";
 export interface DownloadPassPdfOptions {
     elementId: string;
     filename: string;
+    backgroundColor?: string;
+    pixelRatio?: number;
     onStart?: () => void;
     onSuccess?: () => void;
     onError?: (err: Error) => void;
 }
 
 /**
- * Generates and downloads a clean, high-resolution PDF of the Event Registration Pass.
+ * Generates and downloads a clean, ultra-high-resolution PDF of the Event Registration Pass / Certificate.
+ * Preserves authentic Orbix Neo-Brutalist branding, logos, QR codes, and prevents any cropping or button artifacts.
  */
 export async function downloadPassPdf({
     elementId,
     filename,
+    backgroundColor,
+    pixelRatio = 2.5,
     onStart,
     onSuccess,
     onError,
@@ -24,26 +29,27 @@ export async function downloadPassPdf({
 
         const passNode = document.getElementById(elementId);
         if (!passNode) {
-            throw new Error("Application pass element not found on page.");
+            throw new Error(`Target pass element "#${elementId}" not found on page.`);
         }
 
-        // Wait for fonts to be ready
+        // Wait for fonts to finish rendering
         if (document.fonts) {
             await document.fonts.ready;
         }
 
-        // Generate crisp 2x retina PNG snapshot of the pass element
+        // Generate crisp 2.5x retina PNG snapshot of the pass element
         const pngDataUrl = await toPng(passNode, {
             quality: 1.0,
-            pixelRatio: 2,
-            backgroundColor: "#FAF6EE",
+            pixelRatio,
+            ...(backgroundColor ? { backgroundColor } : {}),
             filter: (node) => {
-                // Exclude action buttons marked with print:hidden or no-print
+                // Strictly exclude UI action buttons, toggles, close buttons, and print triggers
                 if (node instanceof HTMLElement) {
                     if (
                         node.classList.contains("print:hidden") ||
                         node.classList.contains("no-print") ||
-                        node.getAttribute("data-no-print") === "true"
+                        node.getAttribute("data-no-print") === "true" ||
+                        node.getAttribute("aria-label") === "Close"
                     ) {
                         return false;
                     }
@@ -58,16 +64,26 @@ export async function downloadPassPdf({
 
         // Standard A4 dimensions in PostScript points: 595.28 x 841.89
         const a4Width = 595.28;
+        const a4Height = 841.89;
         const margin = 28;
         const usableWidth = a4Width - margin * 2;
         const scaledHeight = (pngImage.height / pngImage.width) * usableWidth;
-        const pageHeight = Math.max(841.89, scaledHeight + margin * 2);
 
-        // Add page matching scaled pass receipt
-        const page = pdfDoc.addPage([a4Width, pageHeight]);
+        // Position on page: center vertically if shorter than A4; extend page if longer
+        let pageWidth = a4Width;
+        let pageHeight = a4Height;
+        let drawX = margin;
+        let drawY = Math.max(margin, (a4Height - scaledHeight) / 2);
+
+        if (scaledHeight + margin * 2 > a4Height) {
+            pageHeight = scaledHeight + margin * 2;
+            drawY = margin;
+        }
+
+        const page = pdfDoc.addPage([pageWidth, pageHeight]);
         page.drawImage(pngImage, {
-            x: margin,
-            y: pageHeight - margin - scaledHeight,
+            x: drawX,
+            y: drawY,
             width: usableWidth,
             height: scaledHeight,
         });
@@ -86,8 +102,9 @@ export async function downloadPassPdf({
 
         if (onSuccess) onSuccess();
     } catch (err: any) {
-        console.error("Failed to generate application pass PDF:", err);
+        console.error("Failed to generate Orbix pass PDF:", err);
         if (onError) onError(err);
         else throw err;
     }
 }
+

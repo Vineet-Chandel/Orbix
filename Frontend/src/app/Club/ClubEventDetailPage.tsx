@@ -8,7 +8,6 @@ import {
     ExternalLink,
     Edit3,
     Trash2,
-    Users,
     QrCode,
     FileSpreadsheet,
     CheckCircle2,
@@ -26,10 +25,10 @@ import {
     Award,
     ScanLine,
     Sliders,
-    Paperclip,
     Heart,
     Settings,
     Globe2,
+    Layers,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -43,7 +42,6 @@ import { useToast } from "../../context/ToastContext";
 import {
     fetchClubEventApplications,
     updateApplicantStatus,
-    getEventApplicationsExportUrl,
     type ClubEventApplicantRow,
     type ClubEventApplicationsResponse,
 } from "../../api/collegeEventsApi";
@@ -57,8 +55,17 @@ import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspa
 import { IssuanceConsoleView } from "./CertificateStudio/IssuanceConsoleView";
 import { OrbixLoader } from "../../components/ui/loader";
 import { NeoSelect } from "../../components/NeoSelect";
+import { ClubEventStagesConsole } from "./Stages/ClubEventStagesConsole";
+import {
+    useApplicationsFilterSort,
+    ApplicationsRosterTable,
+    ActiveFiltersBar,
+    exportApplicationsToCsv,
+    type DynamicQuestionMeta,
+    type TableColumnDefinition,
+} from "./ApplicationsRoster";
 
-type EventTab = "roster" | "form" | "checkin" | "certificates" | "analytics" | "pass" | "settings";
+type EventTab = "roster" | "stages" | "form" | "checkin" | "certificates" | "analytics" | "pass" | "settings";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -151,22 +158,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     // Applications & Roster State
     const [appsData, setAppsData] = useState<ClubEventApplicationsResponse | null>(null);
     const [loadingApps, setLoadingApps] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<
-        "all" | "pending" | "registered" | "attended" | "rejected" | "cancelled"
-    >("all");
-    const [institutionFilter, setInstitutionFilter] = useState<string>("all");
-    const [stateFilter, setStateFilter] = useState<string>("all");
     const [updatingApplicantId, setUpdatingApplicantId] = useState<string | null>(null);
     const [copiedShareLink, setCopiedShareLink] = useState(false);
-
-    // Reset institution and state filters if event is campus-bounded
-    useEffect(() => {
-        if (!isPanIndia) {
-            setInstitutionFilter("all");
-            setStateFilter("all");
-        }
-    }, [isPanIndia]);
 
     // Check authentication and load event from backend
     const loadEventDetails = async () => {
@@ -395,8 +388,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     };
 
     // Extract dynamic form question columns from form structure and response answers
-    const formQuestions = useMemo(() => {
-        const questions: { id: string; label: string; type?: string }[] = [];
+    const formQuestions = useMemo<DynamicQuestionMeta[]>(() => {
+        const questions: DynamicQuestionMeta[] = [];
         const seenIds = new Set<string>();
 
         // 1. From formStructure.sections
@@ -419,6 +412,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             id: q.id,
                             label: q.title || q.label || "Question",
                             type: q.type,
+                            options: q.options || q.choices || [],
+                            required: q.required,
                         });
                     }
                 });
@@ -453,87 +448,58 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         return questions;
     }, [appsData]);
 
-    // Format & render each answer cell nicely in the roster table
-    const renderAnswerValue = (
-        app: ClubEventApplicantRow,
-        question: { id: string; label: string; type?: string }
-    ) => {
-        // File attachments check
-        if (app.fileAttachments && app.fileAttachments.length > 0) {
-            const matched = app.fileAttachments.filter((f) => f.questionId === question.id);
-            if (matched.length > 0) {
-                return (
-                    <div className="flex flex-col gap-1 max-w-[220px]">
-                        {matched.map((f, idx) => (
-                            <a
-                                key={idx}
-                                href={f.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:underline truncate"
-                                title={f.fileName || "View Attachment"}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <Paperclip className="w-3 h-3 shrink-0" />
-                                <span className="truncate">{f.fileName || "Attachment"}</span>
-                            </a>
-                        ))}
-                    </div>
-                );
-            }
+    // Enhanced Filter and Sort Hook for Spreadsheet Data Grid
+    const {
+        searchQuery,
+        setSearchQuery,
+        statusFilter,
+        setStatusFilter,
+        institutionFilter,
+        setInstitutionFilter,
+        stateFilter,
+        setStateFilter,
+        columnFilters,
+        setColumnFilter,
+        removeColumnFilter,
+        clearAllFilters,
+        sort,
+        toggleSort,
+        filteredApplications,
+        hasActiveFilters,
+    } = useApplicationsFilterSort({
+        applications: appsData?.applications || [],
+        dynamicQuestions: formQuestions,
+    });
+
+    // Reset institution and state filters if event is campus-bounded
+    useEffect(() => {
+        if (!isPanIndia) {
+            setInstitutionFilter("all");
+            setStateFilter("all");
         }
+    }, [isPanIndia, setInstitutionFilter, setStateFilter]);
 
-        const ansObj = app.answers || app.formResponse || {};
-        const val = ansObj[question.id];
-
-        if (val === null || val === undefined || val === "") {
-            return <span className="text-neutral-400 font-normal">—</span>;
-        }
-
-        if (Array.isArray(val)) {
-            if (val.length === 0) return <span className="text-neutral-400 font-normal">—</span>;
-            const text = val.join(", ");
-            return (
-                <span className="font-medium text-neutral-800 block truncate max-w-[220px]" title={text}>
-                    {text}
-                </span>
-            );
-        }
-
-        if (typeof val === "object") {
-            const jsonStr = JSON.stringify(val);
-            return (
-                <span className="font-mono text-[11px] text-neutral-700 block truncate max-w-[220px]" title={jsonStr}>
-                    {jsonStr}
-                </span>
-            );
-        }
-
-        const strVal = String(val).trim();
-        if (!strVal) return <span className="text-neutral-400 font-normal">—</span>;
-
-        if (strVal.startsWith("http://") || strVal.startsWith("https://")) {
-            return (
-                <a
-                    href={strVal}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-700 font-bold hover:underline truncate inline-flex items-center gap-1 max-w-[220px]"
-                    title={strVal}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <span className="truncate">{strVal.replace(/^https?:\/\/(www\.)?/, "")}</span>
-                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                </a>
-            );
-        }
-
-        return (
-            <span className="font-medium text-neutral-800 block truncate max-w-[220px]" title={strVal}>
-                {strVal}
-            </span>
-        );
-    };
+    // Active table columns metadata for filter bar chips
+    const activeColumnsMeta = useMemo<TableColumnDefinition[]>(() => {
+        return [
+            { id: "applicantName", label: "Student Name", group: "personal", type: "text" },
+            { id: "username", label: "Username", group: "personal", type: "text" },
+            { id: "applicantEmail", label: "Email Address", group: "personal", type: "text" },
+            { id: "phoneNumber", label: "Phone Number", group: "personal", type: "text" },
+            { id: "institutionName", label: "Institution / College", group: "personal", type: "text" },
+            { id: "institutionCity", label: "City", group: "personal", type: "text" },
+            { id: "institutionState", label: "State", group: "personal", type: "text" },
+            { id: "rollNumber", label: "Roll / ID & Dept", group: "personal", type: "text" },
+            ...formQuestions.map((q) => ({
+                id: q.id,
+                label: q.label,
+                group: "response" as const,
+                type: (q.type === "file_upload" ? "file" : "text") as any,
+                options: q.options,
+            })),
+            { id: "registeredAt", label: "Registered At", group: "timestamp", type: "date" },
+        ];
+    }, [formQuestions]);
 
     // Unique institutions and states across all registered applications for filtering (Pan-India events only)
     const uniqueInstitutions = useMemo(() => {
@@ -557,43 +523,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         });
         return Array.from(set).sort();
     }, [isPanIndia, appsData]);
-
-    // Filtered Applications for Roster Tab
-    const filteredApplications = useMemo(() => {
-        if (!appsData?.applications) return [];
-        return appsData.applications.filter((a: any) => {
-            const matchesStatus = statusFilter === "all" || a.status === statusFilter;
-            const matchesInstitution = !isPanIndia || institutionFilter === "all" || a.institutionName === institutionFilter;
-            const matchesState = !isPanIndia || stateFilter === "all" || a.institutionState === stateFilter;
-            const query = searchQuery.trim().toLowerCase();
-            if (!query) return matchesStatus && matchesInstitution && matchesState;
-
-            const name = (a.applicantName || "").toLowerCase();
-            const username = (a.username || "").toLowerCase();
-            const email = (a.applicantEmail || "").toLowerCase();
-            const ticketCode = (a.ticketCode || "").toLowerCase();
-            const inst = (a.institutionName || "").toLowerCase();
-            const city = (a.institutionCity || "").toLowerCase();
-            const state = (a.institutionState || "").toLowerCase();
-
-            // Match against any answer value
-            const ansValues = Object.values(a.answers || a.formResponse || {})
-                .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v || "")).toLowerCase())
-                .join(" ");
-
-            const matchesQuery =
-                name.includes(query) ||
-                username.includes(query) ||
-                email.includes(query) ||
-                ticketCode.includes(query) ||
-                inst.includes(query) ||
-                city.includes(query) ||
-                state.includes(query) ||
-                ansValues.includes(query);
-
-            return matchesStatus && matchesInstitution && matchesState && matchesQuery;
-        });
-    }, [appsData, statusFilter, institutionFilter, stateFilter, searchQuery, isPanIndia]);
 
     // Analytics Breakdown computations
     const analytics = useMemo(() => {
@@ -987,6 +916,22 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
+                        onClick={() => handleTabChange("stages")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "stages"
+                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <Layers className="w-4 h-4 stroke-[2.5]" />
+                        <span>Timeline & Stages</span>
+                        <span className="px-2 py-0.5 rounded-full bg-black text-[#FFE566] border border-black text-[10px] font-black">
+                            PIPELINE
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={() => handleTabChange("form")}
                         className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                             activeTab === "form"
@@ -1178,15 +1123,15 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     />
                                 )}
 
-                                <a
-                                    href={getEventApplicationsExportUrl(event.id)}
-                                    download
+                                <button
+                                    type="button"
+                                    onClick={() => exportApplicationsToCsv(filteredApplications, formQuestions, event.title)}
                                     className="px-3.5 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                    title="Export applicant roster to Excel / CSV"
+                                    title="Export filtered applicant roster to Excel / CSV"
                                 >
                                     <Download className="w-3.5 h-3.5 stroke-[2.5]" />
                                     <span>Export CSV</span>
-                                </a>
+                                </button>
 
                                 <button
                                     type="button"
@@ -1210,6 +1155,25 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             </div>
                         </div>
 
+                        {/* Active Filter Chips & Clear All */}
+                        <ActiveFiltersBar
+                            totalCount={appsData?.applications.length || 0}
+                            filteredCount={filteredApplications.length}
+                            searchQuery={searchQuery}
+                            onClearSearch={() => setSearchQuery("")}
+                            statusFilter={statusFilter}
+                            onClearStatus={() => setStatusFilter("all")}
+                            institutionFilter={institutionFilter}
+                            onClearInstitution={() => setInstitutionFilter("all")}
+                            stateFilter={stateFilter}
+                            onClearState={() => setStateFilter("all")}
+                            columnFilters={columnFilters}
+                            onRemoveColumnFilter={removeColumnFilter}
+                            onClearAll={clearAllFilters}
+                            hasActiveFilters={hasActiveFilters}
+                            columns={activeColumnsMeta}
+                        />
+
                         {/* Attendee Roster Table */}
                         <div className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden">
                             {loadingApps ? (
@@ -1217,219 +1181,29 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     <OrbixLoader size="md" variant="centered" color="#000" />
                                     <span className="text-xs font-bold text-neutral-600">Loading applicant roster...</span>
                                 </div>
-                            ) : filteredApplications.length === 0 ? (
-                                <div className="py-12 text-center space-y-2">
-                                    <Users className="w-10 h-10 text-neutral-400 mx-auto" />
-                                    <h4 className="text-sm font-black text-black">No applicants found</h4>
-                                    <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                                        {searchQuery || statusFilter !== "all"
-                                            ? "No students match your active filters."
-                                            : "No students have RSVP'd or applied to this session yet. Share your event pass to start receiving registrations."}
-                                    </p>
-                                </div>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-xs border-collapse">
-                                        <thead>
-                                            <tr className="bg-[#FAF6EE] border-b-2 border-black text-[11px] font-black uppercase text-neutral-700 tracking-wider">
-                                                <th className="py-3 px-4 min-w-[200px]">Student</th>
-                                                <th className="py-3 px-4 min-w-[170px]">Institution & Location</th>
-                                                {formQuestions.map((q) => (
-                                                    <th
-                                                        key={q.id}
-                                                        className="py-3 px-4 min-w-[150px] max-w-[260px] truncate"
-                                                        title={q.label}
-                                                    >
-                                                        {q.label}
-                                                    </th>
-                                                ))}
-                                                <th className="py-3 px-4 min-w-[120px]">Applied At</th>
-                                                <th className="py-3 px-4 min-w-[120px]">Status</th>
-                                                <th className="py-3 px-4 text-right min-w-[150px]">Review & Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y border-black/10">
-                                            {filteredApplications.map((app) => (
-                                                <tr
-                                                    key={app.id}
-                                                    className="hover:bg-neutral-50/80 transition-colors"
-                                                >
-                                                    <td className="py-3 px-4 font-bold">
-                                                        <div className="flex items-center gap-2.5">
-                                                            {app.avatarUrl ? (
-                                                                <img
-                                                                    src={app.avatarUrl}
-                                                                    alt={app.applicantName}
-                                                                    className="w-8 h-8 rounded-full border border-black object-cover shrink-0 shadow-[1px_1px_0px_#000]"
-                                                                    onError={(e) => {
-                                                                        e.currentTarget.style.display = "none";
-                                                                        const fallback = e.currentTarget.nextElementSibling;
-                                                                        if (fallback) (fallback as HTMLElement).style.display = "flex";
-                                                                    }}
-                                                                />
-                                                            ) : null}
-                                                            <div
-                                                                className={`w-8 h-8 rounded-full bg-black text-[#a2ff86] items-center justify-center font-black text-[11px] shrink-0 border border-black shadow-[1px_1px_0px_#000] ${
-                                                                    app.avatarUrl ? "hidden" : "flex"
-                                                                }`}
-                                                            >
-                                                                {(app.applicantName || "S").slice(0, 2).toUpperCase()}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <div className="text-black font-black truncate">
-                                                                    {app.applicantName}
-                                                                </div>
-                                                                <div className="text-[10px] text-neutral-500 font-normal truncate flex items-center gap-1">
-                                                                    {app.username ? (
-                                                                        <a
-                                                                            href={`/profile/${app.username}`}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="hover:underline text-indigo-700 font-bold"
-                                                                            title="Inspect student profile"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                        >
-                                                                            @{app.username}
-                                                                        </a>
-                                                                    ) : null}
-                                                                    {app.applicantEmail && <span>· {app.applicantEmail}</span>}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3 px-4">
-                                                        <div className="font-bold text-black flex items-center gap-1">
-                                                            <span className="truncate max-w-[200px]" title={app.institutionName || app.campusName || "Host Campus"}>
-                                                                {app.institutionName || app.campusName || "Host Campus"}
-                                                            </span>
-                                                            {app.institutionVerificationStatus === "verified" && (
-                                                                <span className="inline-flex items-center text-[10px] text-emerald-700 bg-emerald-100 p-0.5 rounded border border-emerald-800 font-black shrink-0" title="AISHE Verified Institution">
-                                                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {(app.institutionCity || app.institutionState) ? (
-                                                            <div className="text-[10px] text-neutral-500 font-medium truncate max-w-[200px]">
-                                                                {[app.institutionCity, app.institutionState].filter(Boolean).join(", ")}
-                                                            </div>
-                                                        ) : null}
-                                                    </td>
-                                                    {formQuestions.map((q) => (
-                                                        <td key={q.id} className="py-3 px-4 max-w-[260px]">
-                                                            {renderAnswerValue(app, q)}
-                                                        </td>
-                                                    ))}
-                                                    <td className="py-3 px-4 text-neutral-500 font-medium whitespace-nowrap">
-                                                        {new Date(app.registeredAt).toLocaleDateString(undefined, {
-                                                            month: "short",
-                                                            day: "numeric",
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                        })}
-                                                    </td>
-                                                    <td className="py-3 px-4">
-                                                        <span
-                                                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-[1px_1px_0px_#000] inline-block ${
-                                                                app.status === "attended"
-                                                                    ? "bg-sky-100 text-sky-950 border-sky-800"
-                                                                    : app.status === "registered"
-                                                                    ? "bg-emerald-100 text-emerald-950 border-emerald-800"
-                                                                    : app.status === "pending"
-                                                                    ? "bg-amber-100 text-amber-950 border-amber-800"
-                                                                    : app.status === "waitlisted"
-                                                                    ? "bg-amber-100 text-amber-950 border-amber-800"
-                                                                    : "bg-rose-100 text-rose-950 border-rose-800"
-                                                            }`}
-                                                        >
-                                                            {app.status === "registered"
-                                                                ? "Accepted / Active"
-                                                                : app.status === "pending"
-                                                                ? "Pending Review"
-                                                                : app.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-3 px-4 text-right">
-                                                        <div className="flex items-center justify-end gap-1.5">
-                                                            {/* Answers button removed - answers are displayed directly in the columns */}
-
-                                                            {app.status === "pending" ? (
-                                                                <>
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={updatingApplicantId === app.id}
-                                                                        onClick={() => handleApplicantStatusChange(app, "registered")}
-                                                                        className="px-2.5 py-1 rounded-lg bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-[11px] border border-black shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 active:translate-x-[0.5px] active:translate-y-[0.5px]"
-                                                                        title="Accept application and activate event entry pass"
-                                                                    >
-                                                                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
-                                                                        <span>Accept</span>
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={updatingApplicantId === app.id}
-                                                                        onClick={() => handleApplicantStatusChange(app, "rejected")}
-                                                                        className="px-2 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 font-black text-[11px] border border-rose-800 shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 active:translate-x-[0.5px] active:translate-y-[0.5px]"
-                                                                        title="Reject application"
-                                                                    >
-                                                                        <XCircle className="w-3 h-3 stroke-[2.5]" />
-                                                                        <span>Reject</span>
-                                                                    </button>
-                                                                </>
-                                                            ) : app.status === "registered" ? (
-                                                                <>
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={updatingApplicantId === app.id}
-                                                                        onClick={() => handleApplicantStatusChange(app, "attended")}
-                                                                        className="px-2.5 py-1 rounded-lg bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-[11px] border border-black shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 active:translate-x-[0.5px] active:translate-y-[0.5px]"
-                                                                        title="Check in attendee at session entrance"
-                                                                    >
-                                                                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
-                                                                        <span>Check-in</span>
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={updatingApplicantId === app.id}
-                                                                        onClick={() => handleApplicantStatusChange(app, "rejected")}
-                                                                        className="px-2 py-1 rounded-lg bg-neutral-100 hover:bg-rose-50 text-neutral-600 hover:text-rose-700 font-bold text-[10px] border border-black/40 cursor-pointer inline-flex items-center gap-0.5"
-                                                                        title="Revoke and reject application"
-                                                                    >
-                                                                        <XCircle className="w-3 h-3" />
-                                                                        <span>Revoke</span>
-                                                                    </button>
-                                                                </>
-                                                            ) : app.status === "attended" ? (
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={updatingApplicantId === app.id}
-                                                                    onClick={() => handleApplicantStatusChange(app, "registered")}
-                                                                    className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-[11px] border border-black cursor-pointer inline-flex items-center gap-1"
-                                                                    title="Undo check-in status"
-                                                                >
-                                                                    <span>Undo</span>
-                                                                </button>
-                                                            ) : app.status === "rejected" ? (
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={updatingApplicantId === app.id}
-                                                                    onClick={() => handleApplicantStatusChange(app, "registered")}
-                                                                    className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-[11px] border border-emerald-800 cursor-pointer inline-flex items-center gap-1"
-                                                                    title="Re-accept application"
-                                                                >
-                                                                    <CheckCircle2 className="w-3 h-3" />
-                                                                    <span>Re-Accept</span>
-                                                                </button>
-                                                            ) : null}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <ApplicationsRosterTable
+                                    applications={filteredApplications}
+                                    dynamicQuestions={formQuestions}
+                                    sort={sort}
+                                    onToggleSort={toggleSort}
+                                    columnFilters={columnFilters}
+                                    onSetColumnFilter={setColumnFilter}
+                                    onStatusChange={handleApplicantStatusChange}
+                                    updatingApplicantId={updatingApplicantId}
+                                />
                             )}
                         </div>
                     </div>
+                )}
+
+                {/* TAB: TIMELINE & STAGES PIPELINE */}
+                {activeTab === "stages" && event && (
+                    <ClubEventStagesConsole
+                        eventId={event.id}
+                        clubId={clubInfo?.id || clubState.club?.id || ""}
+                        onEditStagesInWizard={() => setIsEditModalOpen(true)}
+                    />
                 )}
 
                 {/* TAB: REGISTRATION FORM BUILDER */}

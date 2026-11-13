@@ -49,6 +49,7 @@ export interface CreateClubEventPayload {
     initialFormStructure?: any;
     initialFormSettings?: any;
     initialFormTheme?: any;
+    initialStages?: any[];
 }
 
 export type ClubEventStatus = "draft" | "published" | "completed" | "cancelled";

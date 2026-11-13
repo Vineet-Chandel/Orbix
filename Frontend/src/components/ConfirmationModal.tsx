@@ -103,7 +103,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
         >
             <div
-                className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-scaleUp"
+                className="w-full max-w-md sm:max-w-lg bg-white border-2 border-black rounded-2xl p-5 sm:p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-scaleUp overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header with Icon and Close Button */}
@@ -171,12 +171,12 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 )}
 
                 {/* Actions Footer */}
-                <div className="flex items-center justify-end gap-2.5 pt-2 border-t-2 border-black/10">
+                <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-3 border-t-2 border-black/15">
                     <button
                         type="button"
                         onClick={handleClose}
                         disabled={isLoading}
-                        className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] cursor-pointer disabled:opacity-50 transition-all"
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] cursor-pointer disabled:opacity-50 transition-all text-center whitespace-nowrap active:translate-x-0.5 active:translate-y-0.5"
                     >
                         {finalCancelText}
                     </button>
@@ -187,6 +187,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                         onClick={onConfirm}
                         variant={variant === "danger" ? "danger-solid" : variant === "warning" ? "yellow" : "black"}
                         uppercase
+                        className="w-full sm:w-auto whitespace-nowrap justify-center"
                     >
                         {finalConfirmText}
                     </OrbixButton>

@@ -1,7 +1,7 @@
 if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
-  try {
-    process.loadEnvFile();
-  } catch {}
+    try {
+        process.loadEnvFile();
+    } catch { }
 }
 import express, { type Express, type Request, type Response } from 'express';
 import cookieParser from 'cookie-parser';
@@ -30,6 +30,7 @@ import { platformRouter } from './Routes/platform/platformRoutes.js';
 import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { eventFormRouter } from './Routes/events/eventFormRoutes.js';
 import { eventTeamRouter } from './Routes/events/eventTeamRoutes.js';
+import { eventLifecycleRouter } from './Routes/events/eventLifecycleRoutes.js';
 import { clubCredibilityRouter } from './Routes/club/clubCredibilityRoutes.js';
 import projectRouter from './Routes/projects/projectRoutes.js';
 import { workspaceRouter } from './Routes/workspace/workspaceRoutes.js';
@@ -46,7 +47,7 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
         res.setHeader("Access-Control-Allow-Credentials", "true");
     }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-    
+
     const requestedHeaders = req.headers["access-control-request-headers"];
     if (requestedHeaders) {
         res.setHeader("Access-Control-Allow-Headers", requestedHeaders);
@@ -116,6 +117,7 @@ apiRouter.use('/leaderboard', leaderboardRouter);
 apiRouter.use('/events', eventsRouter);
 apiRouter.use('/', eventFormRouter); // Handles /api/club/events/:id/form & /api/events/:id/form
 apiRouter.use('/', eventTeamRouter); // Handles /api/events/:id/teams & /api/club/events/:id/teams
+apiRouter.use('/', eventLifecycleRouter); // Handles /api/club/events/:id/stages, submissions, rubrics & judging
 
 // Notifications & Institutions
 apiRouter.use('/notifications', notificationsRouter);

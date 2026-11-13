@@ -776,8 +776,11 @@ html.dark body:has(.blog-container) {
     display: block !important;
   }
 
-  /* The actual application pass card */
-  #application-pass-card {
+  /* The actual application pass card and certificate frames */
+  #application-pass-card,
+  #orbix-printable-pass,
+  #notification-event-pass-card,
+  #official-certificate-frame {
     visibility: visible !important;
     display: block !important;
     position: relative !important;
@@ -793,7 +796,10 @@ html.dark body:has(.blog-container) {
     break-inside: avoid !important;
   }
 
-  #application-pass-card * {
+  #application-pass-card *,
+  #orbix-printable-pass *,
+  #notification-event-pass-card *,
+  #official-certificate-frame * {
     visibility: visible !important;
   }
 

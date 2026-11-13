@@ -40,6 +40,7 @@ import { sendGuardianConsentEmail, OnboardingEmailService } from "../../services
 import { ClubCredibilityService } from "../../services/club/clubCredibilityService.js";
 import { ClubCredibilityEngine } from "../../scoring/clubCredibilityEngine.js";
 import { sendSoleRegistrationEmail } from "../../services/email/eventRegistrationEmailService.js";
+import { EventStageService } from "../../services/events/eventStageService.js";
 
 const clubRouter = express.Router();
 
@@ -2266,7 +2267,7 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
         // Record immutable event creation for persistent cooldown tracking
         await ClubCredibilityService.recordEventCreation(clubId, newEvent.id, finalScope);
 
-        // Save and publish initial registration form configured during 3-step event creation
+        // Save and publish initial registration form configured during event creation wizard
         if (initialFormStructure && Array.isArray(initialFormStructure?.sections)) {
             try {
                 await ClubEventFormService.saveFormDraft(newEvent.id, userId, {
@@ -2280,6 +2281,16 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                 }
             } catch (formSaveErr) {
                 console.error("[POST /events] Error saving initial form structure:", formSaveErr);
+            }
+        }
+
+        // Save initial timeline stages configured during 5-step event creation wizard
+        const { initialStages } = req.body;
+        if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
+            try {
+                await EventStageService.syncEventStages(newEvent.id, clubId, initialStages);
+            } catch (stageErr) {
+                console.error("[POST /events] Error saving initial stages:", stageErr);
             }
         }
 
@@ -2661,6 +2672,16 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                         idempotencyKey: `draft_unpublish_${eventId}_${Date.now()}`,
                     }).catch((err) => console.error("[Credibility] Record unpublish_to_draft error:", err));
                 }
+            }
+        }
+
+        // If stages were provided in edit payload, sync them
+        const { initialStages } = req.body;
+        if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
+            try {
+                await EventStageService.syncEventStages(String(eventId), clubId, initialStages);
+            } catch (stageErr) {
+                console.error("[PATCH /events/:eventId] Error syncing stages:", stageErr);
             }
         }
 
@@ -4248,54 +4269,47 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
             return `"${str}"`;
         };
 
-        const standardHeaders = [
-            "Ticket Code",
-            "Name",
+        const headers = [
+            "Status",
+            "Student Name",
             "Username",
-            "Email",
-            "Roll Number / Student ID",
-            "Department",
-            "Year of Study",
+            "Email Address",
             "Phone Number",
             "Institution / College",
-            "University",
             "City",
             "State",
-            "Status",
-            "Applied At",
-            "Reviewed At",
-            "Checked In At",
-            "Notes",
-        ];
-
-        // Append custom question titles
-        const headers = [
-            ...standardHeaders,
+            "Roll / Student ID",
+            "Department",
             ...customQuestions.map((q) => q.title),
+            "Registered At",
         ];
 
         const rows = applicantsRes.rows.map((r) => {
             const ansObj = { ...(r.form_response || {}), ...(r.answers || {}) };
             const attachments = r.file_attachments || [];
 
-            const standardRow = [
-                escapeCsv(r.ticket_code),
+            const statusLabel =
+                r.status === "registered"
+                    ? "Accepted / Active"
+                    : r.status === "pending"
+                    ? "Pending Review"
+                    : r.status === "attended"
+                    ? "Checked-In"
+                    : r.status === "rejected"
+                    ? "Rejected"
+                    : r.status;
+
+            const personalRow = [
+                escapeCsv(statusLabel),
                 escapeCsv(r.name),
-                escapeCsv(r.username),
+                escapeCsv(r.username ? `@${r.username}` : ""),
                 escapeCsv(r.email),
-                escapeCsv(r.roll_number || ansObj["q_roll_number"] || ""),
-                escapeCsv(r.department || ansObj["q_department"] || ""),
-                escapeCsv(r.year_of_study || ansObj["q_year"] || ""),
                 escapeCsv(r.phone || ansObj["q_phone"] || ""),
-                escapeCsv(r.institution_name),
-                escapeCsv(r.university_name),
+                escapeCsv(r.institution_name || r.campus_name || ""),
                 escapeCsv(r.institution_city),
                 escapeCsv(r.institution_state),
-                escapeCsv(r.status === "registered" ? "accepted" : r.status),
-                escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
-                escapeCsv(r.reviewed_at ? new Date(r.reviewed_at).toISOString() : ""),
-                escapeCsv(r.checked_in_at ? new Date(r.checked_in_at).toISOString() : ""),
-                escapeCsv(r.notes),
+                escapeCsv(r.roll_number || ansObj["q_roll_number"] || ""),
+                escapeCsv(r.department || ansObj["q_department"] || ""),
             ];
 
             const customValues = customQuestions.map((q) => {
@@ -4321,7 +4335,11 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
                 return escapeCsv(val ?? "");
             });
 
-            return [...standardRow, ...customValues].join(",");
+            const timestampRow = [
+                escapeCsv(r.registered_at ? new Date(r.registered_at).toLocaleString() : ""),
+            ];
+
+            return [...personalRow, ...customValues, ...timestampRow].join(",");
         });
 
         const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");

@@ -32,6 +32,10 @@ import {
     getRandomPresetBanner,
 } from "../../components/EventBanners/presetEventBanners";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
+import { EventTimelineBuilder } from "./TimelineBuilder/EventTimelineBuilder";
+import { EventWizardReviewStep } from "./TimelineBuilder/EventWizardReviewStep";
+import type { ConfiguredStage } from "./TimelineBuilder/types";
+import { fetchEventStages } from "../../api/eventLifecycleApi";
 import type {
     FormStructure,
     FormQuestion,
@@ -147,7 +151,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     const toast = useToast();
     const modalId = useId();
 
-    const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+    const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
     const formatForInput = (isoStr: string | null | undefined): string => {
         if (!isoStr) return "";
@@ -160,6 +164,119 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             return "";
         }
     };
+
+    const buildDefaultStages = (startsAtStr?: string, endsAtStr?: string): ConfiguredStage[] => {
+        const sDate = startsAtStr ? new Date(startsAtStr) : new Date();
+        const eDate = endsAtStr ? new Date(endsAtStr) : new Date(Date.now() + 7 * 86400000);
+
+        return [
+            {
+                id: `stage_reg_${Date.now()}`,
+                name: "Registration & RSVP",
+                type: "registration",
+                description: "Initial participant signup, profile matching, and admission screening.",
+                instructions: "Complete all required questionnaire fields to secure your admission pass.",
+                stageOrder: 1,
+                startsAt: sDate.toISOString().slice(0, 16),
+                endsAt: new Date(sDate.getTime() + 4 * 86400000).toISOString().slice(0, 16),
+                timezone: "Asia/Kolkata",
+                status: "active",
+                eligibilityType: "all_registered",
+                actionType: "registration",
+                requirements: {
+                    allowResubmission: false,
+                    maxSubmissions: 1,
+                    teamSubmissionOnly: false,
+                    leaderOnlySubmit: false,
+                    allMembersCanView: true,
+                    lateSubmissionPolicy: "disallow",
+                    requireApprovalToAdvance: false,
+                },
+            },
+            {
+                id: `stage_sub_${Date.now()}`,
+                name: "Hackathon Sprint & Submissions",
+                type: "development",
+                description: "Build, commit, and submit project source repository, live demo, and presentation pitch.",
+                instructions: "Submit your GitHub repository, live URL, and architecture deck before the deadline.",
+                stageOrder: 2,
+                startsAt: new Date(sDate.getTime() + 4 * 86400000).toISOString().slice(0, 16),
+                endsAt: new Date(sDate.getTime() + 6 * 86400000).toISOString().slice(0, 16),
+                timezone: "Asia/Kolkata",
+                status: "scheduled",
+                eligibilityType: "accepted_only",
+                actionType: "submit_project",
+                requirements: {
+                    allowResubmission: true,
+                    maxSubmissions: 3,
+                    teamSubmissionOnly: false,
+                    leaderOnlySubmit: true,
+                    allMembersCanView: true,
+                    lateSubmissionPolicy: "disallow",
+                    requireApprovalToAdvance: true,
+                },
+                formConfig: {
+                    title: "Sprint Project Submission",
+                    description: "Upload your code repositories and demo assets.",
+                    fields: [
+                        {
+                            id: "f_github",
+                            label: "GitHub Repository URL",
+                            type: "github",
+                            description: "Link to your public repository containing source code and README.",
+                            required: true,
+                            placeholder: "https://github.com/...",
+                        },
+                        {
+                            id: "f_live_url",
+                            label: "Live Demo URL",
+                            type: "url",
+                            description: "Deployed application preview link.",
+                            required: false,
+                            placeholder: "https://your-project.vercel.app",
+                        },
+                        {
+                            id: "f_deck",
+                            label: "Pitch Deck / Architecture PDF",
+                            type: "file",
+                            description: "Presentation slides or architectural specification (Max 25MB).",
+                            required: false,
+                            allowedExtensions: [".pdf", ".ppt", ".pptx"],
+                            maxSizeBytes: 25 * 1024 * 1024,
+                        },
+                    ],
+                    allowedFileTypes: [".pdf", ".ppt", ".pptx", ".zip"],
+                    maxFileSizeBytes: 25 * 1024 * 1024,
+                    maxFiles: 3,
+                },
+            },
+            {
+                id: `stage_res_${Date.now()}`,
+                name: "Evaluation & Winner Announcement",
+                type: "results",
+                description: "Final evaluation, jury score compilation, and credential issuance.",
+                instructions: "Scores will be revealed live. Verified certificates are dispatched to the student portfolio.",
+                stageOrder: 3,
+                startsAt: new Date(sDate.getTime() + 6 * 86400000).toISOString().slice(0, 16),
+                endsAt: eDate.toISOString().slice(0, 16),
+                timezone: "Asia/Kolkata",
+                status: "scheduled",
+                eligibilityType: "all_registered",
+                actionType: "view_results",
+                requirements: {
+                    allowResubmission: false,
+                    maxSubmissions: 0,
+                    teamSubmissionOnly: false,
+                    leaderOnlySubmit: false,
+                    allMembersCanView: true,
+                    lateSubmissionPolicy: "disallow",
+                    requireApprovalToAdvance: false,
+                },
+            },
+        ];
+    };
+
+    const [stages, setStages] = useState<ConfiguredStage[]>(() => buildDefaultStages());
 
     const [form, setForm] = useState<FormState>({
         title: "",
@@ -231,6 +348,49 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     minTeamSize: editingEvent.minTeamSize || 1,
                     maxTeamSize: editingEvent.maxTeamSize || 4,
                 });
+
+                if (editingEvent.id) {
+                    fetchEventStages(editingEvent.id)
+                        .then((res: { success: boolean; stages: any[] }) => {
+                            if (res.stages && res.stages.length > 0) {
+                                setStages(
+                                    res.stages.map((st: any, idx: number) => ({
+                                        id: st.id || `stage_${idx}`,
+                                        name: st.name || `Round ${idx + 1}`,
+                                        type: st.type || "custom",
+                                        description: st.description || "",
+                                        instructions: st.instructions || "",
+                                        stageOrder: typeof st.stage_order === "number" ? st.stage_order : idx + 1,
+                                        startsAt: formatForInput(st.starts_at || st.startsAt),
+                                        endsAt: formatForInput(st.ends_at || st.endsAt),
+                                        timezone: st.timezone || "Asia/Kolkata",
+                                        status: st.status || "scheduled",
+                                        eligibilityType: st.eligibility_type || "all_registered",
+                                        actionType: st.action_type || "none",
+                                        requirements: st.requirements || {
+                                            allowResubmission: true,
+                                            maxSubmissions: 1,
+                                            teamSubmissionOnly: false,
+                                            leaderOnlySubmit: false,
+                                            allMembersCanView: true,
+                                            lateSubmissionPolicy: "disallow",
+                                            requireApprovalToAdvance: false,
+                                        },
+                                        bannerUrl: st.banner_url || undefined,
+                                        formConfig: st.formConfig || undefined,
+                                    }))
+                                );
+                            } else {
+                                setStages(buildDefaultStages(editingEvent.startsAt || undefined, editingEvent.endsAt || undefined));
+                            }
+                        })
+                        .catch((err: any) => {
+                            console.error("Failed to load stages for editing event:", err);
+                            setStages(buildDefaultStages(editingEvent.startsAt || undefined, editingEvent.endsAt || undefined));
+                        });
+                } else {
+                    setStages(buildDefaultStages(editingEvent.startsAt || undefined, editingEvent.endsAt || undefined));
+                }
             } else {
                 const defaultBanner = getRandomPresetBanner().dataUrl;
                 setForm({
@@ -250,6 +410,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     minTeamSize: 1,
                     maxTeamSize: 4,
                 });
+                setStages(buildDefaultStages());
                 setFormStructure({
                     sections: [
                         {
@@ -389,7 +550,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         }
     };
 
-    // Step 1 -> Step 2 Navigation
+    // Step 1 -> Step 2 Navigation (Event Info -> Timeline)
     const handleGoToStep2 = () => {
         setTouched({
             title: true,
@@ -419,26 +580,49 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             return;
         }
 
+        setCurrentStep(2);
+    };
+
+    // Step 2 -> Step 3 Navigation (Timeline -> Registration Form)
+    const handleGoToStep3 = () => {
+        if (stages.length === 0) {
+            toast.error("Please configure at least 1 round/stage in your timeline.", {
+                title: "Timeline Stage Required",
+            });
+            return;
+        }
+        setCurrentStep(3);
+    };
+
+    // Step 3 -> Step 4 Navigation (Form -> Banner Studio)
+    const handleGoToStep4 = () => {
+        if (totalQuestions === 0) {
+            toast.error("The registration form cannot be empty. Please include at least 1 question for participants.", {
+                title: "Registration Form Required",
+            });
+            return;
+        }
+
         // Ensure banner is selected; if empty, pick a random preset
         if (!form.coverImageUrl) {
             setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
         }
 
-        setCurrentStep(2);
+        setCurrentStep(4);
     };
 
-    // Step 2 -> Step 3 Navigation
-    const handleGoToStep3 = () => {
+    // Step 4 -> Step 5 Navigation (Banner Studio -> Review & Publish)
+    const handleGoToStep5 = () => {
         if (!form.coverImageUrl) {
             setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
         }
-        setCurrentStep(3);
+        setCurrentStep(5);
     };
 
-    // Form builder helper methods for Step 3
+    // Form builder helper methods
     const totalQuestions = formStructure.sections.reduce((acc, s) => acc + s.questions.length, 0);
 
-    // Final Submission Handler (Atomic Launch)
+    // Final Submission Handler (Atomic Launch or Edit Save)
     const handleSubmitFinal = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
@@ -466,6 +650,15 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 validationErrors.registrationUrl;
             toast.error(firstError || "Please fix validation errors in Step 1.", {
                 title: "Validation Error",
+            });
+            return;
+        }
+
+        // Validate Step 2 Stages
+        if (stages.length === 0) {
+            setCurrentStep(2);
+            toast.error("Please configure at least 1 stage in your event timeline.", {
+                title: "Timeline Required",
             });
             return;
         }
@@ -501,6 +694,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             initialFormStructure: formStructure,
             initialFormSettings: formSettings,
             initialFormTheme: formTheme,
+            initialStages: stages,
         };
 
         // Fire callback immediately for optimistic update
@@ -558,19 +752,29 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             </span>
                         </div>
                         <p className="text-[11px] sm:text-xs text-neutral-600 font-medium truncate">
-                            Step {currentStep} of 3: {currentStep === 1 ? "Event Information" : currentStep === 2 ? "Banner Selection" : "Registration Form"}
+                            Step {currentStep} of 5: {
+                                currentStep === 1
+                                    ? "Event Information & Schedule"
+                                    : currentStep === 2
+                                    ? "Timeline & Round Architecture"
+                                    : currentStep === 3
+                                    ? "Registration Form Builder"
+                                    : currentStep === 4
+                                    ? "Banner Selection & Preview"
+                                    : "Review & Publish"
+                            }
                         </p>
                     </div>
                 </div>
 
-                {/* Center / Right: 3-Step Wizard Navigation Stepper */}
+                {/* Center / Right: 5-Step Wizard Navigation Stepper */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Stepper Pills */}
-                    <div className="flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1">
+                    <div className="flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1 overflow-x-auto max-w-full">
                         <button
                             type="button"
                             onClick={() => setCurrentStep(1)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
                                 currentStep === 1
                                     ? "bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                                     : "text-neutral-700 hover:text-black hover:bg-white/60"
@@ -582,21 +786,21 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                         <button
                             type="button"
-                            onClick={() => handleGoToStep2()}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                            onClick={handleGoToStep2}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
                                 currentStep === 2
-                                    ? "bg-[#38BDF8] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    ? "bg-[#C084FC] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                                     : "text-neutral-700 hover:text-black hover:bg-white/60"
                             }`}
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">2</span>
-                            <span>Banner</span>
+                            <span>Timeline ({stages.length})</span>
                         </button>
 
                         <button
                             type="button"
-                            onClick={() => handleGoToStep3()}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                            onClick={handleGoToStep3}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
                                 currentStep === 3
                                     ? "bg-[#A2FF86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                                     : "text-neutral-700 hover:text-black hover:bg-white/60"
@@ -604,6 +808,32 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">3</span>
                             <span>Form ({totalQuestions})</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleGoToStep4}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
+                                currentStep === 4
+                                    ? "bg-[#38BDF8] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
+                            }`}
+                        >
+                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">4</span>
+                            <span>Banner</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleGoToStep5}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
+                                currentStep === 5
+                                    ? "bg-[#FDE047] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
+                            }`}
+                        >
+                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">5</span>
+                            <span>Review</span>
                         </button>
                     </div>
                 </div>
@@ -617,7 +847,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                Step 1 of 3
+                                Step 1 of 5
                             </span>
                             <h3 className="text-base sm:text-lg font-black text-black">Event Information & Schedule</h3>
                         </div>
@@ -1191,21 +1421,109 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             iconRight={<ArrowRight className="w-4 h-4" />}
                             className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000] whitespace-nowrap shrink-0"
                         >
-                            Next: Select Banner
+                            Next: Configure Timeline
                         </OrbixButton>
                     </div>
                 </div>
             )}
 
             {/* ---------------------------------------------------------------- */}
-            {/* STEP 2: BANNER SELECTION STUDIO */}
+            {/* STEP 2: TIMELINE & ROUND ARCHITECTURE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 2 && (
                 <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                Step 2 of 3
+                                Step 2 of 5
+                            </span>
+                            <h3 className="text-base sm:text-lg font-black text-black">Event Timeline & Stage Architecture</h3>
+                            <p className="text-xs text-neutral-600 font-medium mt-0.5">
+                                Structure rounds, deadlines, participant eligibility, and submission requirements.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-black uppercase bg-[#FFE566] text-black px-3 py-1 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                {stages.length} {stages.length === 1 ? "Round" : "Rounds"}
+                            </span>
+                        </div>
+                    </div>
+
+                    <EventTimelineBuilder
+                        stages={stages}
+                        onChange={setStages}
+                        eventStartsAt={form.startsAt}
+                        eventEndsAt={form.endsAt}
+                        isTeamEvent={form.isTeamEvent}
+                    />
+
+                    {/* Step 2 Footer */}
+                    <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentStep(1)}
+                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back: Event Info</span>
+                        </button>
+                        <OrbixButton
+                            type="button"
+                            onClick={handleGoToStep3}
+                            variant="lime"
+                            iconRight={<ArrowRight className="w-4 h-4" />}
+                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000] whitespace-nowrap shrink-0"
+                        >
+                            Next: Build Registration Form
+                        </OrbixButton>
+                    </div>
+                </div>
+            )}
+
+            {/* ---------------------------------------------------------------- */}
+            {/* STEP 3: REGISTRATION FORM BUILDER WORKSPACE */}
+            {/* ---------------------------------------------------------------- */}
+            {currentStep === 3 && (
+                <div className="w-full">
+                    <EventFormBuilderWorkspace
+                        eventId={editingEvent?.id || "create-draft"}
+                        club={{ id: clubId, name: clubName, logoUrl: clubLogoUrl }}
+                        isWizardMode={true}
+                        initialFormRecord={{
+                            id: "wizard-draft-form",
+                            eventId: editingEvent?.id || "create-draft",
+                            title: `${form.title.trim() || "Event"} Registration`,
+                            description: form.summary.trim() || "Complete registration to secure your verified student pass.",
+                            structure: formStructure,
+                            settings: formSettings,
+                            themeSettings: formTheme,
+                            isPublished: false,
+                            version: 1,
+                        } as any}
+                        initialEventData={{
+                            ...form,
+                            title: form.title.trim() || "Event",
+                        }}
+                        onWizardChange={(updatedForm) => {
+                            if (updatedForm.structure) setFormStructure(updatedForm.structure);
+                            if (updatedForm.settings) setFormSettings(updatedForm.settings);
+                            if (updatedForm.themeSettings) setFormTheme(updatedForm.themeSettings);
+                        }}
+                        onWizardBack={() => setCurrentStep(2)}
+                        onWizardSubmit={() => handleGoToStep4()}
+                    />
+                </div>
+            )}
+
+            {/* ---------------------------------------------------------------- */}
+            {/* STEP 4: BANNER SELECTION STUDIO */}
+            {/* ---------------------------------------------------------------- */}
+            {currentStep === 4 && (
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                        <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                Step 4 of 5
                             </span>
                             <h3 className="text-base sm:text-lg font-black text-black">Event Banner Studio & Live Preview</h3>
                             <p className="text-xs text-neutral-600 font-medium mt-0.5">
@@ -1358,60 +1676,77 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Step 2 Footer */}
+                    {/* Step 4 Footer */}
                     <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
                         <button
                             type="button"
-                            onClick={() => setCurrentStep(1)}
+                            onClick={() => setCurrentStep(3)}
                             className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
                         >
                             <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Back: Event Info</span>
+                            <span>Back: Registration Form</span>
                         </button>
                         <OrbixButton
                             type="button"
-                            onClick={handleGoToStep3}
+                            onClick={handleGoToStep5}
                             variant="lime"
                             iconRight={<ArrowRight className="w-4 h-4" />}
                             className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000] whitespace-nowrap shrink-0"
                         >
-                            Next: Build Registration Form
+                            Next: Review & Publish
                         </OrbixButton>
                     </div>
                 </div>
             )}
 
             {/* ---------------------------------------------------------------- */}
-            {/* STEP 3: REGISTRATION FORM BUILDER WORKSPACE */}
+            {/* STEP 5: REVIEW & PUBLISH PRE-FLIGHT CHECKLIST */}
             {/* ---------------------------------------------------------------- */}
-            {currentStep === 3 && (
-                <div className="w-full">
-                    <EventFormBuilderWorkspace
-                        eventId={editingEvent?.id || "create-draft"}
-                        club={{ id: clubId, name: clubName, logoUrl: clubLogoUrl }}
-                        isWizardMode={true}
-                        initialFormRecord={{
-                            id: "wizard-draft-form",
-                            eventId: editingEvent?.id || "create-draft",
-                            title: `${form.title.trim() || "Event"} Registration`,
-                            description: form.summary.trim() || "Complete registration to secure your verified student pass.",
-                            structure: formStructure,
-                            settings: formSettings,
-                            themeSettings: formTheme,
-                            isPublished: false,
-                            version: 1,
-                        } as any}
-                        initialEventData={{
-                            ...form,
-                            title: form.title.trim() || "Event",
-                        }}
-                        onWizardChange={(updatedForm) => {
-                            if (updatedForm.structure) setFormStructure(updatedForm.structure);
-                            if (updatedForm.settings) setFormSettings(updatedForm.settings);
-                            if (updatedForm.themeSettings) setFormTheme(updatedForm.themeSettings);
-                        }}
-                        onWizardSubmit={() => handleSubmitFinal()}
+            {currentStep === 5 && (
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                        <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                Step 5 of 5
+                            </span>
+                            <h3 className="text-base sm:text-lg font-black text-black">Pre-Flight Review & Launch Checklist</h3>
+                            <p className="text-xs text-neutral-600 font-medium mt-0.5">
+                                Verify all event configurations, schedule milestones, and communication channels before publishing.
+                            </p>
+                        </div>
+                        <span className="text-xs font-black uppercase px-3 py-1 rounded-xl border-2 border-black bg-emerald-300 text-black shadow-[1.5px_1.5px_0px_#000]">
+                            Ready for Launch
+                        </span>
+                    </div>
+
+                    <EventWizardReviewStep
+                        form={form}
+                        stages={stages}
+                        formQuestions={formStructure.sections.flatMap((s) => s.questions)}
+                        collegeName={collegeName}
+                        onJumpToStep={(st) => setCurrentStep(st)}
                     />
+
+                    {/* Step 5 Footer */}
+                    <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentStep(4)}
+                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back: Banner Studio</span>
+                        </button>
+                        <OrbixButton
+                            type="button"
+                            onClick={handleSubmitFinal}
+                            variant="lime"
+                            iconRight={<Sparkles className="w-4 h-4" />}
+                            className="px-8 py-3 text-sm font-black shadow-[4px_4px_0px_#000] whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                            {editingEvent ? "Save & Update Event" : "Launch & Publish Event"}
+                        </OrbixButton>
+                    </div>
                 </div>
             )}
         </div>

@@ -10,10 +10,10 @@ import {
     Ban,
     Menu,
     Award,
-    Sparkles,
     QrCode,
     X,
-    Printer,
+    Download,
+    ShieldCheck,
     AlertTriangle,
     Users,
     CheckCircle2,
@@ -37,6 +37,8 @@ import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { OrbixCardQR } from "../Profile/CardStudio/OrbixCardQR";
 import { UserCertificateWalletView } from "../Certificates/UserCertificateWalletView";
+import { OrbixLogo } from "../../components/OrbixLogo";
+import { downloadPassPdf } from "../../utils/passPdfGenerator";
 
 interface StudentActivityViewProps {
     onOpenMobileSidebar?: () => void;
@@ -140,8 +142,31 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
         toast.success("Ticket code copied to clipboard!");
     };
 
-    const handlePrintPass = () => {
-        window.print();
+    const [isDownloadingPass, setIsDownloadingPass] = useState(false);
+
+    const handleDownloadPassPdf = async () => {
+        if (!activePassApp || isDownloadingPass) return;
+        const safeTitle = (activePassApp.eventTitle || "Event").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `Orbix-Pass-${safeTitle}.pdf`;
+
+        try {
+            await downloadPassPdf({
+                elementId: "orbix-printable-pass",
+                filename,
+                onStart: () => setIsDownloadingPass(true),
+                onSuccess: () => {
+                    setIsDownloadingPass(false);
+                    toast.success("Pass PDF downloaded successfully!");
+                },
+                onError: (err) => {
+                    setIsDownloadingPass(false);
+                    console.error("PDF generation error:", err);
+                    toast.error("Could not download pass PDF. Please try again.");
+                },
+            });
+        } catch {
+            setIsDownloadingPass(false);
+        }
     };
 
     const handleConfirmWithdraw = async () => {
@@ -246,37 +271,23 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
         >
             <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                 {/* Header Banner */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                            {onOpenMobileSidebar && (
-                                <button
-                                    onClick={onOpenMobileSidebar}
-                                    className="p-1.5 rounded-lg border-2 border-black bg-white md:hidden hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
-                                >
-                                    <Menu className="w-4 h-4" />
-                                </button>
-                            )}
-                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                Student Portfolio
-                            </span>
-                        </div>
+                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2">
+                        {onOpenMobileSidebar && (
+                            <button
+                                onClick={onOpenMobileSidebar}
+                                className="p-1.5 rounded-lg border-2 border-black bg-white md:hidden hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
+                            >
+                                <Menu className="w-4 h-4" />
+                            </button>
+                        )}
                         <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                             Activity & Credentials
                         </h1>
-                        <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
-                            Track your event registration applications, access active session passes, and view verified digital certificates issued by campus clubs.
-                        </p>
                     </div>
-
-                    {/* Quick Explore Link */}
-                    <Link
-                        to="/college-events"
-                        className="px-4 py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] text-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5 self-start md:self-auto"
-                    >
-                        <Sparkles className="w-4 h-4" />
-                        Explore Campus Events
-                    </Link>
+                    <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
+                        Track your event registration applications, access active session passes, and view verified digital certificates issued by campus clubs.
+                    </p>
                 </div>
 
                 {/* Segment Switcher Navigation */}
@@ -482,7 +493,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                 </p>
                             </div>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
                                 {filteredApplications.map((app) => {
                                     const badge = getStatusBadge(app.status);
                                     const eventDateStr = new Date(app.startsAt).toLocaleDateString("en-US", {
@@ -500,15 +511,15 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                     return (
                                         <div
                                             key={app.id}
-                                            className="p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4"
+                                            className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-4 h-full"
                                         >
                                             {/* Event Banner */}
                                             {app.coverImageUrl && (
-                                                <div className="w-full rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
+                                                <div className="w-full aspect-[2.2/1] rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                     <img
                                                         src={app.coverImageUrl}
                                                         alt={app.eventTitle}
-                                                        className="w-full h-auto max-h-[560px] object-contain block"
+                                                        className="w-full h-full object-cover block"
                                                         loading="lazy"
                                                     />
                                                 </div>
@@ -636,7 +647,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                             </div>
 
                                             {/* Action Controls */}
-                                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-black/10">
+                                            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-black/10 mt-auto">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     {app.teamId && (
                                                         <button
@@ -883,18 +894,43 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                         {/* Close button */}
                         <button
                             onClick={() => setActivePassApp(null)}
-                            className="absolute top-3 right-3 p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 z-20 shadow-[1px_1px_0px_#000] cursor-pointer print:hidden"
+                            className="absolute top-3 right-3 p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 z-20 shadow-[1px_1px_0px_#000] cursor-pointer print:hidden no-print"
+                            data-no-print="true"
                         >
                             <X className="w-4 h-4 text-black stroke-[2.5]" />
                         </button>
 
+                        {/* Official Orbix Brand Header */}
+                        <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/15 text-left">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-black flex items-center justify-center text-white border border-black shadow-[1.5px_1.5px_0px_#000]">
+                                    <OrbixLogo className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-1 leading-none">
+                                        <span className="font-black text-xs text-black tracking-tight uppercase">ORBIX</span>
+                                        <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-[#FFE566] text-black border border-black">Official Pass</span>
+                                    </div>
+                                    <span className="text-[9px] font-bold text-neutral-500 block leading-none mt-0.5">
+                                        Collegiate Ecosystem • Verified Pass
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[8px] font-mono font-bold text-neutral-400 uppercase block">Security ID</span>
+                                <span className="text-[10px] font-mono font-black text-black">
+                                    {activePassApp.id ? activePassApp.id.slice(0, 8).toUpperCase() : "VERIFIED"}
+                                </span>
+                            </div>
+                        </div>
+
                         {/* Event Banner */}
                         {activePassApp.coverImageUrl && (
-                            <div className="w-full rounded-2xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] -mt-1 bg-neutral-950 flex items-center justify-center">
+                            <div className="w-full rounded-2xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] bg-neutral-950 flex items-center justify-center">
                                 <img
                                     src={activePassApp.coverImageUrl}
                                     alt={activePassApp.eventTitle}
-                                    className="w-full h-auto max-h-[260px] object-contain block"
+                                    className="w-full h-auto max-h-[240px] object-contain block"
                                 />
                             </div>
                         )}
@@ -1007,8 +1043,17 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         </div>
 
+                        {/* Pass Verification Footer */}
+                        <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[9px] text-neutral-500 font-bold">
+                            <span className="flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-black" />
+                                Cryptographically Verified Admission Pass
+                            </span>
+                            <span className="font-mono text-neutral-400">orbix.in/verify</span>
+                        </div>
+
                         {/* Modal Action Controls */}
-                        <div className="grid grid-cols-2 gap-2 pt-1 print:hidden">
+                        <div className="grid grid-cols-2 gap-2 pt-1 print:hidden" data-no-print="true">
                             <button
                                 type="button"
                                 onClick={() => handleCopyTicket(activePassApp.ticketCode)}
@@ -1019,11 +1064,13 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </button>
                             <button
                                 type="button"
-                                onClick={handlePrintPass}
-                                className="py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 flex items-center justify-center gap-1.5"
+                                onClick={handleDownloadPassPdf}
+                                disabled={isDownloadingPass}
+                                className="py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                                title="Download Pass as PDF"
                             >
-                                <Printer className="w-3.5 h-3.5" />
-                                Print Pass
+                                <Download className="w-3.5 h-3.5" />
+                                <span>{isDownloadingPass ? "Generating..." : "Download Pass (PDF)"}</span>
                             </button>
                         </div>
                     </div>
@@ -1050,10 +1097,17 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                     <span className="text-neutral-500 font-mono text-[10px] uppercase">Host Club:</span>
                                     <span className="text-black">{withdrawTargetApp.clubName}</span>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
-                                    <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
-                                </div>
+                                {withdrawTargetApp.ticketCode ? (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
+                                        <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-neutral-500 font-mono text-[10px] uppercase">Status:</span>
+                                        <span className="font-mono text-amber-700 font-bold uppercase text-[11px]">Awaiting Organizer Review</span>
+                                    </div>
+                                )}
                                 <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
                                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                                     <span>Your admission pass will be immediately invalidated and your seat will be released.</span>

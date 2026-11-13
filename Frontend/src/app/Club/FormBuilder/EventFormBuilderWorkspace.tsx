@@ -248,7 +248,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     initialFormRecord,
     initialEventData,
     onWizardChange,
-    onWizardBack: _onWizardBack,
+    onWizardBack,
     onWizardSubmit,
 }) => {
     const toast = useToast();
@@ -1581,6 +1581,19 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <span>{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
                         </button>
 
+                        {/* Back button in Wizard Mode */}
+                        {isWizardMode && onWizardBack && (
+                            <button
+                                type="button"
+                                onClick={onWizardBack}
+                                className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-white hover:bg-neutral-100 border-2 border-black font-bold text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 h-9 shrink-0 text-black"
+                            >
+                                <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span className="hidden sm:inline">Back: Timeline</span>
+                                <span className="sm:hidden">Back</span>
+                            </button>
+                        )}
+
                         {/* Divider */}
                         <div className="h-5 w-[1px] bg-neutral-300 dark:bg-neutral-700 mx-0.5 shrink-0" />
 
@@ -1602,18 +1615,27 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             )}
                         </button>
 
-                        {/* Publish (Text only "Publish", Borderless) */}
+                        {/* Publish or Next in Wizard Mode */}
                         <button
                             type="button"
                             onClick={handlePublishForm}
                             disabled={saving || isPublishing}
-                            className="px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none h-9"
-                            title="Publish"
+                            className={`px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 h-9 ${
+                                isWizardMode
+                                    ? "bg-[#38BDF8] text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#0284C7] hover:text-white"
+                                    : "bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 border-0 shadow-none"
+                            }`}
+                            title={isWizardMode ? "Next: Select Banner" : "Publish"}
                         >
                             {isPublishing ? (
                                 <>
                                     <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
                                     <span>Publishing...</span>
+                                </>
+                            ) : isWizardMode ? (
+                                <>
+                                    <span>Next: Select Banner</span>
+                                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
                                 </>
                             ) : (
                                 <span>Publish</span>

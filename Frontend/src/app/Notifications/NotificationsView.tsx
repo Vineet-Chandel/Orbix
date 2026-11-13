@@ -35,13 +35,14 @@ import {
     Clock,
     Ticket,
     QrCode,
-    Printer,
     CheckCircle2,
     Award,
     Sparkles,
     Download,
     Share2,
 } from "lucide-react";
+import { OrbixLogo } from "../../components/OrbixLogo";
+import { downloadPassPdf } from "../../utils/passPdfGenerator";
 import { revealCertificateNotification } from "../../api/certificateStudioApi";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
@@ -112,6 +113,32 @@ export const NotificationsView: React.FC = () => {
     const [isMarkingAllRead, setIsMarkingAllRead] = useState<boolean>(false);
     const [revealedCertificates, setRevealedCertificates] = useState<Record<string, boolean>>({});
     const [selectedGroupCertIndex, setSelectedGroupCertIndex] = useState<number>(0);
+    const [isDownloadingPass, setIsDownloadingPass] = useState(false);
+
+    const handleDownloadPassPdf = async (eventTitle?: string) => {
+        if (isDownloadingPass) return;
+        const safeTitle = (eventTitle || "Event").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `Orbix-Pass-${safeTitle}.pdf`;
+
+        try {
+            await downloadPassPdf({
+                elementId: "notification-event-pass-card",
+                filename,
+                onStart: () => setIsDownloadingPass(true),
+                onSuccess: () => {
+                    setIsDownloadingPass(false);
+                    toast.success("Pass PDF downloaded successfully!");
+                },
+                onError: (err) => {
+                    setIsDownloadingPass(false);
+                    console.error("PDF generation error:", err);
+                    toast.error("Could not download pass PDF. Please try again.");
+                },
+            });
+        } catch {
+            setIsDownloadingPass(false);
+        }
+    };
 
     const handleShareCertificate = (code: string, title: string) => {
         const verifyUrl = `${window.location.origin}/verify/certificate/${encodeURIComponent(code)}`;
@@ -1844,7 +1871,34 @@ export const NotificationsView: React.FC = () => {
 
                                         {/* Case: Application Accepted - Display Scannable Digital Entry Pass with Real QR Code */}
                                         {isAppApproved && meta.ticketCode && (
-                                            <div className="p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 text-center">
+                                            <div
+                                                id="notification-event-pass-card"
+                                                className="p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 text-center print:shadow-none print:border-2"
+                                            >
+                                                {/* Official Orbix Brand Header */}
+                                                <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/15 text-left">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-7 h-7 rounded-lg bg-black flex items-center justify-center text-white border border-black shadow-[1.5px_1.5px_0px_#000]">
+                                                            <OrbixLogo className="w-4 h-4 text-white" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5 leading-none">
+                                                                <span className="font-black text-xs text-black tracking-tight uppercase">ORBIX</span>
+                                                                <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-[#FFE566] text-black border border-black">Official Pass</span>
+                                                            </div>
+                                                            <span className="text-[9px] font-bold text-neutral-500 block leading-tight mt-0.5">
+                                                                Collegiate Ecosystem • Verified Pass
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-[8px] font-mono font-bold text-neutral-400 uppercase block">Security ID</span>
+                                                        <span className="text-[10px] font-mono font-black text-black">
+                                                            {meta.registrationId ? meta.registrationId.slice(0, 8).toUpperCase() : "VERIFIED"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
                                                 <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-neutral-500 border-b border-black/10 pb-2">
                                                     <span className="flex items-center gap-1.5 text-black">
                                                         <Ticket className="w-4 h-4 text-black" />
@@ -1941,17 +1995,31 @@ export const NotificationsView: React.FC = () => {
                                                         </div>
                                                     )}
                                                 </div>
+
+                                                {/* Pass Verification Footer */}
+                                                <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[9px] text-neutral-500 font-bold">
+                                                    <span className="flex items-center gap-1">
+                                                        <ShieldCheck className="w-3 h-3 text-black" />
+                                                        Cryptographically Verified Admission Pass
+                                                    </span>
+                                                    <span className="font-mono text-neutral-400">orbix.in/verify</span>
+                                                </div>
                                             </div>
                                         )}
 
                                         {/* Case: Application Pending Review */}
                                         {isAppSubmitted && (
-                                            <div className="p-4 rounded-2xl bg-amber-50/70 border-2 border-amber-800/40 text-amber-950 space-y-2 text-left">
-                                                <div className="flex items-center gap-2 font-black text-xs">
-                                                    <Clock className="w-4 h-4 text-amber-700" />
-                                                    <span>Entry Pass Pending Review</span>
+                                            <div className="p-4 rounded-2xl bg-[#FFFBEB] border-2 border-black shadow-[3px_3px_0px_#000] text-black space-y-2 text-left">
+                                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-[#FFE566] border border-black font-black text-[10px] uppercase tracking-wider text-black shadow-[1px_1px_0px_#000]">
+                                                        <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        <span>Entry Pass Pending Review</span>
+                                                    </span>
+                                                    <span className="text-[10px] font-mono font-bold text-amber-950 bg-amber-100 px-2 py-0.5 rounded border border-amber-800">
+                                                        Pending Approval
+                                                    </span>
                                                 </div>
-                                                <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                                                <p className="text-xs text-neutral-800 leading-relaxed font-bold">
                                                     The {clubName} organizers have been notified of your registration. Your admission entry pass and check-in QR code will be generated immediately once your application is accepted.
                                                 </p>
                                             </div>
@@ -1986,11 +2054,13 @@ export const NotificationsView: React.FC = () => {
                                                 {isAppApproved && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => window.print()}
-                                                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                        onClick={() => handleDownloadPassPdf(eventTitle)}
+                                                        disabled={isDownloadingPass}
+                                                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-60"
+                                                        title="Download Pass as Official PDF"
                                                     >
-                                                        <Printer className="w-3.5 h-3.5" />
-                                                        <span>Print Pass Receipt</span>
+                                                        <Download className="w-3.5 h-3.5" />
+                                                        <span>{isDownloadingPass ? "Generating PDF..." : "Download Pass (PDF)"}</span>
                                                     </button>
                                                 )}
 

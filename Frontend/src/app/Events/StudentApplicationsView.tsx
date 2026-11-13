@@ -336,11 +336,11 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                 <div className="space-y-3">
                                     {/* Event Banner */}
                                     {app.coverImageUrl && (
-                                        <div className="w-full rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
+                                        <div className="w-full aspect-[2.2/1] rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                             <img
                                                 src={app.coverImageUrl}
                                                 alt={app.eventTitle}
-                                                className="w-full h-auto max-h-[560px] object-contain block"
+                                                className="w-full h-full object-cover block"
                                                 loading="lazy"
                                             />
                                         </div>
