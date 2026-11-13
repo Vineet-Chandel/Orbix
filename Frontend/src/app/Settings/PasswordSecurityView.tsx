@@ -494,9 +494,9 @@ export const PasswordSecurityView: React.FC<PasswordSecurityViewProps> = ({
                                         type="button"
                                         onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-black p-1 cursor-pointer"
-                                        aria-label="Toggle password visibility"
+                                        aria-label={showCurrentPassword ? "Hide password" : "Show password"}
                                     >
-                                        {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        {showCurrentPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                     </button>
                                 </div>
                             </div>
@@ -519,9 +519,9 @@ export const PasswordSecurityView: React.FC<PasswordSecurityViewProps> = ({
                                         type="button"
                                         onClick={() => setShowNewPassword(!showNewPassword)}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-black p-1 cursor-pointer"
-                                        aria-label="Toggle password visibility"
+                                        aria-label={showNewPassword ? "Hide password" : "Show password"}
                                     >
-                                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        {showNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                     </button>
                                 </div>
 
@@ -550,9 +550,9 @@ export const PasswordSecurityView: React.FC<PasswordSecurityViewProps> = ({
                                         type="button"
                                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-black p-1 cursor-pointer"
-                                        aria-label="Toggle password visibility"
+                                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                                     >
-                                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        {showConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                     </button>
                                 </div>
                                 {confirmPassword && newPassword && (
@@ -753,9 +753,9 @@ export const PasswordSecurityView: React.FC<PasswordSecurityViewProps> = ({
                                                 type="button"
                                                 onClick={() => setShowOtpNewPassword(!showOtpNewPassword)}
                                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-black p-1 cursor-pointer"
-                                                aria-label="Toggle password visibility"
+                                                aria-label={showOtpNewPassword ? "Hide password" : "Show password"}
                                             >
-                                                {showOtpNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                {showOtpNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                             </button>
                                         </div>
 
@@ -784,9 +784,9 @@ export const PasswordSecurityView: React.FC<PasswordSecurityViewProps> = ({
                                                 type="button"
                                                 onClick={() => setShowOtpConfirmPassword(!showOtpConfirmPassword)}
                                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-black p-1 cursor-pointer"
-                                                aria-label="Toggle password visibility"
+                                                aria-label={showOtpConfirmPassword ? "Hide password" : "Show password"}
                                             >
-                                                {showOtpConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                {showOtpConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                             </button>
                                         </div>
                                         {otpConfirmPassword && otpNewPassword && (

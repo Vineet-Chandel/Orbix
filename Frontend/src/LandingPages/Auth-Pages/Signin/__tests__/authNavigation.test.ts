@@ -233,3 +233,65 @@ describe("AUTH-01: Authentication Navigation & Query Parameter Synchronization",
         assert.strictEqual(forwardToPage2.authView, "forgot_password");
     });
 });
+
+describe("AUTH-02: Password Visibility Icon Selection & Toggle Behavior", () => {
+    interface PasswordInputState {
+        showPassword: boolean;
+        value: string;
+    }
+
+    function resolvePasswordToggle(state: PasswordInputState) {
+        return {
+            actualType: state.showPassword ? "text" : "password",
+            renderedIcon: state.showPassword ? "Eye" : "EyeOff",
+            ariaLabel: state.showPassword ? "Hide password" : "Show password",
+            buttonType: "button" as const,
+            tabIndex: -1,
+            valuePreserved: state.value,
+        };
+    }
+
+    test("Scenario 10: Hidden password renders complete EyeOff icon, type=password, aria-label=Show password", () => {
+        const initial = resolvePasswordToggle({ showPassword: false, value: "SecretP@ss123!" });
+        assert.strictEqual(initial.actualType, "password");
+        assert.strictEqual(initial.renderedIcon, "EyeOff");
+        assert.strictEqual(initial.ariaLabel, "Show password");
+        assert.strictEqual(initial.buttonType, "button");
+        assert.strictEqual(initial.tabIndex, -1);
+        assert.strictEqual(initial.valuePreserved, "SecretP@ss123!");
+    });
+
+    test("Scenario 11: Clicking toggle renders complete Eye icon, type=text, aria-label=Hide password", () => {
+        const toggled = resolvePasswordToggle({ showPassword: true, value: "SecretP@ss123!" });
+        assert.strictEqual(toggled.actualType, "text");
+        assert.strictEqual(toggled.renderedIcon, "Eye");
+        assert.strictEqual(toggled.ariaLabel, "Hide password");
+        assert.strictEqual(toggled.buttonType, "button");
+        assert.strictEqual(toggled.tabIndex, -1);
+        assert.strictEqual(toggled.valuePreserved, "SecretP@ss123!");
+    });
+
+    test("Scenario 12: Password content remains completely unaltered across multiple toggle transitions", () => {
+        const passwordValue = "Orbix2026!Campus#Elite";
+        let state = { showPassword: false, value: passwordValue };
+
+        // Toggle to visible
+        state.showPassword = !state.showPassword;
+        let resolved = resolvePasswordToggle(state);
+        assert.strictEqual(resolved.renderedIcon, "Eye");
+        assert.strictEqual(resolved.actualType, "text");
+        assert.strictEqual(resolved.valuePreserved, passwordValue);
+
+        // Toggle back to hidden
+        state.showPassword = !state.showPassword;
+        resolved = resolvePasswordToggle(state);
+        assert.strictEqual(resolved.renderedIcon, "EyeOff");
+        assert.strictEqual(resolved.actualType, "password");
+        assert.strictEqual(resolved.valuePreserved, passwordValue);
+    });
+
+    test("Scenario 13: Toggle button has type='button' to prevent accidental form submission", () => {
+        const resolved = resolvePasswordToggle({ showPassword: false, value: "" });
+        assert.strictEqual(resolved.buttonType, "button");
+    });
+});

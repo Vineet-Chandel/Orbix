@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { useBlogLikes } from "../../hooks/useBlogLikes";
+import { OrbixLoader } from "../../../../components/ui/loader";
 
 export type BlogLikeButtonSize = "sm" | "md" | "lg" | "xl";
 
@@ -41,6 +42,13 @@ const SIZE_CONFIG: Record<
         gap: "gap-3 sm:gap-4",
         padding: "px-4 py-2.5 rounded-2xl",
     },
+};
+
+const LOADER_SIZES: Record<BlogLikeButtonSize, number> = {
+    sm: 13,
+    md: 15,
+    lg: 17,
+    xl: 19,
 };
 
 export const BlogLikeButton: React.FC<BlogLikeButtonProps> = ({
@@ -97,13 +105,21 @@ export const BlogLikeButton: React.FC<BlogLikeButtonProps> = ({
                 />
             </motion.div>
             <span
-                className={`font-mono ${config.text} tracking-tight tabular-nums transition-colors duration-150 leading-none ${
+                className={`font-mono ${config.text} tracking-tight tabular-nums transition-colors duration-150 leading-none inline-flex items-center justify-center ${
                     likedByViewer
                         ? "text-red-600 dark:text-red-400 font-bold"
                         : "text-neutral-800 dark:text-neutral-200 group-hover:text-black dark:group-hover:text-white"
                 }`}
             >
-                {loading ? "..." : formattedCount}
+                {loading ? (
+                    <OrbixLoader
+                        size={LOADER_SIZES[resolvedSize]}
+                        variant="minimal"
+                        color="currentColor"
+                    />
+                ) : (
+                    formattedCount
+                )}
             </span>
         </motion.button>
     );

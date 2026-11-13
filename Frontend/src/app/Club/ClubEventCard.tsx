@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { ClubEvent } from "../../store/clubEventsSlice";
 import { IndiaMapBackdrop, CampusPillarsBackdrop } from "../../components/ScopeBackdrops";
+import { EventActionRow } from "../../components/events/EventActionRow";
 
 export interface ClubEventCardProps {
     event: ClubEvent;
@@ -54,10 +55,15 @@ export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelec
                                     Syncing...
                                 </span>
                             )}
-                            <span className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-white/95 text-rose-700 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1">
-                                <Heart className="w-3 h-3 fill-rose-600 text-rose-600" />
-                                <span>{ev.likesCount || 0}</span>
-                            </span>
+                            <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-white/95 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center">
+                                <EventActionRow
+                                    eventId={ev.id}
+                                    eventTitle={ev.title}
+                                    initialLikeCount={ev.likesCount}
+                                    initialShareCount={(ev as any).sharesCount}
+                                    size="sm"
+                                />
+                            </div>
                         </div>
                     )}
 

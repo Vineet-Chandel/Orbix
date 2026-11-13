@@ -30,6 +30,7 @@ import { platformRouter } from './Routes/platform/platformRoutes.js';
 import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { eventFormRouter } from './Routes/events/eventFormRoutes.js';
 import { eventTeamRouter } from './Routes/events/eventTeamRoutes.js';
+import eventEngagementRouter from './Routes/events/eventEngagementRoutes.js';
 import { clubCredibilityRouter } from './Routes/club/clubCredibilityRoutes.js';
 import projectRouter from './Routes/projects/projectRoutes.js';
 import { workspaceRouter } from './Routes/workspace/workspaceRoutes.js';
@@ -112,10 +113,11 @@ apiRouter.use('/projects', projectRouter);
 // Leaderboard & Competitions
 apiRouter.use('/leaderboard', leaderboardRouter);
 
-// Events & Dynamic Event Forms
+// Events, Dynamic Event Forms & Engagement
 apiRouter.use('/events', eventsRouter);
 apiRouter.use('/', eventFormRouter); // Handles /api/club/events/:id/form & /api/events/:id/form
 apiRouter.use('/', eventTeamRouter); // Handles /api/events/:id/teams & /api/club/events/:id/teams
+apiRouter.use('/', eventEngagementRouter); // Handles /api/events/:id/likes, /shares, /engagement & /api/club/events/...
 
 // Notifications & Institutions
 apiRouter.use('/notifications', notificationsRouter);

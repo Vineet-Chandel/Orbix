@@ -280,9 +280,9 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
                                 title={showPassword ? "Hide password" : "Show password"}
                             >
                                 {showPassword ? (
-                                    <EyeOff className="w-3.5 h-3.5" />
-                                ) : (
                                     <Eye className="w-3.5 h-3.5" />
+                                ) : (
+                                    <EyeOff className="w-3.5 h-3.5" />
                                 )}
                             </button>
                         </div>

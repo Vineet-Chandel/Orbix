@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import {
     Clock,
     MapPin,
-    Heart,
     Search,
     ExternalLink,
     Building2,
@@ -33,6 +32,8 @@ import {
 } from "../../api/collegeEventsApi";
 import { DynamicEventRegistrationModal } from "./DynamicEventRegistrationModal";
 import { CollegeEventDetailModal } from "./CollegeEventDetailModal";
+import { EventActionRow } from "../../components/events/EventActionRow";
+import { primeEventEngagementCache } from "../../hooks/useEventEngagement";
 import { CollegeRestrictionModal } from "../../components/CollegeRestrictionModal";
 import { NeoSelect } from "../../components/NeoSelect";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
@@ -147,6 +148,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                 collegeName: user?.college?.officialName || (typeof user?.college === "string" ? user.college : undefined),
             });
             setEvents(data.events || []);
+            primeEventEngagementCache(data.events || []);
             if (data.collegeName) setCollegeName(data.collegeName);
         } catch (err: any) {
             console.error("Failed to load college events:", err);
@@ -413,27 +415,18 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                             </div>
                         )}
 
-                        {/* Heart Button Overlay */}
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleHeart(ev);
-                            }}
-                            className={`absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1.5 text-xs font-black cursor-pointer transition-transform active:scale-95 ${
-                                ev.hasLiked
-                                    ? "bg-rose-100 text-rose-700"
-                                    : "bg-white/95 text-neutral-800 hover:bg-white"
-                            }`}
-                            title={ev.hasLiked ? "Remove heart" : "Appreciate event"}
-                        >
-                            <Heart
-                                className={`w-3.5 h-3.5 ${
-                                    ev.hasLiked ? "fill-rose-600 text-rose-600" : "text-black"
-                                }`}
+                        {/* Compact Action Row Overlay (Like & Share) */}
+                        <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full border-2 border-black bg-white/95 shadow-[1.5px_1.5px_0px_#000] flex items-center backdrop-blur-sm">
+                            <EventActionRow
+                                eventId={ev.id}
+                                eventTitle={ev.title}
+                                eventSummary={ev.summary || undefined}
+                                initialLikeCount={ev.likesCount}
+                                initialLiked={ev.hasLiked}
+                                initialShareCount={(ev as any).sharesCount}
+                                size="sm"
                             />
-                            <span>{ev.likesCount || 0}</span>
-                        </button>
+                        </div>
 
                         {/* Timeline Status Badge & Scope Indicator */}
                         <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">

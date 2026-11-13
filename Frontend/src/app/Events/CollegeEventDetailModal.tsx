@@ -7,8 +7,6 @@ import {
     Clock,
     MapPin,
     Users,
-    Heart,
-    Share2,
     CheckCircle2,
     ExternalLink,
     Building2,
@@ -26,6 +24,7 @@ import {
 import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
 import { ClubMarkdownRenderer } from "../Club/Profile/ClubMarkdownRenderer";
+import { EventActionRow } from "../../components/events/EventActionRow";
 
 interface CollegeEventDetailModalProps {
     event: CollegeEventItem | null;
@@ -40,11 +39,9 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
     isOpen,
     onClose,
     onApply,
-    onToggleHeart,
 }) => {
     const toast = useToast();
     const [copiedCode, setCopiedCode] = useState(false);
-    const [copiedShareLink, setCopiedShareLink] = useState(false);
 
     if (!isOpen || !event) return null;
 
@@ -81,14 +78,6 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
         setCopiedCode(true);
         toast.success("Pass code copied to clipboard!");
         setTimeout(() => setCopiedCode(false), 2000);
-    };
-
-    const handleCopyShareLink = () => {
-        const url = `${window.location.origin}/college-events?event=${event.id}`;
-        navigator.clipboard.writeText(url);
-        setCopiedShareLink(true);
-        toast.success("Event link copied to clipboard!");
-        setTimeout(() => setCopiedShareLink(false), 2000);
     };
 
     if (typeof document === "undefined") return null;
@@ -164,36 +153,16 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                 <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-tight flex-1">
                                     {event.title}
                                 </h1>
-                                <div className="flex items-center gap-2 shrink-0 pt-0.5">
-                                    {onToggleHeart && (
-                                        <button
-                                            type="button"
-                                            onClick={() => onToggleHeart(event)}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer ${
-                                                event.hasLiked
-                                                    ? "bg-rose-100 text-rose-700"
-                                                    : "bg-white hover:bg-neutral-100 text-neutral-800"
-                                            }`}
-                                            title={event.hasLiked ? "Remove heart" : "Appreciate event"}
-                                        >
-                                            <Heart
-                                                className={`w-3.5 h-3.5 ${
-                                                    event.hasLiked ? "fill-rose-600 text-rose-600" : "text-black"
-                                                }`}
-                                            />
-                                            <span>{event.likesCount || 0}</span>
-                                        </button>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyShareLink}
-                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
-                                        title="Share event link"
-                                    >
-                                        {copiedShareLink ? <Check className="w-3.5 h-3.5 text-green-700" /> : <Share2 className="w-3.5 h-3.5" />}
-                                        <span className="hidden sm:inline">{copiedShareLink ? "Copied" : "Share"}</span>
-                                    </button>
+                                <div className="flex items-center shrink-0 pt-0.5">
+                                    <EventActionRow
+                                        eventId={event.id}
+                                        eventTitle={event.title}
+                                        eventSummary={event.summary || undefined}
+                                        initialLikeCount={event.likesCount}
+                                        initialLiked={event.hasLiked}
+                                        initialShareCount={(event as any).sharesCount}
+                                        size="md"
+                                    />
                                 </div>
                             </div>
                             {event.summary && (

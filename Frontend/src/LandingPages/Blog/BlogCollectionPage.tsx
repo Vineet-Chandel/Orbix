@@ -116,20 +116,23 @@ export default function BlogCollectionPage() {
                     </p>
 
                     {/* Primary Action Button */}
-                    <div className="flex flex-wrap items-center gap-4 mb-10 pb-8 border-b-2 border-black/15">
-                        <Link
-                            to="/blog/aws-sbg-psit/aws-launchpad-2026"
-                            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-base shadow-[4px_4px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-1 active:translate-y-1 transition-all cursor-pointer"
-                        >
-                            <span>Open Live Workshop Guide</span>
-                            <ArrowRight className="w-5 h-5 stroke-[2.5]" />
-                        </Link>
-                        <Link
-                            to="/blog/aws-sbg-psit/aws-launchpad-2026/verification-checklist"
-                            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566] text-black border-2 border-black font-black text-sm shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-1 active:translate-y-1 transition-all cursor-pointer"
-                        >
-                            <span>View Verification Checklist</span>
-                        </Link>
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-10 pb-8 border-b-2 border-black/15">
+                        <div className="flex flex-wrap items-center gap-4">
+
+                            <Link
+                                to="/blog/aws-sbg-psit/aws-launchpad-2026"
+                                className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-base shadow-[4px_4px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-1 active:translate-y-1 transition-all cursor-pointer"
+                            >
+                                <span>Open Live Workshop Guide</span>
+                                <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+                            </Link>
+                            <Link
+                                to="/blog/aws-sbg-psit/aws-launchpad-2026/verification-checklist"
+                                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566] text-black border-2 border-black font-black text-sm shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-1 active:translate-y-1 transition-all cursor-pointer"
+                            >
+                                <span>View Verification Checklist</span>
+                            </Link>
+                        </div>
                         <BlogLikeButton hoster="aws-sbg-psit" blogName="aws-launchpad-2026" variant="card" />
                     </div>
 
