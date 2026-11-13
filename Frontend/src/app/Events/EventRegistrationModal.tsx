@@ -37,9 +37,6 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
     const [applicantName, setApplicantName] = useState("");
     const [applicantEmail, setApplicantEmail] = useState("");
-    const [department, setDepartment] = useState("");
-    const [yearOfStudy, setYearOfStudy] = useState("3rd Year");
-    const [rollNumber, setRollNumber] = useState("");
     const [phoneNumber, setPhoneNumber] = useState("");
     const [notes, setNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,9 +61,6 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 : user?.username || "";
             setApplicantName(defaultName);
             setApplicantEmail(user?.gmail || (user as any)?.email || "");
-            setDepartment("");
-            setYearOfStudy("");
-            setRollNumber("");
             setPhoneNumber("");
             setNotes("");
             setIsAttendeeUnder18(false);
@@ -132,9 +126,6 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
             await applyForEvent(event.id, {
                 applicantName: applicantName.trim(),
                 applicantEmail: applicantEmail.trim(),
-                department: department.trim() || undefined,
-                yearOfStudy: yearOfStudy || undefined,
-                rollNumber: rollNumber.trim() || undefined,
                 phoneNumber: phoneNumber.trim() || undefined,
                 notes: notes.trim() || undefined,
                 isAttendeeUnder18,
@@ -290,7 +281,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                                     {applicantName}
                                 </div>
                                 <div className="text-[11px] font-bold text-neutral-600 flex items-center justify-between">
-                                    <span>{department || "General"} · {yearOfStudy}</span>
+                                    <span>Verified Student</span>
                                     <span>{applicantEmail}</span>
                                 </div>
                             </div>
@@ -467,65 +458,17 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                    Department / Branch
-                                </label>
-                                <input
-                                    type="text"
-                                    value={department}
-                                    onChange={(e) => setDepartment(e.target.value)}
-                                    placeholder="e.g. CSE / IT / ECE"
-                                    className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                    Year of Study
-                                </label>
-                                <NeoSelect
-                                    value={yearOfStudy}
-                                    onChange={(val) => setYearOfStudy(val)}
-                                    size="sm"
-                                    triggerClassName="!bg-white !rounded-xl !py-2 text-xs !shadow-[1px_1px_0px_#000]"
-                                >
-                                    <option value="1st Year">1st Year</option>
-                                    <option value="2nd Year">2nd Year</option>
-                                    <option value="3rd Year">3rd Year</option>
-                                    <option value="4th Year / Final">4th Year / Final</option>
-                                    <option value="Postgraduate / Masters">Postgraduate / Masters</option>
-                                </NeoSelect>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                    Roll / Student ID (Optional)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={rollNumber}
-                                    onChange={(e) => setRollNumber(e.target.value)}
-                                    placeholder="e.g. 2110992345"
-                                    className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                    Phone Number (Optional)
-                                </label>
-                                <input
-                                    type="tel"
-                                    value={phoneNumber}
-                                    onChange={(e) => setPhoneNumber(e.target.value)}
-                                    placeholder="+91 98765 43210"
-                                    className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
-                                />
-                            </div>
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                Phone Number (Optional)
+                            </label>
+                            <input
+                                type="tel"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                placeholder="+91 98765 43210"
+                                className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                            />
                         </div>
 
                         <div>

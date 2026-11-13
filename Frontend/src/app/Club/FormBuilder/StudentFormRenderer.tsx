@@ -672,9 +672,6 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             const res = await submitEventFormResponse(form.eventId, {
                 applicantName: studentName,
                 applicantEmail: studentEmail,
-                department: answers["q_department"] || undefined,
-                yearOfStudy: answers["q_year"] || undefined,
-                rollNumber: answers["q_roll_number"] || undefined,
                 phoneNumber: answers["q_phone"] || effectiveProfile.phoneNumber || undefined,
                 notes: answers["q_notes"] || undefined,
                 answers,
@@ -688,9 +685,6 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 ...res.registration,
                 applicantName: studentName,
                 applicantEmail: studentEmail,
-                department: answers["q_department"],
-                rollNumber: answers["q_roll_number"],
-                yearOfStudy: answers["q_year"],
                 answers: res.registration?.answers || answers,
                 fileAttachments: res.registration?.fileAttachments || fileAttachments,
             };
@@ -1430,53 +1424,21 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     <div className="p-4 rounded-2xl bg-amber-50 border-2 border-dashed border-black/30 space-y-3 animate-in fade-in duration-200">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-amber-900">
-                                Event-Specific Identity Overrides
+                                Event-Specific Contact Override
                             </span>
                             <span className="text-[10px] text-neutral-500 font-bold">
-                                Only modifies your application for this event
+                                Only modifies your contact for this event
                             </span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                            <div>
-                                <label className="font-bold text-neutral-700 block mb-1">Roll / Student ID</label>
-                                <input
-                                    type="text"
-                                    value={answers["q_roll_number"] || ""}
-                                    onChange={(e) => setAnswer("q_roll_number", e.target.value)}
-                                    placeholder="e.g. 2024CS0142"
-                                    className="w-full p-2 rounded-xl border border-black font-bold bg-white text-black focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="font-bold text-neutral-700 block mb-1">Phone / WhatsApp</label>
-                                <input
-                                    type="text"
-                                    value={answers["q_phone"] || ""}
-                                    onChange={(e) => setAnswer("q_phone", e.target.value)}
-                                    placeholder="+91 98765 43210"
-                                    className="w-full p-2 rounded-xl border border-black font-bold bg-white text-black focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="font-bold text-neutral-700 block mb-1">Department / Branch</label>
-                                <input
-                                    type="text"
-                                    value={answers["q_department"] || ""}
-                                    onChange={(e) => setAnswer("q_department", e.target.value)}
-                                    placeholder="e.g. Computer Science"
-                                    className="w-full p-2 rounded-xl border border-black font-bold bg-white text-black focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="font-bold text-neutral-700 block mb-1">Year of Study</label>
-                                <input
-                                    type="text"
-                                    value={answers["q_year"] || ""}
-                                    onChange={(e) => setAnswer("q_year", e.target.value)}
-                                    placeholder="e.g. 3rd Year"
-                                    className="w-full p-2 rounded-xl border border-black font-bold bg-white text-black focus:outline-none"
-                                />
-                            </div>
+                        <div className="max-w-xs text-xs">
+                            <label className="font-bold text-neutral-700 block mb-1">Phone / WhatsApp</label>
+                            <input
+                                type="text"
+                                value={answers["q_phone"] || ""}
+                                onChange={(e) => setAnswer("q_phone", e.target.value)}
+                                placeholder="+91 98765 43210"
+                                className="w-full p-2 rounded-xl border border-black font-bold bg-white text-black focus:outline-none"
+                            />
                         </div>
                     </div>
                 )}

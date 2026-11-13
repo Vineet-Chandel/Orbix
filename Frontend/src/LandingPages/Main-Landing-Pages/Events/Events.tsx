@@ -730,7 +730,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                     {/* Prominent Highlighting: Dynamic 7-Day Algorithm Metrics */}
                     <div className="flex items-center gap-2.5 flex-wrap flex-shrink-0">
                         <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000]">
-                            <span className="text-base sm:text-lg font-black font-mono text-black leading-none">
+                            <span className="text-base sm:text-lg font-black text-black leading-none">
                                 {next7DaysStats.count}
                             </span>
                             <span className="text-xs font-black uppercase tracking-wider text-black">
@@ -739,7 +739,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                         </div>
 
                         <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000]">
-                            <span className="text-base sm:text-lg font-black font-mono text-black leading-none">
+                            <span className="text-base sm:text-lg font-black text-black leading-none">
                                 {next7DaysStats.platforms}
                             </span>
                             <span className="text-xs font-black uppercase tracking-wider text-black">

@@ -112,13 +112,12 @@ const CurlyBracket = ({ isToday, isLive }: { isToday?: boolean; isLive?: boolean
     return (
         <div className="relative w-5 sm:w-6 md:w-7 flex-shrink-0 self-stretch flex items-stretch select-none pointer-events-none py-2">
             <svg
-                className={`w-full h-full transition-colors ${
-                    isLive
-                        ? "text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]"
-                        : isToday
+                className={`w-full h-full transition-colors ${isLive
+                    ? "text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]"
+                    : isToday
                         ? "text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]"
                         : "text-neutral-700"
-                }`}
+                    }`}
                 viewBox="0 0 20 100"
                 preserveAspectRatio="none"
                 fill="none"
@@ -582,19 +581,19 @@ export const EventTrackerPage: React.FC = () => {
                             {/* Prominent Highlighting: Dynamic 7-Day Algorithm Metrics */}
                             <div className="flex items-center gap-2.5 flex-wrap flex-shrink-0">
                                 <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000]">
-                                    <span className="text-base sm:text-lg font-black font-mono text-black leading-none">
+                                    <span className="text-xl sm:text-4xl font-black text-black leading-none">
                                         {next7DaysStats.count}
                                     </span>
-                                    <span className="text-xs font-black uppercase tracking-wider text-black">
-                                        Contests in next 7 days
+                                    <span className="text-md font-black uppercase tracking-wider text-black">
+                                        CONTEST IN NEXT WEEK
                                     </span>
                                 </div>
 
                                 <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000]">
-                                    <span className="text-base sm:text-lg font-black font-mono text-black leading-none">
+                                    <span className="text-xl sm:text-4xl font-black text-black leading-none">
                                         {next7DaysStats.platforms}
                                     </span>
-                                    <span className="text-xs font-black uppercase tracking-wider text-black">
+                                    <span className="text-md font-black uppercase tracking-wider text-black">
                                         Platforms
                                     </span>
                                 </div>
@@ -810,402 +809,396 @@ export const EventTrackerPage: React.FC = () => {
                             </div>
                         </section>
 
-                {/* 4 & 5. Unified Scheduler & Contest History Section */}
-                <section className="rounded-2xl sm:rounded-3xl bg-[#0a0b0e] border-3 border-black shadow-[6px_6px_0px_#000] text-white overflow-hidden">
-                    {/* Upper: The Scheduler (Calendar or List View) */}
-                    <div className="p-4 sm:p-6 space-y-4">
-                        {viewMode === "calendar" ? (
-                            <EventTrackerCalendar
-                                events={baseFilteredEvents}
-                                selectedMonth={selectedMonth}
-                                allowedMonths={allowedMonths}
-                                currentMonthStr={currentMonthStr}
-                                onSelectMonth={(m) => dispatch(setSelectedMonth(m))}
-                                reminders={reminders}
-                                onToggleReminder={handleToggleReminder}
-                                nowMs={nowMs}
-                            />
-                        ) : (
-                            /* 4b. List View Mode (Grouped by Date with Brackets) */
-                            <>
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-xl font-bold tracking-tight text-white">
-                                            {showFinished ? `All ${selectedType === "contests" ? "Contests" : "Hackathons"}` : `Upcoming ${selectedType === "contests" ? "Contests" : "Hackathons"}`} ({filteredEvents.length})
-                                        </h3>
-                                        {groupedDateEvents.length > 0 && (
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-neutral-300 font-mono">
-                                                {groupedDateEvents.length} Days
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        {/* Toggle to view finished contests in list view */}
-                                        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-700">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-xs font-bold text-neutral-200">
-                                                    Finished Contests
-                                                </span>
-                                                {finishedCount > 0 && (
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${
-                                                        showFinished ? "bg-[#FFE566] text-black" : "bg-neutral-800 text-neutral-400"
-                                                    }`}>
-                                                        {finishedCount}
+                        {/* 4 & 5. Unified Scheduler & Contest History Section */}
+                        <section className="rounded-2xl sm:rounded-3xl bg-[#0a0b0e] border-3 border-black shadow-[6px_6px_0px_#000] text-white overflow-hidden">
+                            {/* Upper: The Scheduler (Calendar or List View) */}
+                            <div className="p-4 sm:p-6 space-y-4">
+                                {viewMode === "calendar" ? (
+                                    <EventTrackerCalendar
+                                        events={baseFilteredEvents}
+                                        selectedMonth={selectedMonth}
+                                        allowedMonths={allowedMonths}
+                                        currentMonthStr={currentMonthStr}
+                                        onSelectMonth={(m) => dispatch(setSelectedMonth(m))}
+                                        reminders={reminders}
+                                        onToggleReminder={handleToggleReminder}
+                                        nowMs={nowMs}
+                                    />
+                                ) : (
+                                    /* 4b. List View Mode (Grouped by Date with Brackets) */
+                                    <>
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-xl font-bold tracking-tight text-white">
+                                                    {showFinished ? `All ${selectedType === "contests" ? "Contests" : "Hackathons"}` : `Upcoming ${selectedType === "contests" ? "Contests" : "Hackathons"}`} ({filteredEvents.length})
+                                                </h3>
+                                                {groupedDateEvents.length > 0 && (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-neutral-300 font-mono">
+                                                        {groupedDateEvents.length} Days
                                                     </span>
                                                 )}
                                             </div>
-                                            <NeoToggle
-                                                checked={showFinished}
-                                                onChange={setShowFinished}
-                                                size="sm"
-                                                showStatusText={false}
-                                                onIcon={<Eye className="w-3.5 h-3.5 text-black stroke-[2.5]" />}
-                                                offIcon={<EyeOff className="w-3.5 h-3.5 text-neutral-600 stroke-[2.5]" />}
-                                                ariaLabel="Toggle finished contests visibility in list view"
-                                            />
-                                        </div>
-                                        <span className="text-xs text-neutral-400 hidden sm:inline">
-                                            Sorted by Start Time
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {groupedDateEvents.length === 0 ? (
-                                    <div className="py-16 text-center rounded-2xl bg-neutral-950 border border-neutral-800 p-8 space-y-3">
-                                        <CalendarIcon className="w-12 h-12 text-neutral-600 mx-auto" />
-                                        <h4 className="text-base font-bold text-white mb-1">No upcoming contests found</h4>
-                                        <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-                                            {finishedCount > 0
-                                                ? `There are ${finishedCount} concluded contests matching this filter.`
-                                                : "There are no scheduled contests matching your current platform or month filters."}
-                                        </p>
-                                        {finishedCount > 0 && !showFinished && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowFinished(true)}
-                                                className="px-4 py-2 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-yellow-300 transition cursor-pointer inline-flex items-center gap-2 mt-2"
-                                            >
-                                                <Eye className="w-4 h-4 stroke-[2.5]" />
-                                                <span>See Finished Contests ({finishedCount})</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4 sm:space-y-5">
-                                        {groupedDateEvents.map((group) => {
-                                            const hasMultiple = group.events.length > 1;
-
-                                            return (
-                                                <div
-                                                    key={group.dateKey}
-                                                    className="flex items-stretch gap-2 sm:gap-3 md:gap-3.5"
-                                                >
-                                                    {/* Left Date Column */}
-                                                    <div className="flex flex-col items-center justify-center flex-shrink-0 w-20 sm:w-28 md:w-36 self-stretch">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedDayEvents({ date: group.dateKey, events: group.events })}
-                                                            className={`w-full h-full min-h-[90px] rounded-2xl p-2 sm:p-3 text-center border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer shadow-sm ${
-                                                                group.isToday
-                                                                    ? "bg-white text-black border-white shadow-[0_0_24px_rgba(255,255,255,0.18)] hover:bg-neutral-100"
-                                                                    : group.hasLive
-                                                                    ? "bg-neutral-900/90 text-white border-rose-500/40 shadow-[0_0_16px_rgba(244,63,94,0.12)] hover:border-rose-400"
-                                                                    : group.allFinished
-                                                                    ? "bg-neutral-950/70 text-neutral-400 border-neutral-800/60 hover:border-neutral-700"
-                                                                    : "bg-neutral-900/70 text-white border-neutral-800/80 hover:border-neutral-600 hover:bg-neutral-900"
-                                                            }`}
-                                                            title={`View all ${group.events.length} contest${group.events.length > 1 ? "s" : ""} on ${group.fullDateFormatted}`}
-                                                        >
-                                                            {/* Day of Week */}
-                                                            <span
-                                                                className={`text-[10px] sm:text-[11px] font-black uppercase tracking-widest ${
-                                                                    group.isToday ? "text-neutral-700" : group.hasLive ? "text-rose-400" : "text-neutral-400"
-                                                                }`}
-                                                            >
-                                                                {group.weekdayShort}
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                {/* Toggle to view finished contests in list view */}
+                                                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-700">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs font-bold text-neutral-200">
+                                                            Finished Contests
+                                                        </span>
+                                                        {finishedCount > 0 && (
+                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${showFinished ? "bg-[#FFE566] text-black" : "bg-neutral-800 text-neutral-400"
+                                                                }`}>
+                                                                {finishedCount}
                                                             </span>
-
-                                                            {/* Day Number */}
-                                                            <span
-                                                                className={`text-2xl sm:text-3xl md:text-4xl font-black font-mono leading-none tracking-tight my-1 ${
-                                                                    group.isToday ? "text-black" : "text-white"
-                                                                }`}
-                                                            >
-                                                                {group.dayNum}
-                                                            </span>
-
-                                                            {/* Month & Year */}
-                                                            <span
-                                                                className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${
-                                                                    group.isToday ? "text-neutral-800" : "text-neutral-400"
-                                                                }`}
-                                                            >
-                                                                {group.monthShort}
-                                                            </span>
-
-                                                            {/* Context Badges */}
-                                                            <div className="mt-1.5 flex flex-col items-center gap-1 w-full">
-                                                                {group.isToday && (
-                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-black text-white shadow-sm">
-                                                                        Today
-                                                                    </span>
-                                                                )}
-                                                                {group.hasLive && !group.isToday && (
-                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
-                                                                        Live
-                                                                    </span>
-                                                                )}
-                                                                {hasMultiple && (
-                                                                    <span
-                                                                        className={`px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-semibold tracking-tight whitespace-nowrap ${
-                                                                            group.isToday
-                                                                                ? "bg-neutral-200 text-neutral-900"
-                                                                                : "bg-white/5 text-neutral-400 border border-white/5"
-                                                                        }`}
-                                                                    >
-                                                                        {group.events.length} Contests
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </button>
+                                                        )}
                                                     </div>
+                                                    <NeoToggle
+                                                        checked={showFinished}
+                                                        onChange={setShowFinished}
+                                                        size="sm"
+                                                        showStatusText={false}
+                                                        onIcon={<Eye className="w-3.5 h-3.5 text-black stroke-[2.5]" />}
+                                                        offIcon={<EyeOff className="w-3.5 h-3.5 text-neutral-600 stroke-[2.5]" />}
+                                                        ariaLabel="Toggle finished contests visibility in list view"
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-neutral-400 hidden sm:inline">
+                                                    Sorted by Start Time
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                                    {/* Middle: Bracket (if > 1 contest) or empty spacer (if 1 contest) */}
-                                                    {hasMultiple ? (
-                                                        <CurlyBracket isToday={group.isToday} isLive={group.hasLive} />
-                                                    ) : (
-                                                        <div className="w-5 sm:w-6 md:w-7 flex-shrink-0" />
-                                                    )}
+                                        {groupedDateEvents.length === 0 ? (
+                                            <div className="py-16 text-center rounded-2xl bg-neutral-950 border border-neutral-800 p-8 space-y-3">
+                                                <CalendarIcon className="w-12 h-12 text-neutral-600 mx-auto" />
+                                                <h4 className="text-base font-bold text-white mb-1">No upcoming contests found</h4>
+                                                <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+                                                    {finishedCount > 0
+                                                        ? `There are ${finishedCount} concluded contests matching this filter.`
+                                                        : "There are no scheduled contests matching your current platform or month filters."}
+                                                </p>
+                                                {finishedCount > 0 && !showFinished && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowFinished(true)}
+                                                        className="px-4 py-2 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-yellow-300 transition cursor-pointer inline-flex items-center gap-2 mt-2"
+                                                    >
+                                                        <Eye className="w-4 h-4 stroke-[2.5]" />
+                                                        <span>See Finished Contests ({finishedCount})</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4 sm:space-y-5">
+                                                {groupedDateEvents.map((group) => {
+                                                    const hasMultiple = group.events.length > 1;
 
-                                                    {/* Right: Contest Cards for this date */}
-                                                    <div className="flex-1 min-w-0 space-y-2">
-                                                        {group.events.map((ev) => {
-                                                            const isReminded = reminders.includes(ev.id);
-                                                            const isLive = ev.status === "LIVE" || (ev.startTimestamp <= nowMs && ev.endTimestamp > nowMs);
-                                                            const isFinished = ev.status === "FINISHED" || (ev.endTimestamp && ev.endTimestamp < nowMs);
-
-                                                            return (
-                                                                <div
-                                                                    key={ev.id}
-                                                                    className={`p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm group/card ${isFinished ? "opacity-80 hover:opacity-100" : ""}`}
+                                                    return (
+                                                        <div
+                                                            key={group.dateKey}
+                                                            className="flex items-stretch gap-2 sm:gap-3 md:gap-3.5"
+                                                        >
+                                                            {/* Left Date Column */}
+                                                            <div className="flex flex-col items-center justify-center flex-shrink-0 w-20 sm:w-28 md:w-36 self-stretch">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setSelectedDayEvents({ date: group.dateKey, events: group.events })}
+                                                                    className={`w-full h-full min-h-[90px] rounded-2xl p-2 sm:p-3 text-center border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer shadow-sm ${group.isToday
+                                                                        ? "bg-white text-black border-white shadow-[0_0_24px_rgba(255,255,255,0.18)] hover:bg-neutral-100"
+                                                                        : group.hasLive
+                                                                            ? "bg-neutral-900/90 text-white border-rose-500/40 shadow-[0_0_16px_rgba(244,63,94,0.12)] hover:border-rose-400"
+                                                                            : group.allFinished
+                                                                                ? "bg-neutral-950/70 text-neutral-400 border-neutral-800/60 hover:border-neutral-700"
+                                                                                : "bg-neutral-900/70 text-white border-neutral-800/80 hover:border-neutral-600 hover:bg-neutral-900"
+                                                                        }`}
+                                                                    title={`View all ${group.events.length} contest${group.events.length > 1 ? "s" : ""} on ${group.fullDateFormatted}`}
                                                                 >
-                                                                    <div className="flex items-center gap-3.5 min-w-0">
-                                                                        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 p-2">
-                                                                            {getPortalIcon(ev.platform, "w-6 h-6")}
-                                                                        </div>
-                                                                        <div className="min-w-0 space-y-0.5">
-                                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                                                                                    {ev.platformName}
-                                                                                </span>
-                                                                                {ev.division && (
-                                                                                    <span className="text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded">
-                                                                                        {ev.division}
-                                                                                    </span>
-                                                                                )}
-                                                                                {ev.rated && (
-                                                                                    <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
-                                                                                        Rated
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            <h4 className="text-sm font-bold text-white truncate max-w-xl">
-                                                                                {ev.title}
-                                                                            </h4>
-                                                                            <p className="text-xs text-neutral-400 flex items-center gap-1.5">
-                                                                                <Clock className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
-                                                                                <span className="font-mono text-neutral-300 font-medium">
-                                                                                    {formatTimeRangeIST(ev)}
-                                                                                </span>
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
+                                                                    {/* Day of Week */}
+                                                                    <span
+                                                                        className={`text-[10px] sm:text-[11px] font-black uppercase tracking-widest ${group.isToday ? "text-neutral-700" : group.hasLive ? "text-rose-400" : "text-neutral-400"
+                                                                            }`}
+                                                                    >
+                                                                        {group.weekdayShort}
+                                                                    </span>
 
-                                                                    {/* Status & Actions */}
-                                                                    <div className="flex items-center gap-3 ml-auto md:ml-0 flex-shrink-0">
-                                                                        {isLive ? (
-                                                                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center gap-1.5">
+                                                                    {/* Day Number */}
+                                                                    <span
+                                                                        className={`text-2xl sm:text-3xl md:text-4xl font-black font-mono leading-none tracking-tight my-1 ${group.isToday ? "text-black" : "text-white"
+                                                                            }`}
+                                                                    >
+                                                                        {group.dayNum}
+                                                                    </span>
+
+                                                                    {/* Month & Year */}
+                                                                    <span
+                                                                        className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${group.isToday ? "text-neutral-800" : "text-neutral-400"
+                                                                            }`}
+                                                                    >
+                                                                        {group.monthShort}
+                                                                    </span>
+
+                                                                    {/* Context Badges */}
+                                                                    <div className="mt-1.5 flex flex-col items-center gap-1 w-full">
+                                                                        {group.isToday && (
+                                                                            <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-black text-white shadow-sm">
+                                                                                Today
+                                                                            </span>
+                                                                        )}
+                                                                        {group.hasLive && !group.isToday && (
+                                                                            <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1">
                                                                                 <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
-                                                                                LIVE NOW
-                                                                            </span>
-                                                                        ) : isFinished ? (
-                                                                            <span className="px-2.5 py-1 rounded-full text-xs font-medium text-neutral-500 bg-white/5">
-                                                                                Finished
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="text-xs font-mono text-neutral-400">
-                                                                                {formatRelativeCountdown(ev.startTimestamp, nowMs)}
+                                                                                Live
                                                                             </span>
                                                                         )}
-
-                                                                        {/* Remind button */}
-                                                                        {!isFinished && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={(e) => handleToggleReminder(ev.id, e)}
-                                                                                className={`p-2 rounded-lg transition border ${isReminded
-                                                                                    ? "bg-amber-400 text-black border-amber-400"
-                                                                                    : "bg-neutral-900 text-neutral-400 hover:text-white border-neutral-700"
+                                                                        {hasMultiple && (
+                                                                            <span
+                                                                                className={`px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-semibold tracking-tight whitespace-nowrap ${group.isToday
+                                                                                    ? "bg-neutral-200 text-neutral-900"
+                                                                                    : "bg-white/5 text-neutral-400 border border-white/5"
                                                                                     }`}
-                                                                                title={isReminded ? "Reminder enabled" : "Set reminder"}
                                                                             >
-                                                                                <Bell className="w-4 h-4" />
-                                                                            </button>
+                                                                                {group.events.length} Contests
+                                                                            </span>
                                                                         )}
+                                                                    </div>
+                                                                </button>
+                                                            </div>
 
-                                                                        {/* Smart Inline Add to Calendar */}
-                                                                        {openCalDropdownId === `list-${ev.id}` ? (
-                                                                            <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 p-1 rounded-xl shadow-lg animate-in fade-in zoom-in-95">
+                                                            {/* Middle: Bracket (if > 1 contest) or empty spacer (if 1 contest) */}
+                                                            {hasMultiple ? (
+                                                                <CurlyBracket isToday={group.isToday} isLive={group.hasLive} />
+                                                            ) : (
+                                                                <div className="w-5 sm:w-6 md:w-7 flex-shrink-0" />
+                                                            )}
+
+                                                            {/* Right: Contest Cards for this date */}
+                                                            <div className="flex-1 min-w-0 space-y-2">
+                                                                {group.events.map((ev) => {
+                                                                    const isReminded = reminders.includes(ev.id);
+                                                                    const isLive = ev.status === "LIVE" || (ev.startTimestamp <= nowMs && ev.endTimestamp > nowMs);
+                                                                    const isFinished = ev.status === "FINISHED" || (ev.endTimestamp && ev.endTimestamp < nowMs);
+
+                                                                    return (
+                                                                        <div
+                                                                            key={ev.id}
+                                                                            className={`p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm group/card ${isFinished ? "opacity-80 hover:opacity-100" : ""}`}
+                                                                        >
+                                                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                                                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 p-2">
+                                                                                    {getPortalIcon(ev.platform, "w-6 h-6")}
+                                                                                </div>
+                                                                                <div className="min-w-0 space-y-0.5">
+                                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                                                                                            {ev.platformName}
+                                                                                        </span>
+                                                                                        {ev.division && (
+                                                                                            <span className="text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded">
+                                                                                                {ev.division}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {ev.rated && (
+                                                                                            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
+                                                                                                Rated
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <h4 className="text-sm font-bold text-white truncate max-w-xl">
+                                                                                        {ev.title}
+                                                                                    </h4>
+                                                                                    <p className="text-xs text-neutral-400 flex items-center gap-1.5">
+                                                                                        <Clock className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
+                                                                                        <span className="font-mono text-neutral-300 font-medium">
+                                                                                            {formatTimeRangeIST(ev)}
+                                                                                        </span>
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Status & Actions */}
+                                                                            <div className="flex items-center gap-3 ml-auto md:ml-0 flex-shrink-0">
+                                                                                {isLive ? (
+                                                                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center gap-1.5">
+                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                                                                                        LIVE NOW
+                                                                                    </span>
+                                                                                ) : isFinished ? (
+                                                                                    <span className="px-2.5 py-1 rounded-full text-xs font-medium text-neutral-500 bg-white/5">
+                                                                                        Finished
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="text-xs font-mono text-neutral-400">
+                                                                                        {formatRelativeCountdown(ev.startTimestamp, nowMs)}
+                                                                                    </span>
+                                                                                )}
+
+                                                                                {/* Remind button */}
+                                                                                {!isFinished && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => handleToggleReminder(ev.id, e)}
+                                                                                        className={`p-2 rounded-lg transition border ${isReminded
+                                                                                            ? "bg-amber-400 text-black border-amber-400"
+                                                                                            : "bg-neutral-900 text-neutral-400 hover:text-white border-neutral-700"
+                                                                                            }`}
+                                                                                        title={isReminded ? "Reminder enabled" : "Set reminder"}
+                                                                                    >
+                                                                                        <Bell className="w-4 h-4" />
+                                                                                    </button>
+                                                                                )}
+
+                                                                                {/* Smart Inline Add to Calendar */}
+                                                                                {openCalDropdownId === `list-${ev.id}` ? (
+                                                                                    <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 p-1 rounded-xl shadow-lg animate-in fade-in zoom-in-95">
+                                                                                        <a
+                                                                                            href={createGoogleCalendarUrl(ev)}
+                                                                                            target="_blank"
+                                                                                            rel="noopener noreferrer"
+                                                                                            onClick={() => setOpenCalDropdownId(null)}
+                                                                                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-white flex items-center gap-1.5 transition"
+                                                                                            title="Add to Google Calendar"
+                                                                                        >
+                                                                                            <span className="w-2 h-2 rounded-full bg-blue-400" />
+                                                                                            Google
+                                                                                        </a>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => {
+                                                                                                downloadIcsFile(ev);
+                                                                                                setOpenCalDropdownId(null);
+                                                                                            }}
+                                                                                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-white flex items-center gap-1.5 transition"
+                                                                                            title="Download .ics for Apple/Outlook"
+                                                                                        >
+                                                                                            <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                                                                            .ics
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => setOpenCalDropdownId(null)}
+                                                                                            className="p-1 rounded-lg text-neutral-400 hover:text-white transition"
+                                                                                            title="Close"
+                                                                                        >
+                                                                                            <X className="w-3.5 h-3.5" />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setOpenCalDropdownId(`list-${ev.id}`);
+                                                                                        }}
+                                                                                        className="p-2 rounded-xl bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-700 transition"
+                                                                                        title="Add to calendar"
+                                                                                    >
+                                                                                        <CalendarPlus className="w-4 h-4" />
+                                                                                    </button>
+                                                                                )}
+
+                                                                                {/* External link */}
                                                                                 <a
-                                                                                    href={createGoogleCalendarUrl(ev)}
+                                                                                    href={ev.url}
                                                                                     target="_blank"
                                                                                     rel="noopener noreferrer"
-                                                                                    onClick={() => setOpenCalDropdownId(null)}
-                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-white flex items-center gap-1.5 transition"
-                                                                                    title="Add to Google Calendar"
+                                                                                    className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-700 transition"
+                                                                                    title="Open contest link"
                                                                                 >
-                                                                                    <span className="w-2 h-2 rounded-full bg-blue-400" />
-                                                                                    Google
+                                                                                    <ExternalLink className="w-4 h-4" />
                                                                                 </a>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        downloadIcsFile(ev);
-                                                                                        setOpenCalDropdownId(null);
-                                                                                    }}
-                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-white flex items-center gap-1.5 transition"
-                                                                                    title="Download .ics for Apple/Outlook"
-                                                                                >
-                                                                                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                                                                                    .ics
-                                                                                </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => setOpenCalDropdownId(null)}
-                                                                                    className="p-1 rounded-lg text-neutral-400 hover:text-white transition"
-                                                                                    title="Close"
-                                                                                >
-                                                                                    <X className="w-3.5 h-3.5" />
-                                                                                </button>
                                                                             </div>
-                                                                        ) : (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setOpenCalDropdownId(`list-${ev.id}`);
-                                                                                }}
-                                                                                className="p-2 rounded-xl bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-700 transition"
-                                                                                title="Add to calendar"
-                                                                            >
-                                                                                <CalendarPlus className="w-4 h-4" />
-                                                                            </button>
-                                                                        )}
-
-                                                                        {/* External link */}
-                                                                        <a
-                                                                            href={ev.url}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-700 transition"
-                                                                            title="Open contest link"
-                                                                        >
-                                                                            <ExternalLink className="w-4 h-4" />
-                                                                        </a>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </>
                                 )}
-                            </>
-                        )}
+                            </div>
+
+                            {/* Seamless In-Section Divider */}
+                            <div className="border-t border-neutral-800/80 mx-4 sm:mx-6" />
+
+                            {/* Below Section: Your Contest History */}
+                            <div className="p-5 sm:p-6 space-y-5 bg-black">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-neutral-800 pb-3">
+                                    <div className="flex items-center gap-2">
+                                        <Trophy className="w-4 h-4 text-[#FFE566]" />
+                                        <h3 className="text-base sm:text-lg font-black text-white">
+                                            Your contest history
+                                        </h3>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <p className="text-xs text-neutral-400 hidden sm:block">
+                                            Rated contests from your platforms show up here.
+                                        </p>
+                                        <Link
+                                            to="/dashboard"
+                                            className="text-xs font-black text-[#FFE566] hover:underline flex items-center gap-1"
+                                        >
+                                            <TrendingUp className="w-3.5 h-3.5" />
+                                            Rating graph
+                                        </Link>
+                                    </div>
+                                </div>
+
+                                {/* 3 Midnight-Yellow Stat Boxes: Contests, Rating, Best Rank */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
+                                        <div className="text-2xl sm:text-3xl font-black text-white">
+                                            {userContestSummary.total}
+                                        </div>
+                                        <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
+                                            Contests
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
+                                        <div className="text-2xl sm:text-3xl font-black text-[#FFE566]">
+                                            {userContestSummary.rating}
+                                        </div>
+                                        <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
+                                            Rating
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
+                                        <div className="text-2xl sm:text-3xl font-black text-white">
+                                            {userContestSummary.bestRank}
+                                        </div>
+                                        <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
+                                            Best rank
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Connect Platforms Prompt */}
+                                <div className="pt-2 text-center flex flex-col sm:flex-row items-center justify-between gap-3 border-t-2 border-neutral-800">
+                                    <p className="text-xs text-neutral-400">
+                                        Sync your competitive programming handles to automatically track past ratings and progress.
+                                    </p>
+                                    <Link
+                                        to="/onboarding"
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] hover:bg-yellow-300 transition-all cursor-pointer"
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                        Connect More Platforms
+                                    </Link>
+                                </div>
+                            </div>
+                        </section>
                     </div>
 
-                    {/* Seamless In-Section Divider */}
-                    <div className="border-t border-neutral-800/80 mx-4 sm:mx-6" />
-
-                    {/* Below Section: Your Contest History */}
-                    <div className="p-5 sm:p-6 space-y-5 bg-black">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-neutral-800 pb-3">
-                            <div className="flex items-center gap-2">
-                                <Trophy className="w-4 h-4 text-[#FFE566]" />
-                                <h3 className="text-base sm:text-lg font-black text-white">
-                                    Your contest history
-                                </h3>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <p className="text-xs text-neutral-400 hidden sm:block">
-                                    Rated contests from your platforms show up here.
-                                </p>
-                                <Link
-                                    to="/dashboard"
-                                    className="text-xs font-black text-[#FFE566] hover:underline flex items-center gap-1"
-                                >
-                                    <TrendingUp className="w-3.5 h-3.5" />
-                                    Rating graph
-                                </Link>
-                            </div>
-                        </div>
-
-                        {/* 3 Midnight-Yellow Stat Boxes: Contests, Rating, Best Rank */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
-                                <div className="text-2xl sm:text-3xl font-black text-white">
-                                    {userContestSummary.total}
-                                </div>
-                                <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
-                                    Contests
-                                </div>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
-                                <div className="text-2xl sm:text-3xl font-black text-[#FFE566]">
-                                    {userContestSummary.rating}
-                                </div>
-                                <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
-                                    Rating
-                                </div>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
-                                <div className="text-2xl sm:text-3xl font-black text-white">
-                                    {userContestSummary.bestRank}
-                                </div>
-                                <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
-                                    Best rank
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Connect Platforms Prompt */}
-                        <div className="pt-2 text-center flex flex-col sm:flex-row items-center justify-between gap-3 border-t-2 border-neutral-800">
-                            <p className="text-xs text-neutral-400">
-                                Sync your competitive programming handles to automatically track past ratings and progress.
-                            </p>
-                            <Link
-                                to="/onboarding"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] hover:bg-yellow-300 transition-all cursor-pointer"
-                            >
-                                <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                                Connect More Platforms
-                            </Link>
-                        </div>
-                    </div>
+                    {/* ========================================================================= */}
+                    {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms, Resume & Leaderboard) */}
+                    {/* ========================================================================= */}
+                    <SectionBottomIllustration alt="Events workspace illustration" />
                 </section>
             </div>
-
-            {/* ========================================================================= */}
-            {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms, Resume & Leaderboard) */}
-            {/* ========================================================================= */}
-            <SectionBottomIllustration alt="Events workspace illustration" />
-        </section>
-    </div>
 
             {/* Modal: Full Day Contest Breakdown for List View (Matching Midnight-Yellow theme) */}
             <EventTrackerDayEventsModal

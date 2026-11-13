@@ -430,7 +430,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             appsData.applications.forEach((app) => {
                 const ans = app.answers || app.formResponse || {};
                 Object.keys(ans).forEach((k) => {
-                    if (k === "q_roll_number" || k === "q_department" || k === "q_year") {
+                    if (k === "id" || k === "eventId" || k === "userId") {
                         return;
                     }
                     if (!seenIds.has(k)) {

@@ -120,40 +120,10 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {onToggleHeart && (
-                            <button
-                                type="button"
-                                onClick={() => onToggleHeart(event)}
-                                className={`px-2.5 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:scale-95 ${
-                                    event.hasLiked
-                                        ? "bg-rose-100 text-rose-700"
-                                        : "bg-white hover:bg-neutral-100 text-neutral-800"
-                                }`}
-                                title={event.hasLiked ? "Remove heart" : "Appreciate event"}
-                            >
-                                <Heart
-                                    className={`w-3.5 h-3.5 ${
-                                        event.hasLiked ? "fill-rose-600 text-rose-600" : "text-black"
-                                    }`}
-                                />
-                                <span>{event.likesCount || 0}</span>
-                            </button>
-                        )}
-
-                        <button
-                            type="button"
-                            onClick={handleCopyShareLink}
-                            className="px-2.5 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                            title="Share event link"
-                        >
-                            {copiedShareLink ? <Check className="w-3.5 h-3.5 text-green-700" /> : <Share2 className="w-3.5 h-3.5" />}
-                            <span className="hidden sm:inline">{copiedShareLink ? "Copied" : "Share"}</span>
-                        </button>
-
                         <button
                             type="button"
                             onClick={onClose}
-                            className="p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 shadow-[2px_2px_0px_#000] transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                            className="p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 shadow-[2px_2px_0px_#000] transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                             aria-label="Close modal"
                         >
                             <X className="w-4 h-4 text-black" />
@@ -190,9 +160,42 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                         )}
 
                         <div className="space-y-2">
-                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-tight">
-                                {event.title}
-                            </h1>
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                                <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-tight flex-1">
+                                    {event.title}
+                                </h1>
+                                <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                                    {onToggleHeart && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onToggleHeart(event)}
+                                            className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer ${
+                                                event.hasLiked
+                                                    ? "bg-rose-100 text-rose-700"
+                                                    : "bg-white hover:bg-neutral-100 text-neutral-800"
+                                            }`}
+                                            title={event.hasLiked ? "Remove heart" : "Appreciate event"}
+                                        >
+                                            <Heart
+                                                className={`w-3.5 h-3.5 ${
+                                                    event.hasLiked ? "fill-rose-600 text-rose-600" : "text-black"
+                                                }`}
+                                            />
+                                            <span>{event.likesCount || 0}</span>
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyShareLink}
+                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                        title="Share event link"
+                                    >
+                                        {copiedShareLink ? <Check className="w-3.5 h-3.5 text-green-700" /> : <Share2 className="w-3.5 h-3.5" />}
+                                        <span className="hidden sm:inline">{copiedShareLink ? "Copied" : "Share"}</span>
+                                    </button>
+                                </div>
+                            </div>
                             {event.summary && (
                                 <p className="text-sm sm:text-base font-semibold text-neutral-700 leading-relaxed">
                                     {event.summary}
@@ -306,21 +309,21 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                             </div>
 
                             {/* 3. Registration & Action Card */}
-                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                                <div className="flex items-center justify-between pb-2 border-b-2 border-black/10">
+                                    <div className="text-[11px] font-black uppercase tracking-wider text-black">
                                         Registration Status
                                     </div>
-                                    <div className="flex items-center gap-1 text-xs font-black text-neutral-700">
-                                        <Users className="w-3.5 h-3.5" />
+                                    <div className="flex items-center gap-1.5 text-xs font-black text-neutral-800 bg-[#FAF6EE] px-2.5 py-0.5 rounded-full border border-black/20">
+                                        <Users className="w-3.5 h-3.5 text-neutral-600" />
                                         <span>{event.registrationsCount || 0} registered</span>
                                     </div>
                                 </div>
 
                                 {event.isTeamEvent && (
-                                    <div className="p-3 rounded-xl bg-[#a2ff86]/30 border-2 border-black space-y-1">
+                                    <div className="p-3 rounded-xl bg-[#a2ff86]/25 border-l-4 border-emerald-600 space-y-1">
                                         <div className="flex items-center gap-1.5 font-black text-black text-xs">
-                                            <Users className="w-4 h-4 text-black shrink-0" />
+                                            <Users className="w-4 h-4 text-emerald-800 shrink-0" />
                                             <span>Team Registration Event ({event.minTeamSize || 1} to {event.maxTeamSize || 4} Members)</span>
                                         </div>
                                         <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
@@ -330,42 +333,46 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                 )}
 
                                 {event.scope === "PAN_INDIA" && (
-                                    <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/40 text-xs space-y-1">
-                                        <div className="flex items-center gap-1.5 font-black text-black">
-                                            <Globe2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <div className="p-3 rounded-xl bg-amber-500/10 border-l-4 border-amber-500 space-y-1.5">
+                                        <div className="flex items-center gap-1.5 font-black text-black text-xs">
+                                            <Globe2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                                             <span>Pan-India Live Notification Shield</span>
                                         </div>
-                                        <p className="text-[11px] text-neutral-600 leading-relaxed font-medium">
+                                        <div className="flex items-start gap-2 text-[11px] leading-relaxed">
                                             {event.isRegistered || event.registrationStatus === "registered" ? (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 inline" />
-                                                    <span>Live tracking active: Start countdown, pass synchronization, and critical organizer updates are enabled for this national event.</span>
-                                                </span>
+                                                <>
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                                    <span className="font-semibold text-emerald-950">
+                                                        Live tracking active: Start countdown, pass synchronization, and critical organizer updates are enabled for this national event.
+                                                    </span>
+                                                </>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    <Lock className="w-3.5 h-3.5 text-neutral-500 shrink-0 inline" />
-                                                    <span>Non-registered students do not receive start reminders or tracking notifications. Register below to activate live entry tracking, deadline alerts, and verified pass sync.</span>
-                                                </span>
+                                                <>
+                                                    <Lock className="w-3.5 h-3.5 text-amber-800 shrink-0 mt-0.5" />
+                                                    <span className="font-medium text-neutral-700">
+                                                        Non-registered students do not receive start reminders or tracking notifications. Register below to activate live entry tracking, deadline alerts, and verified pass sync.
+                                                    </span>
+                                                </>
                                             )}
-                                        </p>
+                                        </div>
                                     </div>
                                 )}
 
                                 {event.registrationStatus === "registered" || event.registrationStatus === "attended" || (event.isRegistered && event.registrationStatus !== "pending") ? (
-                                    <div className="p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-600 space-y-2">
+                                    <div className="p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-600 space-y-2.5">
                                         <div className="flex items-center gap-2 text-emerald-950 font-black text-xs">
                                             <CheckCircle2 className="w-4 h-4 text-emerald-700" />
                                             <span>Application Accepted · Your Pass is Active!</span>
                                         </div>
                                         {event.ticketCode && (
-                                            <div className="flex items-center justify-between bg-white border border-emerald-700 p-2 rounded-lg text-xs font-mono">
+                                            <div className="flex items-center justify-between bg-white border border-emerald-700 px-3 py-2 rounded-lg text-xs font-mono">
                                                 <span className="font-bold text-neutral-600">Ticket Pass:</span>
-                                                <div className="flex items-center gap-1.5 font-black text-black">
+                                                <div className="flex items-center gap-2 font-black text-black">
                                                     <span>{event.ticketCode}</span>
                                                     <button
                                                         type="button"
                                                         onClick={handleCopyTicket}
-                                                        className="p-1 hover:bg-neutral-100 rounded"
+                                                        className="p-1 hover:bg-neutral-100 rounded cursor-pointer"
                                                         title="Copy Ticket Code"
                                                     >
                                                         {copiedCode ? <Check className="w-3.5 h-3.5 text-green-700" /> : <Copy className="w-3.5 h-3.5" />}
@@ -380,7 +387,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                             <Clock className="w-4 h-4 text-amber-700" />
                                             <span>Application Submitted · Pending Review</span>
                                         </div>
-                                        <p className="text-[11px] font-bold text-amber-800">
+                                        <p className="text-[11px] font-bold text-amber-800 leading-relaxed">
                                             The {event.clubName} team is reviewing your profile. Once approved, your session ticket pass will be activated automatically.
                                         </p>
                                     </div>
@@ -390,7 +397,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                             <ShieldAlert className="w-4 h-4 text-rose-700" />
                                             <span>Application Not Selected</span>
                                         </div>
-                                        <p className="text-[11px] font-bold text-rose-800">
+                                        <p className="text-[11px] font-bold text-rose-800 leading-relaxed">
                                             Your application was not selected by {event.clubName}. You may update your information and re-apply.
                                         </p>
                                         <button
@@ -399,13 +406,13 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                                 onClose();
                                                 onApply(event);
                                             }}
-                                            className="w-full py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs cursor-pointer shadow-[2px_2px_0px_#000]"
+                                            className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs cursor-pointer shadow-[2px_2px_0px_#000]"
                                         >
                                             Re-Submit Application
                                         </button>
                                     </div>
                                 ) : isCompleted ? (
-                                    <div className="p-3 rounded-xl bg-neutral-100 border-2 border-black text-center text-xs font-black text-neutral-600">
+                                    <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-300 text-center text-xs font-bold text-neutral-600">
                                         This event session has concluded.
                                     </div>
                                 ) : (
@@ -427,7 +434,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                         href={event.registrationUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="w-full py-2 px-3 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5"
+                                        className="w-full py-2.5 px-3 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                                     >
                                         <ExternalLink className="w-3.5 h-3.5" />
                                         <span>External RSVP Link</span>
@@ -439,17 +446,11 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                         {/* RIGHT COLUMN: Full Description & Agenda (7 cols) */}
                         <div className="lg:col-span-7">
                             <div className="p-5 sm:p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                                <div className="flex items-center justify-between border-b-2 border-black/10 pb-3">
-                                    <div className="flex items-center gap-2">
-                                        <BookOpen className="w-5 h-5 text-black" />
-                                        <h2 className="font-black text-base sm:text-lg text-black tracking-tight">
-                                            Full Description & Agenda
-                                        </h2>
-                                    </div>
-
-                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/40 text-neutral-700">
-                                        Rich Curriculum
-                                    </span>
+                                <div className="flex items-center gap-2 border-b-2 border-black/10 pb-3">
+                                    <BookOpen className="w-5 h-5 text-black" />
+                                    <h2 className="font-black text-base sm:text-lg text-black tracking-tight">
+                                        Full Description & Agenda
+                                    </h2>
                                 </div>
 
                                 {/* Markdown Content */}
