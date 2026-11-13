@@ -14,15 +14,12 @@ export default function SignInPage() {
     const errorParam = searchParams.get("error");
     const toast = useToast();
 
-    const [loginMode, setLoginMode] = useState<"personal" | "club">(
-        tabParam === "club" ? "club" : "personal"
-    );
+    const loginMode: "personal" | "club" = tabParam === "club" ? "club" : "personal";
 
-    const [authView, setAuthView] = useState<"signin" | "forgot_password">(
+    const authView: "signin" | "forgot_password" =
         viewParam === "forgot_password" || viewParam === "forgot-password"
             ? "forgot_password"
-            : "signin"
-    );
+            : "signin";
 
     const [activeIdentifier, setActiveIdentifier] = useState("");
 
@@ -33,26 +30,9 @@ export default function SignInPage() {
             nextParams.delete("error");
             setSearchParams(nextParams, { replace: true });
         }
-    }, [errorParam]);
-
-    useEffect(() => {
-        if (tabParam === "club") {
-            setLoginMode("club");
-        } else if (tabParam === "personal") {
-            setLoginMode("personal");
-        }
-    }, [tabParam]);
-
-    useEffect(() => {
-        if (viewParam === "forgot_password" || viewParam === "forgot-password") {
-            setAuthView("forgot_password");
-        } else if (!viewParam && authView === "forgot_password") {
-            // Keep current view unless explicit
-        }
-    }, [viewParam]);
+    }, [errorParam, searchParams, setSearchParams, toast]);
 
     const handleSwitchToPersonal = () => {
-        setLoginMode("personal");
         const nextParams: Record<string, string> = { tab: "personal" };
         if (authView === "forgot_password") {
             nextParams.view = "forgot-password";
@@ -61,7 +41,6 @@ export default function SignInPage() {
     };
 
     const handleSwitchToClub = () => {
-        setLoginMode("club");
         const nextParams: Record<string, string> = { tab: "club" };
         if (authView === "forgot_password") {
             nextParams.view = "forgot-password";
@@ -73,21 +52,26 @@ export default function SignInPage() {
         if (identifier) {
             setActiveIdentifier(identifier);
         }
-        setAuthView("forgot_password");
         setSearchParams({ tab: loginMode, view: "forgot-password" });
     };
 
     const handleBackToLogin = () => {
-        setAuthView("signin");
-        setSearchParams({ tab: loginMode });
+        if (loginMode === "club") {
+            setSearchParams({ tab: "club" });
+        } else {
+            setSearchParams({});
+        }
     };
 
     const handleResetSuccess = (identifier: string) => {
         if (identifier) {
             setActiveIdentifier(identifier);
         }
-        setAuthView("signin");
-        setSearchParams({ tab: loginMode });
+        if (loginMode === "club") {
+            setSearchParams({ tab: "club" });
+        } else {
+            setSearchParams({});
+        }
         toast.success("Password reset complete! Please log in with your new password.", {
             title: "Signed Out All Sessions",
         });
@@ -137,7 +121,9 @@ export default function SignInPage() {
             }
             switchLinkHref={
                 authView === "forgot_password"
-                    ? "/auth/signin"
+                    ? loginMode === "club"
+                        ? "/auth/signin?tab=club"
+                        : "/auth/signin"
                     : loginMode === "personal"
                     ? "/auth/signup"
                     : ""
