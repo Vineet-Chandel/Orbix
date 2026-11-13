@@ -29,10 +29,12 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
 
     const [loading, setLoading] = useState(true);
     const [formData, setFormData] = useState<PublicFormResponse | null>(null);
+    const [isSubmitted, setIsSubmitted] = useState(false);
 
     useEffect(() => {
         if (isOpen && event) {
             setLoading(true);
+            setIsSubmitted(false);
             fetchPublicEventForm(event.id)
                 .then((res) => {
                     setFormData(res);
@@ -48,6 +50,56 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
     }, [isOpen, event]);
 
     if (!isOpen || !event || typeof document === "undefined") return null;
+
+    const isSubmittedView = isSubmitted || Boolean(formData?.userResponse);
+
+    // If application has been submitted, render ONLY the single application card without redundant outer modal box
+    if (isSubmittedView && formData?.form) {
+        return createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150 print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible">
+                <div className="relative w-full max-w-xl my-auto print:m-0 print:w-full print:max-w-full">
+                    {/* Close Button attached to single card */}
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="absolute -top-3 -right-3 p-2 rounded-xl bg-white border-2 border-black hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 z-30 print:hidden"
+                        title="Close"
+                    >
+                        <X className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+
+                    <StudentFormRenderer
+                        form={formData.form}
+                        event={event}
+                        club={formData.club || { name: event.clubName }}
+                        user={user}
+                        studentProfile={formData.studentProfile}
+                        userResponse={formData.userResponse}
+                        draftResponse={formData.draftResponse}
+                        isClosed={formData.isClosed}
+                        closedReason={formData.closedReason}
+                        onSuccess={(reg) => {
+                            setIsSubmitted(true);
+                            onSuccess({
+                                ...event,
+                                isRegistered: reg.status === "registered" || reg.status === "attended",
+                                isPending: reg.status === "pending",
+                                registrationStatus: reg.status,
+                                ticketCode: reg.ticketCode,
+                                totalApplicationsCount: (event.totalApplicationsCount || 0) + 1,
+                            });
+                        }}
+                        onCancel={onClose}
+                        onEditResponse={() => {
+                            setIsSubmitted(false);
+                            setFormData((prev) => (prev ? { ...prev, userResponse: undefined } : null));
+                        }}
+                    />
+                </div>
+            </div>,
+            document.body
+        );
+    }
 
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-md animate-in fade-in duration-150">
@@ -81,6 +133,7 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                         isClosed={formData.isClosed}
                         closedReason={formData.closedReason}
                         onSuccess={(reg) => {
+                            setIsSubmitted(true);
                             onSuccess({
                                 ...event,
                                 isRegistered: reg.status === "registered" || reg.status === "attended",
@@ -91,6 +144,10 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                             });
                         }}
                         onCancel={onClose}
+                        onEditResponse={() => {
+                            setIsSubmitted(false);
+                            setFormData((prev) => (prev ? { ...prev, userResponse: undefined } : null));
+                        }}
                     />
                 ) : (
                     <div className="py-16 text-center space-y-3">

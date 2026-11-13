@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
-    CheckCircle2,
     Calendar,
     MapPin,
     AlertCircle,
@@ -24,6 +23,7 @@ import {
     ThumbsUp,
     Award,
     Printer,
+    Download,
     RotateCcw,
     Clock,
     WifiOff,
@@ -59,6 +59,7 @@ import {
 import { useToast } from "../../../context/ToastContext";
 import { OrbixLoader } from "../../../components/ui/loader";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
+import { downloadPassPdf } from "../../../utils/passPdfGenerator";
 
 export interface StudentFormRendererProps {
     form: ClubEventFormRecord;
@@ -80,6 +81,7 @@ export interface StudentFormRendererProps {
     closedReason?: string;
     onSuccess?: (registration: any) => void;
     onCancel?: () => void;
+    onEditResponse?: () => void;
 }
 
 const getYouTubeEmbedUrl = (url?: string): string | null => {
@@ -106,6 +108,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     closedReason,
     onSuccess,
     onCancel,
+    onEditResponse,
 }) => {
     const toast = useToast();
 
@@ -138,6 +141,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const [copiedRegId, setCopiedRegId] = useState(false);
     const [showIdentityEditor, setShowIdentityEditor] = useState(false);
     const [showAnswersSummary, setShowAnswersSummary] = useState(true);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
     // Autosave states
     const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "offline">("saved");
@@ -727,6 +731,33 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         setTimeout(() => setCopiedRegId(false), 2000);
     };
 
+    // Download Pass as PDF
+    const handleDownloadPdf = async () => {
+        if (isDownloadingPdf) return;
+        const eventTitle = (event?.title || form?.title || "Event").trim();
+        const safeName = eventTitle.replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `Orbix-Pass-${safeName}.pdf`;
+
+        try {
+            await downloadPassPdf({
+                elementId: "application-pass-card",
+                filename,
+                onStart: () => setIsDownloadingPdf(true),
+                onSuccess: () => {
+                    setIsDownloadingPdf(false);
+                    toast.success("Pass PDF downloaded successfully!");
+                },
+                onError: (err) => {
+                    setIsDownloadingPdf(false);
+                    console.error("PDF generation failed:", err);
+                    toast.error("Could not download PDF. You can still use Print Pass Receipt.");
+                },
+            });
+        } catch (e) {
+            setIsDownloadingPdf(false);
+        }
+    };
+
     // -------------------------------------------------------------------------
     // RENDER: SUCCESS SCREEN (4.5 Registration Success Screen)
     // -------------------------------------------------------------------------
@@ -761,19 +792,13 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             submittedRegistration.status === "attended";
 
         return (
-            <div className="max-w-xl mx-auto rounded-3xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-8 text-center space-y-6 animate-in fade-in duration-200">
-                {/* Status Indicator Badge */}
-                {isApproved ? (
-                    <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] text-black">
-                        <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
-                    </div>
-                ) : (
-                    <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] text-black">
-                        <Clock className="w-8 h-8 stroke-[2.5]" />
-                    </div>
-                )}
-
-                <div className="space-y-2">
+            <div
+                id="application-pass-card"
+                className="w-full max-w-xl mx-auto rounded-3xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 text-left space-y-4 animate-in fade-in duration-200 print:shadow-none print:border-2 print:p-6 print:rounded-2xl print:bg-white print:max-w-full"
+            >
+                {/* Top Pass Status & Metadata Header */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-black/15">
+                    {/* Status Pill */}
                     {isApproved ? (
                         <span className="px-3.5 py-1 rounded-full text-black bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black inline-flex items-center gap-1.5 uppercase tracking-wide">
                             <CheckCheck className="w-3.5 h-3.5 stroke-[3]" />
@@ -785,232 +810,232 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             Application Submitted for Review
                         </span>
                     )}
-                    <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                        {form.title}
+
+                    {/* Registration ID & Copy */}
+                    <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-neutral-800 bg-white/80 px-2.5 py-1 rounded-xl border border-black/20 shadow-[1px_1px_0px_#000]">
+                        <span className="text-[10px] uppercase font-black text-neutral-500 font-sans">Pass ID:</span>
+                        <span className="text-black font-black truncate max-w-[120px] sm:max-w-[170px]" title={submittedRegistration.id}>
+                            {submittedRegistration.id}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => handleCopyRegId(submittedRegistration.id)}
+                            className="p-1 rounded hover:bg-neutral-100 text-black cursor-pointer print:hidden no-print"
+                            title="Copy ID"
+                            data-no-print="true"
+                        >
+                            {copiedRegId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Event Name & Confirmation Text */}
+                <div className="space-y-1.5 pt-1">
+                    <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
+                        {event?.title || form.title}
                     </h2>
-                    <p className="text-xs sm:text-sm text-neutral-800 font-bold whitespace-pre-line leading-relaxed">
+                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
                         {isApproved
-                            ? form.settings?.confirmationMessage || "Your registration has been confirmed!"
+                            ? form.settings?.confirmationMessage || "Your registration has been confirmed! Present your pass code at event check-in."
                             : "Thank you! Your registration has been submitted successfully and is awaiting review from the club organizers."}
                     </p>
                 </div>
 
-                {/* Event Information Card */}
-                <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] text-left space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
-                        Event Details
+                {/* Event Logistics (Date, Venue, Organizer) - Integrated without repeated boxes */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-bold text-neutral-800 py-2.5 border-y border-black/10">
+                    {formattedDate && (
+                        <span className="inline-flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                            <span>{formattedDate} {formattedTime ? `• ${formattedTime}` : ""}</span>
+                        </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 truncate">
+                        <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                        <span>{event?.venueOrLocation || "Campus"}</span>
                     </span>
-                    <h4 className="text-sm font-black text-black truncate">{event?.title || form.title}</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold text-neutral-800">
-                        {formattedDate && (
-                            <span className="flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-neutral-500" />
-                                {formattedDate} {formattedTime ? `• ${formattedTime}` : ""}
-                            </span>
-                        )}
-                        <span className="flex items-center gap-1.5 truncate">
-                            <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                            {event?.venueOrLocation || "Campus"}
-                        </span>
-                        <span className="flex items-center gap-1.5 truncate sm:col-span-2 text-neutral-600">
-                            <School className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                            Hosted by <strong className="text-black font-black">{club?.name || "Verified Club"}</strong>
-                        </span>
-                    </div>
+                    <span className="inline-flex items-center gap-1.5 truncate text-neutral-600 sm:ml-auto">
+                        <School className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                        <span>Hosted by <strong className="text-black font-black">{club?.name || "Verified Club"}</strong></span>
+                    </span>
                 </div>
 
-                {/* Registration Metadata (ID & Submission Timestamp) */}
-                <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] text-xs text-left space-y-2">
-                    <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-2">
-                        <span className="text-[11px] font-black uppercase text-neutral-500">Registration ID:</span>
-                        <div className="flex items-center gap-1.5">
-                            <span className="font-mono font-black text-black text-[11px] truncate max-w-[170px] sm:max-w-xs">
-                                {submittedRegistration.id}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => handleCopyRegId(submittedRegistration.id)}
-                                className="p-1 rounded-md border border-black bg-[#FAF6EE] hover:bg-neutral-100 text-black shadow-[1px_1px_0px_#000] cursor-pointer"
-                                title="Copy ID"
-                            >
-                                {copiedRegId ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-black uppercase text-neutral-500">Submitted at:</span>
-                        <span className="font-bold text-black font-mono">{submissionTimeStr}</span>
-                    </div>
+                {/* Ticket Perforation Dashed Line */}
+                <div className="relative py-1">
+                    <div className="border-b-2 border-dashed border-black/25 w-full"></div>
                 </div>
 
-                {/* Entry Pass Box */}
+                {/* Entry Clearance Section */}
                 {isApproved && submittedRegistration.ticketCode ? (
-                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black">
-                            <span>Your Entry Pass</span>
-                            <Ticket className="w-4 h-4 text-black" />
-                        </div>
-                        <div className="flex items-center justify-center gap-3">
-                            <span className="font-mono text-xl sm:text-2xl font-black text-black tracking-widest bg-[#FAF6EE] px-4 py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
-                                {submittedRegistration.ticketCode}
+                    <div className="p-4 rounded-2xl bg-white border border-black/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                        <div className="space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 flex items-center gap-1">
+                                <Ticket className="w-3.5 h-3.5 text-black" />
+                                Official Check-In Pass
                             </span>
-                            <button
-                                type="button"
-                                onClick={() => handleCopyTicket(submittedRegistration.ticketCode)}
-                                className="p-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] shadow-[2px_2px_0px_#000] text-black cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                title="Copy Pass Code"
-                            >
-                                {copiedTicket ? <Check className="w-4 h-4 text-black" /> : <Copy className="w-4 h-4" />}
-                            </button>
+                            <div className="font-mono text-2xl font-black text-black tracking-widest">
+                                {submittedRegistration.ticketCode}
+                            </div>
+                            <span className="text-[11px] text-neutral-600 font-medium block">
+                                Present this ticket code or pass during entry check-in.
+                            </span>
                         </div>
-                        <span className="text-[11px] text-neutral-600 font-bold block">
-                            Present this ticket code or QR pass at the entrance during event check-in.
-                        </span>
+                        <button
+                            type="button"
+                            onClick={() => handleCopyTicket(submittedRegistration.ticketCode)}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] shadow-[2px_2px_0px_#000] text-black text-xs font-black cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 print:hidden no-print"
+                            data-no-print="true"
+                            title="Copy Pass Code"
+                        >
+                            {copiedTicket ? <Check className="w-3.5 h-3.5 text-black" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedTicket ? "Copied" : "Copy Code"}</span>
+                        </button>
                     </div>
                 ) : (
-                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3 text-left">
-                        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black">
-                            <span className="flex items-center gap-1.5">
-                                <Ticket className="w-4 h-4 text-black" />
-                                Your Entry Pass
-                            </span>
-                            <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] uppercase">
-                                Pending Club Approval
-                            </span>
+                    <div className="p-3.5 rounded-2xl bg-amber-50/90 border-l-4 border-amber-500 text-left space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-amber-900">
+                            <Ticket className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>Entry Pass Pending Organizer Review</span>
                         </div>
-                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5">
-                            <p className="text-xs font-bold text-black">
-                                Your entry pass number and check-in QR code will be generated once your application is accepted by {club?.name || "the club organizers"}.
-                            </p>
-                            <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
-                                The club has been notified of your application. You will receive an in-app notification with your verified entry pass code and QR pass immediately upon selection.
-                            </p>
-                        </div>
+                        <p className="text-xs text-neutral-700 font-medium leading-relaxed">
+                            Your entry pass number and check-in QR pass will be issued once your registration is approved by <strong className="text-black">{club?.name || "the club organizers"}</strong>. You will receive an in-app notification immediately upon acceptance.
+                        </p>
                     </div>
                 )}
 
                 {/* Collapsible Registration Details Summary */}
-                <div className="border-2 border-black rounded-2xl bg-white shadow-[3px_3px_0px_#000] overflow-hidden text-left">
+                <div className="pt-1">
                     <button
                         type="button"
                         onClick={() => setShowAnswersSummary((prev) => !prev)}
-                        className="w-full p-3.5 bg-[#FAF6EE] hover:bg-neutral-100 flex items-center justify-between text-xs font-black uppercase tracking-wider text-black border-b border-black/10 cursor-pointer transition-colors"
+                        className="w-full py-2 flex items-center justify-between text-xs font-black uppercase tracking-wider text-black border-b border-black/15 cursor-pointer hover:text-neutral-700 transition-colors print:hidden no-print"
+                        data-no-print="true"
                     >
-                        <span>Submitted Registration Details</span>
+                        <span className="flex items-center gap-1.5">
+                            <ClipboardList className="w-3.5 h-3.5" />
+                            Submitted Registration Details
+                        </span>
                         {showAnswersSummary ? <ChevronUp className="w-4 h-4 stroke-[2.5]" /> : <ChevronDown className="w-4 h-4 stroke-[2.5]" />}
                     </button>
 
-                    {showAnswersSummary && (
-                        <div className="p-4 space-y-3 text-xs max-h-72 overflow-y-auto">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-black/10 text-[11px]">
-                                <div>
-                                    <span className="text-neutral-500 font-black uppercase block">Applicant Name</span>
-                                    <p className="font-bold text-black">{submittedRegistration.applicantName || effectiveProfile.fullName}</p>
-                                </div>
-                                <div>
-                                    <span className="text-neutral-500 font-black uppercase block">Email</span>
-                                    <p className="font-bold text-black">{submittedRegistration.applicantEmail || effectiveProfile.email}</p>
-                                </div>
-                                {submittedRegistration.rollNumber && (
-                                    <div>
-                                        <span className="text-neutral-500 font-black uppercase block">Roll / ID</span>
-                                        <p className="font-bold text-black font-mono">{submittedRegistration.rollNumber}</p>
-                                    </div>
-                                )}
-                                {submittedRegistration.department && (
-                                    <div>
-                                        <span className="text-neutral-500 font-black uppercase block">Department</span>
-                                        <p className="font-bold text-black">{submittedRegistration.department}</p>
-                                    </div>
-                                )}
+                    {/* Registration response details */}
+                    <div className={`space-y-3 pt-3 text-xs ${showAnswersSummary ? "block" : "hidden print:block"}`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pb-2.5 border-b border-black/10 text-[11px]">
+                            <div>
+                                <span className="text-neutral-500 font-black uppercase block text-[10px]">Applicant Name</span>
+                                <p className="font-bold text-black">{submittedRegistration.applicantName || effectiveProfile.fullName}</p>
                             </div>
-
-                            {/* Question answers list */}
-                            {allQuestions.map((q) => {
-                                const submittedAns = submittedRegistration.answers?.[q.id];
-                                if (submittedAns === undefined || submittedAns === null || submittedAns === "") return null;
-
-                                return (
-                                    <div key={q.id} className="p-2.5 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1">
-                                        <span className="font-bold text-[11px] text-neutral-600 block">{q.title}</span>
-                                        <p className="font-black text-black text-xs whitespace-pre-wrap">
-                                            {typeof submittedAns === "object"
-                                                ? Array.isArray(submittedAns)
-                                                    ? submittedAns.join(", ")
-                                                    : JSON.stringify(submittedAns)
-                                                : String(submittedAns)}
-                                        </p>
-                                    </div>
-                                );
-                            })}
-
-                            {/* Uploaded file attachments */}
-                            {submittedRegistration.fileAttachments && submittedRegistration.fileAttachments.length > 0 && (
-                                <div className="space-y-1.5 pt-1">
-                                    <span className="text-[11px] font-black uppercase text-neutral-500">Uploaded Files</span>
-                                    {submittedRegistration.fileAttachments.map((f: FileAttachmentMeta, idx: number) => (
-                                        <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-[#FAF6EE] border border-black/20 text-xs">
-                                            <div className="flex items-center gap-2 truncate">
-                                                <Paperclip className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                                                <span className="font-bold text-black truncate">{f.fileName}</span>
-                                            </div>
-                                            <a
-                                                href={f.fileUrl}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-[11px] font-black text-black hover:underline shrink-0 flex items-center gap-1"
-                                            >
-                                                <span>View</span>
-                                                <ExternalLink className="w-3 h-3" />
-                                            </a>
-                                        </div>
-                                    ))}
+                            <div>
+                                <span className="text-neutral-500 font-black uppercase block text-[10px]">Registered Email</span>
+                                <p className="font-bold text-black">{submittedRegistration.applicantEmail || effectiveProfile.email}</p>
+                            </div>
+                            <div>
+                                <span className="text-neutral-500 font-black uppercase block text-[10px]">Submission Time</span>
+                                <p className="font-bold text-black font-mono">{submissionTimeStr}</p>
+                            </div>
+                            {submittedRegistration.rollNumber && (
+                                <div>
+                                    <span className="text-neutral-500 font-black uppercase block text-[10px]">Roll / ID</span>
+                                    <p className="font-bold text-black font-mono">{submittedRegistration.rollNumber}</p>
+                                </div>
+                            )}
+                            {submittedRegistration.department && (
+                                <div>
+                                    <span className="text-neutral-500 font-black uppercase block text-[10px]">Department</span>
+                                    <p className="font-bold text-black">{submittedRegistration.department}</p>
                                 </div>
                             )}
                         </div>
-                    )}
+
+                        {/* Question answers list */}
+                        {allQuestions.length > 0 && (
+                            <div className="space-y-2 max-h-60 overflow-y-auto print:max-h-none print:overflow-visible pr-1">
+                                {allQuestions.map((q) => {
+                                    const submittedAns = submittedRegistration.answers?.[q.id];
+                                    if (submittedAns === undefined || submittedAns === null || submittedAns === "") return null;
+
+                                    return (
+                                        <div key={q.id} className="p-2.5 rounded-xl bg-white/70 border border-black/10 space-y-0.5">
+                                            <span className="font-bold text-[10px] uppercase text-neutral-500 block">{q.title}</span>
+                                            <p className="font-bold text-black text-xs whitespace-pre-wrap">
+                                                {typeof submittedAns === "object"
+                                                    ? Array.isArray(submittedAns)
+                                                        ? submittedAns.join(", ")
+                                                        : JSON.stringify(submittedAns)
+                                                    : String(submittedAns)}
+                                            </p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Uploaded file attachments */}
+                        {submittedRegistration.fileAttachments && submittedRegistration.fileAttachments.length > 0 && (
+                            <div className="space-y-1.5 pt-1">
+                                <span className="text-[10px] font-black uppercase text-neutral-500">Uploaded Files</span>
+                                {submittedRegistration.fileAttachments.map((f: FileAttachmentMeta, idx: number) => (
+                                    <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-white/70 border border-black/10 text-xs">
+                                        <div className="flex items-center gap-2 truncate">
+                                            <Paperclip className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                                            <span className="font-bold text-black truncate">{f.fileName}</span>
+                                        </div>
+                                        <a
+                                            href={f.fileUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-[11px] font-black text-black hover:underline shrink-0 flex items-center gap-1 print:hidden no-print"
+                                            data-no-print="true"
+                                        >
+                                            <span>View</span>
+                                            <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Quiz Assessment Result Card */}
                 {isQuiz && (
-                    <div className="p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-4 text-left shadow-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/60 dark:border-emerald-800/40 pb-3">
+                    <div className="p-4 rounded-2xl border border-emerald-300 bg-emerald-50/50 space-y-3 text-left">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
                             <div className="flex items-center gap-2">
-                                <span className="p-2 rounded-xl bg-emerald-600 text-white">
-                                    <Award className="w-5 h-5" />
+                                <span className="p-1.5 rounded-lg bg-emerald-600 text-white">
+                                    <Award className="w-4 h-4" />
                                 </span>
                                 <div>
-                                    <h4 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-neutral-100">Quiz Assessment Result</h4>
-                                    <p className="text-[11px] text-neutral-500 font-normal">Evaluation and score breakdown</p>
+                                    <h4 className="text-xs sm:text-sm font-bold text-neutral-900">Quiz Assessment Result</h4>
+                                    <p className="text-[10px] text-neutral-500">Evaluation and score breakdown</p>
                                 </div>
                             </div>
                             {gradesReleased ? (
                                 <div className="text-right">
-                                    <span className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                                    <span className="text-lg font-bold text-emerald-700">
                                         {submittedRegistration.quizScore ?? 0} / {submittedRegistration.quizMaxScore ?? 0}
                                     </span>
-                                    <span className="block text-[11px] font-medium text-neutral-500">
+                                    <span className="block text-[10px] font-medium text-neutral-500">
                                         ({Math.round(((submittedRegistration.quizScore ?? 0) / (submittedRegistration.quizMaxScore || 1)) * 100)}%)
                                     </span>
                                 </div>
                             ) : (
-                                <span className="text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 px-3 py-1 rounded-xl border border-amber-300 dark:border-amber-800">
+                                <span className="text-xs font-semibold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-lg border border-amber-300">
                                     Review in Progress
                                 </span>
                             )}
                         </div>
 
                         {!gradesReleased && (
-                            <p className="text-xs text-neutral-600 dark:text-neutral-400 font-normal bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 flex items-start gap-2">
+                            <p className="text-xs text-neutral-600 bg-white p-2.5 rounded-xl border border-neutral-200 flex items-start gap-2">
                                 <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                 <span>Written and subjective answers are currently being evaluated by event staff. Your final score will be released here once review is complete.</span>
                             </p>
                         )}
 
                         {gradesReleased && submittedRegistration.quizGradedAnswers && (
-                            <div className="space-y-3 pt-1">
-                                <h5 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 dark:text-neutral-100">Question Breakdown:</h5>
-                                <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                            <div className="space-y-2 pt-1">
+                                <h5 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-900">Question Breakdown:</h5>
+                                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                     {allQuestions.map((q) => {
                                         const gradedInfo = submittedRegistration.quizGradedAnswers?.[q.id];
                                         if (!gradedInfo) return null;
@@ -1019,56 +1044,40 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                         return (
                                             <div
                                                 key={q.id}
-                                                className={`p-3 rounded-xl border space-y-2 ${
+                                                className={`p-2.5 rounded-xl border space-y-1.5 ${
                                                     isCorrect
-                                                        ? "bg-white dark:bg-neutral-900 border-emerald-500/50 shadow-sm"
-                                                        : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800/60"
+                                                        ? "bg-white border-emerald-500/50"
+                                                        : "bg-rose-50/60 border-rose-300"
                                                 }`}
                                             >
                                                 <div className="flex items-start justify-between gap-2">
-                                                    <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{q.title}</span>
+                                                    <span className="text-xs font-semibold text-neutral-900">{q.title}</span>
                                                     <span
-                                                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
+                                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
                                                             isCorrect
-                                                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
-                                                                : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border-rose-300 dark:border-rose-700"
+                                                                ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                                                                : "bg-rose-100 text-rose-800 border-rose-300"
                                                         }`}
                                                     >
                                                         {gradedInfo.earnedPoints ?? 0} / {gradedInfo.maxPoints ?? q.points ?? 1} pts
                                                     </span>
                                                 </div>
-                                                <div className="text-[11px] font-normal text-neutral-700 dark:text-neutral-300">
-                                                    <strong className="font-medium text-neutral-900 dark:text-neutral-100">Your answer:</strong>{" "}
+                                                <div className="text-[11px] text-neutral-700">
+                                                    <strong className="font-medium text-neutral-900">Your answer:</strong>{" "}
                                                     {Array.isArray(gradedInfo.studentAnswer)
                                                         ? gradedInfo.studentAnswer.join(", ")
                                                         : String(gradedInfo.studentAnswer ?? "(No answer provided)")}
                                                 </div>
                                                 {form.settings?.quiz?.showCorrectAnswers && !isCorrect && q.correctAnswers && q.correctAnswers.length > 0 && (
-                                                    <div className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                                                    <div className="text-[11px] font-medium text-emerald-800 flex items-center gap-1">
                                                         <Check className="w-3.5 h-3.5 text-emerald-600 inline shrink-0" />
                                                         <span><strong className="font-semibold">Correct answer:</strong> {q.correctAnswers.join(", ")}</span>
                                                     </div>
                                                 )}
                                                 {gradedInfo.feedback && (
-                                                    <div className="text-[11px] font-normal text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5">
+                                                    <div className="text-[11px] text-neutral-600 bg-neutral-100 p-2 rounded-lg border border-neutral-200 flex items-center gap-1.5">
                                                         <Lightbulb className="w-3.5 h-3.5 text-amber-500 inline shrink-0" />
                                                         <span>{gradedInfo.feedback}</span>
-                                                    </div>
-                                                )}
-                                                {gradedInfo.links && gradedInfo.links.length > 0 && (
-                                                    <div className="flex flex-wrap gap-2 pt-1">
-                                                        {gradedInfo.links.map((link: any, idx: number) => (
-                                                            <a
-                                                                key={idx}
-                                                                href={link.url}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                                                            >
-                                                                <ExternalLink className="w-3 h-3" />
-                                                                {link.title || link.url}
-                                                            </a>
-                                                        ))}
                                                     </div>
                                                 )}
                                             </div>
@@ -1080,35 +1089,61 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                    <Link
-                        to="/applications"
-                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                {/* Action Buttons Toolbar (Strictly hidden when printing or exporting PDF) */}
+                <div
+                    className="flex flex-wrap items-center justify-center gap-2.5 pt-3 border-t border-black/15 print:hidden no-print"
+                    data-no-print="true"
+                >
+                    {/* Download PDF Pass */}
+                    <button
+                        type="button"
+                        onClick={handleDownloadPdf}
+                        disabled={isDownloadingPdf}
+                        className="px-4 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-60"
+                        title="Download Pass as PDF"
                     >
-                        <span>View My Applications</span>
-                        <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
-                    </Link>
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{isDownloadingPdf ? "Generating PDF..." : "Download PDF Pass"}</span>
+                    </button>
 
+                    {/* Print Pass Receipt */}
                     <button
                         type="button"
                         onClick={() => window.print()}
-                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        title="Print Pass Receipt"
                     >
                         <Printer className="w-3.5 h-3.5" />
                         <span>Print Pass Receipt</span>
                     </button>
 
+                    {/* View My Applications */}
+                    <Link
+                        to="/applications"
+                        className="px-4 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                        <span>My Applications</span>
+                        <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+                    </Link>
+
+                    {/* Edit Response (if allowed) */}
                     {form.settings?.allowEditResponse && (
                         <button
                             type="button"
-                            onClick={() => setSubmittedRegistration(null)}
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            onClick={() => {
+                                if (onEditResponse) {
+                                    onEditResponse();
+                                } else {
+                                    setSubmittedRegistration(null);
+                                }
+                            }}
+                            className="px-4 py-2.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                         >
                             Edit Response
                         </button>
                     )}
 
+                    {/* Submit Another (if allowed) */}
                     {form.settings?.presentation?.showSubmitAnotherLink && !form.settings?.limitOneResponse && (
                         <button
                             type="button"
@@ -1119,17 +1154,18 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 setCurrentSecIdx(0);
                                 setSectionHistory([0]);
                             }}
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            className="px-4 py-2.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                         >
                             Submit Another
                         </button>
                     )}
 
+                    {/* Done / Close */}
                     {onCancel && (
                         <button
                             type="button"
                             onClick={onCancel}
-                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            className="px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                         >
                             Done
                         </button>

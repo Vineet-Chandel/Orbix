@@ -729,4 +729,84 @@ html.dark body:has(.blog-container) {
   }
 }
 
+/* ==========================================================================
+   EVENT APPLICATION PASS PRINT STYLES
+   Ensures that tapping "Print Pass Receipt" or Cmd+P prints exclusively
+   the clean, full registration pass with zero cutoffs, no backdrop overlays,
+   no browser buttons, and perfect A4 centering.
+   ========================================================================== */
+@media print {
+  @page {
+    size: auto;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    font-size: 12pt !important;
+  }
+
+  /* Hide background interface, sidebars, headers, and modal backdrops */
+  body > * {
+    visibility: hidden !important;
+  }
+
+  /* Allow portal root and modal content to remain visible */
+  #root,
+  [data-portal-root],
+  body > div:last-child {
+    visibility: visible !important;
+  }
+
+  /* Deactivate fixed modal overlays and dark backdrops */
+  .fixed.inset-0 {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* The actual application pass card */
+  #application-pass-card {
+    visibility: visible !important;
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    border: 2px solid #000000 !important;
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #application-pass-card * {
+    visibility: visible !important;
+  }
+
+  /* Hide all action buttons, links, close buttons, and print triggers */
+  .print\:hidden,
+  .no-print,
+  [data-no-print="true"],
+  button,
+  a[href^="/applications"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+
 
