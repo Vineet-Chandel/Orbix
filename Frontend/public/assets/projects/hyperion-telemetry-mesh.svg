@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675" style="background:#0D1117;">
+  <defs>
+    <!-- Dot Grid Pattern -->
+    <pattern id="hyperionDots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#30363D" />
+    </pattern>
+    <filter id="shadowBox" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="6" dy="6" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1200" height="675" fill="#0D1117" />
+  <rect width="1200" height="675" fill="url(#hyperionDots)" />
+  <rect width="1200" height="675" fill="none" stroke="#000000" stroke-width="8" />
+
+  <!-- Top Window Header Bar -->
+  <g transform="translate(40, 36)">
+    <rect x="0" y="0" width="1120" height="54" rx="14" fill="#161B22" stroke="#30363D" stroke-width="3" filter="url(#shadowBox)" />
+    <!-- Traffic lights -->
+    <circle cx="28" cy="27" r="6" fill="#FF5F56" />
+    <circle cx="48" cy="27" r="6" fill="#FFBD2E" />
+    <circle cx="68" cy="27" r="6" fill="#27C93F" />
+    <!-- Title pill -->
+    <rect x="96" y="12" width="240" height="30" rx="8" fill="#000000" stroke="#30363D" stroke-width="1.5" />
+    <text x="216" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="900" fill="#a2ff86" text-anchor="middle" letter-spacing="1.5">HYPERION // CORE V3.4</text>
+    <!-- Live Status -->
+    <rect x="910" y="11" width="194" height="32" rx="16" fill="#238636" stroke="#000000" stroke-width="2" />
+    <circle cx="930" cy="27" r="4" fill="#FFFFFF" />
+    <text x="1015" y="32" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.5">eBPF KERNEL ACTIVE</text>
+  </g>
+
+  <!-- Center Visual Architecture -->
+  <g transform="translate(40, 116)">
+    <!-- Left Hero Card -->
+    <rect x="0" y="0" width="580" height="500" rx="24" fill="#161B22" stroke="#30363D" stroke-width="3" filter="url(#shadowBox)" />
+    
+    <!-- Hero Details -->
+    <g transform="translate(36, 48)">
+      <rect x="0" y="0" width="170" height="28" rx="8" fill="#a2ff86" stroke="#000000" stroke-width="2" />
+      <text x="85" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="950" fill="#000000" text-anchor="middle" letter-spacing="1">DISTRIBUTED SYSTEMS</text>
+
+      <text x="0" y="80" font-family="system-ui, sans-serif" font-size="44" font-weight="950" fill="#FFFFFF" letter-spacing="-1">Hyperion Mesh</text>
+      <text x="0" y="120" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#8B949E">Kernel-Level Observability &amp; Tracing</text>
+
+      <g transform="translate(0, 150)">
+        <rect x="0" y="0" width="508" height="150" rx="14" fill="#0D1117" stroke="#30363D" stroke-width="2" />
+        <!-- Metrics rows -->
+        <g transform="translate(20, 24)">
+          <text x="0" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#8B949E">INGRESS THROUGHPUT</text>
+          <text x="0" y="44" font-family="system-ui, sans-serif" font-size="28" font-weight="950" fill="#a2ff86">1.42M req/sec</text>
+
+          <text x="260" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#8B949E">KERNEL LATENCY</text>
+          <text x="260" y="44" font-family="system-ui, sans-serif" font-size="28" font-weight="950" fill="#58A6FF">&lt; 14.2 μs</text>
+
+          <text x="0" y="88" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#7EE787">✓ Zero-Copy RingBuffer Stream</text>
+          <text x="260" y="88" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#79C0FF">✓ OpenTelemetry Protobuf Sink</text>
+        </g>
+      </g>
+
+      <!-- Tech stack pills -->
+      <g transform="translate(0, 330)">
+        <rect x="0" y="0" width="60" height="28" rx="6" fill="#21262D" stroke="#30363D" stroke-width="1.5" />
+        <text x="30" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFFFFF" text-anchor="middle">Go</text>
+
+        <rect x="70" y="0" width="70" height="28" rx="6" fill="#21262D" stroke="#30363D" stroke-width="1.5" />
+        <text x="105" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFFFFF" text-anchor="middle">eBPF</text>
+
+        <rect x="150" y="0" width="75" height="28" rx="6" fill="#21262D" stroke="#30363D" stroke-width="1.5" />
+        <text x="187" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFFFFF" text-anchor="middle">OTel</text>
+
+        <rect x="235" y="0" width="75" height="28" rx="6" fill="#21262D" stroke="#30363D" stroke-width="1.5" />
+        <text x="272" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFFFFF" text-anchor="middle">gRPC</text>
+
+        <rect x="320" y="0" width="105" height="28" rx="6" fill="#21262D" stroke="#30363D" stroke-width="1.5" />
+        <text x="372" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFFFFF" text-anchor="middle">ClickHouse</text>
+
+        <rect x="435" y="0" width="75" height="28" rx="6" fill="#21262D" stroke="#30363D" stroke-width="1.5" />
+        <text x="472" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFFFFF" text-anchor="middle">Docker</text>
+      </g>
+    </g>
+
+    <!-- Right Diagram Schematic Card -->
+    <g transform="translate(610, 0)">
+      <rect x="0" y="0" width="510" height="500" rx="24" fill="#161B22" stroke="#30363D" stroke-width="3" filter="url(#shadowBox)" />
+      
+      <!-- Diagram Inner Canvas -->
+      <g transform="translate(25, 30)">
+        <text x="0" y="20" font-family="ui-monospace, monospace" font-size="13" font-weight="900" fill="#a2ff86">TOPOLOGY // KERNEL PROBES &amp; INGRESS</text>
+
+        <!-- Kernel Level Box -->
+        <g transform="translate(0, 45)">
+          <rect x="0" y="0" width="460" height="100" rx="14" fill="#0D1117" stroke="#238636" stroke-width="2" />
+          <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#7EE787">LINUX KERNEL LAYER (XDP / TC BPF)</text>
+          <text x="20" y="55" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#8B949E">bpf_probe_read_kernel() • socket_filter • kprobe_tcp_connect</text>
+          <rect x="20" y="68" width="120" height="18" rx="4" fill="#238636" />
+          <text x="80" y="81" font-family="ui-monospace, monospace" font-size="9" font-weight="800" fill="#FFFFFF" text-anchor="middle">ZERO CONTEXT SWITCH</text>
+        </g>
+
+        <!-- Down Arrow Flow -->
+        <path d="M 230 155 L 230 185" stroke="#a2ff86" stroke-width="3" stroke-dasharray="6,4" />
+        <polygon points="225,185 235,185 230,195" fill="#a2ff86" />
+
+        <!-- User Space Collector Box -->
+        <g transform="translate(0, 200)">
+          <rect x="0" y="0" width="460" height="100" rx="14" fill="#0D1117" stroke="#1F6FEB" stroke-width="2" />
+          <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#79C0FF">USERSPACE HYPERION DAEMON (GO)</text>
+          <text x="20" y="55" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#8B949E">Perf RingBuffer Reader • High-Throughput Batch Compactor</text>
+          <rect x="20" y="68" width="135" height="18" rx="4" fill="#1F6FEB" />
+          <text x="87" y="81" font-family="ui-monospace, monospace" font-size="9" font-weight="800" fill="#FFFFFF" text-anchor="middle">LOCK-FREE PIPELINE</text>
+        </g>
+
+        <!-- Down Arrow Flow -->
+        <path d="M 230 310 L 230 340" stroke="#58A6FF" stroke-width="3" stroke-dasharray="6,4" />
+        <polygon points="225,340 235,340 230,350" fill="#58A6FF" />
+
+        <!-- Analytics Storage -->
+        <g transform="translate(0, 355)">
+          <rect x="0" y="0" width="460" height="75" rx="14" fill="#0D1117" stroke="#8957E5" stroke-width="2" />
+          <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#D2A8FF">CLICKHOUSE STORAGE &amp; GRAFANA</text>
+          <text x="20" y="55" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#8B949E">Columnar Partitioning • Real-Time Flamegraphs</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

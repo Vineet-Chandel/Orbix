@@ -13,15 +13,67 @@ import {
     Users,
     CheckCircle2,
     Sparkles,
+    Flame,
+    Globe2,
 } from "lucide-react";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 import { useToast } from "../context/ToastContext";
 
-interface InviteCampusLeadsModalProps {
+export interface InviteCampusLeadsModalProps {
     isOpen: boolean;
     onClose: () => void;
     collegeName: string;
     collegeId?: string | null;
+    initialTab?: "wakeUpCall" | "official" | "panIndiaChallenge";
+}
+
+export function getInviteUrl(collegeName?: string, collegeId?: string | null): string {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const params = new URLSearchParams();
+    params.set("tab", "club");
+    params.set("ref", "campus-invite");
+    if (collegeName && collegeName !== "Your College Campus") {
+        params.set("college", collegeName);
+    }
+    if (collegeId) {
+        params.set("collegeId", collegeId);
+    }
+    return `${origin}/auth/signup?${params.toString()}`;
+}
+
+export function getInviteMessageTemplates(collegeName: string, inviteUrl: string) {
+    const displayCollege = collegeName || "Our College Campus";
+    return {
+        wakeUpCall: `URGENT FOR CLUB LEADS AT ${displayCollege}!
+
+Colleges across India (IITs, NITs, and top tech chapters) are publishing live hackathons, workshops, and inter-college competitions on Orbix every week.
+
+Our campus has 0 active sessions right now. Don't let ${displayCollege} fall behind on the national student leaderboard!
+
+If you lead a technical society, coding club, or student organization:
+• Register our official campus club in 2 minutes & publish our events:
+${inviteUrl}`,
+
+        official: `Respected Faculty Coordinators & Student Club Presidents at ${displayCollege},
+
+Students of ${displayCollege} are actively seeking verified technical workshops, guest lectures, and hackathons on the Orbix platform.
+
+Orbix provides our campus chapter with:
+• AISHE-verified institutional listing & automated student attendance verification
+• Dynamic registration forms with fraud-proof QR check-in passes
+• Pan-India event reach & national student rankings
+
+Please activate our campus chapter portal here:
+${inviteUrl}`,
+
+        panIndiaChallenge: `Put ${displayCollege} on India's National Tech Map!
+
+We challenge our campus clubs to launch a Pan-India flagship hackathon or workshop on Orbix and compete with universities nationwide.
+
+Bring thousands of student developers to our campus event.
+Host your Pan-India or Campus-exclusive event now:
+${inviteUrl}`,
+    };
 }
 
 export const InviteCampusLeadsModal: React.FC<InviteCampusLeadsModalProps> = ({
@@ -29,10 +81,12 @@ export const InviteCampusLeadsModal: React.FC<InviteCampusLeadsModalProps> = ({
     onClose,
     collegeName,
     collegeId,
+    initialTab = "wakeUpCall",
 }) => {
     const toast = useToast();
     const [copiedLink, setCopiedLink] = useState(false);
     const [copiedMessage, setCopiedMessage] = useState(false);
+    const [activeTemplate, setActiveTemplate] = useState<"wakeUpCall" | "official" | "panIndiaChallenge">(initialTab);
 
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
@@ -46,35 +100,20 @@ export const InviteCampusLeadsModal: React.FC<InviteCampusLeadsModalProps> = ({
         };
     }, [isOpen]);
 
+    useEffect(() => {
+        if (isOpen) {
+            setActiveTemplate(initialTab);
+        }
+    }, [isOpen, initialTab]);
+
     if (!isOpen) return null;
 
     const displayCollege = collegeName || "Your College Campus";
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const params = new URLSearchParams();
-    params.set("tab", "club");
-    params.set("ref", "campus-invite");
-    if (collegeName && collegeName !== "Your College Campus") {
-        params.set("college", collegeName);
-    }
-    if (collegeId) {
-        params.set("collegeId", collegeId);
-    }
-    const inviteUrl = `${origin}/auth/signup?${params.toString()}`;
-    const directRegisterHref = `/auth/signup?${params.toString()}`;
+    const inviteUrl = getInviteUrl(collegeName, collegeId);
+    const directRegisterHref = `/auth/signup?tab=club&ref=campus-invite${collegeName ? `&college=${encodeURIComponent(collegeName)}` : ""}`;
 
-    const formattedMessage =
-`👋 Hey Club Presidents & Tech Chapter Leads at ${displayCollege}!
-
-We're inviting all student societies, developer chapters, and clubs from ${displayCollege} to register our official campus presence on Orbix.
-
-✨ Why join Orbix?
-• Verified campus chapter listing & badge
-• Centralized member auditions & recruitment
-• Multi-platform contest radar & hackathon promotions
-• Showcase team achievements to students across colleges
-
-👉 Register your club chapter in 2 minutes:
-${inviteUrl}`;
+    const templates = getInviteMessageTemplates(displayCollege, inviteUrl);
+    const formattedMessage = templates[activeTemplate];
 
     const handleCopyLink = async () => {
         try {
@@ -103,6 +142,11 @@ ${inviteUrl}`;
     };
 
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(formattedMessage)}`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+        activeTemplate === "panIndiaChallenge"
+            ? `Calling all student clubs at ${displayCollege}! Put our campus on India's national tech leaderboard on @OrbixHQ: ${inviteUrl}`
+            : `Calling all club presidents and tech chapter leads at ${displayCollege}! Register our campus on @OrbixHQ and host events: ${inviteUrl}`
+    )}`;
     const emailSubject = `Invitation: Register your student club chapter on Orbix (${displayCollege})`;
     const emailUrl = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(formattedMessage)}`;
     const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(`Register your student club/chapter from ${displayCollege} on Orbix!`)}`;
@@ -161,27 +205,31 @@ ${inviteUrl}`;
                     {/* Quick 1-Click Sharing Channels */}
                     <div className="space-y-2">
                         <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700">
-                            Quick 1-Click Sharing
+                            Quick 1-Click Broadcast Channels
                         </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {/* WhatsApp */}
                             <a
                                 href={whatsappUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-3 py-2.5 rounded-xl bg-[#25D366] text-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-2 hover:brightness-105 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-3 py-2 rounded-xl bg-[#25D366] text-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 hover:brightness-105 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <MessageCircle className="w-4 h-4 stroke-[2.5]" />
                                 <span>WhatsApp</span>
                             </a>
 
-                            {/* Email */}
+                            {/* Twitter / X */}
                             <a
-                                href={emailUrl}
-                                className="px-3 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                href={twitterUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-2 rounded-xl bg-black text-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 hover:bg-neutral-900 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
-                                <Mail className="w-4 h-4 stroke-[2.5]" />
-                                <span>Email Leads</span>
+                                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                </svg>
+                                <span>Post on X</span>
                             </a>
 
                             {/* Telegram */}
@@ -189,10 +237,19 @@ ${inviteUrl}`;
                                 href={telegramUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-3 py-2.5 rounded-xl bg-[#229ED9] text-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-2 hover:brightness-105 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-3 py-2 rounded-xl bg-[#229ED9] text-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 hover:brightness-105 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <Send className="w-4 h-4 stroke-[2.5]" />
                                 <span>Telegram</span>
+                            </a>
+
+                            {/* Email */}
+                            <a
+                                href={emailUrl}
+                                className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                                <Mail className="w-4 h-4 stroke-[2.5]" />
+                                <span>Email Leads</span>
                             </a>
                         </div>
                     </div>
@@ -233,37 +290,90 @@ ${inviteUrl}`;
                         </p>
                     </div>
 
-                    {/* Ready-to-Send Invitation Message Card */}
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
+                    {/* Ready-to-Send Invitation Message Card with Audience Tabs */}
+                    <div className="space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                             <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700">
-                                Pre-Formatted Message (For WhatsApp/Discord Groups)
+                                Target Message Angle
                             </label>
                             <span className="text-[10px] font-black text-neutral-500 uppercase">
-                                Ready to Send
+                                Ready to Send in Groups
                             </span>
                         </div>
+
+                        {/* Message Template Switcher Tabs */}
+                        <div className="flex items-center gap-1.5 bg-[#FAF6EE] p-1 rounded-xl border-2 border-black">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTemplate("wakeUpCall")}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                    activeTemplate === "wakeUpCall"
+                                        ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
+                                        : "text-neutral-700 hover:bg-neutral-200"
+                                }`}
+                            >
+                                <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                                <span>Wake-Up Call (FOMO)</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTemplate("official")}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                    activeTemplate === "official"
+                                        ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
+                                        : "text-neutral-700 hover:bg-neutral-200"
+                                }`}
+                            >
+                                <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+                                <span>Faculty & Leads</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTemplate("panIndiaChallenge")}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                    activeTemplate === "panIndiaChallenge"
+                                        ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
+                                        : "text-neutral-700 hover:bg-neutral-200"
+                                }`}
+                            >
+                                <Globe2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span>Pan-India Challenge</span>
+                            </button>
+                        </div>
+
                         <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
                             <pre className="text-xs text-neutral-800 font-sans whitespace-pre-wrap leading-relaxed select-all">
                                 {formattedMessage}
                             </pre>
-                            <button
-                                type="button"
-                                onClick={handleCopyMessage}
-                                className="w-full py-2 px-3 rounded-lg bg-[#FFE566] hover:bg-yellow-300 text-black border-2 border-black font-black text-xs shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                            >
-                                {copiedMessage ? (
-                                    <>
-                                        <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Invitation Message Copied!</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Copy className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Copy Full Message</span>
-                                    </>
-                                )}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleCopyMessage}
+                                    className="flex-1 py-2 px-3 rounded-lg bg-[#FFE566] hover:bg-yellow-300 text-black border-2 border-black font-black text-xs shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    {copiedMessage ? (
+                                        <>
+                                            <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Invitation Message Copied!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Copy Formatted Message</span>
+                                        </>
+                                    )}
+                                </button>
+                                <a
+                                    href={whatsappUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="py-2 px-3 rounded-lg bg-[#25D366] hover:brightness-105 text-white border-2 border-black font-black text-xs shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    title="Send directly on WhatsApp"
+                                >
+                                    <MessageCircle className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Send on WhatsApp</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>

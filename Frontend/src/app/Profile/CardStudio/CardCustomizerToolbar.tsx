@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Code2, FolderGit2, Sparkles } from "lucide-react";
+import { Code2, FolderGit2, Sparkles, X, Plus, Star } from "lucide-react";
 import { CARD_THEMES } from "./types";
 import type { CardFormat, CardFace, CardThemeId, SlotShowcaseCategory } from "./types";
 import type { RankedPlatform, RankedContestPlatform } from "../../../utils/cardStatsAggregator";
@@ -521,16 +521,18 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                                 ({plat.contributionsOrCommits ?? 0} commits)
                                             </span>
                                         ) : plat.hasGoodRating && plat.rating ? (
-                                            <span className={`text-[10px] font-mono ${isPresent ? "text-amber-300" : "text-amber-600"}`}>
-                                                ({plat.rating}★)
+                                            <span className={`inline-flex items-center gap-0.5 text-[10px] font-mono ${isPresent ? "text-amber-300" : "text-amber-600"}`}>
+                                                <span>({plat.rating}</span>
+                                                <Star className="w-2.5 h-2.5 fill-current stroke-[2]" />
+                                                <span>)</span>
                                             </span>
                                         ) : plat.solvedCount > 0 ? (
                                             <span className={`text-[10px] font-mono ${isPresent ? "text-neutral-300" : "text-neutral-500"}`}>
                                                 ({plat.solvedCount})
                                             </span>
                                         ) : null}
-                                        <span className="text-[10px] font-bold">
-                                            {isPresent ? "✕" : "+"}
+                                        <span className="inline-flex items-center">
+                                            {isPresent ? <X className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
                                         </span>
                                     </button>
                                 );

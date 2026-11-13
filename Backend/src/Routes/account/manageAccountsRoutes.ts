@@ -251,11 +251,19 @@ manageAccountsRouter.post("/email/change/cancel", authenticate, async (req: Requ
 manageAccountsRouter.post("/email/verify-primary/send", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
-        const email = req.user?.gmail || req.user?.email;
-        const name = req.user?.firstName || req.user?.username || "Developer";
-
-        if (!userId || !email) {
+        if (!userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const identity = await ManageAccountsService.resolveAccountIdentity(userId);
+        const email = identity.hasRealEmail ? identity.effectiveEmail : "";
+        const name = identity.displayName || req.user?.firstName || req.user?.username || "Developer";
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "No real contact email is configured for this account.",
+            });
         }
 
         const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";

@@ -16,7 +16,8 @@ import {
     Globe2,
     AlertCircle,
     Sparkles,
-    TrendingUp
+    TrendingUp,
+    Star,
 } from "lucide-react";
 import { NeoSelect } from "../../../components/NeoSelect";
 
@@ -923,7 +924,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                 <span className="w-2 h-2 rounded-full bg-[#1F8ACB]" /> Codeforces ({Math.max(1200, contestRating - 80)})
                             </span>
                             <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-black" /> GitHub ({publicRepos} Repos • {repoStars}★)
+                                <span className="w-2 h-2 rounded-full bg-black" /> GitHub ({publicRepos} Repos • {repoStars} <Star className="w-3 h-3 fill-amber-400 text-amber-500 inline ml-0.5" />)
                             </span>
                         </div>
                     </div>

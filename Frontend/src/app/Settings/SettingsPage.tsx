@@ -11,6 +11,7 @@ import { updateProfile } from "../../utils/profileApi";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { buildApiUrl } from "../../api/apiClient";
 import type { SettingsViewKey } from "./types";
 import { SettingsHub } from "./SettingsHub";
 import { AccountCenterView } from "./AccountCenterView";
@@ -134,10 +135,10 @@ export default function SettingsPage() {
     const handleConfirmLogout = async () => {
         setIsLoggingOut(true);
         try {
-            const endpoints = [
-                "/api/auth/signout",
-                "http://localhost:3000/api/auth/signout",
-            ];
+            const primarySignout = buildApiUrl("/api/auth/signout");
+            const endpoints = import.meta.env.DEV
+                ? [primarySignout, "/api/auth/logout", "http://localhost:3000/api/auth/signout"]
+                : [primarySignout, "/api/auth/logout"];
             await Promise.allSettled(
                 endpoints.map((url) =>
                     fetch(url, {

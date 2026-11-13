@@ -94,6 +94,32 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
     const linkedInScale = linkedInWidth / 1200;
     const linkedInHeight = Math.round(linkedInWidth * (627 / 1200));
 
+    // Flip handler that flips both cards simultaneously
+    const handleFlipBoth = () => {
+        setIsStoryFlipped((prev) => !prev);
+        setIsLinkedInFlipped((prev) => !prev);
+    };
+
+    const isAnyFlipped = isStoryFlipped || isLinkedInFlipped;
+
+    // Shared "TAP CARD TO FLIP" Button (Orbix Neo-Brutalist Theme)
+    const renderFlipButton = () => (
+        <button
+            type="button"
+            onClick={handleFlipBoth}
+            className="px-6 py-2.5 rounded-full text-xs sm:text-sm font-black uppercase tracking-wider transition-all flex items-center gap-2.5 border-2 border-black bg-white hover:bg-[#a2ff86] text-black shadow-[4px_4px_0px_#000] hover:shadow-[2px_2px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer active:translate-x-[3px] active:translate-y-[3px]"
+            title="Tap card or click here to flip cards in 3D"
+            aria-label="Tap card to flip"
+        >
+            <RotateCcw
+                className={`w-4 h-4 text-black stroke-[2.5] transition-transform duration-500 ${
+                    isAnyFlipped ? "rotate-180" : ""
+                }`}
+            />
+            <span>Tap Card to Flip</span>
+        </button>
+    );
+
     return (
         <section
             className={`relative w-full bg-[#FAF6EE] text-neutral-900 py-14 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden font-sans select-none ${className}`}
@@ -101,8 +127,13 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
             {/* Warm, eye-friendly dot grid matching Orbix platform canvas */}
             <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
-            {/* Side-by-Side Parallel Cards: Instagram Story on LEFT, LinkedIn on RIGHT */}
+            {/* Side-by-Side Parallel Cards on Desktop / Sequential Stack on Mobile & Tablet */}
             <div className="relative w-full max-w-[1540px] mx-auto flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-10 xl:gap-12">
+                {/* 1. Mobile & Tablet ONLY: Button at the very top */}
+                <div className="flex lg:hidden justify-center w-full">
+                    {renderFlipButton()}
+                </div>
+
                 {/* =========================================================================
                     CARD 1 (LEFT): INSTAGRAM STORY CARD (Portrait 1080 x 1920) 1.5x
                 ========================================================================= */}
@@ -201,27 +232,16 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                             </div>
                         </motion.div>
                     </div>
-
-                    {/* Dedicated 3D Flip Button for Story Card */}
-                    <button
-                        type="button"
-                        onClick={() => setIsStoryFlipped((prev) => !prev)}
-                        className="mt-4 px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-2 border-2 border-black bg-white text-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                        title="Rotate Instagram story card in 3D"
-                    >
-                        <RotateCcw className={`w-3.5 h-3.5 text-black stroke-[2.5] transition-transform duration-500 ${isStoryFlipped ? "rotate-180" : ""}`} />
-                        <span>
-                            {isStoryFlipped ? "Showing Back (QR & Activity) · Flip to Front" : "Showing Front Face · Flip to Back"}
-                        </span>
-                    </button>
                 </div>
 
                 {/* =========================================================================
                     CARD 2 (RIGHT): LINKEDIN CARD (Landscape 1200 x 627) 1.5x
                 ========================================================================= */}
                 <div className="flex flex-col items-center">
-                    {/* Format Header Pill */}
-
+                    {/* Desktop ONLY: Button in the space on top of the Right Card */}
+                    <div className="hidden lg:flex justify-center mb-6 w-full">
+                        {renderFlipButton()}
+                    </div>
 
                     {/* 3D Motion Card Container (Scale effect on hover strictly turned OFF) */}
                     <div style={{ perspective: 1800 }}>
@@ -317,19 +337,6 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                             </div>
                         </motion.div>
                     </div>
-
-                    {/* Dedicated 3D Flip Button for LinkedIn Card */}
-                    <button
-                        type="button"
-                        onClick={() => setIsLinkedInFlipped((prev) => !prev)}
-                        className="mt-4 px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-2 border-2 border-black bg-white text-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                        title="Rotate LinkedIn card in 3D"
-                    >
-                        <RotateCcw className={`w-3.5 h-3.5 text-black stroke-[2.5] transition-transform duration-500 ${isLinkedInFlipped ? "rotate-180" : ""}`} />
-                        <span>
-                            {isLinkedInFlipped ? "Showing Back (QR & Links) · Flip to Front" : "Showing Front Face · Flip to Back"}
-                        </span>
-                    </button>
                 </div>
             </div>
 

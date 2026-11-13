@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
     LayoutDashboard,
     Users,
@@ -13,10 +13,27 @@ import {
     Settings,
     Building2,
     Award,
+    Layers,
+    UserPlus,
+    Megaphone,
+    MessageSquareQuote,
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
-export type ClubTab = "overview" | "team" | "events" | "analytics" | "certificates" | "profile" | "clubs" | "settings";
+export type ClubTab =
+    | "overview"
+    | "analytics"
+    | "events"
+    | "certificates"
+    | "feedback-surveys"
+    | "team"
+    | "team-workspace"
+    | "recruitment"
+    | "announcements"
+    | "clubs"
+    | "profile"
+    | "credibility"
+    | "settings";
 
 interface ClubSidebarProps {
     club: {
@@ -39,6 +56,20 @@ interface ClubSidebarProps {
     onSignOut: () => void;
 }
 
+interface ClubCategoryItem {
+    id: ClubTab;
+    label: string;
+    icon: React.ReactNode;
+    path: string;
+    badge?: string | number;
+}
+
+interface ClubNavCategory {
+    id: string;
+    label: string;
+    items: ClubCategoryItem[];
+}
+
 export const ClubSidebar = ({
     club,
     activeTab,
@@ -51,6 +82,7 @@ export const ClubSidebar = ({
     onOpenInbox,
     onSignOut,
 }: ClubSidebarProps) => {
+    const location = useLocation();
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -83,6 +115,196 @@ export const ClubSidebar = ({
             document.removeEventListener("keydown", handleKeyDown);
         };
     }, [isProfileMenuOpen]);
+
+    const handleItemClick = (tab: ClubTab) => {
+        onTabChange(tab);
+        if (onClose) onClose();
+    };
+
+    // Category-wise Sidebar specification matching personal account structure
+    const clubCategories: ClubNavCategory[] = [
+        {
+            id: "command-center",
+            label: "01 · COMMAND CENTER",
+            items: [
+                {
+                    id: "overview",
+                    label: "Dashboard",
+                    icon: <LayoutDashboard className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/dashboard",
+                },
+                {
+                    id: "analytics",
+                    label: "Trends & Analytics",
+                    icon: <TrendingUp className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/analytics",
+                },
+            ],
+        },
+        {
+            id: "programs-events",
+            label: "02 · PROGRAMS & EVENTS",
+            items: [
+                {
+                    id: "events",
+                    label: "Events",
+                    icon: <CalendarDays className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/events",
+                },
+                {
+                    id: "certificates",
+                    label: "Certificates",
+                    icon: <Award className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/certificates",
+                },
+                {
+                    id: "feedback-surveys",
+                    label: "Feedback & Surveys",
+                    icon: <MessageSquareQuote className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/feedback-surveys",
+                },
+            ],
+        },
+        {
+            id: "people-collaboration",
+            label: "03 · PEOPLE & COLLABORATION",
+            items: [
+                {
+                    id: "team",
+                    label: "Team",
+                    icon: <Users className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/team",
+                    badge: teamPendingCount > 0 ? teamPendingCount : undefined,
+                },
+                {
+                    id: "team-workspace",
+                    label: "Team Workspace",
+                    icon: <Layers className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/team-workspace",
+                },
+                {
+                    id: "recruitment",
+                    label: "Recruitment",
+                    icon: <UserPlus className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/recruitment",
+                },
+            ],
+        },
+        {
+            id: "club-network",
+            label: "04 · CLUB NETWORK",
+            items: [
+                {
+                    id: "announcements",
+                    label: "Announcement",
+                    icon: <Megaphone className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/announcements",
+                },
+                {
+                    id: "clubs",
+                    label: "Campus Clubs",
+                    icon: <Building2 className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/clubs",
+                },
+            ],
+        },
+        {
+            id: "club-identity",
+            label: "05 · CLUB IDENTITY",
+            items: [
+                {
+                    id: "profile",
+                    label: "Manage Profile",
+                    icon: <Edit3 className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
+                    path: "/club/profile",
+                },
+            ],
+        },
+    ];
+
+    const renderNavItem = (item: ClubCategoryItem) => {
+        const isCurrentActive =
+            activeTab === item.id ||
+            (item.path && location.pathname === item.path) ||
+            (item.id === "overview" && (location.pathname === "/club/dashboard" || location.pathname === "/club")) ||
+            (item.id === "analytics" && (location.pathname.startsWith("/club/analytics") || location.pathname.startsWith("/club/trends"))) ||
+            (item.id === "events" && location.pathname.startsWith("/club/events")) ||
+            (item.id === "certificates" && location.pathname.startsWith("/club/certificates")) ||
+            (item.id === "feedback-surveys" && (location.pathname.startsWith("/club/feedback") || activeTab === "feedback-surveys")) ||
+            (item.id === "team" && location.pathname === "/club/team" && activeTab === "team") ||
+            (item.id === "team-workspace" && (location.pathname === "/club/team-workspace" || activeTab === "team-workspace")) ||
+            (item.id === "recruitment" && (location.pathname === "/club/recruitment" || activeTab === "recruitment")) ||
+            (item.id === "announcements" && (location.pathname.startsWith("/club/announcement") || activeTab === "announcements")) ||
+            (item.id === "clubs" && (location.pathname.startsWith("/club/clubs") || location.pathname.startsWith("/club/campus-clubs") || location.pathname.startsWith("/club/other-clubs"))) ||
+            (item.id === "profile" && (location.pathname.startsWith("/club/profile") || location.pathname.startsWith("/club/manage-profile")));
+
+        return (
+            <Link
+                key={item.id}
+                to={item.path}
+                onClick={() => handleItemClick(item.id)}
+                className={`flex items-center h-10 sm:h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
+                    isCurrentActive
+                        ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
+                        : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                }`}
+                title={!isExpanded ? item.label : undefined}
+            >
+                {/* Active vertical accent bar */}
+                <span
+                    className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                        isCurrentActive && isExpanded ? "bg-black opacity-100" : "bg-transparent opacity-0"
+                    }`}
+                />
+
+                <div className="flex items-center w-full min-w-0">
+                    {/* SVG Icon: DEAD-CENTER in container */}
+                    <div className="w-10 sm:w-11 h-10 sm:h-11 flex items-center justify-center flex-shrink-0">
+                        <span
+                            className={`w-5 h-5 flex items-center justify-center transition-colors ${
+                                isCurrentActive
+                                    ? "text-black"
+                                    : "text-neutral-700 group-hover:text-black"
+                            }`}
+                        >
+                            {item.icon}
+                        </span>
+                    </div>
+
+                    {/* Text label only rendered when expanded */}
+                    {isExpanded && (
+                        <span
+                            className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
+                                isCurrentActive ? "text-black font-black" : "text-neutral-800 font-bold"
+                            }`}
+                        >
+                            {item.label}
+                        </span>
+                    )}
+                </div>
+
+                {item.badge !== undefined && isExpanded && (
+                    <span
+                        className={`text-[10px] font-black px-2 py-0.5 rounded-full transition-colors flex-shrink-0 whitespace-nowrap ml-auto mr-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000] ${
+                            isCurrentActive
+                                ? "bg-black text-[#a2ff86]"
+                                : "bg-[#FFE566] text-black"
+                        }`}
+                    >
+                        {item.badge}
+                    </span>
+                )}
+
+                {/* Floating tooltip when contracted */}
+                {!isExpanded && (
+                    <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
+                        <span>{item.label}</span>
+                        {isCurrentActive && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
+                    </div>
+                )}
+            </Link>
+        );
+    };
 
     const sidebarContent = (
         <aside
@@ -143,387 +365,34 @@ export const ClubSidebar = ({
                     )}
                 </div>
 
-                {/* Main Navigation Items */}
-                <div className="pt-3.5 space-y-1.5 px-0.5 pr-1.5">
-                    {/* Item 1: Dashboard Overview */}
-                    <Link
-                        to="/club/dashboard"
-                        onClick={() => {
-                            onTabChange("overview");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                            activeTab === "overview"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                        }`}
-                        title={!isExpanded ? "Dashboard" : undefined}
-                    >
-                        <span
-                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "overview" && isExpanded
-                                    ? "bg-black opacity-100"
-                                    : "bg-transparent opacity-0"
-                            }`}
-                        />
-                        <div className="flex items-center w-full">
-                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <LayoutDashboard
-                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                        activeTab === "overview"
-                                            ? "text-black"
-                                            : "text-neutral-700 group-hover:text-black"
+                {/* Category-Wise Navigation Groups */}
+                <div className="pt-2.5 pb-2 px-0.5 pr-1.5 space-y-1">
+                    {clubCategories.map((category, index) => (
+                        <div key={category.id} className="space-y-0.5">
+                            {/* Divider between categories */}
+                            {index > 0 && (
+                                <div
+                                    className={`my-2 h-0.5 bg-black/15 overflow-x-hidden ${
+                                        isExpanded ? "w-full" : "w-8 mx-auto"
                                     }`}
                                 />
-                            </div>
-                            {isExpanded && (
-                                <span
-                                    className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
-                                        activeTab === "overview"
-                                            ? "text-black font-black"
-                                            : "text-neutral-800 font-bold"
-                                    }`}
-                                >
-                                    Dashboard
-                                </span>
                             )}
-                        </div>
 
-                        {/* Floating tooltip when contracted */}
-                        {!isExpanded && (
-                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                <span>Dashboard</span>
-                                {activeTab === "overview" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
-                            </div>
-                        )}
-                    </Link>
-
-                    {/* Item 2: Team Workspace */}
-                    <Link
-                        to="/club/team"
-                        onClick={() => {
-                            onTabChange("team");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                            activeTab === "team"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                        }`}
-                        title={!isExpanded ? "Team Workspace" : undefined}
-                    >
-                        <span
-                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "team" && isExpanded
-                                    ? "bg-black opacity-100"
-                                    : "bg-transparent opacity-0"
-                            }`}
-                        />
-                        <div className="flex items-center w-full">
-                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <Users
-                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                        activeTab === "team"
-                                            ? "text-black"
-                                            : "text-neutral-700 group-hover:text-black"
-                                    }`}
-                                />
-                            </div>
+                            {/* Category Header Label (rendered when expanded) */}
                             {isExpanded && (
-                                <div className="flex items-center justify-between flex-1 min-w-0 pr-2">
-                                    <span
-                                        className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
-                                            activeTab === "team"
-                                                ? "text-black font-black"
-                                                : "text-neutral-800 font-bold"
-                                        }`}
-                                    >
-                                        Team
-                                    </span>
-                                    {teamPendingCount > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] flex-shrink-0 ml-2">
-                                            {teamPendingCount}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Floating tooltip when contracted */}
-                        {!isExpanded && (
-                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                <span>Team Workspace</span>
-                                {activeTab === "team" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
-                            </div>
-                        )}
-                    </Link>
-
-                    {/* Item 3: Events & Workshops */}
-                    <Link
-                        to="/club/events"
-                        onClick={() => {
-                            onTabChange("events");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                            activeTab === "events"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                        }`}
-                        title={!isExpanded ? "Events & Workshops" : undefined}
-                    >
-                        <span
-                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "events" && isExpanded
-                                    ? "bg-black opacity-100"
-                                    : "bg-transparent opacity-0"
-                            }`}
-                        />
-                        <div className="flex items-center w-full">
-                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <CalendarDays
-                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                        activeTab === "events"
-                                            ? "text-black"
-                                            : "text-neutral-700 group-hover:text-black"
-                                    }`}
-                                />
-                            </div>
-                            {isExpanded && (
-                                <div className="flex items-center justify-between flex-1 min-w-0 pr-2">
-                                    <span
-                                        className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
-                                            activeTab === "events"
-                                                ? "text-black font-black"
-                                                : "text-neutral-800 font-bold"
-                                        }`}
-                                    >
-                                        Events
+                                <div className="px-2 pt-1 pb-1">
+                                    <span className="text-[10px] font-black tracking-wider uppercase text-neutral-500 font-mono select-none block truncate">
+                                        {category.label}
                                     </span>
                                 </div>
                             )}
+
+                            {/* Category items */}
+                            <div className="space-y-1">
+                                {category.items.map(renderNavItem)}
+                            </div>
                         </div>
-
-                        {/* Floating tooltip when contracted */}
-                        {!isExpanded && (
-                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                <span>Events & Workshops</span>
-                                {activeTab === "events" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
-                            </div>
-                        )}
-                    </Link>
-
-                    {/* Item 4: Trends & Analytics */}
-                    <Link
-                        to="/club/analytics"
-                        onClick={() => {
-                            onTabChange("analytics");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                            activeTab === "analytics"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                        }`}
-                        title={!isExpanded ? "Trends & Analytics" : undefined}
-                    >
-                        <span
-                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "analytics" && isExpanded
-                                    ? "bg-black opacity-100"
-                                    : "bg-transparent opacity-0"
-                            }`}
-                        />
-                        <div className="flex items-center w-full">
-                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <TrendingUp
-                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                        activeTab === "analytics"
-                                            ? "text-black"
-                                            : "text-neutral-700 group-hover:text-black"
-                                    }`}
-                                />
-                            </div>
-                            {isExpanded && (
-                                <span
-                                    className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
-                                        activeTab === "analytics"
-                                            ? "text-black font-black"
-                                            : "text-neutral-800 font-bold"
-                                    }`}
-                                >
-                                    Trends & Analytics
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Floating tooltip when contracted */}
-                        {!isExpanded && (
-                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                <span>Trends & Analytics</span>
-                                {activeTab === "analytics" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
-                            </div>
-                        )}
-                    </Link>
-
-                    {/* Item 4.5: Certificates */}
-                    <Link
-                        to="/club/certificates"
-                        onClick={() => {
-                            onTabChange("certificates");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                            activeTab === "certificates"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                        }`}
-                        title={!isExpanded ? "Certificates" : undefined}
-                    >
-                        <span
-                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "certificates" && isExpanded
-                                    ? "bg-black opacity-100"
-                                    : "bg-transparent opacity-0"
-                            }`}
-                        />
-                        <div className="flex items-center w-full">
-                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <Award
-                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                        activeTab === "certificates"
-                                            ? "text-black"
-                                            : "text-neutral-700 group-hover:text-black"
-                                    }`}
-                                />
-                            </div>
-                            {isExpanded && (
-                                <span
-                                    className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
-                                        activeTab === "certificates"
-                                            ? "text-black font-black"
-                                            : "text-neutral-800 font-bold"
-                                    }`}
-                                >
-                                    Certificates
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Floating tooltip when contracted */}
-                        {!isExpanded && (
-                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                <span>Certificates</span>
-                                {activeTab === "certificates" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
-                            </div>
-                        )}
-                    </Link>
-
-                    {/* Item 5: Manage Profile */}
-                    <Link
-                        to="/club/profile"
-                        onClick={() => {
-                            onTabChange("profile");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                            activeTab === "profile"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                        }`}
-                        title={!isExpanded ? "Manage Profile" : undefined}
-                    >
-                        <span
-                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "profile" && isExpanded
-                                    ? "bg-black opacity-100"
-                                    : "bg-transparent opacity-0"
-                            }`}
-                        />
-                        <div className="flex items-center w-full">
-                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <Edit3
-                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                        activeTab === "profile"
-                                            ? "text-black"
-                                            : "text-neutral-700 group-hover:text-black"
-                                    }`}
-                                />
-                            </div>
-                            {isExpanded && (
-                                <span
-                                    className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
-                                        activeTab === "profile"
-                                            ? "text-black font-black"
-                                            : "text-neutral-800 font-bold"
-                                    }`}
-                                >
-                                    Manage Profile
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Floating tooltip when contracted */}
-                        {!isExpanded && (
-                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                <span>Manage Profile</span>
-                                {activeTab === "profile" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
-                            </div>
-                        )}
-                    </Link>
-
-                    {/* Item 5: Other Clubs */}
-                    <Link
-                        to="/club/clubs"
-                        onClick={() => {
-                            onTabChange("clubs");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
-                            activeTab === "clubs"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
-                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                        }`}
-                        title={!isExpanded ? "Campus Clubs" : undefined}
-                    >
-                        <span
-                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "clubs" && isExpanded
-                                    ? "bg-black opacity-100"
-                                    : "bg-transparent opacity-0"
-                            }`}
-                        />
-                        <div className="flex items-center w-full">
-                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <Building2
-                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                        activeTab === "clubs"
-                                            ? "text-black"
-                                            : "text-neutral-700 group-hover:text-black"
-                                    }`}
-                                />
-                            </div>
-                            {isExpanded && (
-                                <span
-                                    className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
-                                        activeTab === "clubs"
-                                            ? "text-black font-black"
-                                            : "text-neutral-800 font-bold"
-                                    }`}
-                                >
-                                    Campus Clubs
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Floating tooltip when contracted */}
-                        {!isExpanded && (
-                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
-                                <span>Campus Clubs</span>
-                                {activeTab === "clubs" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
-                            </div>
-                        )}
-                    </Link>
+                    ))}
                 </div>
             </div>
 
@@ -602,27 +471,20 @@ export const ClubSidebar = ({
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <LayoutDashboard className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Overview Dashboard</span>
+                            <span className="truncate">Dashboard</span>
                         </Link>
 
                         <Link
-                            to="/club/team"
+                            to="/club/analytics"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onTabChange("team");
+                                onTabChange("analytics");
                                 if (onClose) onClose();
                             }}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <Users className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Team Workspace</span>
-                            </div>
-                            {teamPendingCount !== undefined && teamPendingCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                    {teamPendingCount}
-                                </span>
-                            )}
+                            <TrendingUp className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Trends & Analytics</span>
                         </Link>
 
                         <Link
@@ -636,36 +498,93 @@ export const ClubSidebar = ({
                         >
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <CalendarDays className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Events & Workshops</span>
+                                <span className="truncate">Events</span>
                             </div>
                         </Link>
 
                         <Link
-                            to="/club/analytics"
+                            to="/club/certificates"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onTabChange("analytics");
+                                onTabChange("certificates");
+                                if (onClose) onClose();
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <Award className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Certificates</span>
+                        </Link>
+
+                        <Link
+                            to="/club/feedback-surveys"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("feedback-surveys");
+                                if (onClose) onClose();
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <MessageSquareQuote className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Feedback & Surveys</span>
+                        </Link>
+
+                        <Link
+                            to="/club/team"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("team");
                                 if (onClose) onClose();
                             }}
                             className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <div className="flex items-center gap-2.5 min-w-0">
-                                <TrendingUp className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Trends & Analytics</span>
+                                <Users className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                                <span className="truncate">Team</span>
                             </div>
+                            {teamPendingCount !== undefined && teamPendingCount > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                    {teamPendingCount}
+                                </span>
+                            )}
                         </Link>
 
                         <Link
-                            to="/club/profile"
+                            to="/club/team-workspace"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onTabChange("profile");
+                                onTabChange("team-workspace");
                                 if (onClose) onClose();
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
-                            <Edit3 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Manage Profile</span>
+                            <Layers className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Team Workspace</span>
+                        </Link>
+
+                        <Link
+                            to="/club/recruitment"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("recruitment");
+                                if (onClose) onClose();
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <UserPlus className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Recruitment</span>
+                        </Link>
+
+                        <Link
+                            to="/club/announcements"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("announcements");
+                                if (onClose) onClose();
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <Megaphone className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Announcement</span>
                         </Link>
 
                         <Link
@@ -679,6 +598,19 @@ export const ClubSidebar = ({
                         >
                             <Building2 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                             <span className="truncate">Campus Clubs</span>
+                        </Link>
+
+                        <Link
+                            to="/club/profile"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("profile");
+                                if (onClose) onClose();
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <Edit3 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Manage Profile</span>
                         </Link>
 
                         <button

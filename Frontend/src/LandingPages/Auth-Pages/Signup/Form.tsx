@@ -16,6 +16,7 @@ import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { buildApiUrl } from "../../../api/apiClient";
 
 export default function SignupForm() {
     const navigate = useNavigate();
@@ -148,10 +149,10 @@ export default function SignupForm() {
         const lastName = formData.lastName.trim();
 
         try {
-            const endpoints = [
-                "http://localhost:3000/api/signup/send-email-otp",
-                "/api/signup/send-email-otp"
-            ];
+            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
+                : [primaryEndpoint, "/api/signup/send-email-otp"];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -184,8 +185,18 @@ export default function SignupForm() {
             }
 
             if (!response.ok) {
-                const errorMessage = resData?.message || "Failed to dispatch verification email. Please check your information.";
-                toast.error(errorMessage, { title: "Verification Error" });
+                const errorMessage =
+                    resData?.message ||
+                    (response.status === 409
+                        ? "An account with this email address or username already exists. Please sign in instead."
+                        : response.status === 404
+                        ? "Verification service route not found (HTTP 404). Please ensure the backend is running."
+                        : response.status >= 500
+                        ? "Server encountered an error while sending the verification email. Please try again shortly."
+                        : "Failed to dispatch verification email. Please check your information.");
+                toast.error(errorMessage, {
+                    title: response.status === 409 ? "Account Exists" : "Verification Error",
+                });
                 return;
             }
 
@@ -214,10 +225,10 @@ export default function SignupForm() {
 
         setResendingOtp(true);
         try {
-            const endpoints = [
-                "http://localhost:3000/api/signup/send-email-otp",
-                "/api/signup/send-email-otp"
-            ];
+            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
+                : [primaryEndpoint, "/api/signup/send-email-otp"];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -244,7 +255,16 @@ export default function SignupForm() {
             }
 
             if (!response || !response.ok) {
-                throw new Error(resData?.message || "Failed to resend verification code.");
+                const errorMessage =
+                    resData?.message ||
+                    (response?.status === 409
+                        ? "An account with this email address or username already exists. Please sign in instead."
+                        : response?.status === 404
+                        ? "Verification endpoint not found (HTTP 404)."
+                        : response?.status && response.status >= 500
+                        ? "Server error while dispatching verification code. Please try again shortly."
+                        : "Failed to resend verification code.");
+                throw new Error(errorMessage);
             }
 
             setEmailCooldown(resData?.cooldownSeconds || 60);
@@ -271,10 +291,10 @@ export default function SignupForm() {
 
         try {
             // Step 1: Verify OTP and acquire cryptographic proof token
-            const verifyEndpoints = [
-                "http://localhost:3000/api/signup/verify-email-otp",
-                "/api/signup/verify-email-otp"
-            ];
+            const primaryVerify = buildApiUrl("/api/auth/signup/verify-email-otp");
+            const verifyEndpoints = import.meta.env.DEV
+                ? [primaryVerify, "http://localhost:3000/api/auth/signup/verify-email-otp", "/api/signup/verify-email-otp"]
+                : [primaryVerify, "/api/signup/verify-email-otp"];
 
             let verifyResponse: Response | null = null;
             let verifyData: any = null;
@@ -318,10 +338,10 @@ export default function SignupForm() {
                 verificationToken,
             };
 
-            const signupEndpoints = [
-                "http://localhost:3000/api/signup",
-                "/api/signup"
-            ];
+            const primarySignup = buildApiUrl("/api/auth/signup");
+            const signupEndpoints = import.meta.env.DEV
+                ? [primarySignup, "http://localhost:3000/api/auth/signup"]
+                : [primarySignup];
 
             let signupResponse: Response | null = null;
             let signupData: any = null;
@@ -369,7 +389,7 @@ export default function SignupForm() {
             setShowOtpModal(false);
 
             toast.success("Account registered and email verified! Welcome to Orbix.", {
-                title: "Welcome to Orbix! ✓",
+                title: "Welcome to Orbix!",
             });
             const redirectParam = searchParams.get("redirect");
             navigate(redirectParam ? `/onboarding?redirect=${encodeURIComponent(redirectParam)}` : "/onboarding");
@@ -492,10 +512,10 @@ export default function SignupForm() {
                     />
                 </div>
 
-                {/* Separate Versioned Legal Consents & Age Confirmation */}
-                <div className="space-y-3 pt-2">
+                {/* Separate Versioned Legal Consents & Age Confirmation (One by One) */}
+                <div className="flex flex-col gap-3.5 pt-2">
                     {/* 1. Terms & Conditions */}
-                    <div>
+                    <div className="w-full">
                         <NeoCheckbox
                             checked={formData.termsAccepted}
                             onCheckedChange={(checked) => {
@@ -503,6 +523,7 @@ export default function SignupForm() {
                                 if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
                             }}
                             size="sm"
+                            className="w-full flex"
                             label={
                                 <span className="leading-snug font-medium text-xs text-neutral-700">
                                     I accept the{" "}
@@ -514,12 +535,12 @@ export default function SignupForm() {
                             }
                         />
                         {errors.termsAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.termsAccepted}</p>
+                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
                         )}
                     </div>
 
                     {/* 2. Privacy Policy */}
-                    <div>
+                    <div className="w-full">
                         <NeoCheckbox
                             checked={formData.privacyPolicyAccepted}
                             onCheckedChange={(checked) => {
@@ -527,6 +548,7 @@ export default function SignupForm() {
                                 if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: undefined });
                             }}
                             size="sm"
+                            className="w-full flex"
                             label={
                                 <span className="leading-snug font-medium text-xs text-neutral-700">
                                     I acknowledge and agree to the{" "}
@@ -538,12 +560,12 @@ export default function SignupForm() {
                             }
                         />
                         {errors.privacyPolicyAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.privacyPolicyAccepted}</p>
+                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
                         )}
                     </div>
 
                     {/* 3. Age 18+ Confirmation */}
-                    <div>
+                    <div className="w-full">
                         <NeoCheckbox
                             checked={formData.isAgeConfirmed}
                             onCheckedChange={(checked) => {
@@ -551,6 +573,7 @@ export default function SignupForm() {
                                 if (errors.isAgeConfirmed) setErrors({ ...errors, isAgeConfirmed: undefined });
                             }}
                             size="sm"
+                            className="w-full flex"
                             label={
                                 <span className="leading-snug font-medium text-xs text-neutral-700">
                                     I confirm that I am at least <strong>18 years of age</strong> and legally eligible to create an individual Orbix account.
@@ -558,7 +581,7 @@ export default function SignupForm() {
                             }
                         />
                         {errors.isAgeConfirmed && (
-                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.isAgeConfirmed}</p>
+                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.isAgeConfirmed}</p>
                         )}
                     </div>
                 </div>

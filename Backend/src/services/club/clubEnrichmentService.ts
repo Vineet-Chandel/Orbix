@@ -7,6 +7,17 @@ import { query } from "../../database/client.js";
  */
 export async function enrichUserWithClubData(userObj: any, userId: string) {
     if (!userId || !userObj) return userObj;
+
+    // Strict Account Isolation: Personal accounts never carry club ownership/dashboard state.
+    if (userObj.accountType !== "club" && userObj.account_type !== "club") {
+        userObj.verifiedClub = null;
+        userObj.clubStatus = "none";
+        userObj.clubName = null;
+        userObj.clubId = null;
+        userObj.application = null;
+        return userObj;
+    }
+
     try {
         const verifiedClubRes = await query(
             `SELECT vc.id, vc.name, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername", vc.category, vc.college_name, vc.logo_url, vc.is_active 

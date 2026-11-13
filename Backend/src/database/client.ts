@@ -1,5 +1,9 @@
 
-import "dotenv/config";
+if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
+  try {
+    process.loadEnvFile();
+  } catch {}
+}
 import pg from "pg";
 import { performance } from "node:perf_hooks";
 
@@ -125,6 +129,9 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email_operation_id UUID NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS username_updated_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS roll_number VARCHAR(100) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(100) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS year_of_study VARCHAR(50) NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_confirmed_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT false;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ NULL;
@@ -668,6 +675,77 @@ export const testDatabaseConnection = async () => {
                 CREATE INDEX IF NOT EXISTS idx_club_certificates_event ON public.club_certificates(event_id);
                 CREATE INDEX IF NOT EXISTS idx_club_certificates_code ON public.club_certificates(credential_code);
 
+                -- Certificate Studio Ecosystem (Migration 037)
+                CREATE TABLE IF NOT EXISTS public.certificate_templates (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    is_system BOOLEAN NOT NULL DEFAULT false,
+                    name VARCHAR(255) NOT NULL,
+                    category VARCHAR(100) NOT NULL DEFAULT 'event',
+                    design JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    background_asset_url TEXT,
+                    background_fit VARCHAR(20) DEFAULT 'cover',
+                    orientation VARCHAR(20) NOT NULL DEFAULT 'landscape',
+                    page_width INT NOT NULL DEFAULT 842,
+                    page_height INT NOT NULL DEFAULT 595,
+                    version INT NOT NULL DEFAULT 1,
+                    status VARCHAR(30) NOT NULL DEFAULT 'published',
+                    thumbnail_url TEXT,
+                    created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_cert_templates_club ON public.certificate_templates(club_id, status);
+                CREATE INDEX IF NOT EXISTS idx_cert_templates_system ON public.certificate_templates(is_system, category);
+
+                CREATE TABLE IF NOT EXISTS public.certificate_batches (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE SET NULL,
+                    template_id UUID REFERENCES public.certificate_templates(id) ON DELETE SET NULL,
+                    template_version INT NOT NULL DEFAULT 1,
+                    title VARCHAR(255) NOT NULL,
+                    certificate_type VARCHAR(50) NOT NULL DEFAULT 'participation',
+                    issuance_source VARCHAR(50) NOT NULL DEFAULT 'event',
+                    total_recipients INT NOT NULL DEFAULT 0,
+                    successful_count INT NOT NULL DEFAULT 0,
+                    failed_count INT NOT NULL DEFAULT 0,
+                    status VARCHAR(30) NOT NULL DEFAULT 'completed',
+                    error_log JSONB DEFAULT '[]'::jsonb,
+                    batch_payload JSONB DEFAULT '{}'::jsonb,
+                    idempotency_key VARCHAR(128),
+                    issued_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_cert_batches_club ON public.certificate_batches(club_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_cert_batches_event ON public.certificate_batches(event_id);
+                CREATE INDEX IF NOT EXISTS idx_cert_batches_idempotency ON public.certificate_batches(idempotency_key) WHERE idempotency_key IS NOT NULL;
+
+                ALTER TABLE public.club_certificates
+                    ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES public.certificate_templates(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS template_version INT DEFAULT 1,
+                    ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES public.certificate_batches(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES public.club_teams(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS design_snapshot JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS recipient_snapshot JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS pdf_url TEXT,
+                    ADD COLUMN IF NOT EXISTS preview_url TEXT,
+                    ADD COLUMN IF NOT EXISTS sha256_hash VARCHAR(64),
+                    ADD COLUMN IF NOT EXISTS is_revoked BOOLEAN NOT NULL DEFAULT false,
+                    ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ,
+                    ADD COLUMN IF NOT EXISTS revocation_reason TEXT,
+                    ADD COLUMN IF NOT EXISTS revoked_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS verification_count INT NOT NULL DEFAULT 0,
+                    ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ;
+
+                -- Performance and Scalability composite indexes (Phase 19)
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_batch ON public.club_certificates(batch_id);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_team ON public.club_certificates(team_id);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_code_lower ON public.club_certificates(LOWER(credential_code));
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_user_issue ON public.club_certificates(user_id, issue_date DESC);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_club_issue ON public.club_certificates(club_id, issue_date DESC);
+
                 -- Legal Consent & Minor Protection (Migration 030)
                 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_version VARCHAR(32) DEFAULT 'v1.0';
                 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
@@ -719,6 +797,354 @@ export const testDatabaseConnection = async () => {
                     ALTER TABLE public.account_deletion_requests ADD COLUMN IF NOT EXISTS user_email_hash VARCHAR(64);
                     ALTER TABLE public.account_deletion_requests ADD COLUMN IF NOT EXISTS purge_log JSONB DEFAULT '{}'::jsonb;
                 END IF;
+
+                -- Ensure Dynamic Event Registration Form Builder schema exists
+                CREATE TABLE IF NOT EXISTS public.club_event_forms (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    header_image_url TEXT,
+                    header_image_public_id TEXT,
+                    theme_settings JSONB NOT NULL DEFAULT '{
+                        "accentColor": "#38BDF8",
+                        "fontFamily": "sans",
+                        "headerPosition": "center"
+                    }'::jsonb,
+                    settings JSONB NOT NULL DEFAULT '{
+                        "isOpen": true,
+                        "closedMessage": "Registrations are currently closed for this event.",
+                        "maxResponses": null,
+                        "limitOneResponse": true,
+                        "allowEditResponse": false,
+                        "requireLogin": true,
+                        "showProgressBar": true,
+                        "confirmationMessage": "Your registration has been submitted successfully!",
+                        "notifyOnRegistration": true
+                    }'::jsonb,
+                    structure JSONB NOT NULL DEFAULT '{"sections": []}'::jsonb,
+                    is_published BOOLEAN NOT NULL DEFAULT true,
+                    schema_version INT NOT NULL DEFAULT 1,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT unique_event_form UNIQUE (event_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_forms_event
+                    ON public.club_event_forms(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_forms_club
+                    ON public.club_event_forms(club_id);
+
+                ALTER TABLE public.club_event_forms
+                    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft',
+                    ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS current_draft_version_id UUID,
+                    ADD COLUMN IF NOT EXISTS published_version_id UUID,
+                    ADD COLUMN IF NOT EXISTS default_settings JSONB NOT NULL DEFAULT '{
+                        "isOpen": true,
+                        "closedMessage": "Registrations are currently closed for this event.",
+                        "maxResponses": null,
+                        "limitOneResponse": true,
+                        "allowEditResponse": false,
+                        "requireLogin": true,
+                        "showProgressBar": true,
+                        "confirmationMessage": "Your registration has been submitted successfully!",
+                        "notifyOnRegistration": true
+                    }'::jsonb,
+                    ADD COLUMN IF NOT EXISTS version_count INT NOT NULL DEFAULT 1,
+                    ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+
+                CREATE TABLE IF NOT EXISTS public.club_event_form_versions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    form_id UUID NOT NULL REFERENCES public.club_event_forms(id) ON DELETE CASCADE,
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    version_number INT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    header_image_url TEXT,
+                    header_image_public_id TEXT,
+                    structure JSONB NOT NULL DEFAULT '{"sections": []}'::jsonb,
+                    settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    theme_settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    change_summary TEXT,
+                    is_published BOOLEAN NOT NULL DEFAULT false,
+                    published_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    published_at TIMESTAMPTZ,
+                    CONSTRAINT unique_form_version UNIQUE (form_id, version_number)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_form_versions_form
+                    ON public.club_event_form_versions(form_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_form_versions_event
+                    ON public.club_event_form_versions(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_form_versions_published
+                    ON public.club_event_form_versions(form_id, is_published);
+
+                ALTER TABLE public.club_event_registrations
+                    ADD COLUMN IF NOT EXISTS form_id UUID REFERENCES public.club_event_forms(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS form_version_id UUID REFERENCES public.club_event_form_versions(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS form_response JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS answers JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS file_attachments JSONB DEFAULT '[]'::jsonb,
+                    ADD COLUMN IF NOT EXISTS idempotency_key TEXT,
+                    ADD COLUMN IF NOT EXISTS quiz_score NUMERIC(7,2) DEFAULT NULL,
+                    ADD COLUMN IF NOT EXISTS quiz_max_score NUMERIC(7,2) DEFAULT NULL,
+                    ADD COLUMN IF NOT EXISTS quiz_graded_answers JSONB DEFAULT NULL,
+                    ADD COLUMN IF NOT EXISTS quiz_grades_released BOOLEAN DEFAULT FALSE,
+                    ADD COLUMN IF NOT EXISTS last_updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_form
+                    ON public.club_event_registrations(form_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_version
+                    ON public.club_event_registrations(form_version_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_idempotency
+                    ON public.club_event_registrations(idempotency_key) WHERE idempotency_key IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_event_user
+                    ON public.club_event_registrations(event_id, user_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_form_media_assets (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    form_id UUID REFERENCES public.club_event_forms(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    uploader_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    public_id TEXT NOT NULL UNIQUE,
+                    secure_url TEXT NOT NULL,
+                    resource_type TEXT NOT NULL DEFAULT 'image',
+                    format TEXT,
+                    bytes INT,
+                    width INT,
+                    height INT,
+                    asset_purpose TEXT NOT NULL DEFAULT 'question_image',
+                    question_id TEXT,
+                    response_id UUID REFERENCES public.club_event_registrations(id) ON DELETE SET NULL,
+                    metadata JSONB DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_form_media_assets_form
+                    ON public.club_form_media_assets(form_id);
+                CREATE INDEX IF NOT EXISTS idx_club_form_media_assets_event
+                    ON public.club_form_media_assets(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_form_media_assets_response
+                    ON public.club_form_media_assets(response_id);
+
+                -- Student Response Drafts and Autosave Table
+                CREATE TABLE IF NOT EXISTS public.club_event_response_drafts (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    form_id UUID REFERENCES public.club_event_forms(id) ON DELETE CASCADE,
+                    form_version_id UUID REFERENCES public.club_event_form_versions(id) ON DELETE SET NULL,
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    file_attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    current_section_index INT NOT NULL DEFAULT 0,
+                    section_history JSONB NOT NULL DEFAULT '[0]'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT unique_user_event_draft UNIQUE (event_id, user_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_response_drafts_user_event
+                    ON public.club_event_response_drafts(user_id, event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_response_drafts_event_version
+                    ON public.club_event_response_drafts(event_id, form_version_id);
+
+                -- Migration 035: Pan India & Campus-Only Event Scope and Institution Snapshots
+                ALTER TABLE public.club_events 
+                    ADD COLUMN IF NOT EXISTS scope VARCHAR(20) NOT NULL DEFAULT 'CAMPUS';
+                CREATE INDEX IF NOT EXISTS idx_club_events_scope 
+                    ON public.club_events(scope);
+                CREATE INDEX IF NOT EXISTS idx_club_events_scope_status 
+                    ON public.club_events(scope, status);
+
+                ALTER TABLE public.club_event_registrations
+                    ADD COLUMN IF NOT EXISTS institution_id UUID REFERENCES public.institutions(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS institution_name VARCHAR(500),
+                    ADD COLUMN IF NOT EXISTS university_name VARCHAR(500),
+                    ADD COLUMN IF NOT EXISTS campus_name VARCHAR(255),
+                    ADD COLUMN IF NOT EXISTS institution_city VARCHAR(150),
+                    ADD COLUMN IF NOT EXISTS institution_state VARCHAR(100),
+                    ADD COLUMN IF NOT EXISTS institution_verification_status VARCHAR(50) DEFAULT 'unverified',
+                    ADD COLUMN IF NOT EXISTS is_unlisted_institution BOOLEAN DEFAULT false;
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_reg_institution 
+                    ON public.club_event_registrations(institution_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_reg_state 
+                    ON public.club_event_registrations(institution_state);
+
+                -- Migration 036: Club Credibility Engine Snapshots, Ledger & Appeals
+                CREATE TABLE IF NOT EXISTS public.club_credibility_snapshots (
+                    club_id UUID PRIMARY KEY REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    current_score NUMERIC(5,2) NOT NULL DEFAULT 50.00 CHECK (current_score >= 0 AND current_score <= 100),
+                    lifetime_score NUMERIC(5,2) NOT NULL DEFAULT 50.00 CHECK (lifetime_score >= 0 AND lifetime_score <= 100),
+                    recent_score NUMERIC(5,2) NOT NULL DEFAULT 50.00 CHECK (recent_score >= 0 AND recent_score <= 100),
+                    score_level VARCHAR(20) NOT NULL DEFAULT 'developing',
+                    confidence_level VARCHAR(20) NOT NULL DEFAULT 'low',
+                    is_provisional BOOLEAN NOT NULL DEFAULT true,
+                    total_verified_events INT NOT NULL DEFAULT 0,
+                    total_verified_incidents INT NOT NULL DEFAULT 0,
+                    successful_event_streak INT NOT NULL DEFAULT 0,
+                    total_evidence_weight NUMERIC(8,2) NOT NULL DEFAULT 0,
+                    dimensional_scores JSONB NOT NULL DEFAULT '{"eventDelivery":50,"scheduleReliability":50,"communication":50,"participantExperience":50,"cancellationReliability":50,"certificateIntegrity":50}'::jsonb,
+                    scoring_version VARCHAR(20) NOT NULL DEFAULT 'v1.0',
+                    last_calculated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS public.club_credibility_ledger (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE SET NULL,
+                    source_action VARCHAR(50) NOT NULL,
+                    reason_code VARCHAR(60) NOT NULL,
+                    outcome_quality NUMERIC(5,2) NOT NULL CHECK (outcome_quality >= 0 AND outcome_quality <= 100),
+                    evidence_weight NUMERIC(5,2) NOT NULL,
+                    score_before NUMERIC(5,2) NOT NULL,
+                    score_after NUMERIC(5,2) NOT NULL,
+                    score_delta NUMERIC(5,2) NOT NULL,
+                    evidence_confidence NUMERIC(3,2) NOT NULL DEFAULT 1.00,
+                    factor_breakdown JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    evidence_references JSONB DEFAULT '{}'::jsonb,
+                    status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+                    reversal_reference_id UUID REFERENCES public.club_credibility_ledger(id) ON DELETE SET NULL,
+                    actor_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    actor_type VARCHAR(20) NOT NULL DEFAULT 'club_admin',
+                    idempotency_key VARCHAR(128) UNIQUE,
+                    scoring_version VARCHAR(20) NOT NULL DEFAULT 'v1.0',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    finalised_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_credibility_ledger_club_created
+                    ON public.club_credibility_ledger(club_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_credibility_ledger_event
+                    ON public.club_credibility_ledger(event_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_credibility_appeals (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    ledger_id UUID NOT NULL REFERENCES public.club_credibility_ledger(id) ON DELETE CASCADE,
+                    reason TEXT NOT NULL,
+                    evidence_attachments JSONB DEFAULT '[]'::jsonb,
+                    appeal_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    reviewer_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    review_decision VARCHAR(20),
+                    reviewer_reason TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMPTZ
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_credibility_appeals_club
+                    ON public.club_credibility_appeals(club_id, created_at DESC);
+
+                -- Migration 037: Immutable Event Creation History for Cooldown Rate Limiting
+                CREATE TABLE IF NOT EXISTS public.club_event_creation_history (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    event_id UUID,
+                    scope VARCHAR(32) NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_club_creation_hist_club_scope 
+                    ON public.club_event_creation_history(club_id, scope, created_at DESC);
+
+                -- Migration 038: User Projects Showcase System & 4-Project Atomic Cap
+                CREATE TABLE IF NOT EXISTS public.user_projects (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    title VARCHAR(150) NOT NULL,
+                    slug VARCHAR(180) NOT NULL,
+                    tagline VARCHAR(255),
+                    description TEXT,
+                    category VARCHAR(50) DEFAULT 'Full-Stack',
+                    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+                    is_published BOOLEAN DEFAULT false,
+                    is_pinned BOOLEAN DEFAULT false,
+                    display_order INT NOT NULL DEFAULT 0,
+                    repo_url TEXT NULL,
+                    repo_name VARCHAR(150) NULL,
+                    repo_stars INT DEFAULT 0,
+                    repo_forks INT DEFAULT 0,
+                    repo_license VARCHAR(100) NULL,
+                    repo_language VARCHAR(60) NULL,
+                    repo_pushed_at TIMESTAMPTZ NULL,
+                    live_url TEXT NULL,
+                    demo_video_url TEXT NULL,
+                    documentation_url TEXT NULL,
+                    image_url TEXT NULL,
+                    gallery_images JSONB DEFAULT '[]'::jsonb,
+                    technologies JSONB DEFAULT '[]'::jsonb,
+                    features JSONB DEFAULT '[]'::jsonb,
+                    external_links JSONB DEFAULT '[]'::jsonb,
+                    architecture_notes TEXT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_user_projects_user_id ON public.user_projects(user_id);
+                CREATE INDEX IF NOT EXISTS idx_user_projects_user_order ON public.user_projects(user_id, display_order ASC, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_user_projects_published ON public.user_projects(user_id, is_published);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_user_projects_user_slug ON public.user_projects(user_id, slug);
+
+                -- Migration 039: Club Event Team Registrations, Member Rosters & Invitations
+                ALTER TABLE public.club_events 
+                    ADD COLUMN IF NOT EXISTS is_team_event BOOLEAN NOT NULL DEFAULT false,
+                    ADD COLUMN IF NOT EXISTS min_team_size INTEGER NOT NULL DEFAULT 1,
+                    ADD COLUMN IF NOT EXISTS max_team_size INTEGER NOT NULL DEFAULT 4;
+
+                CREATE TABLE IF NOT EXISTS public.club_event_teams (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    name VARCHAR(100) NOT NULL,
+                    code VARCHAR(20) NOT NULL UNIQUE,
+                    leader_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    status VARCHAR(30) NOT NULL DEFAULT 'forming',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_club_event_teams_event_name_lower 
+                    ON public.club_event_teams (event_id, LOWER(name));
+                CREATE INDEX IF NOT EXISTS idx_club_event_teams_event_leader 
+                    ON public.club_event_teams (event_id, leader_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_event_team_members (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    team_id UUID NOT NULL REFERENCES public.club_event_teams(id) ON DELETE CASCADE,
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    role VARCHAR(20) NOT NULL DEFAULT 'member',
+                    joined_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_club_event_team_members_event_user 
+                    ON public.club_event_team_members (event_id, user_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_team_members_team 
+                    ON public.club_event_team_members (team_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_event_team_invitations (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    team_id UUID NOT NULL REFERENCES public.club_event_teams(id) ON DELETE CASCADE,
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    inviter_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    invitee_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    responded_at TIMESTAMPTZ
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_team_invites_invitee 
+                    ON public.club_event_team_invitations (invitee_user_id, status);
+                CREATE INDEX IF NOT EXISTS idx_club_event_team_invites_team 
+                    ON public.club_event_team_invitations (team_id, status);
+
+                ALTER TABLE public.club_event_registrations 
+                    ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES public.club_event_teams(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS team_role VARCHAR(20) DEFAULT NULL;
             END $$;
         `);
         

@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { ArrowRight, BookOpen, RefreshCw, Layers, ShieldCheck } from "lucide-react";
+import { ArrowRight, BookOpen, RefreshCw, Layers, ShieldCheck, Sparkles, X } from "lucide-react";
 import { OrbixLogo } from "../../../components/OrbixLogo";
 
 export interface PlatformItem {
@@ -15,7 +14,7 @@ export interface PlatformItem {
     renderIcon: (className?: string) => React.ReactNode;
 }
 
-// Complete set of all 19 platforms connectable to Orbix
+// Complete set of all 20 platforms connectable to Orbix
 export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
     // -------------------------------------------------------------
     // INNER ORBIT RING (6 Core Portals - 60° apart, alternating AI & Competitive)
@@ -24,7 +23,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "codexa",
         name: "Codexa",
         category: "AI Powered Project Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 270, // Top center (12 o'clock)
         description: "AI-driven project tracking, sprints, team velocity & automated code intelligence.",
@@ -55,7 +54,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "evolexa",
         name: "Evolexa",
         category: "AI Powered Career Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 30, // Bottom right (4 o'clock)
         description: "AI-powered career pathways, skill graphs, interview readiness & job matching.",
@@ -86,7 +85,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "flowexa",
         name: "Flowexa",
         category: "AI Powered Automation System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 150, // Bottom left (8 o'clock)
         description: "Automated developer workflows, agent pipelines & cross-tool orchestration.",
@@ -113,7 +112,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
     },
 
     // -------------------------------------------------------------
-    // OUTER ORBIT RING (13 Platforms - Evenly Spaced around 360°)
+    // OUTER ORBIT RING (14 Platforms - Evenly Spaced around 360°)
     // -------------------------------------------------------------
     {
         id: "github",
@@ -135,7 +134,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Advanced Algorithms",
         brandColor: "#0284C7",
         ring: "outer",
-        angleDeg: 297.7, // Upper right
+        angleDeg: 295.7, // Upper right
         description: "Connect acceleration benchmarks and high-throughput algorithmic scores.",
         renderIcon: (className = "w-8 h-8") => (
             <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 128 128">
@@ -152,7 +151,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Engineering Publications",
         brandColor: "#12100E",
         ring: "outer",
-        angleDeg: 325.4,
+        angleDeg: 321.4,
         description: "Link engineering architecture articles, deep-dives and technical stories.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -170,7 +169,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Tech Newsletters",
         brandColor: "#FF6719",
         ring: "outer",
-        angleDeg: 353.1, // Middle right
+        angleDeg: 347.1, // Middle right
         description: "Publish your developer newsletters and systems engineering insights.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -187,7 +186,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "DSA & Core CS",
         brandColor: "#2F8D46",
         ring: "outer",
-        angleDeg: 20.8,
+        angleDeg: 12.9,
         description: "Aggregate practice score, solved questions and institution rank.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="#2F8D46">
@@ -201,7 +200,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Skill Badges & Certifications",
         brandColor: "#00EA64",
         ring: "outer",
-        angleDeg: 48.5,
+        angleDeg: 38.6,
         description: "Showcase verified badges, gold certificates and domain proficiencies.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="#00EA64">
@@ -215,7 +214,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Japanese CP Contests",
         brandColor: "#222222",
         ring: "outer",
-        angleDeg: 76.2, // Near bottom right
+        angleDeg: 64.3, // Near bottom right
         description: "Sync Dan/Kyu ratings, ABC/ARC contest performance and colors.",
         renderIcon: (className = "w-8 h-8") => (
 
@@ -231,7 +230,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Coding Ninjas Studio",
         brandColor: "#FF5722",
         ring: "outer",
-        angleDeg: 103.8, // Near bottom left
+        angleDeg: 90.0, // Near bottom left
         description: "Sync interview tracks, ninja points and practice challenges.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="#DD6620">
@@ -245,7 +244,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "SRM & Single Round Matches",
         brandColor: "#29A7DF",
         ring: "outer",
-        angleDeg: 131.5,
+        angleDeg: 115.7,
         description: "Display vintage SRM ratings, algorithm division stats and achievements.",
         renderIcon: (className = "w-8 h-8") => (
 
@@ -261,7 +260,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Tech Interview Prep",
         brandColor: "#0D8BD9",
         ring: "outer",
-        angleDeg: 159.2, // Mid left
+        angleDeg: 141.4, // Mid left
         description: "Sync interview streak, topic strengths and company-tagged questions.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} xmlns="http://www.w3.org/2000/svg" width="58" height="35" viewBox="0 0 58 35" fill="none">
@@ -304,7 +303,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Hackathons & Challenges",
         brandColor: "#2C3454",
         ring: "outer",
-        angleDeg: 186.9,
+        angleDeg: 167.1,
         description: "Connect competitive hackathons, company hiring challenges and ratings.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
@@ -318,7 +317,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Problem Set Archive",
         brandColor: "#214478",
         ring: "outer",
-        angleDeg: 214.6, // Upper left
+        angleDeg: 192.9, // Upper left
         description: "Track classical algorithm problem sets and pure competitive tasks.",
         renderIcon: () => (
             <span className="font-black text-[#214478] tracking-wider text-sm sm:text-base font-mono select-none">
@@ -332,7 +331,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Sphere Online Judge",
         brandColor: "#1B6AC9",
         ring: "outer",
-        angleDeg: 242.3, // Top left
+        angleDeg: 218.6, // Top left
         description: "Benchmark classical problem sets across 60+ programming languages.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -347,6 +346,24 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
             </svg>
         ),
     },
+    {
+        id: "awsbuildercenter",
+        name: "AWS Builder Center",
+        category: "Cloud & Developer Community",
+        brandColor: "#FF9900",
+        ring: "outer",
+        angleDeg: 244.3,
+        description: "Connect cloud builder projects, architecture benchmarks and developer community badges.",
+        renderIcon: (className = "w-8 h-8") => (
+            <img
+                src="https://play-lh.googleusercontent.com/2MTOhjyOUjrKQdwbBEuaYhTxruV3U7gL3Eu5UV-D08e2FF8seT_yhKvdJOc__9ctGv46Uql6V3XUUKLJ7ITx=w480-h960-rw"
+                alt="AWS Builder Center"
+                className={`${className} object-contain rounded-md`}
+                loading="lazy"
+                decoding="async"
+            />
+        ),
+    },
 ];
 
 export interface PlatformShowcaseProps {
@@ -357,6 +374,198 @@ export interface PlatformShowcaseProps {
     onPlatformClick?: (platformId: string) => void;
 }
 
+interface CanvasConfig {
+    canvasSize: number;
+    outerRadius: number;
+    innerRadius: number;
+    centerSize: number;
+    centerLogoSize: number;
+    outerBadgeSize: number;
+    innerBadgeSize: number;
+    outerIconClass: string;
+    innerIconClass: string;
+    badgeRadius: string;
+    trackStrokeWidth: number;
+    dashStrokeWidth: number;
+    dashArray: string;
+    trackOpacity: number;
+    dashOpacity: number;
+    isMobile: boolean;
+}
+
+const getCanvasConfig = (width: number): CanvasConfig => {
+    if (width < 380) {
+        // Compact mobile screens (iPhone SE, Galaxy A, etc.)
+        const canvasSize = Math.max(296, Math.min(340, width - 20));
+        return {
+            canvasSize,
+            outerRadius: 132,
+            innerRadius: 76,
+            centerSize: 66,
+            centerLogoSize: 34,
+            outerBadgeSize: 36,
+            innerBadgeSize: 40,
+            outerIconClass: "w-5 h-5 flex-shrink-0",
+            innerIconClass: "w-5 h-5 flex-shrink-0",
+            badgeRadius: "12px",
+            trackStrokeWidth: 1.6,
+            dashStrokeWidth: 2.4,
+            dashArray: "5 7",
+            trackOpacity: 0.22,
+            dashOpacity: 0.85,
+            isMobile: true,
+        };
+    }
+    if (width < 480) {
+        // Standard mobile (iPhone 12/13/14/15/16, Galaxy S, Pixel)
+        const canvasSize = Math.min(390, width - 24);
+        return {
+            canvasSize,
+            outerRadius: 154,
+            innerRadius: 88,
+            centerSize: 76,
+            centerLogoSize: 38,
+            outerBadgeSize: 40,
+            innerBadgeSize: 44,
+            outerIconClass: "w-5 h-5 flex-shrink-0",
+            innerIconClass: "w-6 h-6 flex-shrink-0",
+            badgeRadius: "14px",
+            trackStrokeWidth: 1.8,
+            dashStrokeWidth: 2.5,
+            dashArray: "5 7",
+            trackOpacity: 0.22,
+            dashOpacity: 0.85,
+            isMobile: true,
+        };
+    }
+    if (width < 640) {
+        // Large phones & phablets
+        const canvasSize = Math.min(480, width - 32);
+        return {
+            canvasSize,
+            outerRadius: 195,
+            innerRadius: 110,
+            centerSize: 88,
+            centerLogoSize: 44,
+            outerBadgeSize: 46,
+            innerBadgeSize: 50,
+            outerIconClass: "w-6 h-6 flex-shrink-0",
+            innerIconClass: "w-6 h-6 flex-shrink-0",
+            badgeRadius: "16px",
+            trackStrokeWidth: 1.8,
+            dashStrokeWidth: 2.5,
+            dashArray: "6 8",
+            trackOpacity: 0.20,
+            dashOpacity: 0.80,
+            isMobile: true,
+        };
+    }
+    if (width < 768) {
+        // Small tablet
+        const canvasSize = Math.min(580, width - 40);
+        return {
+            canvasSize,
+            outerRadius: 235,
+            innerRadius: 130,
+            centerSize: 100,
+            centerLogoSize: 52,
+            outerBadgeSize: 50,
+            innerBadgeSize: 54,
+            outerIconClass: "w-6 h-6 flex-shrink-0",
+            innerIconClass: "w-7 h-7 flex-shrink-0",
+            badgeRadius: "18px",
+            trackStrokeWidth: 2.0,
+            dashStrokeWidth: 2.6,
+            dashArray: "6 8",
+            trackOpacity: 0.18,
+            dashOpacity: 0.75,
+            isMobile: false,
+        };
+    }
+    if (width < 1024) {
+        // Medium tablet / iPad
+        const canvasSize = Math.min(740, width - 48);
+        return {
+            canvasSize,
+            outerRadius: 300,
+            innerRadius: 165,
+            centerSize: 116,
+            centerLogoSize: 62,
+            outerBadgeSize: 58,
+            innerBadgeSize: 62,
+            outerIconClass: "w-7 h-7 flex-shrink-0",
+            innerIconClass: "w-8 h-8 flex-shrink-0",
+            badgeRadius: "20px",
+            trackStrokeWidth: 2.0,
+            dashStrokeWidth: 2.6,
+            dashArray: "6 8",
+            trackOpacity: 0.18,
+            dashOpacity: 0.70,
+            isMobile: false,
+        };
+    }
+    if (width < 1280) {
+        // Laptop / small desktop
+        const canvasSize = Math.min(880, width - 64);
+        return {
+            canvasSize,
+            outerRadius: 360,
+            innerRadius: 195,
+            centerSize: 130,
+            centerLogoSize: 70,
+            outerBadgeSize: 64,
+            innerBadgeSize: 68,
+            outerIconClass: "w-8 h-8 flex-shrink-0",
+            innerIconClass: "w-8 h-8 flex-shrink-0",
+            badgeRadius: "22px",
+            trackStrokeWidth: 2.0,
+            dashStrokeWidth: 2.6,
+            dashArray: "6 8",
+            trackOpacity: 0.18,
+            dashOpacity: 0.70,
+            isMobile: false,
+        };
+    }
+    // Large Desktop (>= 1280px)
+    return {
+        canvasSize: 980,
+        outerRadius: 405,
+        innerRadius: 220,
+        centerSize: 144,
+        centerLogoSize: 78,
+        outerBadgeSize: 70,
+        innerBadgeSize: 74,
+        outerIconClass: "w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0",
+        innerIconClass: "w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0",
+        badgeRadius: "24px",
+        trackStrokeWidth: 2.2,
+        dashStrokeWidth: 2.8,
+        dashArray: "6 8",
+        trackOpacity: 0.18,
+        dashOpacity: 0.70,
+        isMobile: false,
+    };
+};
+
+/**
+ * Ensures laser tracking lines and badge active outlines are always clearly visible
+ * on the light background (#FAF6EE). Guards against white, near-white, or empty colors.
+ */
+const getPlatformLaserColor = (brandColor: string | undefined): string => {
+    if (!brandColor) return "#000000";
+    const normalized = brandColor.trim().toLowerCase();
+    if (
+        normalized === "#ffffff" ||
+        normalized === "#fff" ||
+        normalized === "white" ||
+        normalized === "#faf6ee" ||
+        normalized === "transparent"
+    ) {
+        return "#000000";
+    }
+    return brandColor;
+};
+
 export const Platform: React.FC<PlatformShowcaseProps> = ({
     title = "All your platforms. Zero tab-switching.",
     subtitle = "Connect your handles once. We sync solved problems, contest ratings, badges and commits every few hours, automatically. New platforms keep joining.",
@@ -365,113 +574,201 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
     onPlatformClick,
 }) => {
     const sectionRef = useRef<HTMLElement>(null);
+    const canvasRef = useRef<HTMLDivElement>(null);
+
+    // Active platform tracking (hover for desktop, tap/click for mobile & desktop)
     const [hoveredPlatform, setHoveredPlatform] = useState<PlatformItem | null>(null);
+    const [selectedPlatform, setSelectedPlatform] = useState<PlatformItem | null>(null);
     const [isCenterHovered, setIsCenterHovered] = useState(false);
 
-    // Responsive Canvas Dimensions (Expansive 1040px diameter)
-    const CANVAS_SIZE = 1040;
-    const INNER_RADIUS = 225;
-    const OUTER_RADIUS = 415;
+    // Effective active platform
+    const activePlatform = hoveredPlatform || selectedPlatform;
 
-    // Viewport-aware responsive scaling
+    // Viewport-aware responsive configuration
     const [viewportWidth, setViewportWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 1440
     );
 
     useEffect(() => {
-        const handleResize = () => setViewportWidth(window.innerWidth);
+        let resizeTimer: NodeJS.Timeout;
+        const handleResize = () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                setViewportWidth(window.innerWidth);
+            }, 60);
+        };
         window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
+        return () => {
+            window.removeEventListener("resize", handleResize);
+            clearTimeout(resizeTimer);
+        };
     }, []);
 
-    const scale = useMemo(() => {
-        if (viewportWidth >= 1180) return 1.0;
-        if (viewportWidth >= 992) return Math.min(1.0, (viewportWidth - 48) / CANVAS_SIZE);
-        if (viewportWidth >= 768) return Math.min(0.85, (viewportWidth - 32) / CANVAS_SIZE);
-        return Math.max(0.35, (viewportWidth - 24) / CANVAS_SIZE);
-    }, [viewportWidth]);
+    const canvasConfig = useMemo(() => getCanvasConfig(viewportWidth), [viewportWidth]);
 
-    // =========================================================================
-    // SCROLL-VELOCITY DRIVEN ROTATION ENGINE
-    // - Outer and Inner orbits rotate in exact OPPOSITE directions.
-    // - Scrolling gracefully rotates the celestial rings at a calm, controlled speed.
-    // - Scrolling backwards unwinds and traces the platform path back.
-    // =========================================================================
-    const scrollRotation = useMotionValue(0);
-
-    // Smooth physics spring simulating physical momentum and fluid damping
-    const smoothRotation = useSpring(scrollRotation, {
-        stiffness: 80,
-        damping: 28,
-        mass: 0.6,
-    });
-
-    // Outer Orbit rotates Clockwise at a much slower, graceful celestial speed (+smoothRotation * 0.38)
-    const outerRotate = useTransform(smoothRotation, (v) => v * 0.58);
-
-    // Inner Orbit rotates Counter-Clockwise in OPPOSITE direction (-smoothRotation * 0.85)
-    const innerRotate = useTransform(smoothRotation, (v) => -v * 0.85);
-
-    // Counter-rotations to ensure every badge icon always remains perfectly upright
-    const outerCounterRotate = useTransform(outerRotate, (v) => -v);
-    const innerCounterRotate = useTransform(innerRotate, (v) => -v);
-
-    // Track window scroll
-    const { scrollY } = useScroll();
-
-    useEffect(() => {
-        let lastY = window.scrollY;
-        const unsubscribe = scrollY.on("change", (currentY) => {
-            const delta = currentY - lastY;
-            lastY = currentY;
-            // 1px scroll = 0.08 degrees of rotation (calm, slow, and cinematic speed)
-            scrollRotation.set(scrollRotation.get() + delta * 0.08);
-        });
-        return () => unsubscribe();
-    }, [scrollY, scrollRotation]);
-
-    // Handle mouse wheel directly over the showcase container
-    const handleWheel = (e: React.WheelEvent) => {
-        // Direct trackpad/wheel scrub gives smooth, tactile rotation and reverse tracing
-        scrollRotation.set(scrollRotation.get() + e.deltaY * 0.075);
-    };
-
-    // Platform Subsets for Dual Orbit Rings
+    // Platform subsets for Dual Orbit Rings
     const innerPlatforms = useMemo(() => CONNECTABLE_PLATFORMS.filter((p) => p.ring === "inner"), []);
     const outerPlatforms = useMemo(() => CONNECTABLE_PLATFORMS.filter((p) => p.ring === "outer"), []);
 
-    // Exact coordinate of hovered platform in its respective orbit layer
-    const hoveredCoord = useMemo(() => {
-        if (!hoveredPlatform) return null;
-        const radius = hoveredPlatform.ring === "inner" ? INNER_RADIUS : OUTER_RADIUS;
-        const rad = (hoveredPlatform.angleDeg * Math.PI) / 180;
-        return {
-            x: Math.round(Math.cos(rad) * radius),
-            y: Math.round(Math.sin(rad) * radius),
+    // =========================================================================
+    // HIGH-PERFORMANCE GPU-COMPOSITED ROTATION ENGINE (60 / 120 FPS on Mobile)
+    // - Direct CSS Custom Properties (`--outer-rot`, `--inner-rot`) updated in RAF
+    // - 0 React re-renders during motion
+    // - 0 Framer Motion JS matrix transforms for 20 elements
+    // - Ambient cosmic drift + physics momentum + touch swipe + passive scroll
+    // =========================================================================
+    const outerAngleRef = useRef(0);
+    const innerAngleRef = useRef(0);
+    const momentumRef = useRef(0);
+    const isDraggingRef = useRef(false);
+    const lastTouchAngleRef = useRef(0);
+    const touchStartPosRef = useRef({ x: 0, y: 0, time: 0 });
+    const hasDraggedRef = useRef(false);
+
+    useEffect(() => {
+        let animId: number;
+        const canvasEl = canvasRef.current;
+        if (!canvasEl) return;
+
+        // Initialize custom properties
+        canvasEl.style.setProperty("--outer-rot", `${outerAngleRef.current}deg`);
+        canvasEl.style.setProperty("--outer-counter-rot", `${-outerAngleRef.current}deg`);
+        canvasEl.style.setProperty("--inner-rot", `${innerAngleRef.current}deg`);
+        canvasEl.style.setProperty("--inner-counter-rot", `${-innerAngleRef.current}deg`);
+
+        const update = () => {
+            // Calm ambient celestial drift + momentum damping when not actively dragging
+            if (!isDraggingRef.current) {
+                // Outer ring drifts clockwise, inner ring counter-clockwise in opposite direction
+                outerAngleRef.current += 0.032 + momentumRef.current * 0.55;
+                innerAngleRef.current -= 0.048 + momentumRef.current * 0.82;
+                momentumRef.current *= 0.93;
+
+                if (Math.abs(momentumRef.current) < 0.001) {
+                    momentumRef.current = 0;
+                }
+            }
+
+            // Direct GPU-composited CSS variable updates — Zero React re-renders
+            canvasEl.style.setProperty("--outer-rot", `${outerAngleRef.current}deg`);
+            canvasEl.style.setProperty("--outer-counter-rot", `${-outerAngleRef.current}deg`);
+            canvasEl.style.setProperty("--inner-rot", `${innerAngleRef.current}deg`);
+            canvasEl.style.setProperty("--inner-counter-rot", `${-innerAngleRef.current}deg`);
+
+            animId = requestAnimationFrame(update);
         };
-    }, [hoveredPlatform]);
+
+        animId = requestAnimationFrame(update);
+        return () => cancelAnimationFrame(animId);
+    }, []);
+
+    // Passive window scroll listener for fluid scroll momentum
+    useEffect(() => {
+        let lastScrollY = window.scrollY;
+
+        const handleScroll = () => {
+            const currentY = window.scrollY;
+            const delta = currentY - lastScrollY;
+            lastScrollY = currentY;
+
+            // Apply gentle, clamped rotational momentum
+            const clampedDelta = Math.max(-35, Math.min(35, delta));
+            momentumRef.current += clampedDelta * 0.04;
+        };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    // Mouse wheel scrub over canvas
+    const handleWheel = (e: React.WheelEvent) => {
+        const delta = e.deltaY || e.deltaX;
+        const clampedDelta = Math.max(-45, Math.min(45, delta));
+        momentumRef.current += clampedDelta * 0.038;
+    };
+
+    // Mobile touch gestures: Tangential swipe & drag to spin the celestial orbit
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const canvasEl = canvasRef.current;
+        if (!canvasEl) return;
+
+        const rect = canvasEl.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const currentAngle = Math.atan2(touch.clientY - centerY, touch.clientX - centerX) * (180 / Math.PI);
+
+        lastTouchAngleRef.current = currentAngle;
+        touchStartPosRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+        hasDraggedRef.current = false;
+        isDraggingRef.current = true;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDraggingRef.current || e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const canvasEl = canvasRef.current;
+        if (!canvasEl) return;
+
+        const distMoved = Math.hypot(
+            touch.clientX - touchStartPosRef.current.x,
+            touch.clientY - touchStartPosRef.current.y
+        );
+        if (distMoved > 8) {
+            hasDraggedRef.current = true;
+        }
+
+        const rect = canvasEl.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const currentAngle = Math.atan2(touch.clientY - centerY, touch.clientX - centerX) * (180 / Math.PI);
+
+        let delta = currentAngle - lastTouchAngleRef.current;
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
+
+        lastTouchAngleRef.current = currentAngle;
+        outerAngleRef.current += delta;
+        innerAngleRef.current -= delta * 1.35;
+        momentumRef.current = delta * 0.72;
+    };
+
+    const handleTouchEnd = () => {
+        isDraggingRef.current = false;
+    };
+
+    // Handle platform badge tap or click
+    const handlePlatformSelect = useCallback(
+        (platform: PlatformItem) => {
+            if (hasDraggedRef.current) return; // Prevent selection if user was swiping the orbit
+            setSelectedPlatform((prev) => (prev?.id === platform.id ? null : platform));
+            onPlatformClick?.(platform.id);
+        },
+        [onPlatformClick]
+    );
 
     return (
         <section
             ref={sectionRef}
             onWheel={handleWheel}
-            className={`relative w-full py-20 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] text-neutral-900 overflow-hidden select-none flex flex-col items-center justify-center ${className}`}
+            className={`relative w-full py-16 sm:py-20 px-3 sm:px-6 lg:px-8 bg-[#FAF6EE] text-neutral-900 overflow-hidden select-none flex flex-col items-center justify-center ${className}`}
         >
             {/* Warm, eye-friendly dot grid matching Orbix platform canvas */}
             <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
             {/* Section Header: Inspired by Leaderboard Header Layout & Context */}
             {showHeading && (
-                <div className="w-full max-w-7xl mx-auto mb-14 sm:mb-20 relative z-10">
+                <div className="w-full max-w-7xl mx-auto mb-10 sm:mb-16 relative z-10">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
                         {/* Left Column: Headline, Subtitle & Dual Redirections */}
-                        <div className="lg:col-span-6 space-y-6">
-                            <h2 className="text-4xl sm:text-6xl md:text-7xl font-black text-black tracking-tight leading-[1.08]">
+                        <div className="lg:col-span-6 space-y-5 sm:space-y-6">
+                            <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-black tracking-tight leading-[1.08]">
                                 {title.includes("Zero tab-switching") || title.includes("every platform") ? (
                                     <>
                                         All your platforms.
                                         <br />
-                                        <span className="inline-block mt-3 bg-[#FFE566] text-black px-5 sm:px-8 py-1.5 sm:py-2.5 rounded-2xl font-black -rotate-1 border-2 border-black shadow-[4px_4px_0px_#000]">
+                                        <span className="inline-block mt-2 sm:mt-3 bg-[#FFE566] text-black px-4 sm:px-8 py-1 sm:py-2.5 rounded-2xl font-black -rotate-1 border-2 border-black shadow-[4px_4px_0px_#000]">
                                             Zero tab-switching.
                                         </span>
                                     </>
@@ -480,21 +777,21 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                 )}
                             </h2>
 
-                            <p className="text-neutral-700 font-medium text-base sm:text-lg md:text-xl max-w-xl leading-relaxed">
+                            <p className="text-neutral-700 font-medium text-sm sm:text-lg md:text-xl max-w-xl leading-relaxed">
                                 {subtitle}
                             </p>
 
                             {/* Dual Redirections: 1. Connect Platforms & 2. Platform Registry Docs */}
-                            <div className="flex flex-wrap items-center gap-4 pt-2">
+                            <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1 sm:pt-2">
                                 <Link
                                     to="/auth/profiles"
-                                    className="inline-flex items-center gap-2 text-base sm:text-lg font-black text-black hover:text-neutral-800 transition-colors group cursor-pointer"
+                                    className="inline-flex items-center gap-2 text-sm sm:text-lg font-black text-black hover:text-neutral-800 transition-colors group cursor-pointer"
                                     title="Connect your coding handles"
                                 >
                                     <span className="underline decoration-4 underline-offset-4 decoration-[#FFE566] group-hover:decoration-black">
                                         Connect your platforms
                                     </span>
-                                    <ArrowRight className="w-5 h-5 text-black group-hover:translate-x-1.5 transition-transform stroke-[2.5]" />
+                                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-black group-hover:translate-x-1.5 transition-transform stroke-[2.5]" />
                                 </Link>
 
                                 <span className="text-black/30 hidden sm:inline">•</span>
@@ -511,15 +808,15 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                         </div>
 
                         {/* Right Column: 3 Feature Cards matching Leaderboard style */}
-                        <div className="lg:col-span-6 space-y-4">
+                        <div className="lg:col-span-6 space-y-3 sm:space-y-4">
                             {/* Card 1: Automated Sync */}
-                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] transition-all">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
-                                        <RefreshCw className="w-6 h-6 text-black stroke-[2.5]" />
+                            <div className="p-3.5 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] hover:shadow-[5px_5px_0px_#000] transition-all">
+                                <div className="flex items-start gap-3 sm:gap-4">
+                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6 text-black stroke-[2.5]" />
                                     </div>
-                                    <div className="space-y-1 min-w-0">
-                                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
+                                    <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                                        <h3 className="text-sm sm:text-lg font-black text-black tracking-tight">
                                             Automated Background Sync
                                         </h3>
                                         <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
@@ -530,13 +827,13 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                             </div>
 
                             {/* Card 2: 16 Genuine Platforms */}
-                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] transition-all">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
-                                        <Layers className="w-6 h-6 text-black stroke-[2.5]" />
+                            <div className="p-3.5 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] hover:shadow-[5px_5px_0px_#000] transition-all">
+                                <div className="flex items-start gap-3 sm:gap-4">
+                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <Layers className="w-5 h-5 sm:w-6 sm:h-6 text-black stroke-[2.5]" />
                                     </div>
-                                    <div className="space-y-1 min-w-0">
-                                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
+                                    <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                                        <h3 className="text-sm sm:text-lg font-black text-black tracking-tight">
                                             16 Genuine Platforms
                                         </h3>
                                         <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
@@ -547,13 +844,13 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                             </div>
 
                             {/* Card 3: Zero Password Sharing */}
-                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] transition-all">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
-                                        <ShieldCheck className="w-6 h-6 text-black stroke-[2.5]" />
+                            <div className="p-3.5 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] hover:shadow-[5px_5px_0px_#000] transition-all">
+                                <div className="flex items-start gap-3 sm:gap-4">
+                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-black stroke-[2.5]" />
                                     </div>
-                                    <div className="space-y-1 min-w-0">
-                                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
+                                    <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                                        <h3 className="text-sm sm:text-lg font-black text-black tracking-tight">
                                             Zero Password Sharing
                                         </h3>
                                         <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
@@ -567,84 +864,137 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                 </div>
             )}
 
-            {/* Expansive Orbit Canvas Container with Viewport Scaling */}
-            <div
-                className="relative flex items-center justify-center transition-all duration-300"
-                style={{
-                    width: CANVAS_SIZE * scale,
-                    height: CANVAS_SIZE * scale,
-                }}
-            >
-                {/* Scaled Core Canvas Frame */}
+            {/* =========================================================================
+                RESPONSIVE CELESTIAL ORBIT CANVAS
+                - Zero-lag 60/120fps GPU compositing via direct CSS variables
+                - Crisp, prominent dashed orbits with vectorEffect="non-scaling-stroke"
+                - Touch-enabled circular drag on mobile + mouse wheel on desktop
+                - Zero horizontal overflow on any screen size
+            ========================================================================= */}
+            <div className="w-full flex items-center justify-center overflow-visible my-2 sm:my-6">
                 <div
-                    className="relative flex items-center justify-center"
+                    ref={canvasRef}
+                    className="relative flex items-center justify-center select-none"
                     style={{
-                        width: CANVAS_SIZE,
-                        height: CANVAS_SIZE,
-                        transform: `scale(${scale})`,
-                        transformOrigin: "center center",
+                        width: canvasConfig.canvasSize,
+                        height: canvasConfig.canvasSize,
+                        touchAction: "pan-y",
                     }}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchEnd}
                 >
-                    {/* =========================================================================
-                        LAYER 1: OUTER ORBIT LAYER (Rotates Clockwise via Scroll)
-                    ========================================================================= */}
-                    <motion.div
-                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                        style={{ rotate: outerRotate }}
+                    {/* -----------------------------------------------------------------
+                        STATIC SVG GUIDE TRACKS & HIGH-CONTRAST DASHED ORBITS
+                        Crisply visible on all mobile, OLED, and retina displays
+                    ----------------------------------------------------------------- */}
+                    <svg
+                        className="absolute inset-0 w-full h-full pointer-events-none"
+                        viewBox={`-${canvasConfig.canvasSize / 2} -${canvasConfig.canvasSize / 2} ${canvasConfig.canvasSize} ${canvasConfig.canvasSize}`}
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
                     >
-                        {/* SVG Outer Dashed Ring & Synchronized Outer Tracking Laser */}
-                        <svg
-                            className="absolute inset-0 w-full h-full pointer-events-none"
-                            viewBox={`-${CANVAS_SIZE / 2} -${CANVAS_SIZE / 2} ${CANVAS_SIZE} ${CANVAS_SIZE}`}
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            {/* Outer Orbit Guide Track & Visible Dashed Ring */}
-                            <circle
-                                cx="0"
-                                cy="0"
-                                r={OUTER_RADIUS}
-                                stroke="rgba(0, 0, 0, 0.12)"
-                                strokeWidth="1.2"
-                            />
-                            <circle
-                                cx="0"
-                                cy="0"
-                                r={OUTER_RADIUS}
-                                stroke="rgba(0, 0, 0, 0.3)"
-                                strokeWidth="1.6"
-                                strokeDasharray="6 8"
-                            />
+                        {/* Outer Orbit Guide Track (Solid subtle guide) */}
+                        <circle
+                            cx="0"
+                            cy="0"
+                            r={canvasConfig.outerRadius}
+                            stroke="#000000"
+                            strokeOpacity={canvasConfig.trackOpacity}
+                            strokeWidth={canvasConfig.trackStrokeWidth}
+                            vectorEffect="non-scaling-stroke"
+                        />
 
-                            {/* Crisp Pinpoint Tracking Laser for Outer Orbit Platforms */}
-                            {hoveredPlatform && hoveredPlatform.ring === "outer" && hoveredCoord && (
-                                <g>
-                                    <line
-                                        x1="0"
-                                        y1="0"
-                                        x2={hoveredCoord.x}
-                                        y2={hoveredCoord.y}
-                                        stroke={hoveredPlatform.brandColor || "#4f46e5"}
-                                        strokeWidth="2"
-                                        strokeDasharray="5 4"
-                                        strokeLinecap="round"
-                                    />
-                                    <circle
-                                        cx={hoveredCoord.x}
-                                        cy={hoveredCoord.y}
-                                        r="5"
-                                        fill={hoveredPlatform.brandColor || "#4f46e5"}
-                                    />
-                                </g>
-                            )}
-                        </svg>
+                        {/* Outer Orbit Prominent Dashed Track (High-contrast, razor sharp!) */}
+                        <circle
+                            cx="0"
+                            cy="0"
+                            r={canvasConfig.outerRadius}
+                            stroke="#000000"
+                            strokeOpacity={canvasConfig.dashOpacity}
+                            strokeWidth={canvasConfig.dashStrokeWidth}
+                            strokeDasharray={canvasConfig.dashArray}
+                            strokeLinecap="round"
+                            vectorEffect="non-scaling-stroke"
+                        />
 
-                        {/* 13 Outer Orbit Platforms */}
+                        {/* Inner Orbit Guide Track (Solid subtle guide) */}
+                        <circle
+                            cx="0"
+                            cy="0"
+                            r={canvasConfig.innerRadius}
+                            stroke="#000000"
+                            strokeOpacity={canvasConfig.trackOpacity}
+                            strokeWidth={canvasConfig.trackStrokeWidth}
+                            vectorEffect="non-scaling-stroke"
+                        />
+
+                        {/* Inner Orbit Prominent Dashed Track */}
+                        <circle
+                            cx="0"
+                            cy="0"
+                            r={canvasConfig.innerRadius}
+                            stroke="#000000"
+                            strokeOpacity={canvasConfig.dashOpacity}
+                            strokeWidth={canvasConfig.dashStrokeWidth}
+                            strokeDasharray={canvasConfig.dashArray}
+                            strokeLinecap="round"
+                            vectorEffect="non-scaling-stroke"
+                        />
+
+                        {/* Subtle Neo-Brutalist Cardinal Markers for authentic radar/observatory look */}
+                        {[-canvasConfig.outerRadius, canvasConfig.outerRadius].map((coord, i) => (
+                            <React.Fragment key={`outer-dot-${i}`}>
+                                <circle cx={coord} cy="0" r={canvasConfig.isMobile ? "2.5" : "3.5"} fill="#000000" fillOpacity="0.45" />
+                                <circle cx="0" cy={coord} r={canvasConfig.isMobile ? "2.5" : "3.5"} fill="#000000" fillOpacity="0.45" />
+                            </React.Fragment>
+                        ))}
+                    </svg>
+
+                    {/* =========================================================================
+                        LAYER 1: OUTER ORBIT LAYER (Rotates Clockwise via GPU CSS Variable)
+                    ========================================================================= */}
+                    <div
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                        style={{
+                            transform: "rotate(var(--outer-rot, 0deg)) translateZ(0)",
+                            willChange: "transform",
+                            backfaceVisibility: "hidden",
+                        }}
+                    >
+                        {/* Synchronized Outer Tracking Laser for Active Platform */}
+                        {activePlatform && activePlatform.ring === "outer" && (
+                            <svg
+                                className="absolute inset-0 w-full h-full pointer-events-none"
+                                viewBox={`-${canvasConfig.canvasSize / 2} -${canvasConfig.canvasSize / 2} ${canvasConfig.canvasSize} ${canvasConfig.canvasSize}`}
+                                fill="none"
+                            >
+                                <line
+                                    x1="0"
+                                    y1="0"
+                                    x2={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
+                                    y2={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
+                                    stroke={getPlatformLaserColor(activePlatform.brandColor)}
+                                    strokeWidth="2.5"
+                                    strokeDasharray="4 4"
+                                    strokeLinecap="round"
+                                />
+                                <circle
+                                    cx={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
+                                    cy={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
+                                    r="4.5"
+                                    fill={getPlatformLaserColor(activePlatform.brandColor)}
+                                />
+                            </svg>
+                        )}
+
+                        {/* 14 Outer Orbit Platforms */}
                         {outerPlatforms.map((platform) => {
                             const rad = (platform.angleDeg * Math.PI) / 180;
-                            const x = Math.round(Math.cos(rad) * OUTER_RADIUS);
-                            const y = Math.round(Math.sin(rad) * OUTER_RADIUS);
-                            const isHovered = hoveredPlatform?.id === platform.id;
+                            const x = Math.round(Math.cos(rad) * canvasConfig.outerRadius);
+                            const y = Math.round(Math.sin(rad) * canvasConfig.outerRadius);
+                            const isActive = activePlatform?.id === platform.id;
 
                             return (
                                 <div
@@ -657,90 +1007,88 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     }}
                                     onMouseEnter={() => setHoveredPlatform(platform)}
                                     onMouseLeave={() => setHoveredPlatform(null)}
-                                    onClick={() => onPlatformClick?.(platform.id)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlatformSelect(platform);
+                                    }}
                                 >
-                                    {/* Counter-rotation keeps badge logo upright as orbit spins */}
-                                    <motion.div style={{ rotate: outerCounterRotate }}>
-                                        <motion.button
+                                    {/* GPU Counter-Rotation keeps badge upright as orbit spins */}
+                                    <div
+                                        style={{
+                                            transform: "rotate(var(--outer-counter-rot, 0deg)) translateZ(0)",
+                                            willChange: "transform",
+                                            backfaceVisibility: "hidden",
+                                        }}
+                                    >
+                                        <button
                                             type="button"
-                                            whileHover={{ scale: 1.15 }}
-                                            whileTap={{ scale: 0.94 }}
-                                            className={`relative w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[22px] sm:rounded-[24px] bg-white flex items-center justify-center cursor-pointer transition-all duration-200 ${isHovered
-                                                ? "border-2 border-black shadow-[5px_5px_0px_#000] -translate-y-1 z-30"
-                                                : "border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5"
-                                                }`}
+                                            className={`relative bg-white flex items-center justify-center cursor-pointer transition-all duration-200 border-2 border-black ${
+                                                isActive
+                                                    ? "shadow-[4px_4px_0px_#000] scale-110 z-30"
+                                                    : "shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:scale-95"
+                                            }`}
+                                            style={{
+                                                width: canvasConfig.outerBadgeSize,
+                                                height: canvasConfig.outerBadgeSize,
+                                                borderRadius: canvasConfig.badgeRadius,
+                                                outline: isActive ? `3px solid ${getPlatformLaserColor(platform.brandColor)}` : "none",
+                                                outlineOffset: "2px",
+                                            }}
                                             aria-label={`${platform.name} integration`}
                                         >
                                             <div className="relative z-10 flex items-center justify-center">
-                                                {platform.renderIcon("w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0")}
+                                                {platform.renderIcon(canvasConfig.outerIconClass)}
                                             </div>
-                                        </motion.button>
-                                    </motion.div>
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })}
-                    </motion.div>
+                    </div>
 
                     {/* =========================================================================
                         LAYER 2: INNER ORBIT LAYER (Rotates Counter-Clockwise in OPPOSITE direction)
                     ========================================================================= */}
-                    <motion.div
+                    <div
                         className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                        style={{ rotate: innerRotate }}
+                        style={{
+                            transform: "rotate(var(--inner-rot, 0deg)) translateZ(0)",
+                            willChange: "transform",
+                            backfaceVisibility: "hidden",
+                        }}
                     >
-                        {/* SVG Inner Dashed Ring & Synchronized Inner Tracking Laser */}
-                        <svg
-                            className="absolute inset-0 w-full h-full pointer-events-none"
-                            viewBox={`-${CANVAS_SIZE / 2} -${CANVAS_SIZE / 2} ${CANVAS_SIZE} ${CANVAS_SIZE}`}
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            {/* Inner Orbit Guide Track & Visible Dashed Ring */}
-                            <circle
-                                cx="0"
-                                cy="0"
-                                r={INNER_RADIUS}
-                                stroke="rgba(0, 0, 0, 0.12)"
-                                strokeWidth="1.2"
-                            />
-                            <circle
-                                cx="0"
-                                cy="0"
-                                r={INNER_RADIUS}
-                                stroke="rgba(0, 0, 0, 0.35)"
-                                strokeWidth="1.6"
-                                strokeDasharray="6 8"
-                            />
-
-                            {/* Crisp Pinpoint Tracking Laser for Inner Orbit Platforms */}
-                            {hoveredPlatform && hoveredPlatform.ring === "inner" && hoveredCoord && (
-                                <g>
-                                    <line
-                                        x1="0"
-                                        y1="0"
-                                        x2={hoveredCoord.x}
-                                        y2={hoveredCoord.y}
-                                        stroke={hoveredPlatform.brandColor || "#FFA116"}
-                                        strokeWidth="2"
-                                        strokeDasharray="5 4"
-                                        strokeLinecap="round"
-                                    />
-                                    <circle
-                                        cx={hoveredCoord.x}
-                                        cy={hoveredCoord.y}
-                                        r="5"
-                                        fill={hoveredPlatform.brandColor || "#FFA116"}
-                                    />
-                                </g>
-                            )}
-                        </svg>
+                        {/* Synchronized Inner Tracking Laser for Active Platform */}
+                        {activePlatform && activePlatform.ring === "inner" && (
+                            <svg
+                                className="absolute inset-0 w-full h-full pointer-events-none"
+                                viewBox={`-${canvasConfig.canvasSize / 2} -${canvasConfig.canvasSize / 2} ${canvasConfig.canvasSize} ${canvasConfig.canvasSize}`}
+                                fill="none"
+                            >
+                                <line
+                                    x1="0"
+                                    y1="0"
+                                    x2={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
+                                    y2={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
+                                    stroke={getPlatformLaserColor(activePlatform.brandColor)}
+                                    strokeWidth="2.5"
+                                    strokeDasharray="4 4"
+                                    strokeLinecap="round"
+                                />
+                                <circle
+                                    cx={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
+                                    cy={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
+                                    r="4.5"
+                                    fill={getPlatformLaserColor(activePlatform.brandColor)}
+                                />
+                            </svg>
+                        )}
 
                         {/* 6 Inner Orbit Platforms */}
                         {innerPlatforms.map((platform) => {
                             const rad = (platform.angleDeg * Math.PI) / 180;
-                            const x = Math.round(Math.cos(rad) * INNER_RADIUS);
-                            const y = Math.round(Math.sin(rad) * INNER_RADIUS);
-                            const isHovered = hoveredPlatform?.id === platform.id;
+                            const x = Math.round(Math.cos(rad) * canvasConfig.innerRadius);
+                            const y = Math.round(Math.sin(rad) * canvasConfig.innerRadius);
+                            const isActive = activePlatform?.id === platform.id;
 
                             return (
                                 <div
@@ -753,55 +1101,140 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     }}
                                     onMouseEnter={() => setHoveredPlatform(platform)}
                                     onMouseLeave={() => setHoveredPlatform(null)}
-                                    onClick={() => onPlatformClick?.(platform.id)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlatformSelect(platform);
+                                    }}
                                 >
-                                    {/* Counter-rotation keeps badge logo upright */}
-                                    <motion.div style={{ rotate: innerCounterRotate }}>
-                                        <motion.button
+                                    {/* GPU Counter-Rotation keeps badge upright */}
+                                    <div
+                                        style={{
+                                            transform: "rotate(var(--inner-counter-rot, 0deg)) translateZ(0)",
+                                            willChange: "transform",
+                                            backfaceVisibility: "hidden",
+                                        }}
+                                    >
+                                        <button
                                             type="button"
-                                            whileHover={{ scale: 1.15 }}
-                                            whileTap={{ scale: 0.94 }}
-                                            className={`relative w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[22px] sm:rounded-[24px] bg-white flex items-center justify-center cursor-pointer transition-all duration-200 ${isHovered
-                                                ? "border-2 border-black shadow-[5px_5px_0px_#000] -translate-y-1 z-30"
-                                                : "border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5"
-                                                }`}
+                                            className={`relative bg-white flex items-center justify-center cursor-pointer transition-all duration-200 border-2 border-black ${
+                                                isActive
+                                                    ? "shadow-[4px_4px_0px_#000] scale-110 z-30"
+                                                    : "shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:scale-95"
+                                            }`}
+                                            style={{
+                                                width: canvasConfig.innerBadgeSize,
+                                                height: canvasConfig.innerBadgeSize,
+                                                borderRadius: canvasConfig.badgeRadius,
+                                                outline: isActive ? `3px solid ${getPlatformLaserColor(platform.brandColor)}` : "none",
+                                                outlineOffset: "2px",
+                                            }}
                                             aria-label={`${platform.name} integration`}
                                         >
                                             <div className="relative z-10 flex items-center justify-center">
-                                                {platform.renderIcon("w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0")}
+                                                {platform.renderIcon(canvasConfig.innerIconClass)}
                                             </div>
-                                        </motion.button>
-                                    </motion.div>
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })}
-                    </motion.div>
+                    </div>
 
                     {/* =========================================================================
                         CENTER HUB: STATIONARY ORBIX AUTONOMOUS CORE
-                        Clean, Minimal, Pure Orbix Brand Star Emblem (Text completely removed)
+                        Minimalist Pure Brand Star Emblem with crisp Neo-Brutalist styling
                     ========================================================================= */}
                     <div
                         className="relative z-30 flex flex-col items-center justify-center cursor-pointer pointer-events-auto"
                         onMouseEnter={() => setIsCenterHovered(true)}
                         onMouseLeave={() => setIsCenterHovered(false)}
+                        onClick={() => setSelectedPlatform(null)}
+                        title="Orbix Autonomous Integration Core"
                     >
-                        {/* Center Card Badge: Minimalist Pure Logo with crisp neo-brutalist border and shadow */}
-                        <motion.div
-                            whileHover={{ scale: 1.06 }}
-                            whileTap={{ scale: 0.96 }}
-                            className={`relative w-36 h-36 sm:w-40 sm:h-40 rounded-full bg-[#0c101d] border-2 border-black flex items-center justify-center transition-all duration-300 ${isCenterHovered
-                                ? "shadow-[7px_7px_0px_#000] -translate-y-1"
-                                : "shadow-[5px_5px_0px_#000]"
-                                }`}
+                        <div
+                            className={`relative rounded-full bg-[#0c101d] border-2 border-black flex items-center justify-center transition-all duration-300 ${
+                                isCenterHovered
+                                    ? "shadow-[6px_6px_0px_#000] -translate-y-1 scale-105"
+                                    : "shadow-[4px_4px_0px_#000]"
+                            }`}
+                            style={{
+                                width: canvasConfig.centerSize,
+                                height: canvasConfig.centerSize,
+                            }}
                         >
-                            {/* Pure White Orbix Brand Star Emblem */}
-                            <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
+                            <div
+                                className="flex items-center justify-center"
+                                style={{
+                                    width: canvasConfig.centerLogoSize,
+                                    height: canvasConfig.centerLogoSize,
+                                }}
+                            >
                                 <OrbixLogo className="w-full h-full text-white" />
                             </div>
-                        </motion.div>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            {/* =========================================================================
+                ACTIVE PLATFORM DETAIL CARD (Interactive on tap for mobile, hover for desktop)
+            ========================================================================= */}
+            <div className="w-full max-w-xl mx-auto mt-6 sm:mt-10 px-2 min-h-[90px] flex items-center justify-center relative z-20">
+                {activePlatform ? (
+                    <div className="w-full bg-white rounded-2xl border-2 border-black p-4 sm:p-5 shadow-[4px_4px_0px_#000] animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                    {activePlatform.renderIcon("w-5 h-5 sm:w-6 sm:h-6 shrink-0")}
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="text-sm sm:text-base md:text-lg font-black text-black tracking-tight truncate">
+                                            {activePlatform.name}
+                                        </h4>
+                                        <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
+                                            {activePlatform.ring === "inner" ? "Core Portal" : "Integration"}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-neutral-500 font-bold truncate">
+                                        {activePlatform.category}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Link
+                                    to="/auth/profiles"
+                                    className="px-3 py-1.5 rounded-xl bg-black text-white text-xs sm:text-sm font-bold border-2 border-black hover:bg-neutral-800 transition-colors shadow-[2px_2px_0px_#FFE566] cursor-pointer"
+                                >
+                                    Connect
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedPlatform(null)}
+                                    className="p-1.5 rounded-lg border border-black/20 text-neutral-400 hover:text-black hover:border-black transition-colors cursor-pointer"
+                                    aria-label="Dismiss platform info"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                        <p className="mt-2.5 text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed">
+                            {activePlatform.description}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="text-center py-2.5 px-4 rounded-xl border-2 border-dashed border-black/20 bg-black/[0.02]">
+                        <p className="text-xs sm:text-sm text-neutral-500 font-bold flex items-center justify-center gap-2">
+                            <Sparkles className="w-4 h-4 text-[#FFB94D] shrink-0" />
+                            <span>
+                                {canvasConfig.isMobile
+                                    ? "Tap any platform or swipe to spin the orbit"
+                                    : "Hover or click any platform to view synchronization details"}
+                            </span>
+                        </p>
+                    </div>
+                )}
             </div>
         </section>
     );

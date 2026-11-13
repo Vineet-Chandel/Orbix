@@ -10,6 +10,7 @@ import {
     Search,
     Ban,
     Menu,
+    AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -335,11 +336,11 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                 <div className="space-y-3">
                                     {/* Event Banner */}
                                     {app.coverImageUrl && (
-                                        <div className="w-full h-32 sm:h-40 rounded-xl border-2 border-black overflow-hidden relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                        <div className="w-full rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                             <img
                                                 src={app.coverImageUrl}
                                                 alt={app.eventTitle}
-                                                className="w-full h-full object-cover"
+                                                className="w-full h-auto max-h-[560px] object-contain block"
                                                 loading="lazy"
                                             />
                                         </div>
@@ -509,8 +510,9 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                     <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
                                     <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
                                 </div>
-                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200">
-                                    ⚠️ Your pass will be cancelled immediately and cannot be recovered.
+                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Your pass will be cancelled immediately and cannot be recovered.</span>
                                 </p>
                             </div>
                         </div>

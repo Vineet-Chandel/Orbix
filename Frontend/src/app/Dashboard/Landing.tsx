@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Code2, GitBranch, GraduationCap } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
-import { useToast } from "../../context/ToastContext";
 import { NotificationBell } from "../../components/NotificationBell";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
@@ -19,6 +18,9 @@ import { ExploreView } from "../Explore/ExploreView";
 import { StudentCampusClubsView } from "../Club/CollegeClubs/StudentCampusClubsView";
 import { CollegeEventsView } from "../Events/CollegeEventsView";
 import { StudentActivityView } from "../Events/StudentActivityView";
+import { ProjectsManagementView } from "../Projects/ProjectsManagementView";
+import { UserCertificateWalletView } from "../Certificates/UserCertificateWalletView";
+import { MemberWorkspaceView } from "../Club/TeamWorkspace/MemberWorkspaceView";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export default function Dashboard() {
@@ -26,13 +28,13 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
-    const toast = useToast();
 
     // Determine initial active tab based on pathname
     const getTabFromPath = (path: string): SidebarTab => {
         if (path === "/clubs" || path.startsWith("/clubs")) return "clubs";
         if (path.includes("/college-events") || path.includes("/college-event")) return "college-events";
         if (path.includes("/activity") || path.includes("/applications") || path.includes("/application")) return "activity";
+        if (path.includes("/wallet") || path.includes("/certificates") || path.includes("/certificate")) return "wallet";
         if (path.includes("/explore")) return "explore";
         if (path.includes("/trends") || path.includes("/reports")) return "trends";
         if (path.includes("/notifications") || path.includes("/inbox")) return "notifications";
@@ -43,6 +45,7 @@ export default function Dashboard() {
         if (path.includes("/docs")) return "docs";
         if (path.includes("/onboarding") || path.includes("/connect")) return "connect-platform";
         if (path.includes("/leaderboard")) return "leaderboard";
+        if (path.startsWith("/workspace")) return "workspace" as SidebarTab;
         return "dashboard";
     };
 
@@ -153,6 +156,7 @@ export default function Dashboard() {
                     if (tab === "docs") navigate("/docs");
                     if (tab === "leaderboard") navigate("/leaderboard");
                     if (tab === "connect-platform") navigate("/onboarding");
+                    if (tab === ("workspace" as any)) navigate("/workspace");
                 }}
                 isOpen={isMobileSidebarOpen}
                 onClose={() => setIsMobileSidebarOpen(false)}
@@ -205,53 +209,17 @@ export default function Dashboard() {
                         <SectionBottomIllustration alt="Trends illustration" />
                     </section>
                 ) : activeTab === "projects" ? (
-                    <section
-                        aria-label="Orbix Projects"
-                        className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
-                    >
-                        <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
-                            <div className="rounded-2xl bg-white border-2 border-black p-6 sm:p-8 shadow-[4px_4px_0px_#000] space-y-6">
-                                <div className="flex items-center justify-between pb-4 border-b-2 border-black">
-                                    <div>
-                                        <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                                            Projects & Repositories
-                                        </h2>
-                                        <p className="text-xs sm:text-sm font-bold text-neutral-600 mt-1">
-                                            Manage your integrated GitHub repositories and continuous automation pipelines.
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => toast.info("Creating new repository integration will be available soon.", { title: "Coming Soon" })}
-                                        className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all cursor-pointer"
-                                    >
-                                        + New Project
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {[
-                                        { name: "orbix-core", desc: "Core authentication and multi-platform profile aggregator", stars: 142, lang: "TypeScript" },
-                                        { name: "orbix-engine", desc: "Model Context Protocol real-time reviewer and analysis pipeline", stars: 89, lang: "Go" },
-                                        { name: "orbix-ui", desc: "Clean modern dashboard with responsive sidebar and widgets", stars: 64, lang: "React" },
-                                    ].map((proj, idx) => (
-                                        <div key={idx} className="p-5 rounded-xl border-2 border-black bg-[#FAF6EE] shadow-[3px_3px_0px_#000] space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="text-sm font-black text-black">{proj.name}</h4>
-                                                <span className="text-xs font-mono font-bold bg-white border border-black px-2 py-0.5 rounded shadow-[1px_1px_0px_#000]">★ {proj.stars}</span>
-                                            </div>
-                                            <p className="text-xs font-medium text-neutral-700 leading-relaxed">{proj.desc}</p>
-                                            <div className="pt-2 flex items-center gap-2">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-black border border-black" />
-                                                <span className="text-xs text-black font-black">{proj.lang}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        <SectionBottomIllustration alt="Projects illustration" />
-                    </section>
+                    <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
+                        <ProjectsManagementView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                    </div>
+                ) : activeTab === "wallet" || activeTab === "certificates" ? (
+                    <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between animate-in fade-in duration-200">
+                        <UserCertificateWalletView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                    </div>
+                ) : activeTab === ("workspace" as any) || location.pathname.startsWith("/workspace") ? (
+                    <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
+                        <MemberWorkspaceView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                    </div>
                 ) : (
                     /* Default Dashboard View (Practice vs Development) */
                     <section

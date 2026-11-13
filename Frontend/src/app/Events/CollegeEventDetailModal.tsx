@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     X,
@@ -18,6 +19,9 @@ import {
     ShieldCheck,
     ShieldAlert,
     ArrowRight,
+    Globe2,
+    GraduationCap,
+    Lock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
@@ -87,14 +91,28 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
         setTimeout(() => setCopiedShareLink(false), 2000);
     };
 
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
             <div className="relative w-full max-w-5xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] shrink-0">
-                            Campus Session
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1 ${
+                            event.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#a2ff86] text-black"
+                        }`}>
+                            {event.scope === "PAN_INDIA" ? (
+                                <>
+                                    <Globe2 className="w-3 h-3" />
+                                    <span>Pan-India Flagship</span>
+                                </>
+                            ) : (
+                                <>
+                                    <GraduationCap className="w-3 h-3" />
+                                    <span>Campus Session</span>
+                                </>
+                            )}
                         </span>
                         <span className="text-xs font-bold text-neutral-600 truncate hidden sm:inline">
                             {event.collegeName || "Verified College Event"}
@@ -147,13 +165,13 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                     {/* Hero Header Card */}
                     <div className="p-5 sm:p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        {/* Cover Image Banner (if available) */}
+                        {/* Cover Image Banner (100% full view, never cropped) */}
                         {event.coverImageUrl && (
-                            <div className="relative w-full h-48 sm:h-64 rounded-xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000] bg-neutral-100">
+                            <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000] bg-neutral-950 flex items-center justify-center">
                                 <img
                                     src={event.coverImageUrl}
                                     alt={event.title}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain"
                                 />
                                 <div className="absolute top-3 left-3 flex items-center gap-2">
                                     <span
@@ -299,6 +317,40 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                     </div>
                                 </div>
 
+                                {event.isTeamEvent && (
+                                    <div className="p-3 rounded-xl bg-[#a2ff86]/30 border-2 border-black space-y-1">
+                                        <div className="flex items-center gap-1.5 font-black text-black text-xs">
+                                            <Users className="w-4 h-4 text-black shrink-0" />
+                                            <span>Team Registration Event ({event.minTeamSize || 1} to {event.maxTeamSize || 4} Members)</span>
+                                        </div>
+                                        <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
+                                            Register as a Team Leader to invite members via @username, or join an existing squad with their 6-character team code before the event starts.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {event.scope === "PAN_INDIA" && (
+                                    <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/40 text-xs space-y-1">
+                                        <div className="flex items-center gap-1.5 font-black text-black">
+                                            <Globe2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                            <span>Pan-India Live Notification Shield</span>
+                                        </div>
+                                        <p className="text-[11px] text-neutral-600 leading-relaxed font-medium">
+                                            {event.isRegistered || event.registrationStatus === "registered" ? (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 inline" />
+                                                    <span>Live tracking active: Start countdown, pass synchronization, and critical organizer updates are enabled for this national event.</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <Lock className="w-3.5 h-3.5 text-neutral-500 shrink-0 inline" />
+                                                    <span>Non-registered students do not receive start reminders or tracking notifications. Register below to activate live entry tracking, deadline alerts, and verified pass sync.</span>
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {event.registrationStatus === "registered" || event.registrationStatus === "attended" || (event.isRegistered && event.registrationStatus !== "pending") ? (
                                     <div className="p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-600 space-y-2">
                                         <div className="flex items-center gap-2 text-emerald-950 font-black text-xs">
@@ -422,6 +474,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

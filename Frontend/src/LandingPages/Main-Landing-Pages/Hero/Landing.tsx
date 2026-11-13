@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-
-const PublicProfilePage = lazy(() => import('../../../app/Profile/PublicProfilePage'));
+import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
 
 export interface PlatformItem {
     id: string;
@@ -27,7 +26,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "codexa",
         name: "Codexa",
         category: "AI Powered Project Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 270, // Top center (12 o'clock)
         description: "AI-driven project tracking, sprints, team velocity & automated code intelligence.",
@@ -58,7 +57,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "evolexa",
         name: "Evolexa",
         category: "AI Powered Career Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 30, // Bottom right (4 o'clock)
         description: "AI-powered career pathways, skill graphs, interview readiness & job matching.",
@@ -89,7 +88,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "flowexa",
         name: "Flowexa",
         category: "AI Powered Automation System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 150, // Bottom left (8 o'clock)
         description: "Automated developer workflows, agent pipelines & cross-tool orchestration.",
@@ -350,15 +349,92 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
             </svg>
         ),
     },
+    {
+        id: "awsbuildercenter",
+        name: "AWS Builder Center",
+        category: "Cloud & Developer Community",
+        brandColor: "#FF9900",
+        ring: "outer",
+        angleDeg: 244.3,
+        description: "Connect cloud builder projects, architecture benchmarks and developer community badges.",
+        renderIcon: (className = "w-8 h-8") => (
+            <img
+                src="https://play-lh.googleusercontent.com/2MTOhjyOUjrKQdwbBEuaYhTxruV3U7gL3Eu5UV-D08e2FF8seT_yhKvdJOc__9ctGv46Uql6V3XUUKLJ7ITx=w480-h960-rw"
+                alt="AWS Builder Center"
+                className={`${className} object-contain rounded-md`}
+                loading="lazy"
+                decoding="async"
+            />
+        ),
+    },
 ];
 
 export const OPPORTUNITIES: OPPORTUNITIES[] = [
+    {
+        id: "clubs",
+        name: "Clubs",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path
+                    d="M12 2L4 5.5V11.5C4 16.5 7.5 21 12 22C16.5 21 20 16.5 20 11.5V5.5L12 2Z"
+                    fill="#FFE566"
+                    stroke="black"
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                />
+                <path
+                    d="M12 6.2L6.8 9L12 11.8L17.2 9L12 6.2Z"
+                    fill="black"
+                />
+                <path
+                    d="M8.8 10.3V13.5C8.8 14.8 10.2 15.8 12 15.8C13.8 15.8 15.2 14.8 15.2 13.5V10.3"
+                    stroke="black"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                />
+                <path
+                    d="M17 9.5V13"
+                    stroke="black"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                />
+            </svg>
+        ),
+    },
+    {
+        id: "events",
+        name: "Events",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="17" rx="3.5" fill="#FFFFFF" stroke="black" strokeWidth="1.8" />
+                <path d="M3 9H21" stroke="black" strokeWidth="1.8" />
+                <path d="M3 7.5C3 5.567 4.567 4 6.5 4H17.5C19.433 4 21 5.567 21 7.5V9H3V7.5Z" fill="#FF5C5C" stroke="black" strokeWidth="1.8" />
+                <line x1="8" y1="2" x2="8" y2="5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <line x1="16" y1="2" x2="16" y2="5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="8" cy="13" r="1.3" fill="black" />
+                <circle cx="12" cy="13" r="1.3" fill="black" />
+                <circle cx="16" cy="13" r="1.3" fill="black" />
+                <circle cx="8" cy="17" r="1.3" fill="black" />
+                <circle cx="12" cy="17" r="1.3" fill="#FF5C5C" />
+                <circle cx="16" cy="17" r="1.3" fill="black" />
+            </svg>
+        ),
+    },
     {
         id: "hackathons",
         name: "Hackathons",
         renderIcon: (className = "w-8 h-8") => (
             <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24">
-                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5.91 7.46L4.16 8.93C2.46 10.35 1.6 11.06 1.6 12s.85 1.64 2.56 3.07l1.75 1.47m12.18-9.08l1.75 1.47c1.7 1.42 2.56 2.13 2.56 3.07s-.85 1.64-2.56 3.07l-1.75 1.47M14.4 3.07L9.6 20.93"></path>
+                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5.91 7.46L4.16 8.93C2.46 10.35 1.6 11.06 1.6 12s.85 1.64 2.56 3.07l1.75 1.47m12.18-9.08l1.75 1.47c1.7 1.42 2.56 2.13 2.56 3.07s-.85 1.64-2.56 3.07l-1.75 1.47M14.4 3.07L9.6 20.93"></path>
+            </svg>
+        ),
+    },
+    {
+        id: "contests",
+        name: "Contests",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24">
+                <path fill="#FFA116" d="M21 4h-3V3c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v1H3c-.55 0-1 .45-1 1v3c0 4.29 1.79 6.88 4.81 6.99A6 6 0 0 0 11 17.91V20H8v2h8v-2h-3v-2.09a5.98 5.98 0 0 0 4.19-2.92C20.2 14.88 22 12.29 22 8V5c0-.55-.45-1-1-1M4 8V6h2v6c0 .28.03.56.06.83C4.22 12.12 4 9.31 4 8m12 4c0 2.21-1.79 4-4 4s-4-1.79-4-4V4h8zm4-4c0 1.31-.22 4.12-2.06 4.83c.04-.27.06-.55.06-.83V6h2z"></path>
             </svg>
         ),
     },
@@ -401,30 +477,6 @@ export const OPPORTUNITIES: OPPORTUNITIES[] = [
                         </radialGradient>
                     </defs>
                 </g>
-            </svg>
-        ),
-    },
-    {
-        id: "contest",
-        name: "Contest",
-        renderIcon: (className = "w-8 h-8") => (
-            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24">
-                <path fill="orange" d="M21 4h-3V3c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v1H3c-.55 0-1 .45-1 1v3c0 4.29 1.79 6.88 4.81 6.99A6 6 0 0 0 11 17.91V20H8v2h8v-2h-3v-2.09a5.98 5.98 0 0 0 4.19-2.92C20.2 14.88 22 12.29 22 8V5c0-.55-.45-1-1-1M4 8V6h2v6c0 .28.03.56.06.83C4.22 12.12 4 9.31 4 8m12 4c0 2.21-1.79 4-4 4s-4-1.79-4-4V4h8zm4-4c0 1.31-.22 4.12-2.06 4.83c.04-.27.06-.55.06-.83V6h2z"></path>
-            </svg>
-        ),
-    },
-    {
-        id: "collabrations",
-        name: "Collabrations",
-        renderIcon: (className = "w-8 h-8") => (
-            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 48 48">
-                <circle cx={12} cy={21} r={5} fill="#FFA726"></circle>
-                <path fill="#455A64" d="M2 34.7s2.8-6.3 10-6.3s10 6.3 10 6.3V38H2zm44 0s-2.8-6.3-10-6.3s-10 6.3-10 6.3V38h20z"></path>
-                <circle cx={24} cy={17} r={6} fill="#FFB74D"></circle>
-                <path fill="#607D8B" d="M36 34.1s-3.3-7.5-12-7.5s-12 7.5-12 7.5V38h24z"></path>
-                <circle cx={36} cy={21} r={5} fill="#FFA726"></circle>
-                <circle cx={12} cy={21} r={5} fill="#FFA726"></circle>
-                <circle cx={36} cy={21} r={5} fill="#FFA726"></circle>
             </svg>
         ),
     },
@@ -478,9 +530,9 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
     const currentOpp = OPPORTUNITIES[oppIndex];
 
     return (
-        <div className="w-full flex flex-col items-center justify-center gap-2 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[100px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.2] sm:leading-[1.18] md:leading-[1.15] select-none">
+        <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(0.62rem,3.15vw,1.05rem)] sm:text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[95px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-1.5 sm:px-4 md:px-6 max-w-full text-center leading-[1.25] sm:leading-[1.18] md:leading-[1.15] select-none">
             {/* Line 1: Strictly single line, never wraps */}
-            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
+            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>A developer tool to connect</span>
 
                 <motion.div
@@ -511,7 +563,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
                     onMouseLeave={() => setIsPaused(false)}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.94 }}
-                    className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    className="relative bg-white border-[1.5px] sm:border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1 sm:gap-2 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
                     title="Click to switch platform"
                 >
                     {/* Flashing light sweep effect as it bounces out of the underground */}
@@ -575,7 +627,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
             </div>
 
             {/* Line 2: Strictly single line, never wraps regardless of text changes */}
-            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
+            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>and redirecting</span>
                 <motion.div
                     layout
@@ -605,7 +657,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
                     onMouseLeave={() => setIsOppPaused(false)}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.94 }}
-                    className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    className="relative bg-white border-[1.5px] sm:border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1 sm:gap-2 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
                     title="Click to switch opportunity"
                 >
                     {/* Flashing light sweep effect as it bounces out of the underground */}
@@ -736,11 +788,11 @@ const Landing = () => {
                 ref={trackRef}
                 className="relative w-full h-[360vh] sm:h-[440vh] mt-4 sm:mt-8 lg:mt-10 font-sans"
             >
-                {/* Sticky Centered Device Container */}
-                <div className="sticky top-[4vh] sm:top-[6vh] lg:top-[7vh] w-[96%] sm:w-[94%] max-w-[1550px] mx-auto z-20">
+                {/* Sticky Centered Device Container: Pinned cleanly below the floating navbar with comfortable breathing room */}
+                <div className="sticky top-[80px] sm:top-[100px] w-[96%] sm:w-[94%] max-w-[1550px] mx-auto z-20">
                     <div className="w-full">
                         <div
-                            className="embedded-showcase-container relative w-full h-[78vh] sm:h-[84vh] lg:h-[89vh] max-h-[1200px] min-h-[360px] sm:min-h-[480px] md:min-h-[580px] lg:min-h-[640px] rounded-[18px] sm:rounded-[24px] lg:rounded-[30px] overflow-hidden border-2 border-black bg-[#FAF6EE] shadow-[8px_8px_0px_#000] flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
+                            className="embedded-showcase-container relative w-full h-[calc(100vh-96px)] sm:h-[calc(100vh-120px)] [@supports(height:100dvh)]:h-[calc(100dvh-96px)] [@supports(height:100dvh)]:sm:h-[calc(100dvh-120px)] min-h-[360px] rounded-[18px] sm:rounded-[24px] lg:rounded-[30px] overflow-hidden border-2 border-black bg-[#FAF6EE] shadow-[8px_8px_0px_#000] flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
                         >
                             {/* Browser Mockup Header Bar */}
                             <div className="w-full bg-[#FAF6EE] border-b-2 border-black px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shrink-0 select-none z-10">
@@ -768,14 +820,7 @@ const Landing = () => {
                                     style={{ y: contentY }}
                                     className="embedded-showcase-container w-full will-change-transform transform-gpu"
                                 >
-                                    <Suspense fallback={
-                                        <div className="w-full min-h-[460px] flex flex-col items-center justify-center gap-3 p-8">
-                                            <div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black animate-spin" />
-                                            <span className="text-xs font-mono font-bold text-neutral-500">Loading showcase preview...</span>
-                                        </div>
-                                    }>
-                                        <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
-                                    </Suspense>
+                                    <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
                                 </motion.div>
                             </div>
                         </div>

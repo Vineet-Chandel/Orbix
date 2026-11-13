@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { X, ShieldCheck, Award, Zap, Code2, BookOpen, GitPullRequest, Flame, CheckCircle2 } from "lucide-react";
+import { X, ShieldCheck, Award, Zap, Code2, BookOpen, GitPullRequest, Flame, CheckCircle2, Scale } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 
@@ -242,7 +242,8 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
                             <h4 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
-                                <span>⚖️</span> Deterministic Tie-Breaking
+                                <Scale className="w-4 h-4 text-neutral-800" />
+                                <span>Deterministic Tie-Breaking</span>
                             </h4>
                             <ol className="list-decimal list-inside text-xs font-medium text-neutral-700 space-y-1">
                                 <li><strong>Authoritative Orbix Score</strong> (DESC)</li>
@@ -252,7 +253,8 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
                         </div>
                         <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
                             <h4 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
-                                <span>🛡️</span> Anti-Gaming & Fairness Guarantees
+                                <ShieldCheck className="w-4 h-4 text-neutral-800" />
+                                <span>Anti-Gaming & Fairness Guarantees</span>
                             </h4>
                             <ul className="list-disc list-inside text-xs font-medium text-neutral-700 space-y-1">
                                 <li>Diminishing returns curves prevent infinite spam</li>

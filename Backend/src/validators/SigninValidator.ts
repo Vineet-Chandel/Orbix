@@ -1,4 +1,4 @@
-import validator from "validator";
+import validator from "../utils/validation.js";
 import { ValidationError } from "./SignupValidator.js";
 
 const SigninValidator = (data: any) => {

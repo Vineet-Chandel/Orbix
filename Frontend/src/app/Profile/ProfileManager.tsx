@@ -1038,6 +1038,7 @@ export default function ProfileManager() {
                                                     offIcon={<Briefcase className="w-3.5 h-3.5 text-neutral-600 stroke-[2.5]" />}
                                                     onStatusText="Status: Active"
                                                     offStatusText="Status: Hidden"
+                                                    showStatusText={true}
                                                     ariaLabel="Toggle Open to work status"
                                                 />
                                             </div>
@@ -1057,6 +1058,7 @@ export default function ProfileManager() {
                                                     offIcon={<Mail className="w-3.5 h-3.5 text-neutral-600 stroke-[2.5]" />}
                                                     onStatusText="Status: Active"
                                                     offStatusText="Status: Off"
+                                                    showStatusText={true}
                                                     ariaLabel="Toggle Hire me recruiter button"
                                                 />
                                             </div>
@@ -1085,6 +1087,7 @@ export default function ProfileManager() {
                                                         offIcon={<Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />}
                                                         onStatusText="Status: Public"
                                                         offStatusText="Status: Private"
+                                                        showStatusText={true}
                                                         ariaLabel="Toggle resume public visibility"
                                                     />
                                                 </div>

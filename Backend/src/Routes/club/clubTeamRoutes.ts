@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from "express";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
 import { ClubTeamService } from "../../services/club/clubTeamService.js";
 
 const clubTeamRouter = express.Router();
@@ -29,7 +29,7 @@ async function resolveClubContext(req: Request, res: Response): Promise<{ clubId
  * GET /api/club/team/stats
  * Overview statistics (Total Members, Active Teams, Pending Invitations, Team Leads)
  */
-clubTeamRouter.get("/stats", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.get("/stats", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -46,7 +46,7 @@ clubTeamRouter.get("/stats", authenticate, async (req: Request, res: Response) =
  * GET /api/club/team/teams
  * List all teams/departments
  */
-clubTeamRouter.get("/teams", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.get("/teams", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -64,7 +64,7 @@ clubTeamRouter.get("/teams", authenticate, async (req: Request, res: Response) =
  * POST /api/club/team/teams
  * Create a new team
  */
-clubTeamRouter.post("/teams", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.post("/teams", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -95,7 +95,7 @@ clubTeamRouter.post("/teams", authenticate, async (req: Request, res: Response) 
  * PATCH /api/club/team/teams/:teamId
  * Edit team details
  */
-clubTeamRouter.patch("/teams/:teamId", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.patch("/teams/:teamId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -124,7 +124,7 @@ clubTeamRouter.patch("/teams/:teamId", authenticate, async (req: Request, res: R
  * POST /api/club/team/teams/:teamId/archive
  * Toggle archive state of a team
  */
-clubTeamRouter.post("/teams/:teamId/archive", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.post("/teams/:teamId/archive", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -147,7 +147,7 @@ clubTeamRouter.post("/teams/:teamId/archive", authenticate, async (req: Request,
  * DELETE /api/club/team/teams/:teamId
  * Delete a team
  */
-clubTeamRouter.delete("/teams/:teamId", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.delete("/teams/:teamId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -164,7 +164,7 @@ clubTeamRouter.delete("/teams/:teamId", authenticate, async (req: Request, res: 
  * GET /api/club/team/search-users
  * Search registered Orbix users by username
  */
-clubTeamRouter.get("/search-users", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.get("/search-users", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -181,7 +181,7 @@ clubTeamRouter.get("/search-users", authenticate, async (req: Request, res: Resp
  * GET /api/club/team/members
  * Full roster of club members
  */
-clubTeamRouter.get("/members", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.get("/members", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -206,7 +206,7 @@ clubTeamRouter.get("/members", authenticate, async (req: Request, res: Response)
  * PATCH /api/club/team/members/:membershipId
  * Update a member's club role, title, or status
  */
-clubTeamRouter.patch("/members/:membershipId", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.patch("/members/:membershipId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -231,7 +231,7 @@ clubTeamRouter.patch("/members/:membershipId", authenticate, async (req: Request
  * DELETE /api/club/team/members/:membershipId
  * Remove a member from the club
  */
-clubTeamRouter.delete("/members/:membershipId", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.delete("/members/:membershipId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -248,7 +248,7 @@ clubTeamRouter.delete("/members/:membershipId", authenticate, async (req: Reques
  * POST /api/club/team/members/:membershipId/assign-team
  * Assign existing member to a team
  */
-clubTeamRouter.post("/members/:membershipId/assign-team", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.post("/members/:membershipId/assign-team", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -277,7 +277,7 @@ clubTeamRouter.post("/members/:membershipId/assign-team", authenticate, async (r
  * DELETE /api/club/team/teams/:teamId/members/:targetUserId
  * Remove a member from a specific team
  */
-clubTeamRouter.delete("/teams/:teamId/members/:targetUserId", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.delete("/teams/:teamId/members/:targetUserId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -295,7 +295,7 @@ clubTeamRouter.delete("/teams/:teamId/members/:targetUserId", authenticate, asyn
  * GET /api/club/team/invitations
  * List invitations
  */
-clubTeamRouter.get("/invitations", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.get("/invitations", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -312,7 +312,7 @@ clubTeamRouter.get("/invitations", authenticate, async (req: Request, res: Respo
  * POST /api/club/team/invitations
  * Create and send invitation
  */
-clubTeamRouter.post("/invitations", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.post("/invitations", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -344,7 +344,7 @@ clubTeamRouter.post("/invitations", authenticate, async (req: Request, res: Resp
  * POST /api/club/team/invitations/:invitationId/cancel
  * Cancel a pending invitation
  */
-clubTeamRouter.post("/invitations/:invitationId/cancel", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.post("/invitations/:invitationId/cancel", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;
@@ -361,7 +361,7 @@ clubTeamRouter.post("/invitations/:invitationId/cancel", authenticate, async (re
  * POST /api/club/team/invitations/:invitationId/resend
  * Resend an invitation with fresh 7-day expiration
  */
-clubTeamRouter.post("/invitations/:invitationId/resend", authenticate, async (req: Request, res: Response) => {
+clubTeamRouter.post("/invitations/:invitationId/resend", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const ctx = await resolveClubContext(req, res);
         if (!ctx) return;

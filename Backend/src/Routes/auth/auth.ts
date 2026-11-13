@@ -1,7 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import validator from "validator";
+import validator from "../../utils/validation.js";
 import SignupValidator, { ValidationError } from '../../validators/SignupValidator.js';
 import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
@@ -12,6 +12,7 @@ import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
 import { handleGetMyProfile, parseLinks } from '../profile/profile.js';
 import { EmailVerificationService } from '../../services/email/emailVerificationService.js';
+import { OnboardingEmailService } from '../../services/email/onboardingEmailService.js';
 import { TwoFactorAuthService } from '../../services/auth/twoFactorAuthService.js';
 import { enrichUserWithClubData } from '../../services/club/clubEnrichmentService.js';
 import {
@@ -106,12 +107,12 @@ authRouter.post('/signup/send-email-otp', async (req: Request, res: Response) =>
             }
         }
 
-        // 2b. Pre-check: If phone number provided, is it taken?
+        // 2b. Pre-check: If phone number provided, is it taken by another personal account?
         const rawPhone = req.body?.phone;
         if (rawPhone && typeof rawPhone === "string" && rawPhone.trim()) {
             const normalizedPhone = rawPhone.trim();
             const existingPhoneResult = await query(
-                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) AND COALESCE(account_type, 'personal') != 'club' LIMIT 1;`,
                 [normalizedPhone]
             );
             if (existingPhoneResult.rows.length > 0) {
@@ -329,6 +330,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 gmail: validatedData.gmail,
                 username: validatedData.username,
                 sid: sessionId,
+                accountType: "personal",
             },
             JWT_SECRET,
             {
@@ -344,6 +346,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 gmail: validatedData.gmail,
                 username: validatedData.username,
                 sid: sessionId,
+                accountType: "personal",
                 type: "refresh"
             },
             JWT_SECRET,
@@ -378,6 +381,14 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             accountType: "personal"
         });
 
+        // Send founder welcome gesture email asynchronously
+        OnboardingEmailService.sendPersonalWelcomeEmailAsync({
+            to: validatedData.gmail,
+            firstName: validatedData.firstName,
+            username: validatedData.username,
+            userId,
+        });
+
         // 4. Return Success
         return res.status(201).json({
             success: true,
@@ -392,6 +403,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 gmail: validatedData.gmail,
                 avatarUrl: defaultAvatarUrl,
                 photoUrl: null,
+                accountType: "personal",
                 isEmailVerified: true,
                 isVerifiedCoder: true,
                 isVerified: true,
@@ -441,113 +453,194 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-        // 1. Query authoritative database for credentials and full user profile (by email or username)
-        let Result = await query(
-            `SELECT
-                id,
-                firstname AS "firstName",
-                middlename AS "middleName",
-                lastname AS "lastName",
-                email AS gmail,
-                username,
-                password AS password_hash,
-                termsaccepted AS "termsAccepted",
-                account_type AS "accountType",
-                headline,
-                bio,
-                avatar_url AS "avatarUrl",
-                photo_url AS "photoUrl",
-                previous_photo_url AS "previousPhotoUrl",
-                (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
-                cover_image_url AS "coverImageUrl",
-                website,
-                linkedin,
-                github,
-                custom_link AS "customLink",
-                location,
-                skills,
-                links,
-                is_open_to_work AS "isOpenToWork",
-                is_hireable AS "isHireable",
-                is_public AS "isPublic",
-                COALESCE(is_email_verified, false) AS "isEmailVerified",
-                email_verified_at AS "emailVerifiedAt",
-                (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
-                (COALESCE(is_email_verified, false) = true) AS "isVerified",
-                COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
-                two_factor_enabled_at AS "twoFactorEnabledAt",
-                created_at AS "createdAt"
-            FROM users
-            WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
-            LIMIT 1;`,
-            [validatedData.gmail]
-        );
+        // Context-aware Account Type resolution (seamless personal vs club login)
+        const requestedAccountType =
+            validatedData.accountType ||
+            req.body?.accountType ||
+            req.body?.loginMode ||
+            req.body?.expectedAccountType;
+        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
 
-        // 2. If not matched directly on users, check verified_clubs (slug/public_email) or club_verification_requests (contact_email)
-        if (Result.rows.length === 0) {
-            const clubLookup = await query(
-                `SELECT auth_user_id FROM verified_clubs 
-                 WHERE LOWER(slug) = LOWER($1) OR LOWER(public_email) = LOWER($1)
-                 LIMIT 1;`,
+        let Result: any = { rows: [] };
+
+        if (effectiveAccountType === "club") {
+            // 1. Club Portal Authentication:
+            // First check if input matches a club user directly by username or internal club email
+            Result = await query(
+                `SELECT
+                    id,
+                    firstname AS "firstName",
+                    middlename AS "middleName",
+                    lastname AS "lastName",
+                    email AS gmail,
+                    username,
+                    password AS password_hash,
+                    termsaccepted AS "termsAccepted",
+                    account_type AS "accountType",
+                    headline,
+                    bio,
+                    avatar_url AS "avatarUrl",
+                    photo_url AS "photoUrl",
+                    previous_photo_url AS "previousPhotoUrl",
+                    (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                    cover_image_url AS "coverImageUrl",
+                    website,
+                    linkedin,
+                    github,
+                    custom_link AS "customLink",
+                    location,
+                    skills,
+                    links,
+                    is_open_to_work AS "isOpenToWork",
+                    is_hireable AS "isHireable",
+                    is_public AS "isPublic",
+                    COALESCE(is_email_verified, false) AS "isEmailVerified",
+                    email_verified_at AS "emailVerifiedAt",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                    COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                    two_factor_enabled_at AS "twoFactorEnabledAt",
+                    created_at AS "createdAt"
+                FROM users
+                WHERE (LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1))
+                  AND account_type = 'club'
+                LIMIT 1;`,
                 [validatedData.gmail]
             );
-            let targetUserId: string | null = clubLookup.rows[0]?.auth_user_id || null;
 
-            if (!targetUserId) {
-                const reqLookup = await query(
-                    `SELECT auth_user_id FROM club_verification_requests 
-                     WHERE LOWER(contact_email) = LOWER($1) OR LOWER(college_official_email) = LOWER($1)
+            // 2. If not matched on users as a club account, resolve via verified_clubs or club_verification_requests
+            if (Result.rows.length === 0) {
+                const clubLookup = await query(
+                    `SELECT auth_user_id FROM verified_clubs 
+                     WHERE LOWER(slug) = LOWER($1) 
+                        OR LOWER(public_email) = LOWER($1)
+                        OR LOWER(name) = LOWER($1)
+                        OR LOWER(REPLACE(slug, '-', '')) = LOWER(REPLACE($1, '-', ''))
+                        OR LOWER(REPLACE(name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
                      LIMIT 1;`,
                     [validatedData.gmail]
                 );
-                targetUserId = reqLookup.rows[0]?.auth_user_id || null;
-            }
+                let targetUserId: string | null = clubLookup.rows[0]?.auth_user_id || null;
 
-            if (targetUserId) {
-                Result = await query(
-                    `SELECT
-                        id,
-                        firstname AS "firstName",
-                        middlename AS "middleName",
-                        lastname AS "lastName",
-                        email AS gmail,
-                        username,
-                        password AS password_hash,
-                        termsaccepted AS "termsAccepted",
-                        account_type AS "accountType",
-                        headline,
-                        bio,
-                        avatar_url AS "avatarUrl",
-                        photo_url AS "photoUrl",
-                        previous_photo_url AS "previousPhotoUrl",
-                        (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
-                        cover_image_url AS "coverImageUrl",
-                        website,
-                        linkedin,
-                        github,
-                        custom_link AS "customLink",
-                        location,
-                        skills,
-                        links,
-                        is_open_to_work AS "isOpenToWork",
-                        is_hireable AS "isHireable",
-                        is_public AS "isPublic",
-                        COALESCE(is_email_verified, false) AS "isEmailVerified",
-                        email_verified_at AS "emailVerifiedAt",
-                        (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
-                        (COALESCE(is_email_verified, false) = true) AS "isVerified",
-                        COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
-                        two_factor_enabled_at AS "twoFactorEnabledAt",
-                        created_at AS "createdAt"
-                    FROM users
-                    WHERE id = $1
-                    LIMIT 1;`,
-                    [targetUserId]
-                );
+                if (!targetUserId) {
+                    const reqLookup = await query(
+                        `SELECT auth_user_id FROM club_verification_requests 
+                         WHERE LOWER(contact_email) = LOWER($1) 
+                            OR LOWER(college_official_email) = LOWER($1)
+                            OR LOWER(club_name) = LOWER($1)
+                            OR LOWER(REPLACE(club_name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
+                         LIMIT 1;`,
+                        [validatedData.gmail]
+                    );
+                    targetUserId = reqLookup.rows[0]?.auth_user_id || null;
+                }
+
+                if (targetUserId) {
+                    Result = await query(
+                        `SELECT
+                            id,
+                            firstname AS "firstName",
+                            middlename AS "middleName",
+                            lastname AS "lastName",
+                            email AS gmail,
+                            username,
+                            password AS password_hash,
+                            termsaccepted AS "termsAccepted",
+                            account_type AS "accountType",
+                            headline,
+                            bio,
+                            avatar_url AS "avatarUrl",
+                            photo_url AS "photoUrl",
+                            previous_photo_url AS "previousPhotoUrl",
+                            (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                            cover_image_url AS "coverImageUrl",
+                            website,
+                            linkedin,
+                            github,
+                            custom_link AS "customLink",
+                            location,
+                            skills,
+                            links,
+                            is_open_to_work AS "isOpenToWork",
+                            is_hireable AS "isHireable",
+                            is_public AS "isPublic",
+                            COALESCE(is_email_verified, false) AS "isEmailVerified",
+                            email_verified_at AS "emailVerifiedAt",
+                            (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                            (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                            COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                            two_factor_enabled_at AS "twoFactorEnabledAt",
+                            created_at AS "createdAt"
+                        FROM users
+                        WHERE id = $1
+                          AND account_type = 'club'
+                        LIMIT 1;`,
+                        [targetUserId]
+                    );
+                }
+            }
+        } else {
+            // Personal Account Authentication:
+            Result = await query(
+                `SELECT
+                    id,
+                    firstname AS "firstName",
+                    middlename AS "middleName",
+                    lastname AS "lastName",
+                    email AS gmail,
+                    username,
+                    password AS password_hash,
+                    termsaccepted AS "termsAccepted",
+                    account_type AS "accountType",
+                    headline,
+                    bio,
+                    avatar_url AS "avatarUrl",
+                    photo_url AS "photoUrl",
+                    previous_photo_url AS "previousPhotoUrl",
+                    (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                    cover_image_url AS "coverImageUrl",
+                    website,
+                    linkedin,
+                    github,
+                    custom_link AS "customLink",
+                    location,
+                    skills,
+                    links,
+                    is_open_to_work AS "isOpenToWork",
+                    is_hireable AS "isHireable",
+                    is_public AS "isPublic",
+                    COALESCE(is_email_verified, false) AS "isEmailVerified",
+                    email_verified_at AS "emailVerifiedAt",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                    (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                    COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                    two_factor_enabled_at AS "twoFactorEnabledAt",
+                    created_at AS "createdAt"
+                FROM users
+                WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
+                LIMIT 1;`,
+                [validatedData.gmail]
+            );
+
+            // If an account is found but its account_type is 'club', notify user to use club portal
+            if (Result.rows[0]?.accountType === "club") {
+                return res.status(403).json({
+                    success: false,
+                    code: "ACCOUNT_TYPE_MISMATCH",
+                    message: "This is a Club account. Please use the Club Portal to sign in.",
+                });
             }
         }
 
         const user = Result.rows[0];
+
+        if (user && effectiveAccountType === "club" && user.accountType !== "club") {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                message: "Please sign in with your dedicated Club Portal credentials.",
+            });
+        }
 
         if (!user || !user.password_hash) {
             await bcrypt.compare("dummy", "$2b$10$XN4E5x6gT3x7l3eUaR9UOuQYx8wO1bU1Jv3bT6D2p7t3Z6U1q9F4W");
@@ -568,15 +661,6 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 message: "Invalid Credentials"
             });
         }
-
-        // Context-aware Account Type resolution (seamless personal vs club login)
-        const requestedAccountType =
-            validatedData.accountType ||
-            req.body?.accountType ||
-            req.body?.loginMode ||
-            req.body?.expectedAccountType;
-
-        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
 
         // Intercept login if Two-Factor Authentication is enabled on this account
         if (user.isTwoFactorEnabled) {
@@ -685,12 +769,30 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        // Enrich club status & verified club details for all accounts
-        await enrichUserWithClubData(safeUser, user.id);
+        // Enrich club status & verified club details ONLY for club portal accounts
+        if (effectiveAccountType === "club") {
+            await enrichUserWithClubData(safeUser, user.id);
+        } else {
+            safeUser.verifiedClub = null;
+            safeUser.clubStatus = "none";
+            safeUser.clubName = null;
+            safeUser.clubId = null;
+            safeUser.application = null;
+        }
 
         await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
-        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, password_hash, termsAccepted: user.termsAccepted });
+        await userDetailsCache({
+            id: user.id,
+            firstName: user.firstName,
+            middleName: user.middleName,
+            lastName: user.lastName,
+            gmail: user.gmail,
+            username: user.username,
+            password_hash,
+            termsAccepted: user.termsAccepted,
+            accountType: effectiveAccountType,
+        });
         return res.status(200).json({
             success: true,
             message: "Login successfully",
@@ -770,7 +872,11 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             });
         }
 
-        // Fetch full authoritative user profile from database
+        const decodedSub = typeof decoded?.sub === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded.sub)
+            ? decoded.sub
+            : null;
+
+        // Fetch full authoritative user profile from database (prefer immutable UUID over mutable email/username)
         const Result = await query(
             `SELECT
                 id,
@@ -807,9 +913,9 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
                 two_factor_enabled_at AS "twoFactorEnabledAt",
                 created_at AS "createdAt"
             FROM users
-            WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
+            WHERE ${decodedSub ? "id = $1::uuid" : "(LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1))"}
             LIMIT 1;`,
-            [userGmail]
+            [decodedSub || userGmail]
         );
         const user = Result.rows[0];
 
@@ -837,7 +943,18 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             throttleTouchSession(existingSessionId);
         }
 
-        const refreshedAccountType = decoded?.accountType || user.accountType || "personal";
+        const dbAccountType = user.accountType === "club" ? "club" : "personal";
+        if (decoded?.accountType && decoded.accountType !== dbAccountType) {
+            res.clearCookie("token", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+            res.clearCookie("refreshToken", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                message: "Session account type mismatch. Please sign in again.",
+            });
+        }
+
+        const refreshedAccountType = dbAccountType;
 
         // Generate fresh Access Token (8 hours) and fresh Refresh Token (7 days) retaining existing session ID
         const newAccessToken = jwt.sign(
@@ -910,10 +1027,18 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        // Enrich club status & verified club details for all accounts
-        await enrichUserWithClubData(safeUser, user.id);
+        // Enrich club status & verified club details ONLY for club accounts
+        if (refreshedAccountType === "club") {
+            await enrichUserWithClubData(safeUser, user.id);
+        } else {
+            safeUser.verifiedClub = null;
+            safeUser.clubStatus = "none";
+            safeUser.clubName = null;
+            safeUser.clubId = null;
+            safeUser.application = null;
+        }
 
-        await userDetailsCache({ ...user, id: user.id });
+        await userDetailsCache({ ...user, id: user.id, accountType: refreshedAccountType });
 
         return res.status(200).json({
             success: true,
@@ -936,7 +1061,7 @@ authRouter.post('/refresh', handleTokenRefresh);
 authRouter.post('/refresh-token', handleTokenRefresh);
 authRouter.get('/refresh', handleTokenRefresh);
 
-authRouter.post('/signout', async (req: Request, res: Response) => {
+const handleSignout = async (req: Request, res: Response) => {
     try {
         let gmail = req.body?.gmail;
         let sessionId: string | null = null;
@@ -1007,7 +1132,10 @@ authRouter.post('/signout', async (req: Request, res: Response) => {
             message: "Error signing out"
         });
     }
-});
+};
+
+authRouter.post('/signout', handleSignout);
+authRouter.post('/logout', handleSignout);
 
 const handleMeEndpoint = handleGetMyProfile;
 
@@ -1043,9 +1171,21 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
             ipAddress: ip
         });
 
-        // Context-aware Account Type resolution on 2FA Login
+        // Context-aware Account Type resolution on 2FA Login (enforced against authoritative DB record)
         const requestedAccountType = req.body?.accountType || req.body?.loginMode || req.body?.expectedAccountType;
-        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
+        const dbAccountTypeRes = await query(`SELECT account_type FROM users WHERE id = $1 LIMIT 1;`, [user.id]);
+        const dbAccountType = dbAccountTypeRes.rows[0]?.account_type === "club" ? "club" : "personal";
+        if (requestedAccountType && requestedAccountType !== dbAccountType) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                message:
+                    dbAccountType === "club"
+                        ? "This is a Club account. Please use the Club Portal to sign in."
+                        : "Please sign in with your dedicated Club Portal credentials.",
+            });
+        }
+        const effectiveAccountType = dbAccountType;
 
         // Create canonical persistent session record on genuine 2FA authentication
         const sessionResult = await createSession({
@@ -1118,9 +1258,17 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        await enrichUserWithClubData(safeUser, user.id);
+        if (effectiveAccountType === "club") {
+            await enrichUserWithClubData(safeUser, user.id);
+        } else {
+            safeUser.verifiedClub = null;
+            safeUser.clubStatus = "none";
+            safeUser.clubName = null;
+            safeUser.clubId = null;
+            safeUser.application = null;
+        }
         await resetSigninFailures({ email: user.gmail, ip });
-        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, termsAccepted: user.termsAccepted });
+        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, termsAccepted: user.termsAccepted, accountType: effectiveAccountType });
 
         return res.status(200).json({
             success: true,
@@ -1137,7 +1285,6 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/verify-login', handleVerifyLogin2FA);
 authRouter.post('/2fa/verify-login', handleVerifyLogin2FA);
 
 /**
@@ -1172,7 +1319,6 @@ const handleResendLoginOtp = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/resend-login-otp', handleResendLoginOtp);
 authRouter.post('/2fa/resend-login-otp', handleResendLoginOtp);
 
 /**
@@ -1217,7 +1363,6 @@ const handleSendSetupOtp = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/setup/send-otp', authenticate, handleSendSetupOtp);
 authRouter.post('/2fa/setup/send-otp', authenticate, handleSendSetupOtp);
 
 /**
@@ -1253,7 +1398,6 @@ const handleVerifySetupOtp = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/setup/verify-otp', authenticate, handleVerifySetupOtp);
 authRouter.post('/2fa/setup/verify-otp', authenticate, handleVerifySetupOtp);
 
 /**
@@ -1289,7 +1433,6 @@ const handleDisable2FA = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/disable', authenticate, handleDisable2FA);
 authRouter.post('/2fa/disable', authenticate, handleDisable2FA);
 
 /**
@@ -1316,7 +1459,119 @@ const handlePasswordChange = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/password/change', authenticate, handlePasswordChange);
 authRouter.post('/password/change', authenticate, handlePasswordChange);
+
+/**
+ * ============================================================================
+ * FORGOT PASSWORD FLOW (Instagram-Style Account Recovery & Verification)
+ * ============================================================================
+ */
+
+// Step 1: Find Account by username or email and dispatch 6-digit OTP
+const handleForgotPasswordFindAccount = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+
+        const identifier = req.body?.identifier || req.body?.username || req.body?.email || req.body?.gmail;
+        const accountType = req.body?.accountType === "club" ? "club" : "personal";
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.findAccountAndSendOtp({
+            identifier,
+            accountType,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to process recovery request.",
+            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
+        });
+    }
+};
+
+// Resend OTP
+const handleForgotPasswordResendOtp = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+        const resetSessionToken = req.body?.resetSessionToken;
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.resendResetOtp({
+            resetSessionToken,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to resend verification code.",
+            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
+        });
+    }
+};
+
+// Step 2: Verify 6-digit OTP
+const handleForgotPasswordVerifyOtp = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+        const resetSessionToken = req.body?.resetSessionToken;
+        const otp = req.body?.otp;
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.verifyResetOtp({
+            resetSessionToken,
+            otp,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to verify code.",
+        });
+    }
+};
+
+// Step 3: Set New Password
+const handleForgotPasswordReset = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+        const { resetProofToken, newPassword, confirmPassword } = req.body;
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.resetPassword({
+            resetProofToken,
+            newPassword,
+            confirmPassword,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to reset password.",
+        });
+    }
+};
+
+authRouter.post('/forgot-password/find-account', handleForgotPasswordFindAccount);
+authRouter.post('/forgot-password/request-otp', handleForgotPasswordFindAccount);
+authRouter.post('/forgot-password/resend-otp', handleForgotPasswordResendOtp);
+authRouter.post('/forgot-password/verify-otp', handleForgotPasswordVerifyOtp);
+authRouter.post('/forgot-password/reset', handleForgotPasswordReset);
 
 export default authRouter;

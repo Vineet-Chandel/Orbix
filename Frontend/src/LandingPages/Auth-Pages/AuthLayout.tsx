@@ -30,15 +30,25 @@ export const AuthLayout = ({
     const handleGoogleAuth = () => {
         const searchParams = new URLSearchParams(window.location.search);
         const returnTo = searchParams.get("returnTo") || "/dashboard";
-        const deviceId = getOrCreateDeviceId();
-        window.location.href = `/api/auth/google?deviceId=${encodeURIComponent(deviceId)}&returnTo=${encodeURIComponent(returnTo)}`;
+        let deviceId = "";
+        try {
+            deviceId = getOrCreateDeviceId();
+        } catch {}
+        const query = new URLSearchParams({ returnTo });
+        if (deviceId) query.set("deviceId", deviceId);
+        window.location.href = `/api/auth/google?${query.toString()}`;
     };
 
     const handleGitHubAuth = () => {
         const searchParams = new URLSearchParams(window.location.search);
         const returnTo = searchParams.get("returnTo") || "/dashboard";
-        const deviceId = getOrCreateDeviceId();
-        window.location.href = `/api/auth/github?deviceId=${encodeURIComponent(deviceId)}&returnTo=${encodeURIComponent(returnTo)}`;
+        let deviceId = "";
+        try {
+            deviceId = getOrCreateDeviceId();
+        } catch {}
+        const query = new URLSearchParams({ returnTo });
+        if (deviceId) query.set("deviceId", deviceId);
+        window.location.href = `/api/auth/github?${query.toString()}`;
     };
     return (
         <div className="min-h-screen w-full bg-[#FAF6EE] flex flex-col lg:flex-row overflow-hidden text-neutral-900 font-sans selection:bg-black selection:text-white relative">

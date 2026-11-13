@@ -839,17 +839,21 @@ export class ClubTeamService {
             throw err;
         }
 
-        // 1. Resolve invited user
+        // 1. Resolve invited personal user (club portal accounts cannot be invited as team members)
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetUsernameOrId);
         const userRes = isUuid
             ? await query(
                   `SELECT id, username, firstname, lastname, email FROM public.users
-                   WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1;`,
+                   WHERE (id = $1 OR LOWER(username) = LOWER($2))
+                     AND COALESCE(account_type, 'personal') != 'club'
+                   LIMIT 1;`,
                   [targetUsernameOrId, targetUsernameOrId]
               )
             : await query(
                   `SELECT id, username, firstname, lastname, email FROM public.users
-                   WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+                   WHERE LOWER(username) = LOWER($1)
+                     AND COALESCE(account_type, 'personal') != 'club'
+                   LIMIT 1;`,
                   [targetUsernameOrId]
               );
 
@@ -975,6 +979,8 @@ export class ClubTeamService {
             invitedUsername: targetUser.username,
             teamName,
             expiresAt,
+            token,
+            inviteLink: `/club/team-workspace/join?token=${token}`,
             message: `Invitation successfully sent to @${targetUser.username}. A notification has been placed in their Orbix inbox.`,
         };
     }
@@ -1287,6 +1293,57 @@ export class ClubTeamService {
                     })
                 ]
             ).catch(() => {});
+        }
+
+        // 6. Ensure synchronization into team_workspaces & workspace_members
+        try {
+            const wsRes = await query(
+                `SELECT id FROM public.team_workspaces WHERE club_id = $1 LIMIT 1;`,
+                [clubId]
+            );
+            let workspaceId = wsRes.rows[0]?.id;
+            if (!workspaceId) {
+                const newWs = await query(
+                    `INSERT INTO public.team_workspaces
+                        (club_id, owner_id, name, slug, workspace_status, created_at, updated_at)
+                     VALUES ($1, $2, $3, $4, 'active', NOW(), NOW())
+                     ON CONFLICT (club_id) DO UPDATE SET workspace_status = 'active'
+                     RETURNING id;`,
+                    [clubId, inv.inviter_user_id || recipientUserId, inv.clubName, inv.clubSlug || `club-${Date.now()}`]
+                );
+                workspaceId = newWs.rows[0]?.id;
+            }
+
+            if (workspaceId) {
+                let roleRes = await query(
+                    `SELECT id FROM public.workspace_roles WHERE workspace_id = $1 AND slug = 'member' LIMIT 1;`,
+                    [workspaceId]
+                );
+                let roleId = roleRes.rows[0]?.id;
+                if (!roleId) {
+                    const anyRole = await query(
+                        `SELECT id FROM public.workspace_roles WHERE workspace_id = $1 ORDER BY rank DESC LIMIT 1;`,
+                        [workspaceId]
+                    );
+                    roleId = anyRole.rows[0]?.id;
+                }
+
+                if (roleId) {
+                    await query(
+                        `INSERT INTO public.workspace_members
+                            (workspace_id, user_id, club_membership_id, role_id, role_title, membership_status, is_suspended, invited_by, joined_at, created_at, updated_at)
+                         VALUES ($1, $2, $3, $4, $5, 'active', false, $6, NOW(), NOW(), NOW())
+                         ON CONFLICT (workspace_id, user_id) DO UPDATE
+                         SET membership_status = 'active',
+                             is_suspended = false,
+                             role_title = EXCLUDED.role_title,
+                             updated_at = NOW();`,
+                        [workspaceId, recipientUserId, membershipId, roleId, title || "Member", inv.inviter_user_id]
+                    );
+                }
+            }
+        } catch (wsErr) {
+            console.warn("[ClubTeamService] Non-fatal: Workspace synchronization error on invitation acceptance:", wsErr);
         }
 
         return {

@@ -13,6 +13,12 @@ export interface CollegeEventItem {
     registrationUrl: string | null;
     coverImageUrl: string | null;
     status: "published" | "completed" | "draft" | "cancelled";
+    scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
+    teamId?: string | null;
+    teamRole?: "leader" | "member" | null;
     publishedAt: string | null;
     createdAt: string;
     clubName: string;
@@ -47,6 +53,13 @@ export interface ApplyForEventPayload {
     rollNumber?: string;
     phoneNumber?: string;
     notes?: string;
+    institutionId?: string;
+    institutionName?: string;
+    universityName?: string;
+    campusName?: string;
+    institutionCity?: string;
+    institutionState?: string;
+    isUnlistedInstitution?: boolean;
     isAttendeeUnder18?: boolean;
     guardianName?: string;
     guardianEmail?: string;
@@ -70,6 +83,11 @@ export interface StudentApplicationItem {
     yearOfStudy: string | null;
     rollNumber: string | null;
     phoneNumber: string | null;
+    institutionName?: string | null;
+    universityName?: string | null;
+    institutionCity?: string | null;
+    institutionState?: string | null;
+    institutionVerificationStatus?: string | null;
     notes: string | null;
     eventTitle: string;
     eventSlug: string;
@@ -82,6 +100,15 @@ export interface StudentApplicationItem {
     venueOrLocation: string | null;
     coverImageUrl: string | null;
     eventStatus: string;
+    scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
+    teamId?: string | null;
+    teamRole?: "leader" | "member" | null;
+    teamName?: string | null;
+    teamCode?: string | null;
+    teamMembersCount?: number;
     clubName: string;
     clubSlug: string;
     clubLogoUrl: string;
@@ -100,6 +127,10 @@ export interface ClubEventApplicantRow {
     rollNumber: string;
     phoneNumber: string;
     ticketCode: string;
+    teamId?: string | null;
+    teamRole?: "leader" | "member" | null;
+    teamName?: string | null;
+    teamCode?: string | null;
     status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled";
     registeredAt: string;
     checkedInAt: string | null;
@@ -113,6 +144,25 @@ export interface ClubEventApplicantRow {
     guardianRelationship?: string | null;
     guardianConsentStatus?: "not_required" | "pending_verification" | "verified" | "rejected" | "withdrawn";
     guardianConsentVerifiedAt?: string | null;
+    institutionId?: string | null;
+    institutionName?: string | null;
+    universityName?: string | null;
+    campusName?: string | null;
+    institutionCity?: string | null;
+    institutionState?: string | null;
+    institutionVerificationStatus?: string | null;
+    isUnlistedInstitution?: boolean;
+    answers?: Record<string, any>;
+    formResponse?: Record<string, any>;
+    fileAttachments?: Array<{
+        questionId: string;
+        questionTitle?: string;
+        fileName: string;
+        fileUrl: string;
+        filePublicId: string;
+        fileSize: number;
+        mimeType: string;
+    }>;
 }
 
 export interface ClubEventApplicationsResponse {
@@ -124,6 +174,8 @@ export interface ClubEventApplicationsResponse {
         venue: string | null;
         clubName: string;
     };
+    formStructure?: any;
+    formSettings?: any;
     summary: {
         total: number;
         pending: number;
@@ -134,6 +186,18 @@ export interface ClubEventApplicationsResponse {
         cancelled: number;
     };
     applications: ClubEventApplicantRow[];
+}
+
+function getAuthHeaders(includeJson = false): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (includeJson) {
+        headers["Content-Type"] = "application/json";
+    }
+    const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
 }
 
 /**
@@ -155,6 +219,7 @@ export async function fetchCollegeEvents(options?: {
 
     const qs = params.toString();
     const res = await fetch(`/api/club/college-events${qs ? `?${qs}` : ""}`, {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -172,6 +237,7 @@ export async function toggleEventLike(
 ): Promise<{ liked: boolean; likesCount: number }> {
     const res = await fetch(`/api/club/events/${eventId}/like`, {
         method: "POST",
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -190,7 +256,7 @@ export async function applyForEvent(
 ): Promise<{ success: boolean; message: string; registration: any }> {
     const res = await fetch(`/api/club/events/${eventId}/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         credentials: "include",
         body: JSON.stringify(payload),
     });
@@ -207,6 +273,7 @@ export async function applyForEvent(
 export async function cancelEventRegistration(eventId: string): Promise<void> {
     const res = await fetch(`/api/club/events/${eventId}/cancel`, {
         method: "POST",
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -220,6 +287,7 @@ export async function cancelEventRegistration(eventId: string): Promise<void> {
  */
 export async function fetchStudentApplications(): Promise<StudentApplicationItem[]> {
     const res = await fetch("/api/club/user/applications", {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -236,6 +304,7 @@ export async function fetchClubEventApplications(
     eventId: string
 ): Promise<ClubEventApplicationsResponse> {
     const res = await fetch(`/api/club/events/${eventId}/applications`, {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -256,7 +325,7 @@ export async function updateApplicantStatus(
 ): Promise<void> {
     const res = await fetch(`/api/club/events/${eventId}/applications/${registrationId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         credentials: "include",
         body: JSON.stringify({ status, reviewNotes }),
     });
@@ -278,6 +347,7 @@ export function getEventApplicationsExportUrl(eventId: string): string {
  */
 export async function fetchPublicEventById(eventId: string): Promise<CollegeEventItem | null> {
     const res = await fetch(`/api/club/public-events/${encodeURIComponent(eventId)}`, {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();

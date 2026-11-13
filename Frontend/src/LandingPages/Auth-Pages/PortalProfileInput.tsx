@@ -1,5 +1,5 @@
 import { useState, useId } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Check } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { PortalProfileCard, type PortalProfileData } from "./PortalProfileCard";
@@ -326,7 +326,9 @@ export const PortalProfileInput = ({
                     ) : judgment.message ? (
                         judgment.isValid ? (
                             <p className="text-[11px] text-neutral-800 font-bold flex items-center gap-1">
-                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#a2ff86] border border-black text-black text-[10px] font-black">✓</span>
+                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#a2ff86] border border-black text-black">
+                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                </span>
                                 <span>{judgment.message}</span>
                             </p>
                         ) : (

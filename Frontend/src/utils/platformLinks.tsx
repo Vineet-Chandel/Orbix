@@ -176,9 +176,9 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
         aliases: ["huggingface", "hf"],
         color: "#FFD21E",
         icon: (className = "w-3.5 h-3.5") => (
-            <span className={`inline-flex items-center justify-center leading-none text-[13px] ${className}`}>
-                🤗
-            </span>
+            <svg className={className} viewBox="0 0 24 24" fill="#FFD21E">
+                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0m0 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8m-3.6 4.8a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6m7.2 0a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6m-9.13 6.13a.9.9 0 0 0-.64.27.9.9 0 0 0 0 1.27c1.32 1.32 3.12 2.05 5.01 2.05s3.69-.73 5.01-2.05a.9.9 0 0 0 0-1.27.9.9 0 0 0-1.27 0c-1.02 1.02-2.41 1.58-3.74 1.58s-2.72-.56-3.74-1.58a.9.9 0 0 0-.63-.27z" />
+            </svg>
         ),
     },
     {

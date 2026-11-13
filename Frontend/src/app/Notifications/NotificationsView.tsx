@@ -33,12 +33,22 @@ import {
     LifeBuoy,
     Calendar,
     Clock,
+    Ticket,
+    QrCode,
+    Printer,
+    CheckCircle2,
+    Award,
+    Sparkles,
+    Download,
+    Share2,
 } from "lucide-react";
+import { revealCertificateNotification } from "../../api/certificateStudioApi";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { terminateSession } from "../../api/sessionActivityApi";
 import { useAppSelector } from "../../store";
+import { OrbixCardQR } from "../Profile/CardStudio/OrbixCardQR";
 import {
     fetchNotifications,
     deleteNotification,
@@ -100,6 +110,25 @@ export const NotificationsView: React.FC = () => {
     const [terminatedSessionIds, setTerminatedSessionIds] = useState<Set<string>>(new Set());
     const [isTerminatingSession, setIsTerminatingSession] = useState<string | null>(null);
     const [isMarkingAllRead, setIsMarkingAllRead] = useState<boolean>(false);
+    const [revealedCertificates, setRevealedCertificates] = useState<Record<string, boolean>>({});
+    const [selectedGroupCertIndex, setSelectedGroupCertIndex] = useState<number>(0);
+
+    const handleShareCertificate = (code: string, title: string) => {
+        const verifyUrl = `${window.location.origin}/verify/certificate/${encodeURIComponent(code)}`;
+        if (navigator.share) {
+            navigator.share({
+                title: `${title} - Verified Credential`,
+                text: `I've been awarded ${title}! Check out my verified credential on Orbix:`,
+                url: verifyUrl,
+            }).catch(() => {
+                navigator.clipboard.writeText(verifyUrl);
+                toast.success("Verification link copied to clipboard!");
+            });
+        } else {
+            navigator.clipboard.writeText(verifyUrl);
+            toast.success("Verification link copied to clipboard!");
+        }
+    };
 
     // Load notifications with automatic read marking
     const loadNotifications = useCallback(
@@ -251,6 +280,18 @@ export const NotificationsView: React.FC = () => {
             notifType === "account_deletion" ||
             notifType === "privacy_update" ||
             type === "governance"
+        );
+    }, []);
+
+    const isCertificateAward = useCallback((item: UserNotification): boolean => {
+        const type = (item.type || "").toLowerCase();
+        const notifType = ((item as any).notification_type || "").toLowerCase();
+        const title = (item.title || "").toLowerCase();
+        return (
+            type === "certificate_awarded" ||
+            notifType === "certificate_awarded" ||
+            Boolean(item.metadata?.certificateId || item.metadata?.credentialCode) ||
+            title.includes("certificate")
         );
     }, []);
 
@@ -709,6 +750,7 @@ export const NotificationsView: React.FC = () => {
                                 const isSecurity = isSecurityAlert(item);
                                 const isHelp = isHelpTicket(item);
                                 const isGov = isAccountGovernance(item);
+                                const isCert = isCertificateAward(item);
 
                                 const meta = item.metadata || {};
                                 const senderProfile = meta.senderProfile || {};
@@ -726,6 +768,8 @@ export const NotificationsView: React.FC = () => {
                                         ? (item.title || "Help Support Ticket")
                                         : isGov
                                         ? (item.title || "Account Governance")
+                                        : isCert
+                                        ? (meta.clubName || "Campus Club")
                                         : isTeamInv
                                         ? (meta.clubName || "Club Team Invitation")
                                         : isClubEvt
@@ -747,6 +791,8 @@ export const NotificationsView: React.FC = () => {
                                         ? (meta.deviceName ? `${meta.deviceName} · ${meta.location || "Location unavailable"}` : "")
                                         : isHelp
                                         ? (meta.ticketNumber ? `Ticket ${meta.ticketNumber}` : "")
+                                        : isCert
+                                        ? (meta.credentialCode ? `Code: ${meta.credentialCode}` : "Verified Credential")
                                         : isTeamInv
                                         ? (meta.positionTitle ? `${meta.positionTitle}${meta.teamName ? ` · ${meta.teamName}` : ""}` : "")
                                         : isClubEvt
@@ -789,15 +835,32 @@ export const NotificationsView: React.FC = () => {
                                                 <div className="relative w-10 h-10 rounded-xl bg-rose-100 text-rose-900 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5">
                                                     <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
                                                 </div>
+                                            ) : isCert ? (
+                                                <div className="relative w-10 h-10 rounded-xl bg-[#a2ff86] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5">
+                                                    <Award className="w-5 h-5 stroke-[2.2]" />
+                                                    {!item.isRead && (
+                                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-black animate-pulse" />
+                                                    )}
+                                                </div>
                                             ) : isClubEvt ? (
                                                 <div className={`relative w-10 h-10 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5 ${
-                                                    meta.action === "cancelled"
+                                                    meta.action === "application_approved" || Boolean(meta.ticketCode)
+                                                        ? "bg-[#a2ff86] text-black"
+                                                        : meta.action === "application_submitted" || meta.action === "application_received"
+                                                        ? "bg-amber-100 text-amber-900"
+                                                        : meta.action === "cancelled"
                                                         ? "bg-rose-100 text-rose-800"
                                                         : meta.action === "completed"
                                                         ? "bg-sky-100 text-sky-800"
                                                         : "bg-[#a2ff86] text-black"
                                                 }`}>
-                                                    <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    {meta.action === "application_approved" || Boolean(meta.ticketCode) ? (
+                                                        <Ticket className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : meta.action === "application_submitted" || meta.action === "application_received" ? (
+                                                        <Clock className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : (
+                                                        <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    )}
                                                     {!item.isRead && (
                                                         <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-black ${
                                                             meta.action === "cancelled" ? "bg-rose-500" : "bg-emerald-500"
@@ -862,6 +925,13 @@ export const NotificationsView: React.FC = () => {
                                                     {isGov && (
                                                         <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-200 text-black border border-black shadow-[1px_1px_0px_#000]">
                                                             Governance
+                                                        </span>
+                                                    )}
+
+                                                    {isCert && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                            <Award className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                            <span>{meta.certificateType ? String(meta.certificateType).toUpperCase() : "CREDENTIAL"}</span>
                                                         </span>
                                                     )}
 
@@ -1022,6 +1092,282 @@ export const NotificationsView: React.FC = () => {
                                 senderProfile.id ||
                                 meta.actorId ||
                                 senderUsername;
+
+                            // -------------------------------------------------------------
+                            // CASE CERT: CERTIFICATE AWARD WITH SPOILER PREVIEW & REVEAL (Phase 15)
+                            // -------------------------------------------------------------
+                            if (isCertificateAward(activeItem)) {
+                                const isGrouped = Boolean(meta.isGrouped && Array.isArray(meta.certificates) && meta.certificates.length > 0);
+                                const certList: any[] = isGrouped ? meta.certificates : [meta];
+                                const safeIdx = Math.min(selectedGroupCertIndex, certList.length - 1);
+                                const currentCert = certList[safeIdx] || meta;
+
+                                const certId = currentCert.certificateId || meta.certificateId || "";
+                                const credentialCode = currentCert.credentialCode || meta.credentialCode || "";
+                                const clubName = meta.clubName || "Campus Club";
+                                const clubSlug = meta.clubSlug || "";
+                                const clubLogo = meta.clubLogo || null;
+                                const certTitle = currentCert.title || currentCert.certificateTitle || meta.certificateTitle || activeItem.title || "Certificate of Recognition";
+                                const certType = currentCert.certificateType || meta.certificateType || "participation";
+                                const awardPosition = currentCert.awardPosition || meta.awardPosition || null;
+                                const recipientDisplayName = currentCert.recipientName || meta.recipientName || (user ? `${user.firstName} ${user.lastName}`.trim() : "Recipient");
+                                const issueDate = currentCert.issueDate || meta.issueDate || activeItem.createdAt;
+                                const sha256Digest = currentCert.sha256Hash || meta.sha256Hash || null;
+                                const previewUrl = currentCert.previewUrl || (credentialCode ? `/api/club/certificates/${encodeURIComponent(credentialCode)}/preview` : "");
+                                const previewBlurredUrl = currentCert.previewBlurredUrl || (credentialCode ? `/api/club/certificates/${encodeURIComponent(credentialCode)}/preview?blurred=true` : "");
+
+                                const isRevealed = Boolean(
+                                    currentCert.isRevealed ||
+                                    meta.isRevealed ||
+                                    revealedCertificates[`${activeItem.id}-${credentialCode}`] ||
+                                    revealedCertificates[activeItem.id]
+                                );
+
+                                const handleReveal = async () => {
+                                    setRevealedCertificates((prev) => ({
+                                        ...prev,
+                                        [activeItem.id]: true,
+                                        [`${activeItem.id}-${credentialCode}`]: true,
+                                    }));
+                                    try {
+                                        if (certId || credentialCode) {
+                                            await revealCertificateNotification(certId || credentialCode);
+                                        }
+                                    } catch (err) {
+                                        console.error("Failed to mark reveal on server:", err);
+                                    }
+                                };
+
+                                return (
+                                    <div className="flex-1 flex flex-col justify-between overflow-y-auto p-6 sm:p-8 space-y-6">
+                                        {/* Header Bar */}
+                                        <div className="flex items-start justify-between gap-4 pb-6 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-3">
+                                                {clubLogo ? (
+                                                    <img
+                                                        src={clubLogo}
+                                                        alt={clubName}
+                                                        className="w-12 h-12 rounded-xl border-2 border-black object-cover shadow-[2px_2px_0px_#000]"
+                                                    />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center font-black text-black shadow-[2px_2px_0px_#000]">
+                                                        <Award className="w-6 h-6 stroke-[2.5]" />
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-base sm:text-lg font-black text-black">
+                                                            {clubName}
+                                                        </h3>
+                                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-[#FFE566] border border-black rounded shadow-[1px_1px_0px_#000]">
+                                                            {certType}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs font-semibold text-neutral-500">
+                                                        Awarded on {formatFullDateTime(activeItem.createdAt)}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {clubSlug && (
+                                                <Link
+                                                    to={`/clubs/${clubSlug}`}
+                                                    className="text-xs font-black text-blue-700 hover:underline flex items-center gap-1 shrink-0"
+                                                >
+                                                    <span>View Club</span>
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </Link>
+                                            )}
+                                        </div>
+
+                                        {/* Bulk Grouping Tabs Selector (if user received multiple certificates in batch) */}
+                                        {isGrouped && certList.length > 1 && (
+                                            <div className="space-y-2 p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000]">
+                                                <div className="flex items-center justify-between text-xs font-black text-black">
+                                                    <span>Batch Certificates Awarded ({certList.length}):</span>
+                                                    <span className="text-[10px] text-neutral-500 font-bold">Select credential to inspect</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {certList.map((c: any, cIdx: number) => {
+                                                        const isSelected = cIdx === safeIdx;
+                                                        const cCode = c.credentialCode || `cert-${cIdx}`;
+                                                        const cRev = Boolean(
+                                                            c.isRevealed ||
+                                                            revealedCertificates[`${activeItem.id}-${cCode}`] ||
+                                                            revealedCertificates[activeItem.id]
+                                                        );
+                                                        return (
+                                                            <button
+                                                                key={cIdx}
+                                                                type="button"
+                                                                onClick={() => setSelectedGroupCertIndex(cIdx)}
+                                                                className={`px-3 py-1.5 rounded-xl border-2 border-black font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                                                                    isSelected
+                                                                        ? "bg-[#FFE566] text-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                                                        : "bg-white text-neutral-700 hover:bg-neutral-100 shadow-[1px_1px_0px_#000]"
+                                                                }`}
+                                                            >
+                                                                <span>{c.certificateType ? String(c.certificateType).toUpperCase() : `Award #${cIdx + 1}`}</span>
+                                                                {cRev ? (
+                                                                    <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" />
+                                                                ) : (
+                                                                    <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Award Message Content */}
+                                        <div className="space-y-2">
+                                            <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                                                {certTitle}
+                                            </h2>
+                                            {awardPosition && (
+                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 border-2 border-black rounded-lg text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                                    <Trophy className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                                    <span>{awardPosition}</span>
+                                                </div>
+                                            )}
+                                            <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-medium">
+                                                {activeItem.body}
+                                            </p>
+                                        </div>
+
+                                        {/* SPOILER CARD / REVEALED CERTIFICATE */}
+                                        <div className="relative rounded-2xl border-3 border-black overflow-hidden shadow-[5px_5px_0px_#000] bg-neutral-900 text-white min-h-[300px] flex flex-col justify-center items-center p-6 text-center">
+                                            {!isRevealed ? (
+                                                <div className="w-full relative flex flex-col items-center justify-center py-6">
+                                                    {/* Obscured blurred preview backdrop */}
+                                                    {previewBlurredUrl && (
+                                                        <div className="absolute inset-0 overflow-hidden pointer-events-none select-none opacity-30">
+                                                            <img
+                                                                src={previewBlurredUrl}
+                                                                alt="Obscured Certificate Preview"
+                                                                className="w-full h-full object-cover filter blur-md scale-105"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Central Spoiler Reveal Dialog */}
+                                                    <div className="relative z-10 space-y-4 max-w-md bg-black/60 backdrop-blur-md p-6 rounded-2xl border-2 border-neutral-700 shadow-[4px_4px_0px_#000]">
+                                                        <div className="w-16 h-16 rounded-2xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000] animate-bounce">
+                                                            <Sparkles className="w-8 h-8 stroke-[2.5]" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 bg-black/80 border border-neutral-600 rounded-full text-[#a2ff86]">
+                                                                Digital Credential Locked
+                                                            </span>
+                                                            <h4 className="text-lg sm:text-xl font-black text-white">
+                                                                You've received an official certificate!
+                                                            </h4>
+                                                            <p className="text-xs text-neutral-300 font-medium">
+                                                                "Your certificate is ready. Tap to reveal your achievement."
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleReveal}
+                                                            className="px-6 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs sm:text-sm shadow-[3px_3px_0px_#000] flex items-center gap-2 mx-auto transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                        >
+                                                            <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                                                            <span>Reveal Certificate</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="w-full space-y-5">
+                                                    {/* Original Low-Resolution Vector Preview */}
+                                                    {previewUrl && (
+                                                        <div className="rounded-xl border-2 border-black bg-white overflow-hidden shadow-[3px_3px_0px_#000]">
+                                                            <img
+                                                                src={previewUrl}
+                                                                alt={certTitle}
+                                                                className="w-full max-h-[360px] object-contain mx-auto"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Certificate Details Strip */}
+                                                    <div className="p-4 rounded-xl bg-neutral-800/90 border-2 border-neutral-700 space-y-2 text-left">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                                            <span className="font-mono text-[#a2ff86] font-bold">
+                                                                ID: {credentialCode}
+                                                            </span>
+                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-[#a2ff86] text-black rounded border border-black">
+                                                                Valid & Verified
+                                                            </span>
+                                                        </div>
+                                                        <h4 className="text-lg font-black text-white tracking-tight">
+                                                            {certTitle}
+                                                        </h4>
+                                                        <div className="text-xs text-neutral-300">
+                                                            Conferred to <strong className="text-white">{recipientDisplayName}</strong> by {clubName}
+                                                        </div>
+                                                        {issueDate && (
+                                                            <div className="text-[11px] text-neutral-400">
+                                                                Issued on {new Date(issueDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                                                            </div>
+                                                        )}
+                                                        {sha256Digest && (
+                                                            <div className="text-[10px] font-mono text-neutral-400 truncate pt-1 border-t border-neutral-700/60">
+                                                                SHA-256: {sha256Digest}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Action Buttons: Download PDF, Share, Verify Certificate */}
+                                                    <div className="flex flex-wrap items-center justify-center gap-3">
+                                                        {credentialCode && (
+                                                            <a
+                                                                href={`/api/club/certificates/${encodeURIComponent(credentialCode)}/download`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                            >
+                                                                <Download className="w-4 h-4 stroke-[2.5]" />
+                                                                <span>Download PDF</span>
+                                                            </a>
+                                                        )}
+
+                                                        {credentialCode && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleShareCertificate(credentialCode, certTitle)}
+                                                                className="px-5 py-2.5 rounded-xl bg-[#FFE566] text-black hover:bg-[#ebd04e] border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                            >
+                                                                <Share2 className="w-4 h-4 stroke-[2.5]" />
+                                                                <span>Share</span>
+                                                            </button>
+                                                        )}
+
+                                                        {credentialCode && (
+                                                            <Link
+                                                                to={`/verify/certificate/${encodeURIComponent(credentialCode)}`}
+                                                                target="_blank"
+                                                                className="px-5 py-2.5 rounded-xl bg-white text-black hover:bg-neutral-100 border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                            >
+                                                                <ShieldCheck className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+                                                                <span>Verify Certificate</span>
+                                                            </Link>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Security Verification footer note */}
+                                        <div className="p-3.5 rounded-xl bg-emerald-50 border-2 border-black flex items-center gap-2.5 text-xs text-emerald-900 font-semibold">
+                                            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 stroke-[2.5]" />
+                                            <span>
+                                                This credential is cryptographically sealed in the Orbix ledger. You can share this verification link on resumes, LinkedIn, and portfolios.
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            }
 
                             // -------------------------------------------------------------
                             // CASE 0: CLUB TEAM INVITATION (CONSENT-BASED INVITATION)
@@ -1351,6 +1697,20 @@ export const NotificationsView: React.FC = () => {
                                       })
                                     : null;
 
+                                const isAppApproved =
+                                    action === "application_approved" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_approved" ||
+                                    Boolean(meta.ticketCode);
+                                const isAppSubmitted =
+                                    action === "application_submitted" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_submitted";
+                                const isAppReceived =
+                                    action === "application_received" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_received";
+                                const isAppRejected =
+                                    action === "application_rejected" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_rejected";
+
                                 const isCancelled = action === "cancelled";
                                 const isCompleted = action === "completed";
 
@@ -1361,14 +1721,24 @@ export const NotificationsView: React.FC = () => {
                                             <div className="flex items-center gap-3.5 min-w-0">
                                                 <div
                                                     className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center font-black ${
-                                                        isCancelled
+                                                        isAppApproved
+                                                            ? "bg-[#a2ff86] text-black"
+                                                            : isAppSubmitted || isAppReceived
+                                                            ? "bg-amber-100 text-amber-900"
+                                                            : isCancelled || isAppRejected
                                                             ? "bg-rose-100 text-rose-700"
                                                             : isCompleted
                                                             ? "bg-sky-100 text-sky-700"
                                                             : "bg-[#a2ff86] text-black"
                                                     }`}
                                                 >
-                                                    <Calendar className="w-8 h-8 stroke-[2.2]" />
+                                                    {isAppApproved ? (
+                                                        <Ticket className="w-8 h-8 stroke-[2.2]" />
+                                                    ) : isAppSubmitted || isAppReceived ? (
+                                                        <Clock className="w-8 h-8 stroke-[2.2]" />
+                                                    ) : (
+                                                        <Calendar className="w-8 h-8 stroke-[2.2]" />
+                                                    )}
                                                 </div>
 
                                                 <div className="min-w-0 space-y-1">
@@ -1378,7 +1748,11 @@ export const NotificationsView: React.FC = () => {
                                                         </h3>
                                                         <span
                                                             className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000] shrink-0 ${
-                                                                isCancelled
+                                                                isAppApproved
+                                                                    ? "bg-[#a2ff86] text-black"
+                                                                    : isAppSubmitted || isAppReceived
+                                                                    ? "bg-amber-200 text-amber-950"
+                                                                    : isCancelled || isAppRejected
                                                                     ? "bg-rose-300 text-black"
                                                                     : isCompleted
                                                                     ? "bg-sky-300 text-black"
@@ -1386,7 +1760,15 @@ export const NotificationsView: React.FC = () => {
                                                             }`}
                                                         >
                                                             <span>
-                                                                {isCancelled
+                                                                {isAppApproved
+                                                                    ? "Application Accepted · Pass Active"
+                                                                    : isAppSubmitted
+                                                                    ? "Application Submitted · Under Review"
+                                                                    : isAppReceived
+                                                                    ? "New Applicant · Review Needed"
+                                                                    : isAppRejected
+                                                                    ? "Application Rejected"
+                                                                    : isCancelled
                                                                     ? "Cancelled"
                                                                     : isCompleted
                                                                     ? "Completed"
@@ -1416,7 +1798,11 @@ export const NotificationsView: React.FC = () => {
                                         {/* Status Message / Banner */}
                                         <div
                                             className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] ${
-                                                isCancelled
+                                                isAppApproved
+                                                    ? "bg-[#a2ff86] border-black"
+                                                    : isAppSubmitted || isAppReceived
+                                                    ? "bg-amber-50 border-amber-950"
+                                                    : isCancelled || isAppRejected
                                                     ? "bg-rose-50 border-rose-950"
                                                     : isCompleted
                                                     ? "bg-sky-50 border-sky-950"
@@ -1426,25 +1812,150 @@ export const NotificationsView: React.FC = () => {
                                             <div className="flex items-start gap-3">
                                                 <div
                                                     className={`p-2 rounded-xl border border-black shrink-0 ${
-                                                        isCancelled
+                                                        isAppApproved
+                                                            ? "bg-black text-[#a2ff86]"
+                                                            : isAppSubmitted || isAppReceived
+                                                            ? "bg-amber-200 text-amber-950"
+                                                            : isCancelled || isAppRejected
                                                             ? "bg-rose-200 text-rose-900"
                                                             : isCompleted
                                                             ? "bg-sky-200 text-sky-900"
                                                             : "bg-[#a2ff86] text-black"
                                                     }`}
                                                 >
-                                                    <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    {isAppApproved ? (
+                                                        <CheckCircle2 className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : isAppSubmitted || isAppReceived ? (
+                                                        <Clock className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : (
+                                                        <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    )}
                                                 </div>
                                                 <div className="space-y-1 min-w-0 flex-1">
                                                     <h4 className="text-sm font-black text-black">
                                                         {activeItem.title}
                                                     </h4>
-                                                    <p className="text-xs text-neutral-700 leading-relaxed font-medium">
+                                                    <p className="text-xs text-neutral-800 leading-relaxed font-bold">
                                                         {activeItem.body}
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* Case: Application Accepted - Display Scannable Digital Entry Pass with Real QR Code */}
+                                        {isAppApproved && meta.ticketCode && (
+                                            <div className="p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 text-center">
+                                                <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-neutral-500 border-b border-black/10 pb-2">
+                                                    <span className="flex items-center gap-1.5 text-black">
+                                                        <Ticket className="w-4 h-4 text-black" />
+                                                        Verified Event Entry Pass
+                                                    </span>
+                                                    <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                        Active Admission Pass
+                                                    </span>
+                                                </div>
+
+                                                {/* High-DPI Scannable QR Code */}
+                                                <div className="flex flex-col items-center justify-center py-2">
+                                                    <div className="p-4 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] inline-block">
+                                                        <OrbixCardQR
+                                                            value={meta.ticketCode}
+                                                            size={190}
+                                                            showLogo={true}
+                                                            noShadow={true}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[11px] font-mono font-bold text-neutral-600 mt-2.5 flex items-center gap-1.5 justify-center">
+                                                        <QrCode className="w-3.5 h-3.5 text-black" />
+                                                        Scan at registration desk for campus admission check-in
+                                                    </span>
+                                                </div>
+
+                                                {/* Pass Code Box */}
+                                                <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1.5">
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                                        Your Ticket Pass Code
+                                                    </span>
+                                                    <div className="flex items-center justify-center gap-2.5">
+                                                        <span className="font-mono text-xl sm:text-2xl font-black text-black tracking-widest bg-white px-4 py-1.5 rounded-xl border border-black shadow-[1px_1px_0px_#000]">
+                                                            {meta.ticketCode}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(meta.ticketCode);
+                                                                setCopiedField("pass_code");
+                                                                toast.success("Ticket pass code copied!");
+                                                                setTimeout(() => setCopiedField(null), 2000);
+                                                            }}
+                                                            className="p-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                            title="Copy Ticket Pass Code"
+                                                        >
+                                                            {copiedField === "pass_code" ? (
+                                                                <Check className="w-4 h-4 text-emerald-600" />
+                                                            ) : (
+                                                                <Copy className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Attendee Details Strip */}
+                                                <div className="p-3 rounded-xl bg-neutral-50 border border-black/20 text-xs font-bold text-left grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <div>
+                                                        <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                            Ticket Holder
+                                                        </span>
+                                                        <span className="text-black font-black truncate block">
+                                                            {meta.applicantName || user?.firstName || user?.username || "Student Attendee"}
+                                                        </span>
+                                                    </div>
+                                                    {meta.rollNumber && (
+                                                        <div>
+                                                            <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                                Student ID / Roll No
+                                                            </span>
+                                                            <span className="text-neutral-800 font-mono text-[11px] block">
+                                                                {meta.rollNumber}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {meta.department && (
+                                                        <div>
+                                                            <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                                Department
+                                                            </span>
+                                                            <span className="text-neutral-800 text-[11px] block">
+                                                                {meta.department}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {meta.registrationId && (
+                                                        <div>
+                                                            <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                                Registration ID
+                                                            </span>
+                                                            <span className="text-neutral-600 font-mono text-[10px] truncate block">
+                                                                {meta.registrationId}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Case: Application Pending Review */}
+                                        {isAppSubmitted && (
+                                            <div className="p-4 rounded-2xl bg-amber-50/70 border-2 border-amber-800/40 text-amber-950 space-y-2 text-left">
+                                                <div className="flex items-center gap-2 font-black text-xs">
+                                                    <Clock className="w-4 h-4 text-amber-700" />
+                                                    <span>Entry Pass Pending Review</span>
+                                                </div>
+                                                <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                                                    The {clubName} organizers have been notified of your registration. Your admission entry pass and check-in QR code will be generated immediately once your application is accepted.
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Event Specific Info Cards */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1472,6 +1983,24 @@ export const NotificationsView: React.FC = () => {
                                         {/* Actions Footer */}
                                         <div className="mt-auto pt-4 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-3">
                                             <div className="flex items-center gap-2">
+                                                {isAppApproved && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => window.print()}
+                                                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                    >
+                                                        <Printer className="w-3.5 h-3.5" />
+                                                        <span>Print Pass Receipt</span>
+                                                    </button>
+                                                )}
+
+                                                <Link
+                                                    to="/applications"
+                                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
+                                                >
+                                                    <span>View My Applications</span>
+                                                </Link>
+
                                                 {clubSlug && (
                                                     <Link
                                                         to={`/clubs/${clubSlug}`}
@@ -1486,7 +2015,7 @@ export const NotificationsView: React.FC = () => {
                                             <div className="flex items-center gap-2">
                                                 {eventId && (
                                                     <Link
-                                                        to={`/events?eventId=${eventId}`}
+                                                        to={`/college-events?eventId=${eventId}`}
                                                         className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
                                                     >
                                                         <span>Open Event Details</span>

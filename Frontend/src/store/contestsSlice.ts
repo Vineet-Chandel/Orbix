@@ -178,10 +178,10 @@ export const fetchContestPerformance = createAsyncThunk<
         const reqHeaders: Record<string, string> = { "Content-Type": "application/json" };
         if (token) reqHeaders["Authorization"] = `Bearer ${token}`;
 
-        const endpoints = [
-            `/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force || portalsMismatched ? "&refresh=true" : ""}${portalsQuery}`,
-            `http://localhost:3000/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force || portalsMismatched ? "&refresh=true" : ""}${portalsQuery}`,
-        ];
+        const primaryUrl = `/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force || portalsMismatched ? "&refresh=true" : ""}${portalsQuery}`;
+        const endpoints = import.meta.env.DEV
+            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
+            : [primaryUrl];
 
         let lastError = "Failed to fetch contest performance";
         for (const url of endpoints) {

@@ -3,6 +3,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../store";
 import { useToast } from "../context/ToastContext";
 import { PORTALS } from "../utils/portalParser";
+import { buildApiUrl } from "../api/apiClient";
 
 export interface ResyncResultItem {
     portal: string;
@@ -92,10 +93,10 @@ export function usePlatformSync(): UsePlatformSyncReturn {
                 }
             })();
 
-            const endpoints = [
-                "/api/portals/resync",
-                "http://localhost:3000/api/portals/resync",
-            ];
+            const primarySync = buildApiUrl("/api/portals/resync");
+            const endpoints = import.meta.env.DEV
+                ? [primarySync, "http://localhost:3000/api/portals/resync"]
+                : [primarySync];
 
             let resData: any = null;
 

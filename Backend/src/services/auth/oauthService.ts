@@ -6,6 +6,7 @@ import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { userDetailsCache } from "../../redis/cache/cache-auth.js";
 import { createSession } from "../session/sessionService.js";
+import { OnboardingEmailService } from "../email/onboardingEmailService.js";
 
 const DEFAULT_AVATAR_URL = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
 const ACCESS_TOKEN_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -412,6 +413,15 @@ export class OAuthService {
         if (existingResult.rows.length > 0) {
             const existingUser = existingResult.rows[0];
 
+            if (existingUser.accountType === "club") {
+                const err: any = new Error(
+                    "OAuth sign-in is only supported for Personal accounts. Please use the Club Portal to sign in with your club credentials."
+                );
+                err.statusCode = 403;
+                err.code = "ACCOUNT_TYPE_MISMATCH";
+                throw err;
+            }
+
             // If user exists, target the exact same account (canonical email identity)
             const updates: string[] = [];
             const values: any[] = [];
@@ -568,6 +578,14 @@ export class OAuthService {
             accountType: "personal",
         });
 
+        // Send founder welcome gesture email asynchronously for new OAuth signup
+        OnboardingEmailService.sendPersonalWelcomeEmailAsync({
+            to: normalizedEmail,
+            firstName: createdUser.firstName,
+            username: createdUser.username,
+            userId: createdUser.id,
+        });
+
         return { user: createdUser, isNewUser: true };
     }
 
@@ -624,6 +642,13 @@ export class OAuthService {
         res: Response,
         deviceId?: string
     ): Promise<{ token: string; refreshToken: string; sessionId: string }> {
+        if (user?.accountType === "club" || user?.account_type === "club") {
+            const err: any = new Error("OAuth sign-in is not permitted for Club accounts.");
+            err.statusCode = 403;
+            err.code = "ACCOUNT_TYPE_MISMATCH";
+            throw err;
+        }
+
         const JWT_SECRET = this.getJWTSecret();
 
         if (deviceId) {

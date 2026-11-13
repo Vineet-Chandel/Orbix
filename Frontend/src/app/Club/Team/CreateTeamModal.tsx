@@ -72,6 +72,8 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
     const [coLeadUserId, setCoLeadUserId] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
 
@@ -120,8 +122,6 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
             setIsSubmitting(false);
         }
     };
-
-    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     return createPortal(
         <div

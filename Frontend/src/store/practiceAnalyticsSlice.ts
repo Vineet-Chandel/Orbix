@@ -172,10 +172,10 @@ export const fetchPracticeAnalytics = createAsyncThunk<
             }
         }
 
-        const endpoints = [
-            `/api/portals/practice/analytics?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsParam}`,
-            `http://localhost:3000/api/portals/practice/analytics?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsParam}`,
-        ];
+        const primaryUrl = `/api/portals/practice/analytics?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsParam}`;
+        const endpoints = import.meta.env.DEV
+            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
+            : [primaryUrl];
 
         let lastError = "Failed to fetch practice analytics";
         for (const url of endpoints) {

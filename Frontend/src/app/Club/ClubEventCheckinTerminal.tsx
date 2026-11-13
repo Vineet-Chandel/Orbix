@@ -15,6 +15,8 @@ import {
     ScanLine,
     FlipHorizontal,
     Globe,
+    Check,
+    X,
 } from "lucide-react";
 import jsQR from "jsqr";
 import {
@@ -435,17 +437,17 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                                     <input
                                         type="text"
                                         value={ticketInput}
-                                        onChange={(e) => setTicketInput(e.target.value.toUpperCase())}
-                                        placeholder="e.g. ORB-543F5A81"
+                                        onChange={(e) => setTicketInput(e.target.value)}
+                                        placeholder="e.g. ORB-543F5A81, Student ID or Roll No"
                                         className="w-full pl-3 pr-10 py-3 rounded-2xl bg-[#FAF6EE] border-3 border-black text-sm font-mono font-black text-black placeholder:text-neutral-400 focus:outline-hidden focus:bg-white shadow-[2px_2px_0px_#000] tracking-wider"
                                     />
                                     {ticketInput && (
                                         <button
                                             type="button"
                                             onClick={() => setTicketInput("")}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-black text-xs font-black"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-black cursor-pointer"
                                         >
-                                            ✕
+                                            <X className="w-3.5 h-3.5" />
                                         </button>
                                     )}
                                 </div>
@@ -624,8 +626,8 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                                                     {attendee.firstName?.[0] || attendee.username?.[0] || "U"}
                                                 </div>
                                             )}
-                                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                                                ✓
+                                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
+                                                <Check className="w-3.5 h-3.5 stroke-[3] text-black" />
                                             </div>
                                         </div>
 

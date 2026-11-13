@@ -36,24 +36,48 @@ institutionsRouter.get("/search", async (req: Request, res: Response) => {
             });
         }
 
-        const result = await query(
-            `SELECT
-                id,
-                official_name AS "officialName",
-                city,
-                state,
-                district,
-                institution_type AS "institutionType",
-                aishe_code AS "aisheCode",
-                verification_status AS "verificationStatus"
-            FROM search_verified_institutions($1, $2, $3);`,
-            [sanitized, stateFilter, limit]
-        );
+        let rows = [];
+        try {
+            const result = await query(
+                `SELECT
+                    id,
+                    official_name AS "officialName",
+                    city,
+                    state,
+                    district,
+                    institution_type AS "institutionType",
+                    aishe_code AS "aisheCode",
+                    verification_status AS "verificationStatus"
+                FROM search_verified_institutions($1, $2, $3);`,
+                [sanitized, stateFilter, limit]
+            );
+            rows = result.rows;
+        } catch (procErr) {
+            const fallbackRes = await query(
+                `SELECT
+                    id,
+                    official_name AS "officialName",
+                    city,
+                    state,
+                    district,
+                    institution_type AS "institutionType",
+                    aishe_code AS "aisheCode",
+                    verification_status AS "verificationStatus"
+                FROM institutions
+                WHERE is_active = true
+                  AND (official_name ILIKE $1 OR normalized_name ILIKE $1)
+                  AND ($2::text IS NULL OR state = $2)
+                ORDER BY official_name ASC
+                LIMIT $3;`,
+                [`%${sanitized}%`, stateFilter, limit]
+            );
+            rows = fallbackRes.rows;
+        }
 
         return res.status(200).json({
             success: true,
-            institutions: result.rows,
-            total: result.rows.length,
+            institutions: rows,
+            total: rows.length,
         });
     } catch (err: any) {
         console.error("Institution search error:", err);

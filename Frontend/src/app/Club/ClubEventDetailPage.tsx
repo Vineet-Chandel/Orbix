@@ -9,7 +9,6 @@ import {
     Edit3,
     Trash2,
     Users,
-    BarChart3,
     QrCode,
     FileSpreadsheet,
     CheckCircle2,
@@ -26,6 +25,11 @@ import {
     RefreshCw,
     Award,
     ScanLine,
+    Sliders,
+    Paperclip,
+    Heart,
+    Settings,
+    Globe2,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -46,11 +50,15 @@ import {
 import { ClubEventModal } from "./ClubEventModal";
 import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
+import { CredibilityImpactModal } from "../../components/credibility/CredibilityImpactModal";
 import { EventLiveListingCard } from "../../components/EventLiveListingCard";
 import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
+import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
+import { IssuanceConsoleView } from "./CertificateStudio/IssuanceConsoleView";
 import { OrbixLoader } from "../../components/ui/loader";
+import { NeoSelect } from "../../components/NeoSelect";
 
-type EventTab = "roster" | "checkin" | "analytics" | "pass";
+type EventTab = "roster" | "form" | "checkin" | "certificates" | "analytics" | "pass" | "settings";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -76,6 +84,9 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
     // Event & loading state
     const [event, setEvent] = useState<ClubEvent | null>(null);
+    const isPanIndia = Boolean(
+        event?.scope === "PAN_INDIA" || (event as any)?.isPanIndia === true || (event as any)?.is_pan_india === true
+    );
     const [clubInfo, setClubInfo] = useState<{
         id: string;
         name: string;
@@ -88,17 +99,35 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [accessDenied, setAccessDenied] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
     const location = useLocation();
-    const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin";
-    const [activeTab, setActiveTab] = useState<EventTab>(isCheckinRoute ? "checkin" : "roster");
+    const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin" || searchParams.get("eventTab") === "checkin";
+    const eventTabQuery = (searchParams.get("eventTab") || searchParams.get("tab")) as EventTab | null;
+    const initialTab: EventTab = isCheckinRoute
+        ? "checkin"
+        : (eventTabQuery && ["roster", "form", "checkin", "certificates", "analytics", "pass", "settings"].includes(eventTabQuery) ? eventTabQuery : "roster");
+    const [activeTab, setActiveTab] = useState<EventTab>(initialTab);
+
+    // Keep activeTab in sync with URL searchParams (e.g. browser back/forward or tab changes)
+    useEffect(() => {
+        const queryTab = (searchParams.get("eventTab") || searchParams.get("tab")) as EventTab | null;
+        if (queryTab && ["roster", "form", "checkin", "certificates", "analytics", "pass", "settings"].includes(queryTab)) {
+            setActiveTab(queryTab);
+        } else if (!queryTab && !location.pathname.endsWith("/checkin")) {
+            setActiveTab("roster");
+        }
+    }, [searchParams, location.pathname]);
 
     const handleTabChange = (tab: EventTab) => {
         setActiveTab(tab);
+        if (tab === "roster") {
+            loadApplications();
+        }
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
+            next.delete("tab");
             if (tab === "roster") {
-                next.delete("tab");
+                next.delete("eventTab");
             } else {
-                next.set("tab", tab);
+                next.set("eventTab", tab);
             }
             return next;
         });
@@ -110,6 +139,14 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [securityTarget, setSecurityTarget] = useState<{
         action: "draft" | "cancelled" | "delete";
     } | null>(null);
+    const [credibilityTarget, setCredibilityTarget] = useState<{
+        action: "cancel" | "delete" | "draft" | "complete";
+    } | null>(null);
+    const [credibilityInputs, setCredibilityInputs] = useState<{
+        reasonCategory?: string;
+        communicatedToAll?: boolean;
+        rescheduleOffered?: boolean;
+    }>({});
 
     // Applications & Roster State
     const [appsData, setAppsData] = useState<ClubEventApplicationsResponse | null>(null);
@@ -118,8 +155,18 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [statusFilter, setStatusFilter] = useState<
         "all" | "pending" | "registered" | "attended" | "rejected" | "cancelled"
     >("all");
+    const [institutionFilter, setInstitutionFilter] = useState<string>("all");
+    const [stateFilter, setStateFilter] = useState<string>("all");
     const [updatingApplicantId, setUpdatingApplicantId] = useState<string | null>(null);
     const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+    // Reset institution and state filters if event is campus-bounded
+    useEffect(() => {
+        if (!isPanIndia) {
+            setInstitutionFilter("all");
+            setStateFilter("all");
+        }
+    }, [isPanIndia]);
 
     // Check authentication and load event from backend
     const loadEventDetails = async () => {
@@ -264,6 +311,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         password,
                         confirmationText,
                         emergencyBypass,
+                        reasonCategory: credibilityInputs.reasonCategory,
+                        rescheduleOffered: credibilityInputs.rescheduleOffered,
                     })
                 ).unwrap();
 
@@ -345,30 +394,206 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         }
     };
 
+    // Extract dynamic form question columns from form structure and response answers
+    const formQuestions = useMemo(() => {
+        const questions: { id: string; label: string; type?: string }[] = [];
+        const seenIds = new Set<string>();
+
+        // 1. From formStructure.sections
+        if (appsData?.formStructure && Array.isArray(appsData.formStructure.sections)) {
+            appsData.formStructure.sections.forEach((sec: any) => {
+                const list = sec.questions || sec.fields || [];
+                list.forEach((q: any) => {
+                    if (
+                        q &&
+                        q.id &&
+                        !seenIds.has(q.id) &&
+                        q.type !== "image_card" &&
+                        q.type !== "markdown_card" &&
+                        q.type !== "image_block" &&
+                        q.type !== "video_block" &&
+                        q.type !== "title_card"
+                    ) {
+                        seenIds.add(q.id);
+                        questions.push({
+                            id: q.id,
+                            label: q.title || q.label || "Question",
+                            type: q.type,
+                        });
+                    }
+                });
+            });
+        }
+
+        // 2. Discover any additional question keys present in applicants' answers
+        if (appsData?.applications) {
+            appsData.applications.forEach((app) => {
+                const ans = app.answers || app.formResponse || {};
+                Object.keys(ans).forEach((k) => {
+                    if (k === "q_roll_number" || k === "q_department" || k === "q_year") {
+                        return;
+                    }
+                    if (!seenIds.has(k)) {
+                        seenIds.add(k);
+                        let cleanLabel = k;
+                        if (cleanLabel.startsWith("q_")) {
+                            cleanLabel = cleanLabel.substring(2).replace(/_/g, " ");
+                            cleanLabel = cleanLabel.charAt(0).toUpperCase() + cleanLabel.slice(1);
+                        }
+                        questions.push({
+                            id: k,
+                            label: cleanLabel,
+                            type: "text",
+                        });
+                    }
+                });
+            });
+        }
+
+        return questions;
+    }, [appsData]);
+
+    // Format & render each answer cell nicely in the roster table
+    const renderAnswerValue = (
+        app: ClubEventApplicantRow,
+        question: { id: string; label: string; type?: string }
+    ) => {
+        // File attachments check
+        if (app.fileAttachments && app.fileAttachments.length > 0) {
+            const matched = app.fileAttachments.filter((f) => f.questionId === question.id);
+            if (matched.length > 0) {
+                return (
+                    <div className="flex flex-col gap-1 max-w-[220px]">
+                        {matched.map((f, idx) => (
+                            <a
+                                key={idx}
+                                href={f.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:underline truncate"
+                                title={f.fileName || "View Attachment"}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Paperclip className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{f.fileName || "Attachment"}</span>
+                            </a>
+                        ))}
+                    </div>
+                );
+            }
+        }
+
+        const ansObj = app.answers || app.formResponse || {};
+        const val = ansObj[question.id];
+
+        if (val === null || val === undefined || val === "") {
+            return <span className="text-neutral-400 font-normal">—</span>;
+        }
+
+        if (Array.isArray(val)) {
+            if (val.length === 0) return <span className="text-neutral-400 font-normal">—</span>;
+            const text = val.join(", ");
+            return (
+                <span className="font-medium text-neutral-800 block truncate max-w-[220px]" title={text}>
+                    {text}
+                </span>
+            );
+        }
+
+        if (typeof val === "object") {
+            const jsonStr = JSON.stringify(val);
+            return (
+                <span className="font-mono text-[11px] text-neutral-700 block truncate max-w-[220px]" title={jsonStr}>
+                    {jsonStr}
+                </span>
+            );
+        }
+
+        const strVal = String(val).trim();
+        if (!strVal) return <span className="text-neutral-400 font-normal">—</span>;
+
+        if (strVal.startsWith("http://") || strVal.startsWith("https://")) {
+            return (
+                <a
+                    href={strVal}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-700 font-bold hover:underline truncate inline-flex items-center gap-1 max-w-[220px]"
+                    title={strVal}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <span className="truncate">{strVal.replace(/^https?:\/\/(www\.)?/, "")}</span>
+                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                </a>
+            );
+        }
+
+        return (
+            <span className="font-medium text-neutral-800 block truncate max-w-[220px]" title={strVal}>
+                {strVal}
+            </span>
+        );
+    };
+
+    // Unique institutions and states across all registered applications for filtering (Pan-India events only)
+    const uniqueInstitutions = useMemo(() => {
+        if (!isPanIndia || !appsData?.applications) return [];
+        const set = new Set<string>();
+        appsData.applications.forEach((a: any) => {
+            if (a.institutionName && a.institutionName.trim()) {
+                set.add(a.institutionName.trim());
+            }
+        });
+        return Array.from(set).sort();
+    }, [isPanIndia, appsData]);
+
+    const uniqueStates = useMemo(() => {
+        if (!isPanIndia || !appsData?.applications) return [];
+        const set = new Set<string>();
+        appsData.applications.forEach((a: any) => {
+            if (a.institutionState && a.institutionState.trim()) {
+                set.add(a.institutionState.trim());
+            }
+        });
+        return Array.from(set).sort();
+    }, [isPanIndia, appsData]);
+
     // Filtered Applications for Roster Tab
     const filteredApplications = useMemo(() => {
         if (!appsData?.applications) return [];
-        return appsData.applications.filter((a) => {
+        return appsData.applications.filter((a: any) => {
             const matchesStatus = statusFilter === "all" || a.status === statusFilter;
+            const matchesInstitution = !isPanIndia || institutionFilter === "all" || a.institutionName === institutionFilter;
+            const matchesState = !isPanIndia || stateFilter === "all" || a.institutionState === stateFilter;
             const query = searchQuery.trim().toLowerCase();
-            if (!query) return matchesStatus;
+            if (!query) return matchesStatus && matchesInstitution && matchesState;
 
             const name = (a.applicantName || "").toLowerCase();
             const username = (a.username || "").toLowerCase();
             const email = (a.applicantEmail || "").toLowerCase();
-            const rollNo = (a.rollNumber || "").toLowerCase();
-            const department = (a.department || "").toLowerCase();
+            const ticketCode = (a.ticketCode || "").toLowerCase();
+            const inst = (a.institutionName || "").toLowerCase();
+            const city = (a.institutionCity || "").toLowerCase();
+            const state = (a.institutionState || "").toLowerCase();
+
+            // Match against any answer value
+            const ansValues = Object.values(a.answers || a.formResponse || {})
+                .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v || "")).toLowerCase())
+                .join(" ");
 
             const matchesQuery =
                 name.includes(query) ||
                 username.includes(query) ||
                 email.includes(query) ||
-                rollNo.includes(query) ||
-                department.includes(query);
+                ticketCode.includes(query) ||
+                inst.includes(query) ||
+                city.includes(query) ||
+                state.includes(query) ||
+                ansValues.includes(query);
 
-            return matchesStatus && matchesQuery;
+            return matchesStatus && matchesInstitution && matchesState && matchesQuery;
         });
-    }, [appsData, statusFilter, searchQuery]);
+    }, [appsData, statusFilter, institutionFilter, stateFilter, searchQuery, isPanIndia]);
 
     // Analytics Breakdown computations
     const analytics = useMemo(() => {
@@ -382,6 +607,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 turnoutRate: 0,
                 deptBreakdown: [] as { name: string; count: number; pct: number }[],
                 yearBreakdown: [] as { year: string; count: number; pct: number }[],
+                collegeBreakdown: [] as { name: string; count: number; pct: number }[],
+                stateBreakdown: [] as { name: string; count: number; pct: number }[],
             };
         }
 
@@ -392,13 +619,29 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
         const deptMap = new Map<string, number>();
         const yearMap = new Map<string, number>();
+        const instMap = new Map<string, number>();
+        const stateMap = new Map<string, number>();
 
-        appsData.applications.forEach((a) => {
-            const dept = (a.department || "General / Undeclared").trim();
-            deptMap.set(dept, (deptMap.get(dept) || 0) + 1);
+        appsData.applications.forEach((a: any) => {
+            if (a.department) {
+                const dept = a.department.trim();
+                deptMap.set(dept, (deptMap.get(dept) || 0) + 1);
+            }
 
-            const yr = a.yearOfStudy ? `Year ${a.yearOfStudy}` : "Unspecified";
-            yearMap.set(yr, (yearMap.get(yr) || 0) + 1);
+            if (a.yearOfStudy) {
+                const yr = `Year ${a.yearOfStudy}`;
+                yearMap.set(yr, (yearMap.get(yr) || 0) + 1);
+            }
+
+            if (a.institutionName && a.institutionName.trim()) {
+                const inst = a.institutionName.trim();
+                instMap.set(inst, (instMap.get(inst) || 0) + 1);
+            }
+
+            if (a.institutionState && a.institutionState.trim()) {
+                const st = a.institutionState.trim();
+                stateMap.set(st, (stateMap.get(st) || 0) + 1);
+            }
         });
 
         const deptBreakdown = Array.from(deptMap.entries())
@@ -418,6 +661,24 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             }))
             .sort((a, b) => a.year.localeCompare(b.year));
 
+        const collegeBreakdown = Array.from(instMap.entries())
+            .map(([name, count]) => ({
+                name,
+                count,
+                pct: total > 0 ? Math.round((count / total) * 100) : 0,
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8);
+
+        const stateBreakdown = Array.from(stateMap.entries())
+            .map(([name, count]) => ({
+                name,
+                count,
+                pct: total > 0 ? Math.round((count / total) * 100) : 0,
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8);
+
         return {
             total,
             registered,
@@ -427,6 +688,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             turnoutRate,
             deptBreakdown,
             yearBreakdown,
+            collegeBreakdown,
+            stateBreakdown,
         };
     }, [appsData]);
 
@@ -571,6 +834,11 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             : "Cancelled"}
                     </span>
 
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-950 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
+                        <Heart className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                        <span>{(event as any).likesCount || 0} Likes</span>
+                    </span>
+
                     <button
                         type="button"
                         onClick={() => setIsEditModalOpen(true)}
@@ -604,13 +872,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
             {/* Hero Event Card */}
             <div className="p-6 sm:p-7 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-6">
-                    {/* Cover Banner if present */}
+                    {/* Cover Banner if present (100% full view, never cropped) */}
                     {event.coverImageUrl ? (
-                        <div className="w-full h-44 sm:h-64 rounded-2xl border-2 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-100">
+                        <div className="w-full aspect-[2.4/1] max-h-[420px] rounded-2xl border-2 sm:border-3 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-950 flex items-center justify-center">
                             <img
                                 src={event.coverImageUrl}
                                 alt={event.title}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                             />
                         </div>
                     ) : (
@@ -635,6 +903,21 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
                                 <GraduationCap className="w-3 h-3" />
                                 {collegeAffiliation}
+                            </span>
+                            {isPanIndia ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FF9933] text-black border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
+                                    <Globe2 className="w-3 h-3 stroke-[2.3]" />
+                                    Pan India Reach
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-200 text-sky-950 border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
+                                    <GraduationCap className="w-3 h-3 stroke-[2.3]" />
+                                    Campus Only
+                                </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-950 border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
+                                <Heart className="w-3 h-3 text-rose-600 fill-rose-600" />
+                                <span>{(event as any).likesCount || 0} Likes</span>
                             </span>
                         </div>
 
@@ -704,6 +987,22 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
+                        onClick={() => handleTabChange("form")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "form"
+                                ? "bg-[#C084FC] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <Sliders className="w-4 h-4 stroke-[2.5]" />
+                        <span>Registration Form Builder</span>
+                        <span className="px-2 py-0.5 rounded-full bg-white text-black border border-black text-[10px] font-black">
+                            BUILDER
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={() => handleTabChange("checkin")}
                         className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                             activeTab === "checkin"
@@ -720,15 +1019,18 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
-                        onClick={() => handleTabChange("analytics")}
+                        onClick={() => handleTabChange("certificates")}
                         className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                            activeTab === "analytics"
+                            activeTab === "certificates"
                                 ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
                                 : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
                         }`}
                     >
-                        <BarChart3 className="w-4 h-4 stroke-[2.5]" />
-                        <span>Analytics & Attendance</span>
+                        <Award className="w-4 h-4 stroke-[2.5]" />
+                        <span>Certificates & Credentials</span>
+                        <span className="px-2 py-0.5 rounded-full bg-black text-[#FFE566] border border-black text-[10px] font-black">
+                            STUDIO
+                        </span>
                     </button>
 
                     <button
@@ -743,13 +1045,26 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         <QrCode className="w-4 h-4 stroke-[2.5]" />
                         <span>Invitation Card & QR Pass</span>
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange("settings")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "settings"
+                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <Settings className="w-4 h-4 stroke-[2.5]" />
+                        <span>Event Settings</span>
+                    </button>
                 </div>
 
                 {/* TAB 1: APPLICATIONS SHEET & ATTENDEE ROSTER */}
                 {activeTab === "roster" && (
                     <div className="space-y-4">
                         {/* Summary Metrics Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
                                 <span className="text-[10px] font-black uppercase text-neutral-500">Total Signups</span>
                                 <div className="text-2xl font-black text-black mt-1">
@@ -774,6 +1089,15 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     {appsData?.summary.attended || 0}
                                 </div>
                             </div>
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
+                                <span className="text-[10px] font-black uppercase text-rose-700 flex items-center gap-1">
+                                    <Heart className="w-3 h-3 fill-rose-600 text-rose-600" />
+                                    <span>Likes</span>
+                                </span>
+                                <div className="text-2xl font-black text-rose-600 mt-1">
+                                    {(event as any).likesCount || 0}
+                                </div>
+                            </div>
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] col-span-2 sm:col-span-1">
                                 <span className="text-[10px] font-black uppercase text-neutral-500">Turnout Rate</span>
                                 <div className="text-2xl font-black text-purple-700 mt-1">
@@ -791,7 +1115,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search by student name, roll no, branch, or email..."
+                                    placeholder="Search by student name, username, email, or answers..."
                                     className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden"
                                 />
                             </div>
@@ -828,6 +1152,32 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     })}
                                 </div>
 
+                                {isPanIndia && uniqueInstitutions.length > 0 && (
+                                    <NeoSelect
+                                        value={institutionFilter}
+                                        onChange={(val) => setInstitutionFilter(val)}
+                                        size="sm"
+                                        className="max-w-[200px]"
+                                        options={[
+                                            { value: "all", label: `All Colleges (${uniqueInstitutions.length})` },
+                                            ...uniqueInstitutions.map((inst) => ({ value: inst, label: inst })),
+                                        ]}
+                                    />
+                                )}
+
+                                {isPanIndia && uniqueStates.length > 0 && (
+                                    <NeoSelect
+                                        value={stateFilter}
+                                        onChange={(val) => setStateFilter(val)}
+                                        size="sm"
+                                        className="max-w-[160px]"
+                                        options={[
+                                            { value: "all", label: `All States (${uniqueStates.length})` },
+                                            ...uniqueStates.map((st) => ({ value: st, label: st })),
+                                        ]}
+                                    />
+                                )}
+
                                 <a
                                     href={getEventApplicationsExportUrl(event.id)}
                                     download
@@ -837,6 +1187,16 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     <Download className="w-3.5 h-3.5 stroke-[2.5]" />
                                     <span>Export CSV</span>
                                 </a>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleTabChange("certificates")}
+                                    className="px-3.5 py-2 rounded-xl bg-[#FFE566] hover:bg-[#FACC15] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    title="Open Certificate Studio for this event"
+                                >
+                                    <Award className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Issue Certificates</span>
+                                </button>
 
                                 <button
                                     type="button"
@@ -872,13 +1232,20 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
                                             <tr className="bg-[#FAF6EE] border-b-2 border-black text-[11px] font-black uppercase text-neutral-700 tracking-wider">
-                                                <th className="py-3 px-4">Student</th>
-                                                <th className="py-3 px-4">Roll / ID</th>
-                                                <th className="py-3 px-4">Department</th>
-                                                <th className="py-3 px-4">Year</th>
-                                                <th className="py-3 px-4">Applied At</th>
-                                                <th className="py-3 px-4">Status</th>
-                                                <th className="py-3 px-4 text-right">Review & Action</th>
+                                                <th className="py-3 px-4 min-w-[200px]">Student</th>
+                                                <th className="py-3 px-4 min-w-[170px]">Institution & Location</th>
+                                                {formQuestions.map((q) => (
+                                                    <th
+                                                        key={q.id}
+                                                        className="py-3 px-4 min-w-[150px] max-w-[260px] truncate"
+                                                        title={q.label}
+                                                    >
+                                                        {q.label}
+                                                    </th>
+                                                ))}
+                                                <th className="py-3 px-4 min-w-[120px]">Applied At</th>
+                                                <th className="py-3 px-4 min-w-[120px]">Status</th>
+                                                <th className="py-3 px-4 text-right min-w-[150px]">Review & Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y border-black/10">
@@ -930,16 +1297,29 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="py-3 px-4 font-mono font-bold text-neutral-700">
-                                                        {app.rollNumber || "—"}
+                                                    <td className="py-3 px-4">
+                                                        <div className="font-bold text-black flex items-center gap-1">
+                                                            <span className="truncate max-w-[200px]" title={app.institutionName || app.campusName || "Host Campus"}>
+                                                                {app.institutionName || app.campusName || "Host Campus"}
+                                                            </span>
+                                                            {app.institutionVerificationStatus === "verified" && (
+                                                                <span className="inline-flex items-center text-[10px] text-emerald-700 bg-emerald-100 p-0.5 rounded border border-emerald-800 font-black shrink-0" title="AISHE Verified Institution">
+                                                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {(app.institutionCity || app.institutionState) ? (
+                                                            <div className="text-[10px] text-neutral-500 font-medium truncate max-w-[200px]">
+                                                                {[app.institutionCity, app.institutionState].filter(Boolean).join(", ")}
+                                                            </div>
+                                                        ) : null}
                                                     </td>
-                                                    <td className="py-3 px-4 font-bold text-neutral-800">
-                                                        {app.department || "General"}
-                                                    </td>
-                                                    <td className="py-3 px-4 font-bold text-neutral-700">
-                                                        {app.yearOfStudy ? `Year ${app.yearOfStudy}` : "—"}
-                                                    </td>
-                                                    <td className="py-3 px-4 text-neutral-500 font-medium">
+                                                    {formQuestions.map((q) => (
+                                                        <td key={q.id} className="py-3 px-4 max-w-[260px]">
+                                                            {renderAnswerValue(app, q)}
+                                                        </td>
+                                                    ))}
+                                                    <td className="py-3 px-4 text-neutral-500 font-medium whitespace-nowrap">
                                                         {new Date(app.registeredAt).toLocaleDateString(undefined, {
                                                             month: "short",
                                                             day: "numeric",
@@ -970,6 +1350,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                     </td>
                                                     <td className="py-3 px-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
+                                                            {/* Answers button removed - answers are displayed directly in the columns */}
+
                                                             {app.status === "pending" ? (
                                                                 <>
                                                                     <button
@@ -1050,6 +1432,15 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     </div>
                 )}
 
+                {/* TAB: REGISTRATION FORM BUILDER */}
+                {activeTab === "form" && event && (
+                    <EventFormBuilderWorkspace
+                        eventId={event.id}
+                        club={clubInfo || clubState.club}
+                        onBack={() => handleTabChange("roster")}
+                    />
+                )}
+
                 {/* TAB: LIVE CHECK-IN SCANNER TERMINAL */}
                 {activeTab === "checkin" && event && (
                     <ClubEventCheckinTerminal
@@ -1074,6 +1465,20 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             });
                         }}
                     />
+                )}
+
+                {/* TAB: EVENT CERTIFICATE STUDIO & CREDENTIAL ISSUANCE */}
+                {activeTab === "certificates" && event && (
+                    <div className="space-y-6">
+                        <IssuanceConsoleView
+                            preselectedEventId={event.id}
+                            preselectedEventTitle={event.title}
+                            onBatchIssued={() => {
+                                toast.success("Certificate batch successfully issued!");
+                                loadApplications();
+                            }}
+                        />
+                    </div>
                 )}
 
                 {/* TAB 2: ANALYTICS & ATTENDANCE */}
@@ -1145,6 +1550,72 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     </div>
                                 )}
                             </div>
+
+                            {/* College / Institution Breakdown */}
+                            <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b-2 border-black/10">
+                                    <Globe2 className="w-5 h-5 text-black stroke-[2.5]" />
+                                    <h3 className="text-base font-black text-black">Participating Institutions ({analytics.collegeBreakdown.length})</h3>
+                                </div>
+
+                                {analytics.collegeBreakdown.length === 0 ? (
+                                    <p className="text-xs text-neutral-500 py-6 text-center">
+                                        No institution statistics recorded yet.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {analytics.collegeBreakdown.map((item) => (
+                                            <div key={item.name} className="space-y-1">
+                                                <div className="flex items-center justify-between text-xs font-bold">
+                                                    <span className="text-black truncate max-w-[280px]" title={item.name}>{item.name}</span>
+                                                    <span className="text-neutral-500 font-mono">
+                                                        {item.count} ({item.pct}%)
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 w-full bg-[#FAF6EE] rounded-full border border-black overflow-hidden p-0.5">
+                                                    <div
+                                                        className="h-full bg-[#FF9933] rounded-full border-r border-black"
+                                                        style={{ width: `${Math.max(5, item.pct)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* State Reach Breakdown */}
+                            <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b-2 border-black/10">
+                                    <Building2 className="w-5 h-5 text-black stroke-[2.5]" />
+                                    <h3 className="text-base font-black text-black">Geographic State Reach ({analytics.stateBreakdown.length})</h3>
+                                </div>
+
+                                {analytics.stateBreakdown.length === 0 ? (
+                                    <p className="text-xs text-neutral-500 py-6 text-center">
+                                        No state distribution statistics available yet.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {analytics.stateBreakdown.map((item) => (
+                                            <div key={item.name} className="space-y-1">
+                                                <div className="flex items-center justify-between text-xs font-bold">
+                                                    <span className="text-black">{item.name}</span>
+                                                    <span className="text-neutral-500 font-mono">
+                                                        {item.count} ({item.pct}%)
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 w-full bg-[#FAF6EE] rounded-full border border-black overflow-hidden p-0.5">
+                                                    <div
+                                                        className="h-full bg-[#38BDF8] rounded-full border-r border-black"
+                                                        style={{ width: `${Math.max(5, item.pct)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1167,6 +1638,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     description={event.description || undefined}
                                     startsAt={event.startsAt}
                                     endsAt={event.endsAt || undefined}
+                                    timezone={event.timezone}
                                     venueOrLocation={event.venueOrLocation || undefined}
                                     locationType={event.locationType}
                                     registrationUrl={event.registrationUrl || undefined}
@@ -1183,228 +1655,297 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     </div>
                 )}
 
-                {/* DEDICATED BOTTOM EVENT ACTIONS & CONTROLS */}
-                <div className="p-6 sm:p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
-                        <div>
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566] tracking-wider">
-                                Event Operations
-                            </span>
-                            <h3 className="text-lg sm:text-xl font-black text-black mt-1">
-                                Event Actions & Controls
-                            </h3>
-                            <p className="text-xs text-neutral-600 font-bold">
-                                Update details, mark completion, change publication state, or delete event.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-neutral-500">Status:</span>
-                            <span
-                                className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-black ${
-                                    event.status === "published"
-                                        ? "bg-emerald-300 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                        : event.status === "completed"
-                                        ? "bg-sky-200 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                        : event.status === "draft"
-                                        ? "bg-amber-200 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                        : "bg-rose-200 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                }`}
-                            >
-                                {event.status}
-                            </span>
+                {/* TAB 4: EVENT SETTINGS & CONTROLS */}
+                {activeTab === "settings" && event && (
+                    <div className="space-y-6">
+                        <div className="p-6 sm:p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566] tracking-wider">
+                                        Event Operations
+                                    </span>
+                                    <h3 className="text-lg sm:text-xl font-black text-black mt-1">
+                                        Event Actions & Controls
+                                    </h3>
+                                    <p className="text-xs text-neutral-600 font-bold">
+                                        Update details, mark completion, change publication state, or delete event.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-neutral-500">Status:</span>
+                                    <span
+                                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-black ${
+                                            event.status === "published"
+                                                ? "bg-emerald-300 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                : event.status === "completed"
+                                                ? "bg-sky-200 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                : event.status === "draft"
+                                                ? "bg-amber-200 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                : "bg-rose-200 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                        }`}
+                                    >
+                                        {event.status}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Action Controls & Impact Guidelines (Row-by-Row: Left Info / Right Button) */}
+                            <div className="space-y-4 pt-1">
+                                {/* 0. Edit Event Details & Basic Info */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
+                                                Event Information & Poster
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            Update session title, cover banner graphic, event schedule date & time, venue or virtual meeting link, and public description.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditModalOpen(true)}
+                                            className="w-full py-3 px-4 rounded-2xl bg-[#FFE566] hover:bg-[#ebd04e] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            title="Edit event details"
+                                        >
+                                            <Edit3 className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Edit Event Details</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 1. Mark Completed / Re-open Live (Sky Blue / Emerald) */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#F0F9FF] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-sky-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-sky-950">
+                                                {event.status === "published"
+                                                    ? "Conclude Event Session"
+                                                    : event.status === "completed"
+                                                    ? "Re-open Live Session"
+                                                    : "Publish to Campus"}
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            {event.status === "published"
+                                                ? "Conclude the live event once it has finished. Freezes new RSVP registrations, preserves verified attendee records, and archives it into chapter completed milestones."
+                                                : event.status === "completed"
+                                                ? "Re-publish this completed event back to the live campus directory and resume public student RSVP registrations."
+                                                : event.status === "draft"
+                                                ? "Make this draft event live and visible in the public campus directory for students to view and register."
+                                                : "Reactivate this cancelled event and restore public RSVPs in the campus directory."}
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        {event.status === "published" && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setCredibilityTarget({ action: "complete" })}
+                                                className="w-full py-3 px-6 rounded-2xl bg-[#BAE6FD] hover:bg-[#93c5fd] text-sky-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Mark session as completed with final attendee roster"
+                                            >
+                                                <CheckCheck className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Mark Completed</span>
+                                            </button>
+                                        )}
+
+                                        {event.status === "completed" && (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Re-open this event as live in campus directory"
+                                            >
+                                                <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Re-open as Live Event</span>
+                                            </button>
+                                        )}
+
+                                        {event.status === "draft" && (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Publish live to campus directory"
+                                            >
+                                                <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Publish Live to Campus</span>
+                                            </button>
+                                        )}
+
+                                        {event.status === "cancelled" && (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Restore and publish live"
+                                            >
+                                                <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Restore & Publish Live</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 2. [To Draft] and [Cancel Event] side-by-side with Left Guidelines */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
+                                                Campus Directory Visibility
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            Move to Draft to temporarily unpublish this event from campus feeds for offline changes, or mark as Cancelled to display a cancellation notice while preserving student applicant records. Both actions require security verification.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0 grid grid-cols-2 gap-2.5">
+                                        {event.status !== "draft" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (event.status === "published") {
+                                                        setCredibilityTarget({ action: "draft" });
+                                                    } else {
+                                                        setSecurityTarget({ action: "draft" });
+                                                    }
+                                                }}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-[#FEF3C7] hover:bg-[#fde68a] text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Move event to draft status"
+                                            >
+                                                <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>To Draft</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            >
+                                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Publish Live</span>
+                                            </button>
+                                        )}
+
+                                        {event.status !== "cancelled" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setCredibilityTarget({ action: "cancel" })}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-[#FECDD3] hover:bg-[#fca5a5] text-rose-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Cancel event with notification"
+                                            >
+                                                <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Cancel</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSecurityTarget({ action: "draft" })}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            >
+                                                <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Restore Draft</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 2.5 Issue Participation & Turnout Certificates */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <Award className="w-4 h-4 text-black stroke-[2.5]" />
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
+                                                Participation & Merit Certificates
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            Issue verifiable credentials to students who attended or registered for "{event.title}". Dispatches in-app notifications to each recipient's Activity portfolio.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleTabChange("certificates")}
+                                            className="w-full py-3 px-4 rounded-2xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <Award className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Issue Certificates</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 3. Delete Event... with Danger Zone Guidelines */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF1F2] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-rose-950">
+                                                Danger Zone — Permanent Removal
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-rose-900/80 font-medium leading-relaxed">
+                                            Permanently delete this event listing, remove the public invitation pass, and erase all student RSVP applications from the database. Irreversible action protected by title confirmation and coordinator password verification.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (event.status === "published") {
+                                                    setCredibilityTarget({ action: "delete" });
+                                                } else {
+                                                    setSecurityTarget({ action: "delete" });
+                                                }
+                                            }}
+                                            className="w-full py-3 px-6 rounded-2xl bg-[#FFE4E6] hover:bg-[#fecdd3] text-rose-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            title="Permanently delete this event from the system"
+                                        >
+                                            <Trash2 className="w-4 h-4 stroke-[2.2] text-rose-900" />
+                                            <span>Delete Event...</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                )}
 
-                    {/* Action Controls & Impact Guidelines (Row-by-Row: Left Info / Right Button) */}
-                    <div className="space-y-4 pt-1">
-                        {/* 1. Mark Completed / Re-open Live (Sky Blue / Emerald) */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#F0F9FF] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500 border border-black"></span>
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-sky-950">
-                                        {event.status === "published"
-                                            ? "Conclude Event Session"
-                                            : event.status === "completed"
-                                            ? "Re-open Live Session"
-                                            : "Publish to Campus"}
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                                    {event.status === "published"
-                                        ? "Conclude the live event once it has finished. Freezes new RSVP registrations, preserves verified attendee records, and archives it into chapter completed milestones."
-                                        : event.status === "completed"
-                                        ? "Re-publish this completed event back to the live campus directory and resume public student RSVP registrations."
-                                        : event.status === "draft"
-                                        ? "Make this draft event live and visible in the public campus directory for students to view and register."
-                                        : "Reactivate this cancelled event and restore public RSVPs in the campus directory."}
-                                </p>
-                            </div>
+            {/* ATTACHED CREDIBILITY IMPACT WARNING MODAL */}
+            {event && (
+                <CredibilityImpactModal
+                    isOpen={Boolean(credibilityTarget)}
+                    onClose={() => setCredibilityTarget(null)}
+                    eventId={event.id}
+                    eventTitle={event.title}
+                    action={credibilityTarget?.action || "cancel"}
+                    onConfirm={(data) => {
+                        const targetAct = credibilityTarget?.action;
+                        setCredibilityInputs(data);
+                        setCredibilityTarget(null);
 
-                            <div className="w-full md:w-60 shrink-0">
-                                {event.status === "published" && (
-                                    <button
-                                        type="button"
-                                        onClick={handleMarkCompleted}
-                                        className="w-full py-3 px-6 rounded-2xl bg-[#BAE6FD] hover:bg-[#93c5fd] text-sky-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Mark session as completed with final attendee roster"
-                                    >
-                                        <CheckCheck className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Mark Completed</span>
-                                    </button>
-                                )}
-
-                                {event.status === "completed" && (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Re-open this event as live in campus directory"
-                                    >
-                                        <RotateCcw className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Re-open as Live Event</span>
-                                    </button>
-                                )}
-
-                                {event.status === "draft" && (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Publish live to campus directory"
-                                    >
-                                        <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Publish Live to Campus</span>
-                                    </button>
-                                )}
-
-                                {event.status === "cancelled" && (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Restore and publish live"
-                                    >
-                                        <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Restore & Publish Live</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2. [To Draft] and [Cancel Event] side-by-side with Left Guidelines */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black"></span>
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
-                                        Campus Directory Visibility
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                                    Move to Draft to temporarily unpublish this event from campus feeds for offline changes, or mark as Cancelled to display a cancellation notice while preserving student applicant records. Both actions require security verification.
-                                </p>
-                            </div>
-
-                            <div className="w-full md:w-60 shrink-0 grid grid-cols-2 gap-2.5">
-                                {event.status !== "draft" ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSecurityTarget({ action: "draft" })}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-[#FEF3C7] hover:bg-[#fde68a] text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Move event to draft status"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>To Draft</span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Publish Live</span>
-                                    </button>
-                                )}
-
-                                {event.status !== "cancelled" ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSecurityTarget({ action: "cancelled" })}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-[#FECDD3] hover:bg-[#fca5a5] text-rose-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Cancel event with notification"
-                                    >
-                                        <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Cancel</span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSecurityTarget({ action: "draft" })}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Restore Draft</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2.5 Issue Participation & Turnout Certificates */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <Award className="w-4 h-4 text-black stroke-[2.5]" />
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
-                                        Participation & Merit Certificates
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                                    Issue verifiable credentials to students who attended or registered for "{event.title}". Dispatches in-app notifications to each recipient's Activity portfolio.
-                                </p>
-                            </div>
-
-                            <div className="w-full md:w-60 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCertStudioOpen(true)}
-                                    className="w-full py-3 px-4 rounded-2xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    <Award className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Issue Certificates</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* 3. Delete Event... with Danger Zone Guidelines */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF1F2] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border border-black"></span>
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-rose-950">
-                                        Danger Zone — Permanent Removal
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-rose-900/80 font-medium leading-relaxed">
-                                    Permanently delete this event listing, remove the public invitation pass, and erase all student RSVP applications from the database. Irreversible action protected by title confirmation and coordinator password verification.
-                                </p>
-                            </div>
-
-                            <div className="w-full md:w-60 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => setSecurityTarget({ action: "delete" })}
-                                    className="w-full py-3 px-6 rounded-2xl bg-[#FFE4E6] hover:bg-[#fecdd3] text-rose-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    title="Permanently delete this event from the system"
-                                >
-                                    <Trash2 className="w-4 h-4 stroke-[2.2] text-rose-900" />
-                                    <span>Delete Event...</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        if (targetAct === "complete") {
+                            handleMarkCompleted();
+                        } else if (targetAct === "cancel") {
+                            setSecurityTarget({ action: "cancelled" });
+                        } else if (targetAct === "draft") {
+                            setSecurityTarget({ action: "draft" });
+                        } else if (targetAct === "delete") {
+                            setSecurityTarget({ action: "delete" });
+                        }
+                    }}
+                />
+            )}
 
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}
             <EventSecurityConfirmModal

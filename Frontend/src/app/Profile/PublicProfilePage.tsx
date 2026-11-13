@@ -18,6 +18,7 @@ import {
     X,
     GraduationCap,
     ShieldCheck,
+    Wifi,
     WifiOff,
     ServerCrash,
     AlertTriangle,
@@ -33,7 +34,14 @@ import {
     Clock,
     Settings,
     ShieldAlert,
+    Lightbulb,
+    Sparkles,
+    FolderKanban,
 } from "lucide-react";
+import { ProjectCard } from "../../components/projects/ProjectCard";
+import { ProjectDetailModal } from "../../components/projects/ProjectDetailModal";
+import { fetchUserProjects } from "../../api/projectApi";
+import type { ProjectItem } from "../../types/project";
 import { RelationshipActionButton } from "../../components/RelationshipActionButton";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { OrbixLogo } from "../../components/OrbixLogo";
@@ -45,7 +53,7 @@ import {
     type ProfileErrorKind,
     invalidatePublicProfileClientCache,
 } from "../../utils/profileApi";
-import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals } from "../../data/demoProfileData";
+import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals, demoProjects } from "../../data/demoProfileData";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { HireMeModal } from "./HireMeModal";
@@ -547,7 +555,25 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         return typeof navigator !== "undefined" ? navigator.onLine : true;
     });
     const [cardFace, setCardFace] = useState<"front" | "back">("front");
-    const [activeField, setActiveField] = useState<"practice" | "development">("practice");
+    const [activeField, setActiveField] = useState<"practice" | "development" | "projects">("practice");
+    const [userProjects, setUserProjects] = useState<ProjectItem[]>(() => {
+        if (isDemoProfileUsername(username)) {
+            return demoProjects;
+        }
+        return [];
+    });
+    const [viewingProject, setViewingProject] = useState<ProjectItem | null>(null);
+
+    // Conditional showcase source of truth: only published & visible projects are eligible
+    const publishedProjects = useMemo(() => {
+        return userProjects.filter((p) => p.isPublished && (p.showOnProfile ?? true));
+    }, [userProjects]);
+
+    useEffect(() => {
+        if (activeField === "projects" && publishedProjects.length === 0) {
+            setActiveField("practice");
+        }
+    }, [activeField, publishedProjects.length]);
     const [isHireModalOpen, setIsHireModalOpen] = useState(false);
     const [isCardModalOpen, setIsCardModalOpen] = useState(false);
     const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
@@ -683,6 +709,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
         if (isDemoProfileUsername(username)) {
             setProfile(demoPublicProfile);
+            setUserProjects(demoProjects);
             setLoading(false);
             setRawError(null);
             if (!isEmbedded) {
@@ -694,6 +721,16 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         let isMounted = true;
         setLoading(true);
         setRawError(null);
+
+        fetchUserProjects(username)
+            .then((res) => {
+                if (isMounted && res && res.projects) {
+                    setUserProjects(res.projects);
+                }
+            })
+            .catch(() => {
+                if (isMounted) setUserProjects([]);
+            });
 
         fetchPublicProfile(username)
             .then((data) => {
@@ -980,8 +1017,18 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 </span>
                                 <div className="flex items-center justify-between text-neutral-700">
                                     <span>Browser Internet Status:</span>
-                                    <span className={`font-mono font-bold px-2 py-0.5 rounded-full text-[10px] ${isClientOnline ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-rose-100 text-rose-800 border border-rose-300"}`}>
-                                        {isClientOnline ? "● ONLINE" : "○ OFFLINE"}
+                                    <span className={`inline-flex items-center gap-1 font-mono font-bold px-2 py-0.5 rounded-full text-[10px] ${isClientOnline ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-rose-100 text-rose-800 border border-rose-300"}`}>
+                                        {isClientOnline ? (
+                                            <>
+                                                <Wifi className="w-2.5 h-2.5 text-emerald-700" />
+                                                <span>ONLINE</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <WifiOff className="w-2.5 h-2.5 text-rose-700" />
+                                                <span>OFFLINE</span>
+                                            </>
+                                        )}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between text-neutral-700">
@@ -990,8 +1037,9 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         /api/profile/public/{username}
                                     </span>
                                 </div>
-                                <div className="pt-2 border-t border-black/10 text-neutral-500 text-[11px] leading-relaxed">
-                                    💡 <strong>Developer Tip:</strong> If running in development, ensure the backend server is active on <code className="bg-neutral-200/80 px-1 py-0.5 rounded font-mono text-neutral-900">localhost:3000</code>.
+                                <div className="pt-2 border-t border-black/10 text-neutral-500 text-[11px] leading-relaxed flex items-center gap-1.5">
+                                    <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span><strong>Developer Tip:</strong> If running in development, ensure the backend server is active on <code className="bg-neutral-200/80 px-1 py-0.5 rounded font-mono text-neutral-900">localhost:3000</code>.</span>
                                 </div>
                             </div>
                         )}
@@ -999,7 +1047,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                         {/* Not Found Callout */}
                         {diag.kind === "NOT_FOUND" && (
                             <div className="mb-6 p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-300 text-left text-xs flex items-center gap-3">
-                                <span className="text-emerald-600 text-lg flex-shrink-0">✨</span>
+                                <Sparkles className="w-5 h-5 text-emerald-600 flex-shrink-0" />
                                 <p className="text-emerald-950 leading-relaxed">
                                     <strong>This handle is unclaimed!</strong> You can register <span className="font-mono font-bold">@{username}</span> and showcase your competitive programming & dev stats.
                                 </p>
@@ -1821,6 +1869,23 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                     <GitBranch className="w-3.5 h-3.5 text-[#FFE566] stroke-[2.5]" />
                                     <span>Development</span>
                                 </button>
+
+                                {publishedProjects.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveField("projects")}
+                                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "projects"
+                                            ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
+                                            }`}
+                                    >
+                                        <FolderKanban className="w-3.5 h-3.5 text-[#60A5FA] stroke-[2.5]" />
+                                        <span>Projects</span>
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-[#a2ff86] text-black">
+                                            {publishedProjects.length}
+                                        </span>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -1855,9 +1920,68 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 />
                             </div>
                         )}
+
+                        {/* Projects Field: Flagship Architecture Showcase & GitHub Intelligence */}
+                        {activeField === "projects" && publishedProjects.length > 0 && (
+                            <div className="w-full animate-fadeIn space-y-6 mt-4 sm:mt-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                                    {publishedProjects.map((project) => (
+                                        <ProjectCard
+                                            key={project.id}
+                                            project={project}
+                                            isManageMode={false}
+                                            onViewDetails={(p) => setViewingProject(p)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                {/* ========================================================================= */}
+                {/* FLAGSHIP PROJECTS SHOWCASE (AT BOTTOM OF PROFILE FOR PRACTICE & DEV TABS) */}
+                {/* ========================================================================= */}
+                {publishedProjects.length > 0 && activeField !== "projects" && (
+                    <section
+                        aria-label="Flagship Projects Showcase"
+                        className="w-full max-w-[1600px] mx-auto space-y-6 mt-14 sm:mt-20 pt-2"
+                    >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+                            <div>
+                                <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                                    <FolderKanban className="w-6 h-6 text-black stroke-[2.5]" />
+                                    <span>Flagship Projects</span>
+                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                        {publishedProjects.length} / 4 Showcased
+                                    </span>
+                                </h2>
+                                <p className="text-xs text-neutral-500 font-medium">
+                                    Curated engineering architectures, open-source repositories, and production systems.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                            {publishedProjects.map((project) => (
+                                <ProjectCard
+                                    key={project.id}
+                                    project={project}
+                                    isManageMode={false}
+                                    onViewDetails={(p) => setViewingProject(p)}
+                                />
+                            ))}
+                        </div>
                     </section>
                 )}
             </main>
+
+            {/* Project Architecture Deep-Dive Modal */}
+            <ProjectDetailModal
+                isOpen={Boolean(viewingProject)}
+                onClose={() => setViewingProject(null)}
+                project={viewingProject}
+            />
 
             {/* Hire Me Recruiter Modal (Exact Match to User Reference Screenshot) */}
             <HireMeModal

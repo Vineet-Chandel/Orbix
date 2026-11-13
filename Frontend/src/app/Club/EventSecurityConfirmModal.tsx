@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { ClubEvent } from "../../store/clubEventsSlice";
 import { OrbixLoader } from "../../components/ui/loader";
+import { NeoCheckbox } from "../../components/NeoCheckbox";
 
 export interface EventSecurityConfirmModalProps {
     isOpen: boolean;
@@ -117,7 +118,7 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
             <div
                 className="w-full max-w-lg bg-[#FAF6EE] border-3 border-black rounded-3xl shadow-[8px_8px_0px_#000] p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200 text-black max-h-[90vh] overflow-y-auto"
                 role="dialog"
@@ -175,7 +176,7 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="w-4 h-4 text-rose-700 stroke-[2.5]" />
                                     <span className="text-xs font-black uppercase tracking-wider text-rose-950">
-                                        ⚠️ Minimum 4-Hour Cancellation Policy Limit
+                                        Minimum 4-Hour Cancellation Policy Limit
                                     </span>
                                 </div>
                                 <p className="text-xs font-bold text-rose-950 leading-relaxed">
@@ -185,15 +186,20 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
                                     </span>
                                     . Orbix requires a minimum 4-hour advance cancellation limit to prevent disruption to registered students.
                                 </p>
-                                <label className="flex items-start gap-2 pt-1 text-xs font-black text-rose-950 cursor-pointer select-none">
-                                    <input
-                                        type="checkbox"
+                                <div className="flex items-start gap-2 pt-1">
+                                    <NeoCheckbox
                                         checked={emergencyBypass}
-                                        onChange={(e) => setEmergencyBypass(e.target.checked)}
-                                        className="mt-0.5 w-4 h-4 rounded border-2 border-black accent-black cursor-pointer"
+                                        onCheckedChange={(checked) => setEmergencyBypass(checked)}
+                                        size="sm"
+                                        colorScheme="pink"
                                     />
-                                    <span>I confirm this is an urgent emergency cancellation. Please alert all registered students immediately.</span>
-                                </label>
+                                    <span
+                                        onClick={() => setEmergencyBypass(!emergencyBypass)}
+                                        className="text-xs font-black text-rose-950 cursor-pointer select-none leading-tight"
+                                    >
+                                        I confirm this is an urgent emergency cancellation. Please alert all registered students immediately.
+                                    </span>
+                                </div>
                             </div>
                         )}
                     </div>

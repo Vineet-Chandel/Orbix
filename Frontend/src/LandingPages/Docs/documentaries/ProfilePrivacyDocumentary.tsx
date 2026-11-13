@@ -419,8 +419,9 @@ export const ProfilePrivacyDocumentary: React.FC = () => {
                                             <span>Get The Card {isOwner && !isPublic && "(Owner Access)"}</span>
                                         </button>
                                     ) : (
-                                        <div className="p-2 rounded-lg bg-neutral-100 border border-neutral-300 text-center text-[10px] font-mono text-neutral-500">
-                                            🔒 Digital Card Sharing Restricted
+                                        <div className="p-2 rounded-lg bg-neutral-100 border border-neutral-300 text-center text-[10px] font-mono text-neutral-500 flex items-center justify-center gap-1.5">
+                                            <Lock className="w-3 h-3 text-neutral-500 shrink-0" />
+                                            <span>Digital Card Sharing Restricted</span>
                                         </div>
                                     )}
                                 </div>

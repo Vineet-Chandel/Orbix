@@ -129,147 +129,157 @@ export const Footer: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Nav Links Column 1: Product */}
-                    <div className="lg:col-span-2 space-y-3">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#FFE566] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
-                            Product
-                        </h4>
-                        <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
-                            <li>
-                                <Link to="/profile/u/Vineet-Chandel" className="hover:text-black hover:underline transition-colors">
-                                    Live Public Profile
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/auth/profiles" className="hover:text-black hover:underline transition-colors">
-                                    Connect Platforms
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/events" className="hover:text-black hover:underline transition-colors">
-                                    Contest Radar
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/leaderboard" className="hover:text-black hover:underline transition-colors">
-                                    National CP League
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/card" className="hover:text-black hover:underline transition-colors">
-                                    Verified Cards
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
+                    {/* Footer Nav Links: Responsive 2-column grid on mobile (eliminates dead space), 4-column on desktop */}
+                    <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-6 lg:gap-8 items-start">
+                        {/* Nav Links Column 1: Product */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#FFE566] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Product
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li>
+                                    <Link to="/profile/u/Vineet-Chandel" className="hover:text-black hover:underline transition-colors">
+                                        Live Public Profile
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/auth/profiles" className="hover:text-black hover:underline transition-colors">
+                                        Connect Platforms
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/events" className="hover:text-black hover:underline transition-colors">
+                                        Contest Radar
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/leaderboard" className="hover:text-black hover:underline transition-colors">
+                                        National CP League
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/card" className="hover:text-black hover:underline transition-colors">
+                                        Verified Cards
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
 
-                    {/* Nav Links Column 2: Documentation */}
-                    <div className="lg:col-span-2 space-y-3">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#a2ff86] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
-                            Documentation
-                        </h4>
-                        <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
-                            <li>
-                                <Link to="/docs/supported-platform-registry" className="hover:text-black hover:underline transition-colors">
-                                    Platform Registry
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/docs/orbix-score-algorithm" className="hover:text-black hover:underline transition-colors">
-                                    Score Algorithm
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/docs/club-verification-protocol" className="hover:text-black hover:underline transition-colors">
-                                    Club Verification Standard
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/docs" className="hover:text-black hover:underline transition-colors">
-                                    Developer Docs Hub
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/leaderboard" className="hover:text-black hover:underline transition-colors">
-                                    AISHE Directory
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/docs" className="hover:text-black hover:underline transition-colors">
-                                    API & Webhooks
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
+                        {/* Nav Links Column 2: Documentation */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#a2ff86] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Documentation
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li>
+                                    <Link to="/docs/supported-platform-registry" className="hover:text-black hover:underline transition-colors">
+                                        Platform Registry
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/orbix-score-algorithm" className="hover:text-black hover:underline transition-colors">
+                                        Score Algorithm
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/club-credibility-algorithm" className="hover:text-black hover:underline transition-colors">
+                                        Club Credibility Engine
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/club-verification-protocol" className="hover:text-black hover:underline transition-colors">
+                                        Club Verification Standard
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/college-chapters" className="hover:text-black hover:underline transition-colors">
+                                        College Chapter Standard
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs" className="hover:text-black hover:underline transition-colors">
+                                        Developer Docs Hub
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/leaderboard" className="hover:text-black hover:underline transition-colors">
+                                        AISHE Directory
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs" className="hover:text-black hover:underline transition-colors">
+                                        API & Webhooks
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
 
-                    {/* Nav Links Column 3: Company */}
-                    <div className="lg:col-span-2 space-y-3">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#c4b5fd] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
-                            Company
-                        </h4>
-                        <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
-                            <li>
-                                <Link to="/customers" className="hover:text-black hover:underline transition-colors">
-                                    Customers
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/pricing" className="hover:text-black hover:underline transition-colors">
-                                    Pricing Plans
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/support" className="hover:text-black hover:underline transition-colors">
-                                    24/7 Support Hub
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/blogs" className="hover:text-black hover:underline transition-colors">
-                                    Engineering Blog
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/demo" className="hover:text-black hover:underline transition-colors">
-                                    Demo Profile
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
+                        {/* Nav Links Column 3: Company */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#c4b5fd] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Company
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li>
+                                    <Link to="/customers" className="hover:text-black hover:underline transition-colors">
+                                        Customers
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/pricing" className="hover:text-black hover:underline transition-colors">
+                                        Pricing Plans
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/support" className="hover:text-black hover:underline transition-colors">
+                                        24/7 Support Hub
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/blogs" className="hover:text-black hover:underline transition-colors">
+                                        Engineering Blog
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/demo" className="hover:text-black hover:underline transition-colors">
+                                        Demo Profile
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
 
-                    {/* Nav Links Column 4: Trust & Security */}
-                    <div className="lg:col-span-2 space-y-3">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-black bg-white px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
-                            Trust & Security
-                        </h4>
-                        <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
-                            <li className="flex items-center gap-1.5 text-neutral-800">
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
-                                <span>Zero Password Sync</span>
-                            </li>
-                            <li>
-                                <Link to="/privacy" className="hover:text-black hover:underline transition-colors">
-                                    Privacy Policy
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/terms" className="hover:text-black hover:underline transition-colors">
-                                    Terms of Service
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/support" className="hover:text-black hover:underline transition-colors">
-                                    Security Disclosures
-                                </Link>
-                            </li>
-                        </ul>
+                        {/* Nav Links Column 4: Trust & Security */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-white px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Trust & Security
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li className="flex items-center gap-1.5 text-neutral-800">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                                    <span>Zero Password Sync</span>
+                                </li>
+                                <li>
+                                    <Link to="/privacy" className="hover:text-black hover:underline transition-colors">
+                                        Privacy Policy
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/terms" className="hover:text-black hover:underline transition-colors">
+                                        Terms of Service
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/support" className="hover:text-black hover:underline transition-colors">
+                                        Security Disclosures
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
-                {/* Sub-footer Copyright Row */}
-                <div className="mt-12 pt-6 border-t-2 border-black/15 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-neutral-600">
-                    <p>
-                        © 2026 Orbix Inc. All rights reserved. Engineered for high-velocity coders.
-                    </p>
+                {/* Sub-footer Row */}
+                <div className="mt-12 pt-6 border-t-2 border-black/15 flex items-center justify-center text-xs font-bold text-neutral-600">
                     <div className="flex items-center gap-2">
                         <span>Crafted with</span>
                         <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />

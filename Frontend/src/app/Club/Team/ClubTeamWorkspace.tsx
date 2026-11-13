@@ -36,6 +36,7 @@ interface ClubTeamWorkspaceProps {
     onOpenMobileSidebar?: () => void;
     onStatsLoaded?: (stats: TeamStats) => void;
     hideHeaderTitle?: boolean;
+    initialTab?: "overview" | "departments" | "members" | "invitations";
 }
 
 export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
@@ -43,11 +44,18 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
     onOpenMobileSidebar,
     onStatsLoaded,
     hideHeaderTitle = false,
+    initialTab,
 }) => {
     const toast = useToast();
 
     // Internal navigation tabs
-    const [activeTab, setActiveTab] = useState<"overview" | "departments" | "members" | "invitations">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "departments" | "members" | "invitations">(initialTab || "overview");
+
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
 
     // Data states
     const [stats, setStats] = useState<TeamStats | null>(null);

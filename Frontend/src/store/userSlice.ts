@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { buildApiUrl } from "../api/apiClient";
 
 export interface User {
     id?: string;
@@ -123,12 +124,10 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
         }
 
         const fetchPromise = (async () => {
-            const endpoints = [
-                "/api/profile/me",
-                "http://localhost:3000/api/profile/me",
-                "/api/me",
-                "http://localhost:3000/api/me"
-            ];
+            const primaryEndpoint = buildApiUrl("/api/profile/me");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/profile/me"]
+                : [primaryEndpoint];
             let lastError = "Unable to fetch profile";
 
             for (const url of endpoints) {

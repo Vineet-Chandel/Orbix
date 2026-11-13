@@ -11,11 +11,13 @@ import {
     Menu,
     Award,
     Sparkles,
-    Eye,
     QrCode,
-    Share2,
-    Building2,
     X,
+    Printer,
+    AlertTriangle,
+    Users,
+    CheckCircle2,
+    XCircle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -27,12 +29,14 @@ import {
     fetchStudentCertificates,
     type CertificateItem,
 } from "../../api/clubCertificatesApi";
-import { CertificateModal } from "../common/CertificateModal";
+import { clubEventTeamApi } from "../../api/clubEventTeamApi";
+import { EventTeamManagementModal } from "./EventTeamManagementModal";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { OrbixLoader } from "../../components/ui/loader";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { OrbixCardQR } from "../Profile/CardStudio/OrbixCardQR";
+import { UserCertificateWalletView } from "../Certificates/UserCertificateWalletView";
 
 interface StudentActivityViewProps {
     onOpenMobileSidebar?: () => void;
@@ -61,16 +65,44 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
     // Certificates data
     const [certificates, setCertificates] = useState<CertificateItem[]>([]);
-    const [loadingCerts, setLoadingCerts] = useState(false);
-    const [selectedCert, setSelectedCert] = useState<CertificateItem | null>(null);
 
     // QR Pass Modal state
     const [activePassApp, setActivePassApp] = useState<StudentApplicationItem | null>(null);
+
+    // Team management modal state & invitations
+    const [managingTeamApp, setManagingTeamApp] = useState<StudentApplicationItem | null>(null);
+    const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+    const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null);
 
     const { handleBackdropClick: handlePassBackdropClick } = useModalDismiss({
         isOpen: Boolean(activePassApp),
         onClose: () => setActivePassApp(null),
     });
+
+    // Load Invitations
+    const loadInvitations = async () => {
+        try {
+            const res = await clubEventTeamApi.getMyPendingInvitations();
+            setPendingInvitations(res.invitations || []);
+        } catch {
+            // Ignore error
+        }
+    };
+
+    // Respond to invitation
+    const handleRespondInvitation = async (invitationId: string, action: "accept" | "decline") => {
+        try {
+            setRespondingInviteId(invitationId);
+            const res = await clubEventTeamApi.respondToInvitation(invitationId, action);
+            toast.success(res.message || (action === "accept" ? "Joined team!" : "Invitation declined."));
+            loadInvitations();
+            loadApplications();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to respond to invitation.");
+        } finally {
+            setRespondingInviteId(null);
+        }
+    };
 
     // Load Applications
     const loadApplications = async () => {
@@ -88,27 +120,28 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
     // Load Certificates
     const loadCertificates = async () => {
-        setLoadingCerts(true);
         try {
             const certs = await fetchStudentCertificates();
             setCertificates(certs);
         } catch (err: any) {
             console.error("Failed to load certificates:", err);
-            toast.error(err.message || "Failed to load certificates.");
-        } finally {
-            setLoadingCerts(false);
         }
     };
 
     useEffect(() => {
         loadApplications();
         loadCertificates();
+        loadInvitations();
     }, []);
 
     const handleCopyTicket = (code?: string | null) => {
         if (!code) return;
         navigator.clipboard.writeText(code);
         toast.success("Ticket code copied to clipboard!");
+    };
+
+    const handlePrintPass = () => {
+        window.print();
     };
 
     const handleConfirmWithdraw = async () => {
@@ -376,6 +409,62 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         </div>
 
+                        {/* Pending Team Invitations Banner */}
+                        {pendingInvitations.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-[#a2ff86]/25 border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-black" />
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                        Pending Team Invitations ({pendingInvitations.length})
+                                    </h4>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {pendingInvitations.map((inv) => (
+                                        <div
+                                            key={inv.id}
+                                            className="p-3 bg-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                        >
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-black text-black">
+                                                        {inv.teamName}
+                                                    </span>
+                                                    <span className="text-[10px] font-mono text-neutral-500">
+                                                        (Code: {inv.teamCode})
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-neutral-600 font-medium">
+                                                    Invited by <span className="font-bold text-black">{inv.leaderName}</span> (@{inv.leaderUsername}) for <span className="font-bold text-black">{inv.eventTitle}</span>
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 self-end sm:self-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRespondInvitation(inv.id, "decline")}
+                                                    disabled={respondingInviteId === inv.id}
+                                                    className="px-3 py-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1"
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5 text-neutral-600" />
+                                                    <span>Decline</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRespondInvitation(inv.id, "accept")}
+                                                    disabled={respondingInviteId === inv.id}
+                                                    className="px-3.5 py-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#86ef6c] text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1"
+                                                >
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    <span>{respondingInviteId === inv.id ? "Joining..." : "Accept & Join"}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Applications List */}
                         {loadingApps ? (
                             <div className="p-16 text-center space-y-3">
@@ -415,11 +504,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                         >
                                             {/* Event Banner */}
                                             {app.coverImageUrl && (
-                                                <div className="w-full h-36 sm:h-48 rounded-xl border-2 border-black overflow-hidden relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                <div className="w-full rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                     <img
                                                         src={app.coverImageUrl}
                                                         alt={app.eventTitle}
-                                                        className="w-full h-full object-cover"
+                                                        className="w-full h-auto max-h-[560px] object-contain block"
                                                         loading="lazy"
                                                     />
                                                 </div>
@@ -461,6 +550,21 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                             · {app.collegeName || "Campus Event"}
                                                         </span>
                                                     </div>
+                                                    {app.isTeamEvent && (
+                                                        <div className="flex items-center gap-1.5 pt-1">
+                                                            {app.teamName ? (
+                                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                                    <Users className="w-3 h-3 text-black" />
+                                                                    <span>Team: {app.teamName} ({app.teamRole === "leader" ? "Leader" : "Member"}) · {app.teamMembersCount} Members</span>
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FAF6EE] text-neutral-700 border border-black/40 inline-flex items-center gap-1">
+                                                                    <Users className="w-3 h-3 text-neutral-500" />
+                                                                    <span>Team Event ({app.minTeamSize || 1}-{app.maxTeamSize || 4} Members)</span>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="text-left sm:text-right flex flex-col sm:items-end gap-1">
@@ -533,7 +637,17 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
                                             {/* Action Controls */}
                                             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-black/10">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {app.teamId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setManagingTeamApp(app)}
+                                                            className="px-3 py-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#86ef6c] text-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                        >
+                                                            <Users className="w-3.5 h-3.5" />
+                                                            <span>Manage Team Roster</span>
+                                                        </button>
+                                                    )}
                                                     {app.status === "registered" || app.status === "attended" ? (
                                                         <button
                                                             onClick={() => setActivePassApp(app)}
@@ -627,11 +741,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                         >
                                             {/* Cover Banner */}
                                             {item.coverImageUrl && (
-                                                <div className="w-full h-32 rounded-xl border-2 border-black overflow-hidden relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                <div className="w-full rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                     <img
                                                         src={item.coverImageUrl}
                                                         alt={item.eventTitle}
-                                                        className="w-full h-full object-cover"
+                                                        className="w-full h-auto max-h-[380px] object-contain block"
                                                         loading="lazy"
                                                     />
                                                 </div>
@@ -720,144 +834,67 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 )}
 
                 {/* ========================================================================= */}
-                {/* SEGMENT 3: CERTIFICATES */}
+                {/* SEGMENT 3: CERTIFICATES & CREDENTIAL WALLET */}
                 {/* ========================================================================= */}
                 {activeSegment === "certificates" && (
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="font-black text-base text-black">Awarded Certificates & Credentials</h3>
-                                <p className="text-xs font-bold text-neutral-600">
-                                    Official verified achievement certificates issued to you by verified campus clubs.
-                                </p>
-                            </div>
-                            <span className="px-2.5 py-1 rounded-lg border border-black bg-white text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
-                                Total Earned: {certificates.length}
-                            </span>
-                        </div>
-
-                        {loadingCerts ? (
-                            <div className="p-16 text-center space-y-3">
-                                <OrbixLoader size="md" />
-                                <span className="text-xs font-black text-black">Loading your verified certificates...</span>
-                            </div>
-                        ) : certificates.length === 0 ? (
-                            <div className="p-12 text-center rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                                <Award className="w-12 h-12 text-neutral-400 mx-auto" />
-                                <h4 className="font-black text-base text-black">No certificates awarded yet</h4>
-                                <p className="text-xs font-bold text-neutral-600 max-w-md mx-auto">
-                                    When you participate in club events, contribute to campus chapters, or earn distinctions, verified certificates issued by clubs will appear right here.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {certificates.map((cert) => {
-                                    const issueDateStr = new Date(cert.issueDate).toLocaleDateString("en-US", {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                    });
-
-                                    return (
-                                        <div
-                                            key={cert.id}
-                                            className="p-5 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] flex flex-col justify-between space-y-4"
-                                        >
-                                            <div className="space-y-3">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FFDE59] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                                        {cert.certificateType}
-                                                    </span>
-                                                    <span className="text-[11px] font-mono font-bold text-neutral-500">
-                                                        {issueDateStr}
-                                                    </span>
-                                                </div>
-
-                                                <div>
-                                                    <h4 className="font-black text-lg text-black leading-tight">
-                                                        {cert.title}
-                                                    </h4>
-                                                    <p className="text-xs font-bold text-neutral-600 flex items-center gap-1.5 mt-1">
-                                                        <Building2 className="w-3.5 h-3.5" />
-                                                        {cert.clubName} · {cert.collegeName || "Campus Club"}
-                                                    </p>
-                                                </div>
-
-                                                <p className="text-xs font-medium text-neutral-700 line-clamp-2">
-                                                    {cert.description}
-                                                </p>
-
-                                                <div className="p-2.5 rounded-xl bg-neutral-100 border border-black/20 flex items-center justify-between text-xs font-mono">
-                                                    <span className="font-bold text-neutral-600">Credential ID:</span>
-                                                    <span className="font-black text-black">{cert.credentialCode}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between pt-2 border-t border-black/10">
-                                                <button
-                                                    onClick={() => setSelectedCert(cert)}
-                                                    className="px-3.5 py-1.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] text-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                                >
-                                                    <Eye className="w-3.5 h-3.5" />
-                                                    View Certificate
-                                                </button>
-
-                                                <button
-                                                    onClick={() => {
-                                                        const url = `${window.location.origin}/verify-cert/${encodeURIComponent(cert.credentialCode)}`;
-                                                        navigator.clipboard.writeText(url);
-                                                        toast.success("Verification link copied!");
-                                                    }}
-                                                    className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[1px_1px_0px_#000]"
-                                                    title="Share Verification Link"
-                                                >
-                                                    <Share2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <UserCertificateWalletView compact={true} />
                 )}
             </div>
 
             {/* Bottom Illustration */}
             <SectionBottomIllustration />
 
-            {/* Official Certificate Full View Modal */}
-            <CertificateModal
-                certificate={selectedCert}
-                isOpen={!!selectedCert}
-                onClose={() => setSelectedCert(null)}
-            />
-
             {/* QR Pass Details Modal */}
             {activePassApp && (
                 <div
                     onClick={handlePassBackdropClick}
-                    className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto"
+                    className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:static"
                 >
+                    <style>{`
+                        @media print {
+                            body * {
+                                visibility: hidden !important;
+                            }
+                            #orbix-printable-pass, #orbix-printable-pass * {
+                                visibility: visible !important;
+                            }
+                            #orbix-printable-pass {
+                                position: absolute !important;
+                                left: 50% !important;
+                                top: 20px !important;
+                                transform: translateX(-50%) !important;
+                                width: 100% !important;
+                                max-width: 480px !important;
+                                margin: 0 auto !important;
+                                background: #ffffff !important;
+                                border: 3px solid #000000 !important;
+                                border-radius: 24px !important;
+                                box-shadow: none !important;
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
+                        }
+                    `}</style>
                     <div
+                        id="orbix-printable-pass"
                         onClick={(e) => e.stopPropagation()}
-                        className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl border-4 border-black shadow-[8px_8px_0px_#000] p-5 sm:p-6 text-center space-y-4 my-auto overflow-hidden"
+                        className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl border-4 border-black shadow-[8px_8px_0px_#000] p-5 sm:p-6 text-center space-y-4 my-auto overflow-hidden print:border-3 print:shadow-none print:max-w-md print:mx-auto print:my-0"
                     >
                         {/* Close button */}
                         <button
                             onClick={() => setActivePassApp(null)}
-                            className="absolute top-3 right-3 p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 z-20 shadow-[1px_1px_0px_#000] cursor-pointer"
+                            className="absolute top-3 right-3 p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 z-20 shadow-[1px_1px_0px_#000] cursor-pointer print:hidden"
                         >
                             <X className="w-4 h-4 text-black stroke-[2.5]" />
                         </button>
 
                         {/* Event Banner */}
                         {activePassApp.coverImageUrl && (
-                            <div className="w-full h-32 sm:h-36 rounded-2xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] -mt-1">
+                            <div className="w-full rounded-2xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] -mt-1 bg-neutral-950 flex items-center justify-center">
                                 <img
                                     src={activePassApp.coverImageUrl}
                                     alt={activePassApp.eventTitle}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-auto max-h-[260px] object-contain block"
                                 />
                             </div>
                         )}
@@ -925,28 +962,53 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         </div>
 
-                        {/* Attendee Info Strip */}
-                        <div className="p-2.5 rounded-xl bg-white border border-black/20 text-xs font-bold text-left flex items-center justify-between">
-                            <div className="truncate">
+                        {/* Attendee Info Grid: Name, College, Applied Time, Student ID/Dept */}
+                        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-left grid grid-cols-2 gap-2.5 shadow-[1.5px_1.5px_0px_#000]">
+                            <div>
                                 <span className="text-[9px] uppercase font-black text-neutral-500 block">
                                     Ticket Holder
                                 </span>
-                                <span className="text-black font-black truncate block">
-                                    {activePassApp.applicantName}
+                                <span className="text-black font-black truncate block text-xs">
+                                    {activePassApp.applicantName || "Attendee"}
                                 </span>
                             </div>
-                            <div className="text-right shrink-0">
+                            <div>
+                                <span className="text-[9px] uppercase font-black text-neutral-500 block">
+                                    College / Campus
+                                </span>
+                                <span className="text-black font-black truncate block text-xs" title={activePassApp.collegeName || "Campus Student"}>
+                                    {activePassApp.collegeName || "Campus Student"}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-[9px] uppercase font-black text-neutral-500 block">
+                                    Applied Time
+                                </span>
+                                <span className="text-neutral-800 font-mono text-[11px] block truncate">
+                                    {activePassApp.registeredAt
+                                        ? new Date(activePassApp.registeredAt).toLocaleString("en-US", {
+                                              month: "short",
+                                              day: "numeric",
+                                              year: "numeric",
+                                              hour: "numeric",
+                                              minute: "2-digit",
+                                              hour12: true,
+                                          })
+                                        : "Verified Registration"}
+                                </span>
+                            </div>
+                            <div>
                                 <span className="text-[9px] uppercase font-black text-neutral-500 block">
                                     Student ID / Dept
                                 </span>
-                                <span className="text-neutral-700 font-mono text-[11px]">
+                                <span className="text-neutral-800 font-mono text-[11px] block truncate">
                                     {activePassApp.rollNumber || activePassApp.department || "Verified"}
                                 </span>
                             </div>
                         </div>
 
                         {/* Modal Action Controls */}
-                        <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="grid grid-cols-2 gap-2 pt-1 print:hidden">
                             <button
                                 type="button"
                                 onClick={() => handleCopyTicket(activePassApp.ticketCode)}
@@ -957,10 +1019,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setActivePassApp(null)}
-                                className="py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                onClick={handlePrintPass}
+                                className="py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 flex items-center justify-center gap-1.5"
                             >
-                                Done / Close
+                                <Printer className="w-3.5 h-3.5" />
+                                Print Pass
                             </button>
                         </div>
                     </div>
@@ -991,8 +1054,9 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                     <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
                                     <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
                                 </div>
-                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200">
-                                    ⚠️ Your admission pass will be immediately invalidated and your seat will be released.
+                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Your admission pass will be immediately invalidated and your seat will be released.</span>
                                 </p>
                             </div>
                         </div>
@@ -1006,6 +1070,20 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 requiredInputText="WITHDRAW"
                 inputPlaceholder='Type "WITHDRAW" to confirm'
             />
+
+            {/* Event Team Management Modal */}
+            {managingTeamApp && managingTeamApp.teamId && (
+                <EventTeamManagementModal
+                    isOpen={Boolean(managingTeamApp)}
+                    onClose={() => setManagingTeamApp(null)}
+                    eventId={managingTeamApp.eventId}
+                    teamId={managingTeamApp.teamId}
+                    eventTitle={managingTeamApp.eventTitle}
+                    eventStartsAt={managingTeamApp.startsAt}
+                    onTeamUpdated={loadApplications}
+                    onTeamLeft={loadApplications}
+                />
+            )}
         </section>
     );
 };

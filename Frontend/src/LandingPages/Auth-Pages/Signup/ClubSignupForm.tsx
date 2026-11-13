@@ -9,6 +9,7 @@ import {
     confirmFirebasePhoneOtp,
     isFirebaseConfigured,
 } from "../../../services/phoneAuthService";
+import { buildApiUrl } from "../../../api/apiClient";
 import {
     Building2,
     UserCheck,
@@ -178,21 +179,15 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         privacyPolicyAccepted: true,
     });
 
-    // Auto-populate logged-in user details if user is authenticated with their email account
+    // Auto-populate ONLY optional representative name/email convenience fields if a personal user opens club registration.
+    // Never prefill username or mark email pre-verified: every Club Account is strictly isolated with its own credentials.
     useEffect(() => {
-        if (isAuthenticated && authUser) {
+        if (isAuthenticated && authUser && authUser.accountType !== "club") {
             const fullName = [authUser.firstName, authUser.lastName].filter(Boolean).join(" ");
             setFormData((prev) => ({
                 ...prev,
-                contactEmail: prev.contactEmail || authUser.gmail || "",
                 contactPersonName: prev.contactPersonName || fullName || "",
-                username: prev.username || authUser.username || "",
             }));
-
-            if (authUser.isEmailVerified && authUser.gmail) {
-                setEmailVerified(true);
-                setVerifiedEmailAddress(authUser.gmail.toLowerCase());
-            }
         }
     }, [isAuthenticated, authUser]);
 
@@ -420,18 +415,16 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
         }
 
-        // Password validation (only required for new unauthenticated account signups)
-        if (!isAuthenticated) {
-            if (!formData.password) {
-                newErrors.password = "Password is required";
-            } else if (!passwordStrength.isValid) {
-                newErrors.password = "Please satisfy all password conditions below";
-            }
+        // Password validation (always required: every club receives an isolated Club Portal account)
+        if (!formData.password) {
+            newErrors.password = "Password is required";
+        } else if (!passwordStrength.isValid) {
+            newErrors.password = "Please satisfy all password conditions below";
+        }
 
-            // Password confirmation validation
-            if (formData.password !== formData.passwordConfirm) {
-                newErrors.passwordConfirm = "Passwords do not match";
-            }
+        // Password confirmation validation
+        if (formData.password !== formData.passwordConfirm) {
+            newErrors.passwordConfirm = "Passwords do not match";
         }
 
         // Legal acceptance validation
@@ -501,7 +494,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                 return;
             }
 
-            const res = await fetch("/api/club/verify/send-email-otp", {
+            const res = await fetch(buildApiUrl("/api/club/verify/send-email-otp"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -665,7 +658,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
         const isEmailMatch = Boolean(
             emailVerified &&
-            (emailVerificationToken || (isAuthenticated && authUser?.isEmailVerified && authUser.gmail?.toLowerCase() === emailNorm)) &&
+            emailVerificationToken &&
             verifiedEmailAddress &&
             verifiedEmailAddress === emailNorm
         );
@@ -736,7 +729,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
         setVerifyingEmail(true);
         try {
-            const res = await fetch("/api/club/verify/verify-email-otp", {
+            const res = await fetch(buildApiUrl("/api/club/verify/verify-email-otp"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -753,7 +746,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             setEmailVerified(true);
             setEmailVerificationToken(data.token);
             setVerifiedEmailAddress(formData.contactEmail.trim().toLowerCase());
-            toast.success("Primary email verified successfully!", { title: "Email Verified ✓" });
+            toast.success("Primary email verified successfully!", { title: "Email Verified" });
         } catch (err: any) {
             toast.error(err.message || "Email verification failed");
         } finally {
@@ -809,7 +802,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             setVerifiedPhoneNumber(parsed.e164);
             clearRecaptchaVerifier(recaptchaVerifierRef.current, "firebase-recaptcha-wrapper");
             recaptchaVerifierRef.current = null;
-            toast.success("Primary phone number verified successfully!", { title: "Phone Verified ✓" });
+            toast.success("Primary phone number verified successfully!", { title: "Phone Verified" });
         } catch (err: any) {
             toast.error(err.message || "Phone verification failed");
         } finally {
@@ -857,7 +850,10 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         };
 
         try {
-            const endpoints = ["http://localhost:3000/api/club/register", "/api/club/register"];
+            const primaryEndpoint = buildApiUrl("/api/club/register");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/club/register"]
+                : [primaryEndpoint];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -896,8 +892,8 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
             const clubUser = resultData?.user || {
                 username: payload.username,
-                firstName: payload.contactPersonName,
-                lastName: "Representative",
+                firstName: payload.clubName,
+                lastName: "Club",
                 gmail: payload.contactEmail,
                 accountType: "club",
             };
@@ -905,7 +901,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             dispatch(setUser(clubUser));
 
             toast.success("Contact verified & club application received successfully!", {
-                title: "Application Received ✓",
+                title: "Application Received",
             });
 
             // Redirect immediately to standalone club application-status page
@@ -943,14 +939,14 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                     {/* Signed-in user account & club status banner */}
                     {isAuthenticated && authUser && (
                         <div className="mb-2">
-                            {authUser.verifiedClub ? (
+                            {authUser.accountType === "club" && authUser.verifiedClub ? (
                                 <div className="p-4 sm:p-5 rounded-3xl bg-[#E8F5E9] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
                                         <Building2 className="w-7 h-7 text-emerald-700 shrink-0" />
                                         <div>
                                             <h4 className="font-black text-black text-sm">You Hold a Verified Club</h4>
                                             <p className="text-xs font-semibold text-neutral-700">
-                                                You are the verified administrator for <strong>{authUser.verifiedClub.name}</strong>.
+                                                You are signed in as the verified club <strong>{authUser.verifiedClub.name}</strong>.
                                             </p>
                                         </div>
                                     </div>
@@ -962,7 +958,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                         Go to Dashboard →
                                     </button>
                                 </div>
-                            ) : authUser.application || (authUser.clubStatus && authUser.clubStatus !== "none" && authUser.clubStatus !== "rejected") ? (
+                            ) : authUser.accountType === "club" && (authUser.application || (authUser.clubStatus && authUser.clubStatus !== "none" && authUser.clubStatus !== "rejected")) ? (
                                 <div className="p-4 sm:p-5 rounded-3xl bg-[#FFF8E1] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
                                         <ShieldCheck className="w-7 h-7 text-amber-700 shrink-0" />
@@ -985,7 +981,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 <div className="p-3.5 sm:p-4 rounded-2xl bg-[#EFF6FF] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
                                     <UserCheck className="w-5 h-5 text-blue-700 shrink-0" />
                                     <p className="text-xs font-semibold text-neutral-800">
-                                        Signed in as <strong>@{authUser.username}</strong> ({authUser.gmail}). This club will be linked directly to your account.
+                                        Currently signed into Personal Account <strong>@{authUser.username}</strong>. Submitting this form creates a <strong>separate institutional Club Account</strong> with its own dedicated Club Handle and password.
                                     </p>
                                 </div>
                             )}
@@ -1363,100 +1359,97 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                             />
                         </div>
 
-                        {isAuthenticated ? (
-                            <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black/20 flex items-center gap-3">
-                                <Lock className="w-5 h-5 text-neutral-600 shrink-0" />
-                                <p className="text-xs font-semibold text-neutral-700">
-                                    Linked to your signed-in account (<span className="font-bold text-black">{authUser?.gmail}</span>). You will use your existing account password to sign in.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
-                                {/* Password Input */}
-                                <div>
-                                    <FormInput
-                                        name="password"
-                                        isPassword
-                                        placeholder="Password"
-                                        hideLabel
-                                        value={formData.password}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, password: e.target.value });
-                                            if (errors.password) setErrors({ ...errors, password: "" });
-                                        }}
-                                        error={errors.password}
-                                        autoComplete="new-password"
-                                    />
-
-                                    <PasswordStrengthIndicator
-                                        result={passwordStrength}
-                                        hasInput={formData.password.length > 0}
-                                    />
-                                </div>
-
-                                {/* Confirm Password */}
+                        <div className="space-y-3.5">
+                            {/* Password Input */}
+                            <div>
                                 <FormInput
-                                    name="passwordConfirm"
+                                    name="password"
                                     isPassword
-                                    placeholder="Confirm Password"
+                                    placeholder="Club Account Password"
                                     hideLabel
-                                    value={formData.passwordConfirm}
+                                    value={formData.password}
                                     onChange={(e) => {
-                                        setFormData({ ...formData, passwordConfirm: e.target.value });
-                                        if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
+                                        setFormData({ ...formData, password: e.target.value });
+                                        if (errors.password) setErrors({ ...errors, password: "" });
                                     }}
-                                    error={errors.passwordConfirm}
+                                    error={errors.password}
                                     autoComplete="new-password"
                                 />
+
+                                <PasswordStrengthIndicator
+                                    result={passwordStrength}
+                                    hasInput={formData.password.length > 0}
+                                />
                             </div>
-                        )}
-                    </div>
 
-                    {/* SECTION E: LEGAL CONSENT */}
-                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-2.5">
-                        <div className="space-y-3 pt-1">
-                            <NeoCheckbox
-                                checked={formData.termsAccepted}
-                                onCheckedChange={(checked) => {
-                                    setFormData({ ...formData, termsAccepted: checked });
-                                    if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                            {/* Confirm Password */}
+                            <FormInput
+                                name="passwordConfirm"
+                                isPassword
+                                placeholder="Confirm Password"
+                                hideLabel
+                                value={formData.passwordConfirm}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, passwordConfirm: e.target.value });
+                                    if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
                                 }}
-                                size="sm"
-                                label={
-                                    <span className="leading-snug font-medium text-xs text-neutral-700">
-                                        I accept the{" "}
-                                        <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                            Terms of Service
-                                        </Link>
-                                        .
-                                    </span>
-                                }
-                            />
-
-                            <NeoCheckbox
-                                checked={formData.privacyPolicyAccepted}
-                                onCheckedChange={(checked) => {
-                                    setFormData({ ...formData, privacyPolicyAccepted: checked });
-                                    if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
-                                }}
-                                size="sm"
-                                label={
-                                    <span className="leading-snug font-medium text-xs text-neutral-700">
-                                        I accept the{" "}
-                                        <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                            Privacy Policy
-                                        </Link>
-                                        .
-                                    </span>
-                                }
+                                error={errors.passwordConfirm}
+                                autoComplete="new-password"
                             />
                         </div>
-                        {errors.termsAccepted && (
-                            <p className="text-xs font-bold text-rose-600 px-1">{errors.termsAccepted}</p>
-                        )}
-                        {errors.privacyPolicyAccepted && (
-                            <p className="text-xs font-bold text-rose-600 px-1">{errors.privacyPolicyAccepted}</p>
-                        )}
+                    </div>
+
+                    {/* SECTION E: LEGAL CONSENT (ONE BY ONE, NOT PARALLEL) */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                        <div className="flex flex-col gap-3.5 pt-1">
+                            <div className="w-full">
+                                <NeoCheckbox
+                                    checked={formData.termsAccepted}
+                                    onCheckedChange={(checked) => {
+                                        setFormData({ ...formData, termsAccepted: checked });
+                                        if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                                    }}
+                                    size="sm"
+                                    className="w-full flex"
+                                    label={
+                                        <span className="leading-snug font-medium text-xs text-neutral-700">
+                                            I accept the{" "}
+                                            <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                                Terms of Service
+                                            </Link>
+                                            .
+                                        </span>
+                                    }
+                                />
+                                {errors.termsAccepted && (
+                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
+                                )}
+                            </div>
+
+                            <div className="w-full">
+                                <NeoCheckbox
+                                    checked={formData.privacyPolicyAccepted}
+                                    onCheckedChange={(checked) => {
+                                        setFormData({ ...formData, privacyPolicyAccepted: checked });
+                                        if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
+                                    }}
+                                    size="sm"
+                                    className="w-full flex"
+                                    label={
+                                        <span className="leading-snug font-medium text-xs text-neutral-700">
+                                            I accept the{" "}
+                                            <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                                Privacy Policy
+                                            </Link>
+                                            .
+                                        </span>
+                                    }
+                                />
+                                {errors.privacyPolicyAccepted && (
+                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Proceed Button */}

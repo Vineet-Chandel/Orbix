@@ -37,6 +37,8 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
     const [isDeleting, setIsDeleting] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
 
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     useEffect(() => {
         if (team) {
             setName(team.name || "");
@@ -133,8 +135,6 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
             setIsDeleting(false);
         }
     };
-
-    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     return createPortal(
         <div

@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Check } from "lucide-react";
 
 interface UsernameRulesIndicatorProps {
     username: string;
@@ -74,7 +75,16 @@ export const UsernameRulesIndicator = ({
                             : "bg-neutral-100 text-neutral-500 border-neutral-300"
                     }`}
                 >
-                    {isValid ? "✓ All Rules Met" : hasInput ? "In Progress" : "Required"}
+                    {isValid ? (
+                        <span className="inline-flex items-center gap-1">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>All Rules Met</span>
+                        </span>
+                    ) : hasInput ? (
+                        "In Progress"
+                    ) : (
+                        "Required"
+                    )}
                 </span>
             </div>
 

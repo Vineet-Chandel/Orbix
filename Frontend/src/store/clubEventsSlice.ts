@@ -15,6 +15,10 @@ export interface ClubEvent {
     registrationUrl: string | null;
     coverImageUrl: string | null;
     status: "draft" | "published" | "completed" | "cancelled";
+    scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
     publishedAt: string | null;
     createdAt: string;
     updatedAt?: string;
@@ -38,6 +42,13 @@ export interface CreateClubEventPayload {
     registrationUrl?: string | null;
     coverImageUrl?: string | null;
     status: "draft" | "published" | "completed" | "cancelled";
+    scope?: "PAN_INDIA" | "CAMPUS";
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
+    initialFormStructure?: any;
+    initialFormSettings?: any;
+    initialFormTheme?: any;
 }
 
 export type ClubEventStatus = "draft" | "published" | "completed" | "cancelled";
@@ -165,15 +176,17 @@ export const changeClubEventStatus = createAsyncThunk<
         password?: string;
         confirmationText?: string;
         emergencyBypass?: boolean;
+        reasonCategory?: string;
+        rescheduleOffered?: boolean;
     },
     { rejectValue: { eventId: string; previousStatus: ClubEventStatus; message: string } }
->("clubEvents/changeClubEventStatus", async ({ eventId, status, previousStatus, password, confirmationText, emergencyBypass }, { rejectWithValue }) => {
+>("clubEvents/changeClubEventStatus", async ({ eventId, status, previousStatus, password, confirmationText, emergencyBypass, reasonCategory, rescheduleOffered }, { rejectWithValue }) => {
     try {
         const res = await fetch(`/api/club/events/${eventId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ status, password, confirmationText, emergencyBypass }),
+            body: JSON.stringify({ status, password, confirmationText, emergencyBypass, reasonCategory, rescheduleOffered }),
         });
 
         const data = await res.json().catch(() => null);
@@ -369,7 +382,16 @@ export const clubEventsSlice = createSlice({
                         );
                     }
                 }
-            });
+            })
+            // Automatically reset club events cache on sign out or non-club session
+            .addMatcher(
+                (action) =>
+                    action.type === "user/clearUser" ||
+                    (action.type === "user/setUser" && (action as any).payload?.accountType !== "club") ||
+                    (action.type === "user/fetchUserProfile/fulfilled" && (action as any).payload?.accountType !== "club") ||
+                    action.type === "user/fetchUserProfile/rejected",
+                () => initialState
+            );
     },
 });
 

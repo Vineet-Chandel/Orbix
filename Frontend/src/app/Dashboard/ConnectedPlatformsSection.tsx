@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { AlertTriangle, Check, X, AlertCircle, ArrowUpRight } from "lucide-react";
 import { PORTALS, DASHBOARD_PLATFORMS_ORDER, judgePortalInput } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { useToast } from "../../context/ToastContext";
@@ -9,6 +10,7 @@ import { PlatformDifficultyGauge, type DifficultyBreakdown } from "./PlatformDif
 import { useAppDispatch, useAppSelector } from "../../store";
 import { invalidateConnectedPlatformCaches } from "../../utils/cacheManager";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { buildApiUrl } from "../../api/apiClient";
 
 export interface PortalProfileData {
     success: boolean;
@@ -457,18 +459,21 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                 username: user?.username,
             };
 
-            fetch("/api/portals/save", {
+            const saveUrl = buildApiUrl("/api/portals/save");
+            fetch(saveUrl, {
                 method: "POST",
                 headers,
                 credentials: "include",
                 body: JSON.stringify(savePayload),
             }).catch(() => {
-                fetch("http://localhost:3000/api/portals/save", {
-                    method: "POST",
-                    headers,
-                    credentials: "include",
-                    body: JSON.stringify(savePayload),
-                }).catch(() => {});
+                if (import.meta.env.DEV) {
+                    fetch("http://localhost:3000/api/portals/save", {
+                        method: "POST",
+                        headers,
+                        credentials: "include",
+                        body: JSON.stringify(savePayload),
+                    }).catch(() => {});
+                }
             });
         } catch (e) {
             console.error("Failed to persist connected portals:", e);
@@ -542,10 +547,10 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         setConnectError(null);
 
         const timer = setTimeout(async () => {
-            const endpoints = [
-                `/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`,
-                `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`,
-            ];
+            const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`);
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
+                : [primaryEndpoint];
 
             let data: PortalProfileData | null = null;
             let errorMessage: string | null = null;
@@ -653,10 +658,10 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         if (!profile || !config) return;
 
         setIsSingleVerifying(true);
-        const endpoints = [
-            `/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`,
-            `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`,
-        ];
+        const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`);
+        const endpoints = import.meta.env.DEV
+            ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
+            : [primaryEndpoint];
 
         let fetched: PortalProfileData | null = null;
         let is404 = false;
@@ -979,7 +984,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                         title="Account handle no longer exists. Click to reconnect with valid username."
                                     >
                                         <span>Fix Link</span>
-                                        <span className="text-[10px]">⚠️</span>
+                                        <AlertTriangle className="w-3 h-3 text-white stroke-[2.5]" />
                                     </button>
                                 ) : isConnected ? (
                                     (() => {
@@ -1070,7 +1075,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                 onClick={() => setConnectingPortalId(null)}
                                 className="w-8 h-8 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
                             >
-                                ✕
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
 
@@ -1088,21 +1093,24 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                         if (judgment.badgeVariant === "username") {
                                             return (
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                                                    ✓ Username detected
+                                                    <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
+                                                    <span>Username detected</span>
                                                 </span>
                                             );
                                         }
                                         if (judgment.badgeVariant === "link") {
                                             return (
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
-                                                    ✓ Full Link detected
+                                                    <Check className="w-3 h-3 text-sky-600 stroke-[2.5]" />
+                                                    <span>Full Link detected</span>
                                                 </span>
                                             );
                                         }
                                         if (judgment.badgeVariant === "error") {
                                             return (
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-neutral-700 bg-neutral-100 px-2.5 py-0.5 rounded-full border border-neutral-300">
-                                                    ⚠️ {judgment.badgeLabel}
+                                                    <AlertCircle className="w-3 h-3 text-amber-600 stroke-[2.5]" />
+                                                    <span>{judgment.badgeLabel}</span>
                                                 </span>
                                             );
                                         }
@@ -1129,7 +1137,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                             onClick={() => setInputValue("")}
                                             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 text-xs p-1 cursor-pointer"
                                         >
-                                            ✕
+                                            <X className="w-3.5 h-3.5" />
                                         </button>
                                     )}
                                 </div>
@@ -1163,7 +1171,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                             {/* Error Banner when Account Not Found — Connect button is completely hidden! */}
                             {connectError && !isVerifying && (
                                 <div className="p-3 rounded-xl bg-rose-50 border border-rose-200/90 text-xs font-semibold text-rose-700 flex items-start gap-2.5 animate-fadeIn">
-                                    <span className="text-sm flex-shrink-0">⚠️</span>
+                                    <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
                                     <div className="flex-1">
                                         <p>{connectError}</p>
                                         <p className="text-[11px] font-normal text-rose-600/80 mt-0.5">
@@ -1305,7 +1313,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                 onClick={() => setViewingPortalId(null)}
                                 className="w-8 h-8 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
                             >
-                                ✕
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
 
@@ -1313,7 +1321,8 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                         {activeViewingProfile.verified === false || activeViewingProfile.syncStatus === "broken" ? (
                             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 space-y-2">
                                 <div className="flex items-center gap-1.5 text-rose-700 font-bold text-xs">
-                                    <span>⚠️ Connection Broken</span>
+                                    <AlertTriangle className="w-4 h-4 text-rose-700 shrink-0" />
+                                    <span>Connection Broken</span>
                                 </div>
                                 <p className="text-xs text-rose-600 leading-relaxed">
                                     {activeViewingProfile.syncError ||
@@ -1382,7 +1391,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                     className="text-xs font-semibold text-neutral-600 hover:text-neutral-950 hover:underline flex items-center gap-1 mt-0.5"
                                 >
                                     <span>Visit public profile</span>
-                                    <span>↗</span>
+                                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                                 </a>
                             </div>
                         </div>

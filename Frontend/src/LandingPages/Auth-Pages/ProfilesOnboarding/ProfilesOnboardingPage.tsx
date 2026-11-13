@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Check, ChevronUp } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { PortalProfileInput } from "../PortalProfileInput";
@@ -11,6 +12,7 @@ import { disconnectPlatform } from "../../../utils/profileApi";
 import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
 import { SectionBottomIllustration } from "../../../app/common/SectionBottomIllustration";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { buildApiUrl } from "../../../api/apiClient";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -231,7 +233,8 @@ export default function ProfilesOnboardingPage() {
                 const headers: Record<string, string> = { "Content-Type": "application/json" };
                 if (token) headers["Authorization"] = `Bearer ${token}`;
 
-                const endpoints = ["/api/portals/save", "http://localhost:3000/api/portals/save"];
+                const primarySave = buildApiUrl("/api/portals/save");
+                const endpoints = import.meta.env.DEV ? [primarySave, "http://localhost:3000/api/portals/save"] : [primarySave];
                 let serverLinks: any[] = [];
 
                 for (const url of endpoints) {
@@ -322,10 +325,8 @@ export default function ProfilesOnboardingPage() {
                     if (!uname) continue;
 
                     try {
-                        const endpoints = [
-                            `/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`,
-                            `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`,
-                        ];
+                        const primaryFetch = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`);
+                        const endpoints = import.meta.env.DEV ? [primaryFetch, `http://localhost:3000${primaryFetch}`] : [primaryFetch];
                         for (const url of endpoints) {
                             try {
                                 const res = await fetch(url);
@@ -589,10 +590,11 @@ export default function ProfilesOnboardingPage() {
                 syncMode: "exact",
             };
 
-            // Call primary endpoint, fallback to secondary if needed
+            // Call primary endpoint, fallback to secondary if needed in dev
+            const saveUrl = buildApiUrl("/api/portals/save");
             let saveSuccessful = false;
             try {
-                const res = await fetch("/api/portals/save", {
+                const res = await fetch(saveUrl, {
                     method: "POST",
                     headers,
                     credentials: "include",
@@ -603,7 +605,7 @@ export default function ProfilesOnboardingPage() {
                 // try fallback
             }
 
-            if (!saveSuccessful) {
+            if (!saveSuccessful && import.meta.env.DEV) {
                 try {
                     const fallbackRes = await fetch("http://localhost:3000/api/portals/save", {
                         method: "POST",
@@ -899,7 +901,9 @@ export default function ProfilesOnboardingPage() {
                                                                         <span className="text-xs font-black text-black uppercase truncate">
                                                                             {portalConf?.name || pId}
                                                                         </span>
-                                                                        <span className="inline-flex items-center justify-center text-[10px] font-black text-black bg-[#a2ff86] border border-black px-1.5 rounded" title="Verified">✓</span>
+                                                                        <span className="inline-flex items-center justify-center p-0.5 text-black bg-[#a2ff86] border border-black rounded" title="Verified">
+                                                                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                                        </span>
                                                                     </div>
                                                                     <p className="text-[11px] text-neutral-600 font-mono font-bold truncate">
                                                                         @{profile.username}
@@ -1015,7 +1019,7 @@ export default function ProfilesOnboardingPage() {
                             ))}
                         </div>
                         <span>Bucket ({connectedCount})</span>
-                        <span className="text-black text-[10px]">▴</span>
+                        <ChevronUp className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                     </button>
                 </div>
             )}
@@ -1081,7 +1085,9 @@ export default function ProfilesOnboardingPage() {
                                                     <span className="text-xs font-black text-black uppercase truncate">
                                                         {portalConf?.name || pId}
                                                     </span>
-                                                    <span className="text-[10px] text-black font-black bg-[#a2ff86] border border-black px-1 rounded">✓</span>
+                                                    <span className="inline-flex items-center justify-center p-0.5 text-black bg-[#a2ff86] border border-black rounded" title="Verified">
+                                                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                    </span>
                                                 </div>
                                                 <p className="text-xs text-neutral-900 font-bold truncate">
                                                     {profile.name}

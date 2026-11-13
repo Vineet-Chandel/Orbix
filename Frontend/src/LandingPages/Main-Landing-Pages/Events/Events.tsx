@@ -6,6 +6,8 @@ import {
     Check,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
+    ChevronUp,
     ExternalLink,
     CalendarPlus,
     Clock,
@@ -121,13 +123,12 @@ const CurlyBracket = ({ isToday, isLive }: { isToday?: boolean; isLive?: boolean
     return (
         <div className="relative w-5 sm:w-6 md:w-7 flex-shrink-0 self-stretch flex items-stretch select-none pointer-events-none py-2">
             <svg
-                className={`w-full h-full transition-colors ${
-                    isLive
-                        ? "text-rose-500"
-                        : isToday
+                className={`w-full h-full transition-colors ${isLive
+                    ? "text-rose-500"
+                    : isToday
                         ? "text-amber-400"
                         : "text-neutral-500"
-                }`}
+                    }`}
                 viewBox="0 0 20 100"
                 preserveAspectRatio="none"
                 fill="none"
@@ -227,6 +228,10 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
 
     // Toggle to see/remove finished contests from the list (default false to keep the list clean & focused on upcoming)
     const [showFinished, setShowFinished] = useState<boolean>(false);
+
+    // Initial limit of days shown in List View (10-day listing over the list section through mock data)
+    const INITIAL_LIST_DAYS_LIMIT = 10;
+    const [listDaysLimit, setListDaysLimit] = useState<number>(INITIAL_LIST_DAYS_LIMIT);
 
     // Dynamic Landing Events state (rehydrated from dummy profile cache or dynamic generator)
     const [eventsList, setEventsList] = useState<EventItem[]>(() => getInitialLandingEvents());
@@ -452,6 +457,21 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
         return groups;
     }, [filteredEvents, nowMs]);
 
+    // Visible Date Groups for sleek landing page List View (caps to listDaysLimit days by default)
+    const visibleDateGroups = useMemo(() => {
+        return groupedDateEvents.slice(0, listDaysLimit);
+    }, [groupedDateEvents, listDaysLimit]);
+
+    // Count of currently visible contests in the List View
+    const visibleContestsCount = useMemo(() => {
+        return visibleDateGroups.reduce((acc, g) => acc + g.events.length, 0);
+    }, [visibleDateGroups]);
+
+    // Reset list days limit whenever active filters change
+    useEffect(() => {
+        setListDaysLimit(INITIAL_LIST_DAYS_LIMIT);
+    }, [selectedPlatform, selectedType, showFinished]);
+
     // Dynamic platform contest counts for the currently viewed month
     const activeCounts = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -644,22 +664,20 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                             <button
                                 type="button"
                                 onClick={() => setSelectedType("contests")}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                    selectedType === "contests"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "text-neutral-700 hover:text-black font-bold"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${selectedType === "contests"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black font-bold"
+                                    }`}
                             >
                                 Contests
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setSelectedType("hackathons")}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                    selectedType === "hackathons"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "text-neutral-700 hover:text-black font-bold"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${selectedType === "hackathons"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black font-bold"
+                                    }`}
                             >
                                 Hackathons
                             </button>
@@ -670,11 +688,10 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                             <button
                                 type="button"
                                 onClick={() => setViewMode("calendar")}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                                    viewMode === "calendar"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "text-neutral-700 hover:text-black font-bold"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${viewMode === "calendar"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black font-bold"
+                                    }`}
                             >
                                 <CalendarIcon className="w-3.5 h-3.5 stroke-[2.5]" />
                                 <span>Calendar</span>
@@ -682,11 +699,10 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                             <button
                                 type="button"
                                 onClick={() => setViewMode("list")}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                                    viewMode === "list"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "text-neutral-700 hover:text-black font-bold"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${viewMode === "list"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black font-bold"
+                                    }`}
                             >
                                 <ListIcon className="w-3.5 h-3.5 stroke-[2.5]" />
                                 <span>List</span>
@@ -822,11 +838,10 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                                     <button
                                         type="button"
                                         onClick={(e) => handleToggleReminder(activeUpNext.id, e)}
-                                        className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer ${
-                                            reminders.includes(activeUpNext.id)
-                                                ? "bg-black text-[#a2ff86]"
-                                                : "bg-white text-black hover:bg-neutral-100"
-                                        }`}
+                                        className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer ${reminders.includes(activeUpNext.id)
+                                            ? "bg-black text-[#a2ff86]"
+                                            : "bg-white text-black hover:bg-neutral-100"
+                                            }`}
                                     >
                                         {reminders.includes(activeUpNext.id) ? (
                                             <>
@@ -904,11 +919,10 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                             <button
                                 type="button"
                                 onClick={() => setSelectedPlatform(null)}
-                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 flex-shrink-0 border-2 border-black cursor-pointer ${
-                                    selectedPlatform === null
-                                        ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                        : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 flex-shrink-0 border-2 border-black cursor-pointer ${selectedPlatform === null
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
+                                    }`}
                             >
                                 All Platforms
                             </button>
@@ -923,22 +937,20 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                                         key={plat.id}
                                         type="button"
                                         onClick={() => setSelectedPlatform(plat.id)}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 flex-shrink-0 border-2 border-black cursor-pointer ${
-                                            isSelected
-                                                ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
-                                        }`}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 flex-shrink-0 border-2 border-black cursor-pointer ${isSelected
+                                            ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
+                                            }`}
                                     >
                                         <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
                                             {getPortalIcon(plat.id, "w-3.5 h-3.5")}
                                         </div>
                                         <span>{plat.name}</span>
                                         <span
-                                            className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono font-black border border-black ${
-                                                isSelected
-                                                    ? "bg-white text-black"
-                                                    : "bg-[#FFE566] text-black"
-                                            }`}
+                                            className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono font-black border border-black ${isSelected
+                                                ? "bg-white text-black"
+                                                : "bg-[#FFE566] text-black"
+                                                }`}
                                         >
                                             {count}
                                         </span>
@@ -1021,13 +1033,12 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className={`min-h-[115px] sm:min-h-[135px] p-1.5 sm:p-2 flex flex-col justify-between transition-colors ${
-                                                        cell.isCurrentMonth
-                                                            ? cell.isToday
-                                                                ? "bg-neutral-900 text-white ring-2 ring-amber-400 shadow-md"
-                                                                : "bg-black hover:bg-neutral-950"
-                                                            : "bg-neutral-950/40 opacity-20 pointer-events-none"
-                                                    }`}
+                                                    className={`min-h-[115px] sm:min-h-[135px] p-1.5 sm:p-2 flex flex-col justify-between transition-colors ${cell.isCurrentMonth
+                                                        ? cell.isToday
+                                                            ? "bg-neutral-900 text-white ring-2 ring-amber-400 shadow-md"
+                                                            : "bg-black hover:bg-neutral-950"
+                                                        : "bg-neutral-950/40 opacity-20 pointer-events-none"
+                                                        }`}
                                                 >
                                                     {/* Cell Date Header */}
                                                     <div className="flex items-center justify-between mb-1.5">
@@ -1116,11 +1127,10 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowFinished(!showFinished)}
-                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border-2 cursor-pointer ${
-                                                    showFinished
-                                                        ? "bg-[#FFE566] text-black border-black shadow-[2px_2px_0px_#000]"
-                                                        : "bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-700 shadow-sm"
-                                                }`}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border-2 cursor-pointer ${showFinished
+                                                    ? "bg-[#FFE566] text-black border-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-700 shadow-sm"
+                                                    }`}
                                                 title={showFinished ? "Click to remove finished contests from this list" : "Click to view finished contests in this list"}
                                             >
                                                 {showFinished ? (
@@ -1170,226 +1180,272 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="space-y-4 sm:space-y-5">
-                                        {groupedDateEvents.map((group) => {
-                                            const hasMultiple = group.events.length > 1;
+                                    <>
+                                        <div className="space-y-4 sm:space-y-5">
+                                            {visibleDateGroups.map((group) => {
+                                                const hasMultiple = group.events.length > 1;
 
-                                            return (
-                                                <div
-                                                    key={group.dateKey}
-                                                    className="flex items-stretch gap-2 sm:gap-3 md:gap-3.5"
-                                                >
-                                                    {/* Left Date Column */}
-                                                    <div className="flex flex-col items-center justify-center flex-shrink-0 w-20 sm:w-28 md:w-36 self-stretch">
-                                                        <div
-                                                            className={`w-full h-full min-h-[90px] rounded-2xl p-2 sm:p-3 text-center border-2 transition-all duration-200 flex flex-col items-center justify-center shadow-sm ${
-                                                                group.isToday
+                                                return (
+                                                    <div
+                                                        key={group.dateKey}
+                                                        className="flex items-stretch gap-2 sm:gap-3 md:gap-3.5"
+                                                    >
+                                                        {/* Left Date Column */}
+                                                        <div className="flex flex-col items-center justify-center flex-shrink-0 w-20 sm:w-28 md:w-36 self-stretch">
+                                                            <div
+                                                                className={`w-full h-full min-h-[90px] rounded-2xl p-2 sm:p-3 text-center border-2 transition-all duration-200 flex flex-col items-center justify-center shadow-sm ${group.isToday
                                                                     ? "bg-white text-black border-white shadow-[0_0_24px_rgba(255,255,255,0.18)]"
                                                                     : group.hasLive
-                                                                    ? "bg-neutral-900 text-white border-rose-500 shadow-[0_0_16px_rgba(244,63,94,0.25)]"
-                                                                    : group.allFinished
-                                                                    ? "bg-neutral-950/70 text-neutral-400 border-neutral-800/60"
-                                                                    : "bg-neutral-900/90 text-white border-neutral-800 hover:border-neutral-600"
-                                                            }`}
-                                                        >
-                                                            {/* Day of Week */}
-                                                            <span
-                                                                className={`text-[10px] sm:text-[11px] font-black uppercase tracking-widest ${
-                                                                    group.isToday
+                                                                        ? "bg-neutral-900 text-white border-rose-500 shadow-[0_0_16px_rgba(244,63,94,0.25)]"
+                                                                        : group.allFinished
+                                                                            ? "bg-neutral-950/70 text-neutral-400 border-neutral-800/60"
+                                                                            : "bg-neutral-900/90 text-white border-neutral-800 hover:border-neutral-600"
+                                                                    }`}
+                                                            >
+                                                                {/* Day of Week */}
+                                                                <span
+                                                                    className={`text-[10px] sm:text-[11px] font-black uppercase tracking-widest ${group.isToday
                                                                         ? "text-neutral-700"
                                                                         : group.hasLive
-                                                                        ? "text-rose-400"
-                                                                        : "text-neutral-400"
-                                                                }`}
-                                                            >
-                                                                {group.weekdayShort}
-                                                            </span>
+                                                                            ? "text-rose-400"
+                                                                            : "text-neutral-400"
+                                                                        }`}
+                                                                >
+                                                                    {group.weekdayShort}
+                                                                </span>
 
-                                                            {/* Day Number */}
-                                                            <span
-                                                                className={`text-2xl sm:text-3xl md:text-4xl font-black font-mono leading-none tracking-tight my-1 ${
-                                                                    group.isToday ? "text-black" : "text-white"
-                                                                }`}
-                                                            >
-                                                                {group.dayNum}
-                                                            </span>
+                                                                {/* Day Number */}
+                                                                <span
+                                                                    className={`text-2xl sm:text-3xl md:text-4xl font-black font-mono leading-none tracking-tight my-1 ${group.isToday ? "text-black" : "text-white"
+                                                                        }`}
+                                                                >
+                                                                    {group.dayNum}
+                                                                </span>
 
-                                                            {/* Month & Year */}
-                                                            <span
-                                                                className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${
-                                                                    group.isToday ? "text-neutral-800" : "text-neutral-400"
-                                                                }`}
-                                                            >
-                                                                {group.monthShort}
-                                                            </span>
+                                                                {/* Month & Year */}
+                                                                <span
+                                                                    className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${group.isToday ? "text-neutral-800" : "text-neutral-400"
+                                                                        }`}
+                                                                >
+                                                                    {group.monthShort}
+                                                                </span>
 
-                                                            {/* Context Badges */}
-                                                            <div className="mt-1.5 flex flex-col items-center gap-1 w-full">
-                                                                {group.isToday && (
-                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-black text-white shadow-sm">
-                                                                        Today
-                                                                    </span>
-                                                                )}
-                                                                {group.hasLive && !group.isToday && (
-                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
-                                                                        Live
-                                                                    </span>
-                                                                )}
-                                                                {hasMultiple && (
-                                                                    <span
-                                                                        className={`px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold tracking-tight whitespace-nowrap ${
-                                                                            group.isToday
+                                                                {/* Context Badges */}
+                                                                <div className="mt-1.5 flex flex-col items-center gap-1 w-full">
+                                                                    {group.isToday && (
+                                                                        <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-black text-white shadow-sm">
+                                                                            Today
+                                                                        </span>
+                                                                    )}
+                                                                    {group.hasLive && !group.isToday && (
+                                                                        <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                                                                            Live
+                                                                        </span>
+                                                                    )}
+                                                                    {hasMultiple && (
+                                                                        <span
+                                                                            className={`px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold tracking-tight whitespace-nowrap ${group.isToday
                                                                                 ? "bg-neutral-200 text-neutral-900"
                                                                                 : "bg-white/10 text-neutral-300 border border-white/10"
-                                                                        }`}
-                                                                    >
-                                                                        {group.events.length} Contests
-                                                                    </span>
-                                                                )}
+                                                                                }`}
+                                                                        >
+                                                                            {group.events.length} Contests
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
 
-                                                    {/* Middle: Bracket (if > 1 contest) or empty spacer (if 1 contest) */}
-                                                    {hasMultiple ? (
-                                                        <CurlyBracket isToday={group.isToday} isLive={group.hasLive} />
-                                                    ) : (
-                                                        <div className="w-5 sm:w-6 md:w-7 flex-shrink-0" />
-                                                    )}
+                                                        {/* Middle: Bracket (if > 1 contest) or empty spacer (if 1 contest) */}
+                                                        {hasMultiple ? (
+                                                            <CurlyBracket isToday={group.isToday} isLive={group.hasLive} />
+                                                        ) : (
+                                                            <div className="w-5 sm:w-6 md:w-7 flex-shrink-0" />
+                                                        )}
 
-                                                    {/* Right: Contest Cards for this date */}
-                                                    <div className="flex-1 min-w-0 space-y-2">
-                                                        {group.events.map((ev) => {
-                                                            const isReminded = reminders.includes(ev.id);
-                                                            const isLive = nowMs >= ev.startTimestamp && nowMs < ev.endTimestamp;
-                                                            const isFinished = nowMs >= ev.endTimestamp;
+                                                        {/* Right: Contest Cards for this date */}
+                                                        <div className="flex-1 min-w-0 space-y-2">
+                                                            {group.events.map((ev) => {
+                                                                const isReminded = reminders.includes(ev.id);
+                                                                const isLive = nowMs >= ev.startTimestamp && nowMs < ev.endTimestamp;
+                                                                const isFinished = nowMs >= ev.endTimestamp;
 
-                                                            return (
-                                                                <div
-                                                                    key={ev.id}
-                                                                    className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-600 transition flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm group/card"
-                                                                >
-                                                                    <div className="flex items-center gap-3.5 min-w-0">
-                                                                        <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0 p-2">
-                                                                            {getPortalIcon(ev.platform, "w-6 h-6")}
-                                                                        </div>
-                                                                        <div className="min-w-0 space-y-0.5">
-                                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                                                                                    {ev.platformName}
-                                                                                </span>
-                                                                                {ev.division && (
-                                                                                    <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/25 px-1.5 py-0.2 rounded">
-                                                                                        {ev.division}
-                                                                                    </span>
-                                                                                )}
-                                                                                {ev.rated && (
-                                                                                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
-                                                                                        Rated
-                                                                                    </span>
-                                                                                )}
+                                                                return (
+                                                                    <div
+                                                                        key={ev.id}
+                                                                        className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-600 transition flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm group/card"
+                                                                    >
+                                                                        <div className="flex items-center gap-3.5 min-w-0">
+                                                                            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0 p-2">
+                                                                                {getPortalIcon(ev.platform, "w-6 h-6")}
                                                                             </div>
-                                                                            <h5 className="text-sm font-bold text-white truncate max-w-xl">
-                                                                                {ev.title}
-                                                                            </h5>
-                                                                            <p className="text-xs text-neutral-400 flex items-center gap-1.5">
-                                                                                <Clock className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
-                                                                                <span className="font-mono text-neutral-300 font-medium">
-                                                                                    {formatTimeRangeIST(ev)}
-                                                                                </span>
-                                                                            </p>
+                                                                            <div className="min-w-0 space-y-0.5">
+                                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                                                                                        {ev.platformName}
+                                                                                    </span>
+                                                                                    {ev.division && (
+                                                                                        <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/25 px-1.5 py-0.2 rounded">
+                                                                                            {ev.division}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {ev.rated && (
+                                                                                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+                                                                                            Rated
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <h5 className="text-sm font-bold text-white truncate max-w-xl">
+                                                                                    {ev.title}
+                                                                                </h5>
+                                                                                <p className="text-xs text-neutral-400 flex items-center gap-1.5">
+                                                                                    <Clock className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
+                                                                                    <span className="font-mono text-neutral-300 font-medium">
+                                                                                        {formatTimeRangeIST(ev)}
+                                                                                    </span>
+                                                                                </p>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
 
-                                                                    {/* Status & Actions */}
-                                                                    <div className="flex items-center gap-3 ml-auto md:ml-0 flex-shrink-0">
-                                                                        {isLive ? (
-                                                                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center gap-1.5">
-                                                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
-                                                                                LIVE NOW
-                                                                            </span>
-                                                                        ) : isFinished ? (
-                                                                            <span className="px-2.5 py-1 rounded-full text-xs font-bold text-neutral-400 bg-white/5 border border-white/10">
-                                                                                Finished
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="text-xs font-mono text-neutral-300 font-bold">
-                                                                                {formatRelativeCountdown(ev.startTimestamp, nowMs)}
-                                                                            </span>
-                                                                        )}
+                                                                        {/* Status & Actions */}
+                                                                        <div className="flex items-center gap-3 ml-auto md:ml-0 flex-shrink-0">
+                                                                            {isLive ? (
+                                                                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center gap-1.5">
+                                                                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                                                                                    LIVE NOW
+                                                                                </span>
+                                                                            ) : isFinished ? (
+                                                                                <span className="px-2.5 py-1 rounded-full text-xs font-bold text-neutral-400 bg-white/5 border border-white/10">
+                                                                                    Finished
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-xs font-mono text-neutral-300 font-bold">
+                                                                                    {formatRelativeCountdown(ev.startTimestamp, nowMs)}
+                                                                                </span>
+                                                                            )}
 
-                                                                        {/* Remind button */}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => handleToggleReminder(ev.id, e)}
-                                                                            className={`p-2 rounded-lg transition border cursor-pointer ${
-                                                                                isReminded
-                                                                                    ? "bg-amber-400 text-black border-amber-400"
-                                                                                    : "bg-neutral-900 text-neutral-400 hover:text-white border-neutral-700"
-                                                                            }`}
-                                                                            title={isReminded ? "Reminder enabled" : "Set reminder"}
-                                                                        >
-                                                                            <Bell className="w-4 h-4" />
-                                                                        </button>
-
-                                                                        {/* Add to Calendar button */}
-                                                                        <div className="relative">
+                                                                            {/* Remind button */}
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => setOpenCalDropdownId(openCalDropdownId === `list-${ev.id}` ? null : `list-${ev.id}`)}
-                                                                                className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-500 transition cursor-pointer"
-                                                                                title="Add to Calendar"
+                                                                                onClick={(e) => handleToggleReminder(ev.id, e)}
+                                                                                className={`p-2 rounded-lg transition border cursor-pointer ${isReminded
+                                                                                    ? "bg-amber-400 text-black border-amber-400"
+                                                                                    : "bg-neutral-900 text-neutral-400 hover:text-white border-neutral-700"
+                                                                                    }`}
+                                                                                title={isReminded ? "Reminder enabled" : "Set reminder"}
                                                                             >
-                                                                                <CalendarPlus className="w-4 h-4" />
+                                                                                <Bell className="w-4 h-4" />
                                                                             </button>
 
-                                                                            {openCalDropdownId === `list-${ev.id}` && (
-                                                                                <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-neutral-900 border border-neutral-700 shadow-2xl z-40 p-1.5 text-white animate-in fade-in zoom-in-95">
-                                                                                    <a
-                                                                                        href={createGoogleCalendarUrl(ev)}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        onClick={() => setOpenCalDropdownId(null)}
-                                                                                        className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold hover:bg-[#FFE566] hover:text-black flex items-center gap-2 transition"
-                                                                                    >
-                                                                                        <span className="w-2 h-2 rounded-full bg-blue-500" />
-                                                                                        Google Calendar
-                                                                                    </a>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            downloadIcsFile(ev);
-                                                                                            setOpenCalDropdownId(null);
-                                                                                        }}
-                                                                                        className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold hover:bg-[#a2ff86] hover:text-black flex items-center gap-2 transition cursor-pointer"
-                                                                                    >
-                                                                                        <span className="w-2 h-2 rounded-full bg-amber-400" />
-                                                                                        Apple / Outlook (.ics)
-                                                                                    </button>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
+                                                                            {/* Add to Calendar button */}
+                                                                            <div className="relative">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setOpenCalDropdownId(openCalDropdownId === `list-${ev.id}` ? null : `list-${ev.id}`)}
+                                                                                    className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-500 transition cursor-pointer"
+                                                                                    title="Add to Calendar"
+                                                                                >
+                                                                                    <CalendarPlus className="w-4 h-4" />
+                                                                                </button>
 
-                                                                        {/* External Link button */}
-                                                                        <a
-                                                                            href={ev.url}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-500 transition"
-                                                                            title="Open Contest Page"
-                                                                        >
-                                                                            <ExternalLink className="w-4 h-4" />
-                                                                        </a>
+                                                                                {openCalDropdownId === `list-${ev.id}` && (
+                                                                                    <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-neutral-900 border border-neutral-700 shadow-2xl z-40 p-1.5 text-white animate-in fade-in zoom-in-95">
+                                                                                        <a
+                                                                                            href={createGoogleCalendarUrl(ev)}
+                                                                                            target="_blank"
+                                                                                            rel="noopener noreferrer"
+                                                                                            onClick={() => setOpenCalDropdownId(null)}
+                                                                                            className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold hover:bg-[#FFE566] hover:text-black flex items-center gap-2 transition"
+                                                                                        >
+                                                                                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                                                                            Google Calendar
+                                                                                        </a>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => {
+                                                                                                downloadIcsFile(ev);
+                                                                                                setOpenCalDropdownId(null);
+                                                                                            }}
+                                                                                            className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold hover:bg-[#a2ff86] hover:text-black flex items-center gap-2 transition cursor-pointer"
+                                                                                        >
+                                                                                            <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                                                                            Apple / Outlook (.ics)
+                                                                                        </button>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+
+                                                                            {/* External Link button */}
+                                                                            <a
+                                                                                href={ev.url}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-500 transition"
+                                                                                title="Open Contest Page"
+                                                                            >
+                                                                                <ExternalLink className="w-4 h-4" />
+                                                                            </a>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            );
-                                                        })}
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Sleek Pagination & Load More Control (Keeps Landing Page Compact: 1-2 Swipes Max) */}
+                                        {groupedDateEvents.length > INITIAL_LIST_DAYS_LIMIT && (
+                                            <div className="pt-4 border-t border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div className="text-xs font-bold text-neutral-400">
+                                                    Showing <strong className="text-white">{visibleContestsCount}</strong> of <strong className="text-white">{filteredEvents.length}</strong> upcoming contests across <strong className="text-white">{visibleDateGroups.length}</strong> of {groupedDateEvents.length} scheduled days
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
+
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    {groupedDateEvents.length > visibleDateGroups.length ? (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setListDaysLimit((prev) => Math.min(groupedDateEvents.length, prev + 5))}
+                                                                className="px-3.5 py-1.5 rounded-xl bg-[#FFE566] hover:bg-yellow-300 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                            >
+                                                                <span>Show Next 5 Days (+{Math.min(5, groupedDateEvents.length - visibleDateGroups.length)} days)</span>
+                                                                <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setListDaysLimit(groupedDateEvents.length)}
+                                                                className="px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700 text-xs font-bold transition cursor-pointer"
+                                                            >
+                                                                View All ({filteredEvents.length})
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setListDaysLimit(INITIAL_LIST_DAYS_LIMIT)}
+                                                            className="px-3.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                                        >
+                                                            <span>Collapse to 10 Days</span>
+                                                            <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        </button>
+                                                    )}
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewMode("calendar")}
+                                                        className="px-3 py-1.5 rounded-xl bg-neutral-950 hover:bg-neutral-900 text-neutral-400 hover:text-[#a2ff86] border border-neutral-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                                        title="Switch to compact month calendar grid"
+                                                    >
+                                                        <CalendarIcon className="w-3.5 h-3.5" />
+                                                        <span>Switch to Calendar</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </>
                         )}

@@ -1,4 +1,5 @@
 import type { PublicProfileData, PublicProfilePlatform } from "../utils/profileApi";
+import type { ProjectItem } from "../types/project";
 import type { UnifiedSubmissionsData } from "../store/submissionsSlice";
 import type { PracticeAnalyticsData } from "../store/practiceAnalyticsSlice";
 import type { UnifiedContestData, PlatformContestAnalytics, UnifiedRecentContestItem } from "../store/contestsSlice";
@@ -252,6 +253,163 @@ export const demoPublicProfilePlatforms: PublicProfilePlatform[] = [
     },
 ];
 
+// ---------------------------------------------------------------------------
+// 1.5 FLAGSHIP DEMO PROJECTS SHOWCASE (4 CAPACITY SLOTS)
+// ---------------------------------------------------------------------------
+export const demoProjects: ProjectItem[] = [
+    {
+        id: "demo-proj-1",
+        userId: "demo-vineet-chandel",
+        title: "Hyperion Telemetry Mesh",
+        slug: "hyperion-telemetry-mesh",
+        tagline: "High-performance distributed eBPF tracing agent & kernel event streamer.",
+        description: "Cloud-native observability daemon capturing Linux kernel socket events via eBPF probes with sub-15 microsecond overhead. Streams protobuf traces directly to ClickHouse with zero context switching.",
+        category: "Distributed Systems",
+        status: "published",
+        isPublished: true,
+        isPinned: true,
+        displayOrder: 0,
+        repoUrl: "https://github.com/Vineet-Chandel/hyperion-telemetry-mesh",
+        repoName: "Vineet-Chandel/hyperion-telemetry-mesh",
+        repoStars: 840,
+        repoForks: 142,
+        repoLanguage: "Go",
+        repoLicense: "Apache-2.0",
+        liveUrl: "https://hyperion.mesh.dev",
+        documentationUrl: "https://docs.hyperion.mesh.dev",
+        coverImageUrl: "/assets/projects/hyperion-telemetry-mesh.svg",
+        imageUrl: "/assets/projects/hyperion-telemetry-mesh.svg",
+        galleryImages: [
+            { url: "/assets/projects/hyperion-telemetry-mesh.svg", caption: "Hyperion eBPF Kernel Probe & RingBuffer Topology" }
+        ],
+        technologies: ["Go", "eBPF", "OpenTelemetry", "gRPC", "ClickHouse", "Docker", "Prometheus"],
+        features: [
+            { title: "Sub-15μs kernel-level socket capture via TC and XDP probes" },
+            { title: "Lock-free ringbuffer streaming emitting 1.4M events/sec" },
+            { title: "OpenTelemetry-compliant protobuf ingestion for ClickHouse analytics" },
+        ],
+        externalLinks: [
+            { label: "Live Gateway", url: "https://hyperion.mesh.dev" },
+            { label: "Architecture RFC", url: "https://github.com/Vineet-Chandel/hyperion-telemetry-mesh" },
+        ],
+        architectureNotes: "Hexagonal pipeline decoupling low-level BPF ringbuffers from userspace gRPC forwarders. Employs SIMD-accelerated serialization.",
+        createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+    {
+        id: "demo-proj-2",
+        userId: "demo-vineet-chandel",
+        title: "RaftKV Distributed Key-Value Store",
+        slug: "raftkv-distributed-cache",
+        tagline: "In-memory distributed key-value store with Raft consensus and LRU eviction.",
+        description: "High-throughput distributed caching cluster designed for low-latency state synchronization. Implements custom Raft state machine replication with automated leader election and shard rebalancing.",
+        category: "Distributed Systems",
+        status: "published",
+        isPublished: true,
+        isPinned: true,
+        displayOrder: 1,
+        repoUrl: "https://github.com/Vineet-Chandel/raftkv-cluster",
+        repoName: "Vineet-Chandel/raftkv-cluster",
+        repoStars: 512,
+        repoForks: 94,
+        repoLanguage: "Go",
+        repoLicense: "Apache-2.0",
+        liveUrl: "https://raftkv.dev",
+        documentationUrl: "https://docs.raftkv.dev",
+        coverImageUrl: "/assets/projects/raft-distributed-cache.svg",
+        imageUrl: "/assets/projects/raft-distributed-cache.svg",
+        galleryImages: [
+            { url: "/assets/projects/raft-distributed-cache.svg", caption: "Linearizable 3-Node Raft Consensus Cluster State" }
+        ],
+        technologies: ["Go", "Raft", "gRPC", "Protobuf", "Docker", "Prometheus"],
+        features: [
+            { title: "Linearizable read/write consistency guaranteed by Raft state replication" },
+            { title: "Sub-millisecond P99 response times under 85,000 req/sec benchmark" },
+            { title: "Zero-loss partition healing with dynamic cluster topology discovery" },
+        ],
+        externalLinks: [
+            { label: "Benchmark Suite", url: "https://github.com/Vineet-Chandel/raftkv-cluster" },
+        ],
+        architectureNotes: "Thread-safe lock-striped hash rings minimize mutex contention under high concurrent writes. Custom memory-efficient binary wire protocol over TCP/gRPC.",
+        createdAt: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+    {
+        id: "demo-proj-3",
+        userId: "demo-vineet-chandel",
+        title: "Algorithm Forge C++20",
+        slug: "algorithm-forge",
+        tagline: "Production implementations of 1,200+ advanced data structures and graph algorithms.",
+        description: "Exhaustive algorithmic library containing modern C++20 implementations of heavy-light decomposition, segment trees with lazy propagation, max-flow push-relabel, and suffix automata.",
+        category: "Open Source",
+        status: "published",
+        isPublished: true,
+        isPinned: false,
+        displayOrder: 2,
+        repoUrl: "https://github.com/Vineet-Chandel/algorithm-forge",
+        repoName: "Vineet-Chandel/algorithm-forge",
+        repoStars: 340,
+        repoForks: 78,
+        repoLanguage: "C++",
+        repoLicense: "MIT",
+        liveUrl: "https://algoforge.dev",
+        documentationUrl: "https://docs.algoforge.dev",
+        coverImageUrl: "/assets/projects/algorithm-forge.svg",
+        imageUrl: "/assets/projects/algorithm-forge.svg",
+        galleryImages: [
+            { url: "/assets/projects/algorithm-forge.svg", caption: "Heavy-Light Decomposition & AVX-512 Vector Lanes" }
+        ],
+        technologies: ["C++20", "CMake", "Google Test", "Python", "GitHub Actions"],
+        features: [
+            { title: "1,200+ data structures verified against competitive programming test suites" },
+            { title: "Cache-conscious memory layouts with SIMD vectorization" },
+            { title: "Exhaustive fuzz-testing pipeline with 100% code coverage" },
+        ],
+        externalLinks: [
+            { label: "Repository", url: "https://github.com/Vineet-Chandel/algorithm-forge" },
+        ],
+        createdAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+    {
+        id: "demo-proj-4",
+        userId: "demo-vineet-chandel",
+        title: "WasmEdge Serverless Runtime",
+        slug: "wasmedge-runtime",
+        tagline: "Serverless microservice deployment framework with zero-cold-start edge routing.",
+        description: "Next-generation serverless execution runtime leveraging lightweight WebAssembly sandboxes and Linux eBPF hooks for instantaneous function execution with zero cold-start latency.",
+        category: "Cloud & DevOps",
+        status: "published",
+        isPublished: true,
+        isPinned: false,
+        displayOrder: 3,
+        repoUrl: "https://github.com/Vineet-Chandel/wasmedge-runtime",
+        repoName: "Vineet-Chandel/wasmedge-runtime",
+        repoStars: 228,
+        repoForks: 46,
+        repoLanguage: "Rust",
+        repoLicense: "MIT",
+        liveUrl: "https://wasmedge.runtime.dev",
+        documentationUrl: "https://docs.wasmedge.runtime.dev",
+        coverImageUrl: "/assets/projects/wasmedge-runtime.svg",
+        imageUrl: "/assets/projects/wasmedge-runtime.svg",
+        galleryImages: [
+            { url: "/assets/projects/wasmedge-runtime.svg", caption: "Microsecond Wasmtime Sandbox Isolation Pipeline" }
+        ],
+        technologies: ["Rust", "WASM", "Tokio", "eBPF", "Linux", "Docker"],
+        features: [
+            { title: "Microsecond WebAssembly sandbox isolation via Wasmtime engine" },
+            { title: "Kernel-bypass packet routing using custom eBPF XDP programs" },
+            { title: "Memory snapshotting enabling instant cold-start resumption" },
+        ],
+        externalLinks: [
+            { label: "Design RFC", url: "https://github.com/Vineet-Chandel/wasmedge-runtime" },
+        ],
+        createdAt: new Date(Date.now() - 280 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+];
+
 export const demoPublicProfile: PublicProfileData = {
     id: "demo-vineet-chandel",
     username: DEMO_USERNAME,
@@ -300,6 +458,7 @@ export const demoPublicProfile: PublicProfileData = {
         { label: "LeetCode", url: "https://leetcode.com/u/Vineet-Chandel", platform: "leetcode" },
     ],
     platforms: demoPublicProfilePlatforms,
+    projects: demoProjects,
 };
 
 // ---------------------------------------------------------------------------
@@ -2627,3 +2786,4 @@ export const demoTopContests: RankedContestPlatform[] = [
 
 export const demoTheme: CardThemeConfig = CARD_THEMES.indigo;
 export const demoPublicProfileUrl = `https://orbix.dev/profile/u/${DEMO_USERNAME}`;
+

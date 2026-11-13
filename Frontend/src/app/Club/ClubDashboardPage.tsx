@@ -5,19 +5,18 @@ import {
     CalendarDays,
     Plus,
     Edit3,
-    Clock,
-    MapPin,
     Bell,
-    ExternalLink,
     Users,
-    UserCheck,
-    ShieldCheck,
     ArrowRight,
     Building2,
     Mail,
     Settings,
     TrendingUp,
     Award,
+    Layers,
+    UserPlus,
+    Megaphone,
+    MessageSquareQuote,
 } from "lucide-react";
 import {
     useAppDispatch,
@@ -41,12 +40,17 @@ import ClubInboxModal from "./ClubInboxModal";
 import { ClubEventModal } from "./ClubEventModal";
 import { ClubEventAnalyticsSection } from "./ClubEventAnalyticsSection";
 import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
+import { WorkspaceShell } from "./TeamWorkspace/WorkspaceShell";
 import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
 import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
+import { CertificateStudioWorkspace } from "./CertificateStudio/CertificateStudioWorkspace";
+import { EventScopeSelectionModal } from "./EventScopeSelectionModal";
+import { ClubCredibilityWorkspace } from "./Credibility/ClubCredibilityWorkspace";
+import { ClubEventCard } from "./ClubEventCard";
 import { OrbixLoader } from "../../components/ui/loader";
 
 interface VerifiedClub {
@@ -122,10 +126,15 @@ export default function ClubDashboardPage() {
 
     // Path to Club Tab mapping & clean full route paths
     const getClubTabFromPath = (pathname: string): ClubTab => {
+        if (pathname.startsWith("/club/team-workspace")) return "team-workspace";
+        if (pathname.startsWith("/club/recruitment")) return "recruitment";
         if (pathname.startsWith("/club/team")) return "team";
         if (pathname.startsWith("/club/events")) return "events";
         if (pathname.startsWith("/club/analytics") || pathname.startsWith("/club/trends")) return "analytics";
         if (pathname.startsWith("/club/certificates")) return "certificates";
+        if (pathname.startsWith("/club/feedback-surveys") || pathname.startsWith("/club/feedback")) return "feedback-surveys";
+        if (pathname.startsWith("/club/announcements") || pathname.startsWith("/club/announcement")) return "announcements";
+        if (pathname.startsWith("/club/credibility")) return "overview";
         if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
         if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
         if (pathname.startsWith("/club/settings")) return "settings";
@@ -135,9 +144,14 @@ export default function ClubDashboardPage() {
     const clubTabToPath: Record<ClubTab, string> = {
         overview: "/club/dashboard",
         team: "/club/team",
+        "team-workspace": "/club/team-workspace",
+        recruitment: "/club/recruitment",
         events: "/club/events",
         analytics: "/club/analytics",
         certificates: "/club/certificates",
+        "feedback-surveys": "/club/feedback-surveys",
+        announcements: "/club/announcements",
+        credibility: "/club/dashboard",
         profile: "/club/profile",
         clubs: "/club/clubs",
         settings: "/club/settings",
@@ -147,9 +161,11 @@ export default function ClubDashboardPage() {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const [activeTab, setActiveTabState] = useState<ClubTab>(() => {
-        const tabQuery = searchParams.get("tab") as ClubTab | null;
-        if (tabQuery && clubTabToPath[tabQuery]) {
-            return tabQuery;
+        if (!eventId && !location.pathname.startsWith("/club/events")) {
+            const tabQuery = searchParams.get("tab") as ClubTab | null;
+            if (tabQuery && clubTabToPath[tabQuery]) {
+                return tabQuery;
+            }
         }
         return getClubTabFromPath(location.pathname);
     });
@@ -162,11 +178,14 @@ export default function ClubDashboardPage() {
 
     // Backward compatibility: automatically migrate legacy query parameters (?tab=team) to clean full routes (/club/team)
     useEffect(() => {
+        if (eventId || location.pathname.startsWith("/club/events")) {
+            return;
+        }
         const tabQuery = searchParams.get("tab") as ClubTab | null;
         if (tabQuery && clubTabToPath[tabQuery]) {
             navigate(clubTabToPath[tabQuery], { replace: true });
         }
-    }, [searchParams, navigate]);
+    }, [searchParams, navigate, eventId, location.pathname]);
 
     // Deep link support for /club/inbox
     useEffect(() => {
@@ -216,6 +235,8 @@ export default function ClubDashboardPage() {
 
     // Event Modal State
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const [isScopeModalOpen, setIsScopeModalOpen] = useState(false);
+    const [selectedScope, setSelectedScope] = useState<"PAN_INDIA" | "CAMPUS">("CAMPUS");
     const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
     const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
     const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
@@ -227,6 +248,7 @@ export default function ClubDashboardPage() {
 
     // Fetch club profile and events (leveraging Redux and Redis caching)
     const fetchClubData = async (force = false) => {
+        if (user?.accountType !== "club") return;
         if (isFetchingClubRef.current && !force) return;
         isFetchingClubRef.current = true;
         try {
@@ -247,8 +269,8 @@ export default function ClubDashboardPage() {
                 }
             } else {
                 const err: any = profileResult.reason;
-                if (typeof err === "string" && (err.includes("401") || err.toLowerCase().includes("unauthorized") || err.toLowerCase().includes("authentication required"))) {
-                    navigate("/auth/signin", { replace: true });
+                if (typeof err === "string" && (err.includes("401") || err.toLowerCase().includes("unauthorized") || err.toLowerCase().includes("authentication required") || err.toLowerCase().includes("club portal"))) {
+                    navigate("/auth/signin?tab=club", { replace: true });
                     return;
                 }
                 if (typeof err === "string" && (err.includes("404") || err.includes("403") || err.toLowerCase().includes("no verified club"))) {
@@ -268,7 +290,7 @@ export default function ClubDashboardPage() {
 
     // Fetch inbox unread count
     const fetchInboxCounts = async () => {
-        if (isFetchingInboxRef.current) return;
+        if (user?.accountType !== "club" || isFetchingInboxRef.current) return;
         isFetchingInboxRef.current = true;
         try {
             const queryParam = club?.id ? `?clubId=${encodeURIComponent(club.id)}` : "";
@@ -291,6 +313,7 @@ export default function ClubDashboardPage() {
     };
 
     useEffect(() => {
+        if (user?.accountType !== "club") return;
         fetchClubData();
         fetchInboxCounts();
 
@@ -301,22 +324,21 @@ export default function ClubDashboardPage() {
             clearInterval(notifInterval);
             window.removeEventListener("focus", fetchInboxCounts);
         };
-    }, []);
+    }, [user?.accountType]);
 
-    // Open Event Create Modal
+    // Open Event Scope Selection Modal
     const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
         setEditingEvent(null);
         setInitialModalStatus(initialStatus);
         setActiveTabState("events");
         navigate("/club/events");
-        setIsEventModalOpen(true);
+        setIsScopeModalOpen(true);
     };
 
-    // Open Event Edit Modal
-    const handleEditEvent = (ev: ClubEvent) => {
-        setEditingEvent(ev);
-        setActiveTabState("events");
-        navigate("/club/events");
+    // Callback when event scope is selected from the scope modal
+    const handleSelectScope = (scope: "PAN_INDIA" | "CAMPUS") => {
+        setSelectedScope(scope);
+        setIsScopeModalOpen(false);
         setIsEventModalOpen(true);
     };
 
@@ -405,7 +427,7 @@ export default function ClubDashboardPage() {
             // ignore
         }
         dispatch(clearUser());
-        navigate("/auth/signin", { replace: true });
+        navigate("/auth/signin?tab=club", { replace: true });
     };
 
     // Date formatting matching Personal Account ("Today, 29 October 2026")
@@ -516,6 +538,28 @@ export default function ClubDashboardPage() {
                                         </div>
                                     )}
 
+                                    {activeTab === "team-workspace" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Layers className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Team Workspace
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "recruitment" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Recruitment & Member Drives
+                                            </h1>
+                                        </div>
+                                    )}
+
                                     {activeTab === "events" && (
                                         <div className="flex items-center gap-2.5">
                                             <div className="w-8 h-8 rounded-lg bg-black text-[#38BDF8] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
@@ -545,6 +589,28 @@ export default function ClubDashboardPage() {
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                                                 Certificates & Credentials
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "feedback-surveys" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <MessageSquareQuote className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Feedback & Surveys
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "announcements" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Megaphone className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Announcement
                                             </h1>
                                         </div>
                                     )}
@@ -603,23 +669,40 @@ export default function ClubDashboardPage() {
                                     {activeTab === "team" && (
                                         <>
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                                Team Workspace
+                                                Team Roster
                                             </span>
                                             <span className="text-xs font-bold text-neutral-700">
-                                                · Build your club's organisation, manage people, and assign departments
+                                                · Overview of all active student club leads and core team members
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "team-workspace" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Workspace Departments
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Build organizational hierarchy, create departments, and appoint team leads
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "recruitment" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Auditions & Drives
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Dispatch invitation links, manage pending invites, and onboard new chapter talent
                                             </span>
                                         </>
                                     )}
 
                                     {activeTab === "events" && (
-                                        <>
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#38BDF8] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                                Active Schedule
-                                            </span>
-                                            <span className="text-xs font-bold text-neutral-700">
-                                                · Manage published sessions, drafts, and meetups
-                                            </span>
-                                        </>
+                                        <span className="text-xs font-bold text-neutral-700">
+                                            Manage published sessions, drafts, and meetups
+                                        </span>
                                     )}
 
                                     {activeTab === "analytics" && (
@@ -640,6 +723,28 @@ export default function ClubDashboardPage() {
                                             </span>
                                             <span className="text-xs font-bold text-neutral-700">
                                                 · Issue verifiable participation & merit credentials to campus students
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "feedback-surveys" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Audience Feedback
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Create surveys, evaluate attendee sentiment, and collect event ratings
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "announcements" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Club Broadcasts
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Broadcast important announcements, club notices, and event highlights to campus
                                             </span>
                                         </>
                                     )}
@@ -742,52 +847,7 @@ export default function ClubDashboardPage() {
                         {/* TAB: DASHBOARD OVERVIEW */}
                         {activeTab === "overview" && (
                             <div className="space-y-6">
-                                {/* Club Identity Hero Card */}
-                                <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                    <div className="flex items-start sm:items-center gap-4 min-w-0">
-                                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden flex items-center justify-center flex-shrink-0 font-black text-xl sm:text-2xl">
-                                            {club.logo_url || club.logoUrl ? (
-                                                <img src={club.logo_url || club.logoUrl || ""} alt={club.name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <span>{club.name.slice(0, 2).toUpperCase()}</span>
-                                            )}
-                                        </div>
-                                        <div className="space-y-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight truncate">
-                                                    {club.name}
-                                                </h2>
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-950 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                                                    <ShieldCheck className="w-3 h-3 text-emerald-700" />
-                                                    Verified Club
-                                                </span>
-                                                <span className="px-2 py-0.5 rounded-full bg-[#FFE566] text-black border border-black text-[10px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                                    {club.category || "Student Club"}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs sm:text-sm font-bold text-neutral-600 truncate">
-                                                {club.college_name} · {club.college_city}, {club.college_state}
-                                            </p>
-                                            <p className="text-xs text-neutral-700 font-medium line-clamp-2 pt-1 max-w-2xl leading-relaxed">
-                                                {club.short_description || "No headline description set yet. Click Manage Profile to add your club's mission, socials, and contact links."}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Action Links Pill Box */}
-                                    <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleTabChange("profile")}
-                                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
-                                        >
-                                            <Edit3 className="w-3.5 h-3.5" />
-                                            <span>Edit Club Profile</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Overview Metrics Grid */}
+                                {/* Overview Metrics Grid (Top of Dashboard) */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                     {/* Card 1: Upcoming Sessions */}
                                     <button
@@ -878,68 +938,8 @@ export default function ClubDashboardPage() {
                                     </button>
                                 </div>
 
-                                {/* Quick Management Hub Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Hub Card 1: Team Management */}
-                                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-4">
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-9 h-9 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                                    <Users className="w-5 h-5 text-black stroke-[2.5]" />
-                                                </div>
-                                                <h3 className="text-base sm:text-lg font-black text-black">
-                                                    Team & Organisation Workspace
-                                                </h3>
-                                            </div>
-                                            <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
-                                                Build your club's organizational hierarchy, create departments (Technical, Design, PR, Operations), invite registered Orbix users by username, and appoint team leads.
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleTabChange("team")}
-                                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] self-start"
-                                        >
-                                            <span>Open Team Workspace</span>
-                                            <ArrowRight className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-
-                                    {/* Hub Card 2: Events & Workshops */}
-                                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-4">
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-9 h-9 rounded-xl bg-[#38BDF8] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                                    <CalendarDays className="w-5 h-5 text-black stroke-[2.5]" />
-                                                </div>
-                                                <h3 className="text-base sm:text-lg font-black text-black">
-                                                    Events & Workshops Hub
-                                                </h3>
-                                            </div>
-                                            <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
-                                                Publish upcoming hackathons, tech talks, workshops, and manage draft agendas with location details, RSVP registration links, and live visibility.
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleTabChange("events")}
-                                                className="px-4 py-2.5 rounded-xl bg-black text-[#38BDF8] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                            >
-                                                <span>Manage All Events</span>
-                                                <ArrowRight className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => openCreateEventModal("published")}
-                                                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer"
-                                            >
-                                                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                <span>New Event</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                                {/* Club Credibility & Accountability Standing (Full Width) */}
+                                <ClubCredibilityWorkspace />
 
                                 {/* Recent Events Preview */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
@@ -977,60 +977,13 @@ export default function ClubDashboardPage() {
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {events.slice(0, 3).map((ev) => (
-                                                <div
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                            {events.slice(0, 4).map((ev) => (
+                                                <ClubEventCard
                                                     key={ev.id}
-                                                    className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-2"
-                                                >
-                                                    <div>
-                                                        {ev.coverImageUrl && (
-                                                            <div className="w-full h-24 rounded-lg border border-black overflow-hidden mb-2 bg-neutral-100 shadow-[1px_1px_0px_#000]">
-                                                                <img src={ev.coverImageUrl} alt={ev.title} className="w-full h-full object-cover" />
-                                                            </div>
-                                                        )}
-                                                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                                                            <span
-                                                                className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black ${
-                                                                    ev.status === "published"
-                                                                        ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
-                                                                        : ev.status === "draft"
-                                                                        ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
-                                                                        : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
-                                                                }`}
-                                                            >
-                                                                {ev.status}
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-neutral-500 flex items-center gap-1">
-                                                                <Clock className="w-3 h-3" />
-                                                                {new Date(ev.startsAt).toLocaleDateString(undefined, {
-                                                                    month: "short",
-                                                                    day: "numeric",
-                                                                })}
-                                                            </span>
-                                                        </div>
-                                                        <h4 className="font-black text-sm text-black truncate">{ev.title}</h4>
-                                                        <p className="text-xs text-neutral-600 line-clamp-2 mt-1">
-                                                            {ev.summary || ev.description || "No description."}
-                                                        </p>
-                                                    </div>
-                                                    <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] text-neutral-600">
-                                                        <span className="truncate font-bold flex items-center gap-1">
-                                                            <MapPin className="w-3 h-3 text-neutral-500" />
-                                                            {ev.venueOrLocation || "Campus"}
-                                                        </span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                handleTabChange("events");
-                                                                handleEditEvent(ev);
-                                                            }}
-                                                            className="font-black text-black hover:underline cursor-pointer"
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                    event={ev}
+                                                    onSelect={(id) => navigate(`/club/events/${id}`)}
+                                                />
                                             ))}
                                         </div>
                                     )}
@@ -1038,11 +991,25 @@ export default function ClubDashboardPage() {
                             </div>
                         )}
 
+                        {/* TAB: CLUB TEAM WORKSPACE */}
+                        {activeTab === "team-workspace" && (
+                            <WorkspaceShell
+                                club={club}
+                                isClubContext={true}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                            />
+                        )}
+
                         {/* TAB: CLUB TEAM & ORGANISATION */}
-                        {activeTab === "team" && (
+                        {(activeTab === "team" || activeTab === "recruitment") && (
                             <ClubTeamWorkspace
                                 club={club}
                                 hideHeaderTitle={true}
+                                initialTab={
+                                    activeTab === "recruitment"
+                                        ? "invitations"
+                                        : "overview"
+                                }
                                 onOpenInbox={() => setIsInboxModalOpen(true)}
                                 onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 onStatsLoaded={(stats: TeamStats) => {
@@ -1072,6 +1039,7 @@ export default function ClubDashboardPage() {
                                     }}
                                     onSubmit={handleModalSubmit}
                                     editingEvent={editingEvent}
+                                    selectedScope={selectedScope}
                                     clubId={club?.id}
                                     clubName={club?.name}
                                     clubLogoUrl={club?.logo_url || undefined}
@@ -1141,10 +1109,6 @@ export default function ClubDashboardPage() {
                                             Cancelled ({cancelledEvents.length})
                                         </button>
                                     </div>
-
-                                    <span className="text-xs font-bold text-neutral-500">
-                                        Showing {filteredEvents.length} event{filteredEvents.length === 1 ? "" : "s"}
-                                    </span>
                                 </div>
 
                                 {/* Event Cards Grid */}
@@ -1173,122 +1137,11 @@ export default function ClubDashboardPage() {
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                         {filteredEvents.map((ev) => (
-                                            <div
+                                            <ClubEventCard
                                                 key={ev.id}
-                                                onClick={() => navigate(`/club/events/${ev.id}`)}
-                                                className="p-5 sm:p-6 rounded-3xl bg-white border-4 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 transition-all cursor-pointer flex flex-col justify-between group"
-                                            >
-                                                <div>
-                                                    {/* Cover Banner if attached */}
-                                                    {ev.coverImageUrl && (
-                                                        <div className="w-full h-40 sm:h-48 rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
-                                                            <img
-                                                                src={ev.coverImageUrl}
-                                                                alt={ev.title}
-                                                                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-                                                            />
-                                                            {ev.isOptimistic && (
-                                                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
-                                                                    Syncing...
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex items-center justify-between gap-2 mb-2">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span
-                                                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black ${
-                                                                    ev.status === "published"
-                                                                        ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
-                                                                        : ev.status === "completed"
-                                                                        ? "bg-sky-200 text-black shadow-[1px_1px_0px_#000]"
-                                                                        : ev.status === "draft"
-                                                                        ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
-                                                                        : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
-                                                                }`}
-                                                            >
-                                                                {ev.status === "published"
-                                                                    ? "Published (Live)"
-                                                                    : ev.status === "completed"
-                                                                    ? "Completed"
-                                                                    : ev.status === "draft"
-                                                                    ? "Draft"
-                                                                    : "Cancelled"}
-                                                            </span>
-                                                            {!ev.coverImageUrl && ev.isOptimistic && (
-                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
-                                                                    Syncing...
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <span className="text-xs font-bold text-neutral-500 flex items-center gap-1">
-                                                            <Clock className="w-3.5 h-3.5" />
-                                                            {new Date(ev.startsAt).toLocaleDateString(undefined, {
-                                                                month: "short",
-                                                                day: "numeric",
-                                                                year: "numeric",
-                                                                hour: "2-digit",
-                                                                minute: "2-digit",
-                                                            })}
-                                                        </span>
-                                                    </div>
-
-                                                    <h3 className="text-base sm:text-lg font-black text-neutral-900 line-clamp-1 group-hover:text-black transition-colors">
-                                                        {ev.title}
-                                                    </h3>
-                                                    <p className="text-xs text-neutral-600 line-clamp-2 mt-1.5 leading-relaxed">
-                                                        {ev.summary || ev.description || "No description provided."}
-                                                    </p>
-
-                                                    <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-neutral-600 font-medium">
-                                                        <span className="flex items-center gap-1 font-bold">
-                                                            <MapPin className="w-3.5 h-3.5 text-neutral-500" />
-                                                            {ev.venueOrLocation || (ev.locationType === "virtual" ? "Virtual (Online)" : ev.locationType === "hybrid" ? "Hybrid" : "Campus Hall")}
-                                                        </span>
-                                                        {ev.registrationUrl && (
-                                                            <span className="text-emerald-700 flex items-center gap-1 font-bold">
-                                                                <span>RSVP Enabled</span>
-                                                                <ExternalLink className="w-3 h-3" />
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Event-wise Key Analytics Metrics */}
-                                                    <div className="mt-3 flex items-center gap-2 text-xs font-bold flex-wrap">
-                                                        <span className="inline-flex items-center gap-1 text-sky-950 bg-sky-50 px-2 py-0.5 rounded-md border border-black/20">
-                                                            <Users className="w-3 h-3 text-sky-700 stroke-[2.5]" />
-                                                            <span>{ev.registrationsCount || 0} RSVPs</span>
-                                                        </span>
-                                                        <span className="inline-flex items-center gap-1 text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded-md border border-black/20">
-                                                            <UserCheck className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
-                                                            <span>{ev.attendeesCount || 0} Attended</span>
-                                                        </span>
-                                                        {(ev.rejectedCount ?? 0) > 0 && (
-                                                            <span className="inline-flex items-center gap-1 text-rose-950 bg-rose-50 px-2 py-0.5 rounded-md border border-black/20">
-                                                                <span>{ev.rejectedCount} Rejected</span>
-                                                            </span>
-                                                        )}
-                                                        {(Number(ev.registrationsCount) || 0) > 0 && (
-                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-[#FAF6EE] text-black text-[10px] font-black border border-black/30">
-                                                                {Math.round(((Number(ev.attendeesCount) || 0) / (Number(ev.registrationsCount) || 1)) * 100)}% Turnout
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Clean Action Footer: clicking navigates to dedicated event console */}
-                                                <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex items-center justify-between gap-2">
-                                                    <span className="text-xs font-bold text-neutral-500 group-hover:text-black transition-colors">
-                                                        Manage roster, agenda & analytics
-                                                    </span>
-
-                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] group-hover:bg-[#8ee673] group-hover:translate-x-0.5 transition-all shrink-0">
-                                                        <span>Open Event</span>
-                                                        <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                    </span>
-                                                </div>
-                                            </div>
+                                                event={ev}
+                                                onSelect={(id) => navigate(`/club/events/${id}`)}
+                                            />
                                         ))}
                                     </div>
                                 )}
@@ -1313,74 +1166,50 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: CERTIFICATES & CREDENTIALS STUDIO */}
                         {activeTab === "certificates" && (
-                            <div className="space-y-6">
-                                <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-4">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                                Official Credential Studio
-                                            </span>
-                                            <span className="text-xs font-bold text-neutral-500">
-                                                Cryptographically Signed · Strict Eligibility Enforced
-                                            </span>
-                                        </div>
-                                        <h2 className="text-xl sm:text-2xl font-black text-black">
-                                            Campus Certificates & Turnout Recognition
-                                        </h2>
-                                        <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
-                                            Issue verified achievement and participation certificates directly to campus students and event attendees. Dispatches automated in-app notifications to each recipient.
-                                        </p>
-                                    </div>
+                            <CertificateStudioWorkspace
+                                clubId={club.id}
+                                clubName={club.name}
+                                clubLogo={club.logo_url}
+                                onOpenLegacyModal={() => setIsCertStudioOpen(true)}
+                            />
+                        )}
 
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCertStudioOpen(true)}
-                                        className="px-5 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
-                                    >
-                                        <Award className="w-5 h-5 stroke-[2.5]" />
-                                        <span>+ Launch Issuance Studio</span>
-                                    </button>
+                        {/* TAB: FEEDBACK & SURVEYS */}
+                        {activeTab === "feedback-surveys" && (
+                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                                <div className="w-14 h-14 rounded-2xl bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mx-auto text-black">
+                                    <MessageSquareQuote className="w-7 h-7 stroke-[2.2]" />
                                 </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="font-black text-lg sm:text-xl text-black">
+                                        Feedback & Surveys
+                                    </h3>
+                                    <p className="text-xs sm:text-sm font-medium text-neutral-600">
+                                        Participant feedback collection, post-event surveys, and satisfaction analytics will appear here.
+                                    </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-600 text-xs font-bold font-mono">
+                                    Module in development
+                                </div>
+                            </div>
+                        )}
 
-                                {/* Quick Launch Cards for the Two Perspectives */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    <div
-                                        onClick={() => setIsCertStudioOpen(true)}
-                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
-                                    >
-                                        <div className="w-12 h-12 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                            <CalendarDays className="w-6 h-6 text-black" />
-                                        </div>
-                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
-                                            <span>1. Event Participation Turnout</span>
-                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                        </h3>
-                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
-                                            Select a completed or live event, review verified attendees and checked-in students, and issue participation or merit certificates with 1-click batch delivery.
-                                        </p>
-                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
-                                            <span>Select Event Roster</span> &rarr;
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        onClick={() => setIsCertStudioOpen(true)}
-                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
-                                    >
-                                        <div className="w-12 h-12 rounded-xl bg-[#FFDE59] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                            <ShieldCheck className="w-6 h-6 text-black" />
-                                        </div>
-                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
-                                            <span>2. Credible Campus Network</span>
-                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                        </h3>
-                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
-                                            Categorize students by credibility (attended sessions count, team contributors, campus verified). Hand-pick standout individuals for excellence & appreciation awards.
-                                        </p>
-                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
-                                            <span>Browse Connected Students</span> &rarr;
-                                        </div>
-                                    </div>
+                        {/* TAB: ANNOUNCEMENTS */}
+                        {activeTab === "announcements" && (
+                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                                <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mx-auto text-black">
+                                    <Megaphone className="w-7 h-7 stroke-[2.2]" />
+                                </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="font-black text-lg sm:text-xl text-black">
+                                        Campus Announcements
+                                    </h3>
+                                    <p className="text-xs sm:text-sm font-medium text-neutral-600">
+                                        Campus-wide club broadcasts, bulletin updates, and notification feeds will be managed here.
+                                    </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-600 text-xs font-bold font-mono">
+                                    Module in development
                                 </div>
                             </div>
                         )}
@@ -1412,6 +1241,14 @@ export default function ClubDashboardPage() {
                     <SectionBottomIllustration alt="Orbix club space illustration" />
                 </section>
             </div>
+
+            {/* Event Scope Selection Modal (Pan India vs Campus-Only) */}
+            <EventScopeSelectionModal
+                isOpen={isScopeModalOpen}
+                onClose={() => setIsScopeModalOpen(false)}
+                onSelectScope={handleSelectScope}
+                collegeName={club?.college_name}
+            />
 
             {/* Club Inbox Modal */}
             <ClubInboxModal

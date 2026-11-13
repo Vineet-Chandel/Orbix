@@ -1,0 +1,1077 @@
+// Frontend/src/app/Club/TeamWorkspace/WorkspaceShell.tsx
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+    Users,
+    Hash,
+    Shield,
+    Activity,
+    AlertTriangle,
+    RefreshCw,
+    FolderKanban,
+    Mail,
+    UserCog,
+    Clock,
+    ListTodo,
+    CheckCircle2,
+    Search,
+    ShieldAlert,
+    Menu,
+    FolderArchive,
+    Sparkles,
+    History,
+} from "lucide-react";
+import { workspaceApi } from "../../../api/workspaceApi";
+import { useToast } from "../../../context/ToastContext";
+import { OrbixLoader } from "../../../components/ui/loader";
+import type {
+    TeamWorkspace,
+    WorkspaceMember,
+    WorkspaceRole,
+    WorkspaceDepartment,
+    WorkspaceChannelCategory,
+    WorkspaceChannel,
+    WorkspaceThread,
+    WorkspaceSearchResultItem,
+    MemberCapabilityResolution,
+    WorkspaceHistoryRecordType,
+} from "../../../types/workspace";
+import { DepartmentOverviewView } from "./Departments/DepartmentOverviewView";
+import { MemberDirectoryView } from "./Members/MemberDirectoryView";
+import { InvitationsOverviewView } from "./Invitations/InvitationsOverviewView";
+import { WorkspaceManagerModal } from "./Manager/WorkspaceManagerModal";
+import { WorkspaceSidebar } from "./Sidebar/WorkspaceSidebar";
+import { ChannelView } from "./Channels/ChannelView";
+import { ThreadSidebar } from "./Threads/ThreadSidebar";
+import { CreateCategoryModal } from "./Modals/CreateCategoryModal";
+import { EditCategoryModal } from "./Modals/EditCategoryModal";
+import { CreateChannelModal } from "./Modals/CreateChannelModal";
+import { ChannelSettingsModal } from "./Modals/ChannelSettingsModal";
+import { TasksBoardView } from "./Tasks/TasksBoardView";
+import { MyTasksView } from "./Tasks/MyTasksView";
+import { NotificationBell } from "./Notifications/NotificationBell";
+import { WorkspaceOverviewView } from "./Dashboard/WorkspaceOverviewView";
+import { WorkspaceHistoryView } from "./WorkspaceHistory/WorkspaceHistoryView";
+import { WorkspaceSectionSwitcher, type WorkspaceSectionNavItem } from "./Navigation/WorkspaceSectionSwitcher";
+import { WorkspaceSearchModal } from "./Search/WorkspaceSearchModal";
+import { RolesPermissionsView } from "./Roles/RolesPermissionsView";
+import { WorkspaceSettingsView } from "./Settings/WorkspaceSettingsView";
+import { ResourceLibraryView } from "./Files/ResourceLibraryView";
+import { RecognitionOverviewView } from "./Recognition/RecognitionOverviewView";
+
+interface WorkspaceShellProps {
+    club: {
+        id: string;
+        name: string;
+        slug: string;
+        logo_url?: string | null;
+        college_name?: string;
+    };
+    onOpenMobileSidebar?: () => void;
+    clubSelector?: React.ReactNode;
+    initialSection?: string;
+    isClubContext?: boolean;
+}
+
+export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
+    club,
+    onOpenMobileSidebar,
+    clubSelector,
+    initialSection,
+    isClubContext: isClubContextProp,
+}) => {
+    const isClubContext =
+        isClubContextProp ??
+        (typeof window !== "undefined" && window.location.pathname.startsWith("/club"));
+    const toast = useToast();
+    const toastRef = useRef(toast);
+    useEffect(() => {
+        toastRef.current = toast;
+    }, [toast]);
+
+    // Data States
+    const [workspace, setWorkspace] = useState<TeamWorkspace | null>(null);
+    const [currentMember, setCurrentMember] = useState<WorkspaceMember | null>(null);
+    const [capabilities, setCapabilities] = useState<MemberCapabilityResolution | null>(null);
+    const [roles, setRoles] = useState<WorkspaceRole[]>([]);
+    const [members, setMembers] = useState<WorkspaceMember[]>([]);
+    const [departments, setDepartments] = useState<WorkspaceDepartment[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Active Navigation Sub-tab
+    type ActiveWorkspaceSection =
+        | "overview"
+        | "departments"
+        | "roster"
+        | "invitations"
+        | "channels"
+        | "all-tasks"
+        | "my-tasks"
+        | "resources"
+        | "recognition"
+        | "history"
+        | "roles"
+        | "settings";
+
+    const normalizeSection = (sec?: string): ActiveWorkspaceSection => {
+        if (sec === "activity" || sec === "audit" || sec === "history") return "history";
+        if (sec === "members") return "roster";
+        if (sec === "files") return "resources";
+        return (sec as ActiveWorkspaceSection) || "overview";
+    };
+
+    const [historyInitialRecordType, setHistoryInitialRecordType] =
+        useState<WorkspaceHistoryRecordType>(() =>
+            initialSection === "audit" ? "audit" : initialSection === "activity" ? "activity" : "all"
+        );
+
+    const [activeSection, setActiveSection] = useState<ActiveWorkspaceSection>(() =>
+        normalizeSection(initialSection)
+    );
+
+    useEffect(() => {
+        if (initialSection) {
+            if ((isClubContext || capabilities?.isClubAccount) && initialSection === "my-tasks") {
+                setActiveSection("overview");
+            } else {
+                if (initialSection === "audit") setHistoryInitialRecordType("audit");
+                else if (initialSection === "activity") setHistoryInitialRecordType("activity");
+                else if (initialSection === "history") setHistoryInitialRecordType("all");
+                setActiveSection(normalizeSection(initialSection));
+            }
+        }
+    }, [initialSection, isClubContext, capabilities?.isClubAccount]);
+
+    useEffect(() => {
+        if ((isClubContext || capabilities?.isClubAccount) && activeSection === "my-tasks") {
+            setActiveSection("overview");
+        }
+    }, [isClubContext, capabilities?.isClubAccount, activeSection]);
+
+    // Phase 08 States: Search Modal
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+    // Phase 04 States: Channels & Messaging
+    const [categories, setCategories] = useState<WorkspaceChannelCategory[]>([]);
+    const [activeChannel, setActiveChannel] = useState<WorkspaceChannel | null>(null);
+    const [activeThread, setActiveThread] = useState<WorkspaceThread | null>(null);
+    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+
+    // Modals
+    const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
+    const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
+    const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<WorkspaceChannelCategory | null>(null);
+    const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+    const [selectedCategoryForChannel, setSelectedCategoryForChannel] = useState<string | null>(null);
+    const [isChannelSettingsOpen, setIsChannelSettingsOpen] = useState(false);
+    const [settingsChannel, setSettingsChannel] = useState<WorkspaceChannel | null>(null);
+
+    // Modal state for Member Suspension
+    const [suspendingMember, setSuspendingMember] = useState<WorkspaceMember | null>(null);
+    const [suspendReason, setSuspendReason] = useState("");
+    const [isSubmittingSuspension, setIsSubmittingSuspension] = useState(false);
+
+    // Workspace Manager Modal
+    const [isManagerModalOpen, setIsManagerModalOpen] = useState(false);
+
+    // Load Categories & Channels
+    const loadCategories = useCallback(async () => {
+        try {
+            const [catRes, unreadRes] = await Promise.all([
+                workspaceApi.getCategories(club.id),
+                workspaceApi.getUnreadCounts(club.id),
+            ]);
+            if (catRes.success && catRes.categories) {
+                setCategories(catRes.categories);
+                setActiveChannel((prev) => {
+                    if (prev) {
+                        // Keep current if still exists
+                        const allChans = catRes.categories.flatMap((c) => c.channels || []);
+                        const found = allChans.find((c) => c.id === prev.id);
+                        return found || allChans[0] || null;
+                    }
+                    const firstChan = catRes.categories.flatMap((c) => c.channels || [])[0];
+                    return firstChan || null;
+                });
+            }
+            if (unreadRes.success && unreadRes.unreadCounts) {
+                setUnreadCounts(unreadRes.unreadCounts);
+            }
+        } catch (err) {
+            console.error("Failed to load categories/channels:", err);
+        }
+    }, [club.id]);
+
+    // Load Workspace Data
+    const loadWorkspace = useCallback(async (isRefresh = false) => {
+        try {
+            if (isRefresh) setRefreshing(true);
+            else setLoading(true);
+
+            const res = await workspaceApi.getWorkspace(club.id);
+            if (res.success) {
+                setWorkspace(res.workspace);
+                setCurrentMember(res.currentMember);
+                if (res.capabilities) {
+                    setCapabilities(res.capabilities);
+                }
+                setRoles(res.roles || []);
+
+                // Release shell loading immediately so sidebar and active view are interactive
+                setLoading(false);
+
+                // Load members, departments, and channels asynchronously in background
+                Promise.allSettled([
+                    workspaceApi.getMembers({ clubId: club.id }).then((memRes) => {
+                        if (memRes.success) setMembers(memRes.members || []);
+                    }),
+                    workspaceApi.getDepartments(club.id, true).then((deptRes) => {
+                        if (deptRes.success) setDepartments(deptRes.departments || []);
+                    }),
+                    loadCategories(),
+                ]);
+
+                if (res.isNew) {
+                    toastRef.current.success("Team Workspace successfully provisioned for your chapter!");
+                }
+            }
+        } catch (err: any) {
+            console.error("Workspace load error:", err);
+            toastRef.current.error(err.message || "Failed to load Team Workspace.");
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [club.id, loadCategories]);
+
+    useEffect(() => {
+        loadWorkspace();
+    }, [loadWorkspace]);
+
+    const handleReorderCategories = useCallback(
+        async (direction: "up" | "down", categoryId: string) => {
+            const index = categories.findIndex((c) => c.id === categoryId);
+            if (index === -1) return;
+            if (direction === "up" && index === 0) return;
+            if (direction === "down" && index === categories.length - 1) return;
+
+            const targetIndex = direction === "up" ? index - 1 : index + 1;
+            const reordered = [...categories];
+            const [moved] = reordered.splice(index, 1);
+            reordered.splice(targetIndex, 0, moved);
+
+            setCategories(reordered);
+            try {
+                const res = await workspaceApi.reorderCategories(
+                    reordered.map((c) => c.id),
+                    club.id
+                );
+                if (!res.success) {
+                    loadCategories();
+                }
+            } catch (err) {
+                loadCategories();
+            }
+        },
+        [categories, club.id, loadCategories]
+    );
+
+    // Realtime SSE event stream setup
+    useEffect(() => {
+        if (!workspace?.id) return;
+
+        // Establish SSE connection
+        const baseUrl = import.meta.env.VITE_API_URL || "";
+        const sseUrl = `${baseUrl}/api/club/workspace/realtime/stream?clubId=${club.id}`;
+        
+        let eventSource: EventSource | null = null;
+        try {
+            eventSource = new EventSource(sseUrl, { withCredentials: true });
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    // Dispatch custom event to broadcast live updates to ChannelView and ThreadSidebar
+                    window.dispatchEvent(new CustomEvent("workspace:realtime", { detail: data }));
+
+                    if (data.event === "message:new") {
+                        // Refresh unread counts
+                        workspaceApi.getUnreadCounts(club.id).then((res) => {
+                            if (res.success && res.unreadCounts) {
+                                setUnreadCounts(res.unreadCounts);
+                            }
+                        });
+                    } else if (data.event?.startsWith("channel:") || data.event?.startsWith("category:")) {
+                        loadCategories();
+                    } else if (data.event?.startsWith("member:") || data.event === "role:updated" || data.event === "roles:reordered") {
+                        // Refresh member roster and capabilities asynchronously
+                        workspaceApi.getMembers({ clubId: club.id }).then((m) => {
+                            if (m.success && m.members) setMembers(m.members);
+                        });
+                        workspaceApi.getWorkspace(club.id).then((w) => {
+                            if (w.success && w.capabilities) setCapabilities(w.capabilities);
+                        });
+                    } else if (data.event?.startsWith("department:")) {
+                        workspaceApi.getDepartments(club.id, true).then((d) => {
+                            if (d.success && d.departments) setDepartments(d.departments);
+                        });
+                    }
+                } catch (e) {
+                    // Ignore heartbeat parse errors
+                }
+            };
+
+            eventSource.onerror = () => {
+                // Browser auto-reconnects SSE
+            };
+        } catch (err) {
+            console.error("SSE stream error:", err);
+        }
+
+        return () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+        };
+    }, [workspace?.id, club.id, loadCategories]);
+
+    // Phase 08: Global Cmd+K / Ctrl+K keyboard shortcut for Search
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                setIsSearchOpen((prev) => !prev);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    // Phase 08: Search Result Navigation Handler
+    const handleSelectSearchResult = (item: WorkspaceSearchResultItem) => {
+        switch (item.type) {
+            case "task":
+                setActiveSection("all-tasks");
+                break;
+            case "channel": {
+                const foundChan = categories.flatMap((c) => c.channels || []).find((c) => c.id === item.id);
+                if (foundChan) {
+                    setActiveChannel(foundChan);
+                }
+                setActiveSection("channels");
+                break;
+            }
+            case "message": {
+                if (item.metadata?.channelId) {
+                    const chan = categories.flatMap((c) => c.channels || []).find((c) => c.id === item.metadata?.channelId);
+                    if (chan) setActiveChannel(chan);
+                }
+                setActiveSection("channels");
+                break;
+            }
+            case "member":
+                setActiveSection("roster");
+                break;
+            case "department":
+                setActiveSection("departments");
+                break;
+            case "file":
+                if (item.destinationUrl) {
+                    window.open(item.destinationUrl, "_blank");
+                }
+                break;
+        }
+    };
+
+    // Handle Suspension Action
+    const handleToggleSuspension = async () => {
+        if (!suspendingMember) return;
+        try {
+            setIsSubmittingSuspension(true);
+            const willSuspend = !suspendingMember.isSuspended;
+            const res = await workspaceApi.setMemberSuspension(
+                suspendingMember.userId,
+                willSuspend,
+                suspendReason,
+                club.id
+            );
+
+            if (res.success) {
+                toast.success(res.message);
+                setSuspendingMember(null);
+                setSuspendReason("");
+                await loadWorkspace(true);
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to alter suspension status.");
+        } finally {
+            setIsSubmittingSuspension(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-[450px] flex flex-col items-center justify-center p-8 text-black">
+                <OrbixLoader size="lg" />
+                <p className="mt-4 font-bold text-sm text-neutral-600">Initializing Team Workspace...</p>
+            </div>
+        );
+    }
+
+    if (!workspace) {
+        return (
+            <div className="bg-white border-2 border-black rounded-xl p-8 shadow-neo text-center max-w-lg mx-auto my-12">
+                <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                <h3 className="text-xl font-black">Workspace Unavailable</h3>
+                <p className="text-neutral-600 text-sm mt-2">
+                    Could not retrieve or provision a workspace for {club.name}. Ensure you have administrator rights.
+                </p>
+                <button
+                    onClick={() => loadWorkspace()}
+                    className="mt-4 px-4 py-2 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-bold text-sm border-2 border-black rounded-lg shadow-neo-sm"
+                >
+                    Retry Initialization
+                </button>
+            </div>
+        );
+    }
+
+    const effectiveIsClubContext = Boolean(isClubContext || capabilities?.isClubAccount);
+    const visibleMembers = members.filter((m) => m.user?.accountType !== "club");
+    const isOwner = Boolean(
+        effectiveIsClubContext ||
+        currentMember?.role?.slug === "owner" ||
+        currentMember?.role?.rank === 1000 ||
+        capabilities?.isOwner
+    );
+    const isAdmin = Boolean(
+        effectiveIsClubContext ||
+        isOwner ||
+        (currentMember?.role?.rank || 0) >= 800 ||
+        capabilities?.isAdmin
+    );
+    const isWorkspaceManager = Boolean(
+        !effectiveIsClubContext && (
+            (workspace.managerUserId && workspace.managerUserId === currentMember?.userId) ||
+            capabilities?.isWorkspaceManager
+        )
+    );
+    const canManageChannels = Boolean(
+        isAdmin ||
+        (isWorkspaceManager && Boolean((workspace.managerPermissions as any)?.can_manage_channels)) ||
+        capabilities?.capabilities.channels.manage
+    );
+    const navItems: WorkspaceSectionNavItem[] = [
+        {
+            id: "overview",
+            label: "Workspace Overview",
+            icon: <Activity className="w-3.5 h-3.5" />,
+        },
+        {
+            id: "departments",
+            label: "Departments",
+            count: departments.length,
+            icon: <FolderKanban className="w-3.5 h-3.5" />,
+        },
+        {
+            id: "roster",
+            label: "Member Roster",
+            count: visibleMembers.length,
+            icon: <Users className="w-3.5 h-3.5" />,
+        },
+        ...((capabilities ? capabilities.navigation.canViewInvitations : (isAdmin || isWorkspaceManager))
+            ? [
+                  {
+                      id: "invitations",
+                      label: "Invitations",
+                      icon: <Mail className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        {
+            id: "channels",
+            label: "Channels & Chat",
+            icon: <Hash className="w-3.5 h-3.5" />,
+        },
+        ...((capabilities ? capabilities.navigation.canViewAllTasks : true)
+            ? [
+                  {
+                      id: "all-tasks",
+                      label: "All Tasks",
+                      icon: <ListTodo className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        ...(!effectiveIsClubContext && (capabilities ? capabilities.navigation.canViewMyTasks : true)
+            ? [
+                  {
+                      id: "my-tasks",
+                      label: "My Tasks",
+                      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        ...((capabilities ? (capabilities.navigation.canViewResources ?? true) : true)
+            ? [
+                  {
+                      id: "resources",
+                      label: "Files & Resources",
+                      icon: <FolderArchive className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        {
+            id: "recognition",
+            label: "Recognition",
+            icon: <Sparkles className="w-3.5 h-3.5" />,
+        },
+        {
+            id: "history",
+            label: "Workspace History",
+            icon: <History className="w-3.5 h-3.5" />,
+        },
+        ...((capabilities ? (capabilities.navigation.canViewRoles || capabilities.capabilities.roles.view) : true)
+            ? [
+                  {
+                      id: "roles",
+                      label: "Roles & Permissions",
+                      icon: <ShieldAlert className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+        ...((capabilities ? capabilities.navigation.canViewSettings : isAdmin)
+            ? [
+                  {
+                      id: "settings",
+                      label: "Settings",
+                      icon: <UserCog className="w-3.5 h-3.5" />,
+                  },
+              ]
+            : []),
+    ];
+
+    return (
+        <div className="w-full space-y-4">
+            {/* Compact Workspace Utility Controls (No Club Heading / Divider Line) */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {onOpenMobileSidebar && (
+                        <button
+                            onClick={onOpenMobileSidebar}
+                            className="lg:hidden px-2.5 py-1.5 bg-white hover:bg-neutral-100 text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
+                            title="Open Navigation Menu"
+                        >
+                            <Menu className="w-3.5 h-3.5" />
+                            <span>Menu</span>
+                        </button>
+                    )}
+                    {clubSelector}
+                    {!isClubContext && currentMember && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs">
+                            <Shield className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Your Role: {currentMember?.roleTitle || "Member"}</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap ml-auto">
+                    {/* Owner Workspace Manager Designation Button */}
+                    {isOwner && (
+                        <button
+                            onClick={() => setIsManagerModalOpen(true)}
+                            className="px-3 py-1.5 bg-[#FFE566] hover:bg-[#fbd83a] text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
+                            title="Appoint or configure Workspace Manager"
+                        >
+                            <UserCog className="w-3.5 h-3.5" />
+                            <span>Workspace Manager</span>
+                        </button>
+                    )}
+
+                    {/* Quick Search */}
+                    <button
+                        onClick={() => setIsSearchOpen(true)}
+                        className="px-3 py-1.5 bg-white hover:bg-neutral-100 text-neutral-900 border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs transition-all flex items-center gap-1.5"
+                        title="Search Workspace (⌘K)"
+                    >
+                        <Search className="w-3.5 h-3.5 text-neutral-600" />
+                        <span className="hidden sm:inline">Search</span>
+                        <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-[#FAF6EE] border border-black/30 rounded text-neutral-700">
+                            ⌘K
+                        </kbd>
+                    </button>
+
+                    {/* Notification Bell */}
+                    <div className="bg-neutral-900 border-2 border-black rounded-xl shadow-neo-xs flex items-center justify-center">
+                        <NotificationBell clubId={club.id} />
+                    </div>
+
+                    <button
+                        onClick={() => loadWorkspace(true)}
+                        disabled={refreshing}
+                        className="p-2 bg-white hover:bg-neutral-100 border-2 border-black rounded-xl shadow-neo-xs transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                        title="Refresh Workspace"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Full-Width Black Toggle Navigation Dock with Animated White Slider */}
+            <WorkspaceSectionSwitcher
+                items={navItems}
+                activeSection={activeSection}
+                onSelect={(sectionId) => {
+                    if (sectionId === "history") {
+                        setHistoryInitialRecordType("all");
+                    }
+                    setActiveSection(sectionId as ActiveWorkspaceSection);
+                }}
+            />
+
+            {/* Section Access Authorization Enforcement */}
+            {capabilities && (!capabilities.navigation.allowedTabs.includes(activeSection) || (effectiveIsClubContext && activeSection === "my-tasks")) ? (
+                <div className="bg-[#FAF6EE] border-2 border-black rounded-2xl p-8 text-center shadow-neo max-w-lg mx-auto my-8 animate-in fade-in duration-150">
+                    <div className="w-14 h-14 bg-rose-100 border-2 border-black rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-neo-xs">
+                        <ShieldAlert className="w-7 h-7 text-rose-600" />
+                    </div>
+                    <h3 className="text-xl font-black text-black">Section Restricted</h3>
+                    <p className="text-xs font-bold text-neutral-600 mt-2 max-w-sm mx-auto leading-relaxed">
+                        You do not possess permission to access the "{activeSection}" module in this workspace.
+                    </p>
+                    <button
+                        onClick={() => setActiveSection("overview")}
+                        className="mt-5 px-5 py-2.5 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-sm transition active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                        Return to Workspace Overview
+                    </button>
+                </div>
+            ) : (
+                <>
+                    {/* SECTION 1: OVERVIEW (PHASE 08) */}
+            {activeSection === "overview" && (
+                <WorkspaceOverviewView
+                    clubId={club.id}
+                    departments={departments}
+                    isAdmin={isAdmin}
+                    isClubContext={effectiveIsClubContext}
+                    capabilities={capabilities}
+                    onNavigateToSection={(sec) => {
+                        if (effectiveIsClubContext && sec === "my-tasks") return;
+                        if (sec === "history") setHistoryInitialRecordType("all");
+                        setActiveSection(normalizeSection(sec));
+                    }}
+                    onSelectDepartment={() => {
+                        setActiveSection("departments");
+                    }}
+                />
+            )}
+
+            {/* SECTION 2: DEPARTMENTS */}
+            {activeSection === "departments" && (
+                <DepartmentOverviewView
+                    clubId={club.id}
+                    departments={departments}
+                    allMembers={visibleMembers}
+                    isAdmin={isAdmin}
+                    capabilities={capabilities}
+                    onReload={() => loadWorkspace(true)}
+                />
+            )}
+
+            {/* SECTION 3: ROSTER */}
+            {activeSection === "roster" && (
+                <MemberDirectoryView
+                    workspace={workspace}
+                    members={visibleMembers}
+                    roles={roles}
+                    departments={departments}
+                    currentMember={currentMember}
+                    clubId={club.id}
+                    isClubContext={effectiveIsClubContext}
+                    onRefresh={() => loadWorkspace(true)}
+                    onToggleSuspension={(m) => setSuspendingMember(m)}
+                    onNavigateToRoles={() => setActiveSection("roles")}
+                />
+            )}
+
+            {/* SECTION 4: INVITATIONS */}
+            {activeSection === "invitations" && (
+                <InvitationsOverviewView
+                    clubId={club.id}
+                    roles={roles}
+                    departments={departments}
+                    members={visibleMembers}
+                    currentMember={currentMember}
+                    isClubContext={effectiveIsClubContext}
+                    onRefreshMembers={() => loadWorkspace(true)}
+                />
+            )}
+
+            {/* SECTION 5: CHANNELS & REALTIME COLLABORATION (PHASE 04) */}
+            {activeSection === "channels" && (
+                <div className="flex h-[720px] max-h-[calc(100vh-200px)] rounded-2xl border-2 border-black overflow-hidden shadow-neo bg-white">
+                    {/* Left Channels Sidebar */}
+                    <WorkspaceSidebar
+                        categories={categories}
+                        clubId={club.id}
+                        activeChannelId={activeChannel?.id || null}
+                        activeNavSection={activeSection}
+                        unreadCounts={unreadCounts}
+                        currentMember={currentMember}
+                        canManageChannels={canManageChannels}
+                        isAdmin={isAdmin}
+                        onSelectChannel={(ch) => {
+                            setActiveChannel(ch);
+                            setActiveThread(null);
+                            setActiveSection("channels");
+                        }}
+                        onSelectNavSection={(sec) => {
+                            if (sec === "recognition") setActiveSection("recognition");
+                            else if (sec === "overview") setActiveSection("overview");
+                            else if (sec === "members") setActiveSection("roster");
+                            else if (sec === "all-tasks") setActiveSection("all-tasks");
+                            else if (sec === "my-tasks" && !effectiveIsClubContext) setActiveSection("my-tasks");
+                            else if (sec === "history" || sec === "activity" || sec === "audit") {
+                                setHistoryInitialRecordType(
+                                    sec === "audit" ? "audit" : sec === "activity" ? "activity" : "all"
+                                );
+                                setActiveSection("history");
+                            } else {
+                                setActiveSection("overview");
+                            }
+                        }}
+                        onOpenCreateCategory={() => setIsCreateCategoryOpen(true)}
+                        onOpenEditCategory={(cat) => {
+                            setSelectedCategoryForEdit(cat);
+                            setIsEditCategoryOpen(true);
+                        }}
+                        onReorderCategories={handleReorderCategories}
+                        onOpenCreateChannel={(catId) => {
+                            setSelectedCategoryForChannel(catId || null);
+                            setIsCreateChannelOpen(true);
+                        }}
+                        onOpenChannelSettings={(ch) => {
+                            setSettingsChannel(ch);
+                            setIsChannelSettingsOpen(true);
+                        }}
+                        onOpenSearch={() => setIsSearchOpen(true)}
+                    />
+
+                    {/* Center Active Channel View */}
+                    {activeChannel ? (
+                        <ChannelView
+                            key={activeChannel.id}
+                            channel={activeChannel}
+                            clubId={club.id}
+                            clubName={club.name}
+                            clubLogoUrl={club.logo_url}
+                            isClubContext={isClubContext}
+                            currentMember={currentMember}
+                            canManageChannels={canManageChannels}
+                            members={members}
+                            roles={roles}
+                            onOpenThread={(th) => setActiveThread(th)}
+                            onChannelUpdated={(updated) => {
+                                setActiveChannel(updated);
+                                loadCategories();
+                            }}
+                        />
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#FAF6EE]">
+                            <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center text-black mb-3">
+                                <Hash className="w-7 h-7 text-black" />
+                            </div>
+                            <p className="text-base font-black text-black">Select a channel to start messaging</p>
+                            <p className="text-xs font-semibold text-neutral-600 mt-1">Or create a new channel in the sidebar to collaborate</p>
+                            {canManageChannels && (
+                                <button
+                                    onClick={() => setIsCreateChannelOpen(true)}
+                                    className="mt-4 px-4 py-2 bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black text-xs font-black rounded-xl shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition"
+                                >
+                                    + Create Channel
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Right Thread Sidebar (if active) */}
+                    {activeThread && activeChannel && (
+                        <ThreadSidebar
+                            key={activeThread.id}
+                            thread={activeThread}
+                            channelId={activeChannel.id}
+                            clubId={club.id}
+                            clubName={club.name}
+                            isClubContext={isClubContext}
+                            currentMember={currentMember}
+                            canManageThreads={canManageChannels}
+                            onClose={() => setActiveThread(null)}
+                            onThreadUpdated={(updated) => setActiveThread(updated)}
+                        />
+                    )}
+                </div>
+            )}
+
+            {/* SECTION 6: ALL TASKS (PHASE 05) */}
+            {activeSection === "all-tasks" && (
+                <div className="h-[720px] max-h-[calc(100vh-200px)] flex flex-col rounded-2xl border-2 border-black overflow-hidden shadow-neo">
+                    <TasksBoardView
+                        clubId={club.id}
+                        departments={departments}
+                        members={visibleMembers}
+                        roles={roles}
+                        currentMember={currentMember}
+                        canCreateTasks={canManageChannels || isOwner || Boolean(currentMember?.role?.permissions.includes("tasks:create"))}
+                        canViewAllTasks={capabilities ? capabilities.navigation.canViewAllTasks : true}
+                        isClubContext={effectiveIsClubContext}
+                    />
+                </div>
+            )}
+
+            {/* SECTION 7: MY TASKS (PHASE 05) */}
+            {!effectiveIsClubContext && activeSection === "my-tasks" && (
+                <div className="h-[720px] max-h-[calc(100vh-200px)] flex flex-col rounded-2xl border-2 border-black overflow-hidden shadow-neo">
+                    <MyTasksView
+                        clubId={club.id}
+                        currentMember={currentMember}
+                        allMembers={visibleMembers}
+                        departments={departments}
+                        roles={roles}
+                    />
+                </div>
+            )}
+
+            {/* SECTION 7.5: SHARED RESOURCES & FILES (PHASE 06) */}
+            {activeSection === "resources" && (
+                <ResourceLibraryView
+                    clubId={club.id}
+                    workspaceId={workspace.id}
+                    departments={departments}
+                    capabilities={capabilities}
+                    isAdmin={isAdmin}
+                />
+            )}
+
+            {/* SECTION 7.6: ORBIX RECOGNITION (PHASE 02/03) */}
+            {activeSection === "recognition" && (
+                <RecognitionOverviewView
+                    clubId={club.id}
+                    workspaceId={workspace.id}
+                    currentMember={currentMember}
+                    members={visibleMembers}
+                    departments={departments}
+                    tasks={[]}
+                    isOwner={isOwner}
+                    isAdmin={isAdmin}
+                    isWorkspaceManager={isWorkspaceManager}
+                />
+            )}
+
+            {/* SECTION 8: UNIFIED WORKSPACE HISTORY (ACTIVITY + AUDIT) */}
+            {activeSection === "history" && (
+                <WorkspaceHistoryView
+                    clubId={club.id}
+                    departments={departments}
+                    members={visibleMembers}
+                    currentMember={currentMember}
+                    capabilities={capabilities}
+                    isAdmin={isAdmin}
+                    isClubContext={effectiveIsClubContext}
+                    initialRecordType={historyInitialRecordType}
+                    onNavigateSection={(sec) => {
+                        if (effectiveIsClubContext && sec === "my-tasks") {
+                            setActiveSection("all-tasks");
+                            return;
+                        }
+                        setActiveSection(sec);
+                    }}
+                />
+            )}
+
+            {/* SECTION 10: ROLES & PERMISSIONS (PHASE 07) */}
+            {activeSection === "roles" && (
+                <RolesPermissionsView
+                    clubId={club.id}
+                    roles={roles}
+                    members={members}
+                    departments={departments}
+                    currentMember={currentMember}
+                    capabilities={capabilities}
+                    isAdmin={isAdmin}
+                    isClubContext={isClubContext}
+                    onRefresh={() => loadWorkspace(true)}
+                />
+            )}
+
+            {/* SECTION 11: WORKSPACE SETTINGS (PHASE 07) */}
+            {activeSection === "settings" && (
+                <WorkspaceSettingsView
+                    clubId={club.id}
+                    workspace={workspace}
+                    members={members}
+                    roles={roles}
+                    currentMember={currentMember}
+                    capabilities={capabilities}
+                    isAdmin={isAdmin}
+                    onRefresh={() => loadWorkspace(true)}
+                />
+            )}
+            </>
+            )}
+
+            {/* Phase 04 Modals */}
+            <CreateCategoryModal
+                isOpen={isCreateCategoryOpen}
+                onClose={() => setIsCreateCategoryOpen(false)}
+                clubId={club.id}
+                departments={departments}
+                roles={roles}
+                members={members}
+                onCategoryCreated={() => {
+                    loadCategories();
+                }}
+            />
+
+            <EditCategoryModal
+                isOpen={isEditCategoryOpen}
+                onClose={() => {
+                    setIsEditCategoryOpen(false);
+                    setSelectedCategoryForEdit(null);
+                }}
+                clubId={club.id}
+                category={selectedCategoryForEdit}
+                allCategories={categories}
+                departments={departments}
+                onCategoryUpdated={() => loadCategories()}
+                onCategoryDeleted={() => loadCategories()}
+                onCategoriesReordered={(newCats) => setCategories(newCats)}
+            />
+
+            <CreateChannelModal
+                isOpen={isCreateChannelOpen}
+                onClose={() => {
+                    setIsCreateChannelOpen(false);
+                    setSelectedCategoryForChannel(null);
+                }}
+                clubId={club.id}
+                categories={categories}
+                departments={departments}
+                roles={roles}
+                members={members}
+                defaultCategoryId={selectedCategoryForChannel}
+                onChannelCreated={(ch) => {
+                    setActiveChannel(ch);
+                    loadCategories();
+                }}
+            />
+
+            {settingsChannel && (
+                <ChannelSettingsModal
+                    isOpen={isChannelSettingsOpen}
+                    onClose={() => {
+                        setIsChannelSettingsOpen(false);
+                        setSettingsChannel(null);
+                    }}
+                    clubId={club.id}
+                    channel={settingsChannel}
+                    categories={categories}
+                    departments={departments}
+                    roles={roles}
+                    members={members}
+                    canManageChannel={canManageChannels}
+                    onChannelUpdated={(updated) => {
+                        if (activeChannel?.id === updated.id) {
+                            setActiveChannel(updated);
+                        }
+                        loadCategories();
+                    }}
+                    onChannelDeleted={(channelId) => {
+                        if (activeChannel?.id === channelId) {
+                            setActiveChannel(null);
+                        }
+                        loadCategories();
+                    }}
+                />
+            )}
+
+            {/* Suspension Confirmation Modal */}
+            {suspendingMember && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+                    <div className="bg-white border-2 border-black rounded-2xl max-w-md w-full p-6 shadow-neo animate-in fade-in zoom-in-95">
+                        <div className="flex items-center gap-3 text-amber-600 mb-3">
+                            <AlertTriangle className="w-6 h-6" />
+                            <h4 className="text-lg font-black text-black">
+                                {suspendingMember.isSuspended ? "Re-activate Member" : "Suspend Member from Workspace"}
+                            </h4>
+                        </div>
+
+                        <p className="text-xs text-neutral-700 leading-relaxed">
+                            {suspendingMember.isSuspended
+                                ? `Re-activating will restore @${suspendingMember.user?.username}'s ability to collaborate in this workspace.`
+                                : `Suspending @${suspendingMember.user?.username} revokes their workspace permissions and channel access immediately. Their global Orbix account remains completely unaffected.`}
+                        </p>
+
+                        {!suspendingMember.isSuspended && (
+                            <div className="mt-4">
+                                <label className="block text-xs font-black uppercase text-neutral-600 mb-1">
+                                    Reason for suspension (optional)
+                                </label>
+                                <textarea
+                                    value={suspendReason}
+                                    onChange={(e) => setSuspendReason(e.target.value)}
+                                    placeholder="Enter operational reason for audit record..."
+                                    rows={2}
+                                    className="w-full p-2.5 text-xs font-semibold border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t-2 border-black">
+                            <button
+                                onClick={() => setSuspendingMember(null)}
+                                disabled={isSubmittingSuspension}
+                                className="px-4 py-2 text-xs font-black bg-neutral-100 hover:bg-neutral-200 border-2 border-black rounded-lg"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleToggleSuspension}
+                                disabled={isSubmittingSuspension}
+                                className={`px-4 py-2 text-xs font-black border-2 border-black rounded-lg shadow-neo-xs flex items-center gap-1.5 ${
+                                    suspendingMember.isSuspended
+                                        ? "bg-[#A6FF70] hover:bg-[#95F55D] text-black"
+                                        : "bg-red-500 hover:bg-red-600 text-white"
+                                }`}
+                            >
+                                {isSubmittingSuspension && <Clock className="w-3.5 h-3.5 animate-spin" />}
+                                {suspendingMember.isSuspended ? "Confirm Re-activation" : "Confirm Suspension"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Workspace Manager Modal */}
+            {isOwner && (
+                <WorkspaceManagerModal
+                    isOpen={isManagerModalOpen}
+                    onClose={() => setIsManagerModalOpen(false)}
+                    workspace={workspace}
+                    members={visibleMembers}
+                    clubId={club.id}
+                    onSuccess={() => loadWorkspace(true)}
+                />
+            )}
+
+            {/* Unified Workspace Search Modal (Phase 08) */}
+            <WorkspaceSearchModal
+                isOpen={isSearchOpen}
+                onClose={() => setIsSearchOpen(false)}
+                clubId={club.id}
+                onSelectResult={handleSelectSearchResult}
+            />
+        </div>
+    );
+};
+
+export default WorkspaceShell;

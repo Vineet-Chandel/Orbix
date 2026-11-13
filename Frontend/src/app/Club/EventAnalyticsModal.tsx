@@ -119,7 +119,7 @@ export const EventAnalyticsModal: React.FC<EventAnalyticsModalProps> = ({
     if (!isOpen || !eventId) return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
             <div
                 className="w-full max-w-2xl bg-[#FAF6EE] border-3 border-black rounded-3xl shadow-[8px_8px_0px_#000] p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200 text-black max-h-[90vh] overflow-y-auto"
                 role="dialog"

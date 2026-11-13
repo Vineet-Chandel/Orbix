@@ -1,4 +1,5 @@
 import type { EventItem } from "../../../store";
+import { buildApiUrl } from "../../../api/apiClient";
 
 // Helper to create consistent contest items
 export const createContest = (
@@ -596,12 +597,15 @@ export const saveLandingEventsProfile = (events: EventItem[]): void => {
 
 // Fetch live contest events from search API (/api/events)
 export const fetchLandingEventsApi = async (): Promise<EventItem[] | null> => {
-    const endpoints = ["/api/events", "http://localhost:3000/api/events"];
+    const primaryUrl = buildApiUrl("/api/events");
+    const endpoints = import.meta.env.DEV
+        ? [primaryUrl, "http://localhost:3000/api/events"]
+        : [primaryUrl];
 
     for (const ep of endpoints) {
         try {
             const res = await fetch(ep, {
-                signal: AbortSignal.timeout(5000),
+                signal: AbortSignal.timeout(800),
                 headers: { Accept: "application/json" },
             });
             if (res.ok) {

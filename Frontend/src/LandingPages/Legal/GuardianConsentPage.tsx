@@ -10,6 +10,8 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
+import { NeoSelect } from "../../components/NeoSelect";
+import { NeoCheckbox } from "../../components/NeoCheckbox";
 import { useToast } from "../../context/ToastContext";
 
 interface ConsentDetails {
@@ -60,7 +62,7 @@ export const GuardianConsentPage: React.FC = () => {
 
       try {
         setIsLoading(true);
-        const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3000" : "");
         const res = await fetch(
           `${apiBase}/api/club/events/guardian-consent/verify?token=${encodeURIComponent(token)}&registrationId=${encodeURIComponent(registrationId)}`
         );
@@ -98,7 +100,7 @@ export const GuardianConsentPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3000" : "");
       const res = await fetch(`${apiBase}/api/club/events/guardian-consent/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -274,28 +276,32 @@ export const GuardianConsentPage: React.FC = () => {
                 <label className="block text-xs font-black uppercase text-black mb-1">
                   Relationship to Attendee
                 </label>
-                <select
+                <NeoSelect
                   value={relationship}
-                  onChange={(e) => setRelationship(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border-2 border-black rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#a2ff86]"
-                >
-                  <option value="Mother">Mother</option>
-                  <option value="Father">Father</option>
-                  <option value="Legal Guardian">Legal Guardian</option>
-                  <option value="Parent">Parent</option>
-                </select>
+                  onChange={(val) => setRelationship(val)}
+                  size="sm"
+                  options={[
+                    { value: "Mother", label: "Mother" },
+                    { value: "Father", label: "Father" },
+                    { value: "Legal Guardian", label: "Legal Guardian" },
+                    { value: "Parent", label: "Parent" },
+                  ]}
+                />
               </div>
 
               {/* Declarative Checkbox */}
               <div className="pt-2">
-                <label className="flex items-start gap-3 p-3 bg-zinc-50 border-2 border-black rounded cursor-pointer hover:bg-zinc-100 transition-colors">
-                  <input
-                    type="checkbox"
+                <div className="flex items-start gap-3 p-3 bg-zinc-50 border-2 border-black rounded hover:bg-zinc-100 transition-colors">
+                  <NeoCheckbox
                     checked={isConfirmed}
-                    onChange={(e) => setIsConfirmed(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black accent-black focus:ring-0 cursor-pointer"
+                    onCheckedChange={(checked) => setIsConfirmed(checked)}
+                    size="sm"
+                    colorScheme="green"
                   />
-                  <span className="text-xs text-zinc-700 leading-relaxed font-medium">
+                  <span
+                    onClick={() => setIsConfirmed(!isConfirmed)}
+                    className="text-xs text-zinc-700 leading-relaxed font-medium cursor-pointer select-none"
+                  >
                     I confirm that I am the parent or legally appointed guardian of <strong>{details.applicantName}</strong>. I have reviewed the event information and electronically consent to their registration, event attendance, and necessary collegiate data processing in accordance with the{" "}
                     <Link to="/privacy" target="_blank" className="font-black text-black underline">
                       Orbix Privacy Policy
@@ -305,7 +311,7 @@ export const GuardianConsentPage: React.FC = () => {
                       Terms & Conditions
                     </Link>.
                   </span>
-                </label>
+                </div>
               </div>
             </div>
 

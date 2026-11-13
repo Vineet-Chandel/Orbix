@@ -48,6 +48,15 @@ export function HireMeModal({
         }
     }, [isOpen]);
 
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!sending) onClose();
+        },
+        disableEscape: sending,
+        disableBackdrop: sending,
+    });
+
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
 
@@ -108,15 +117,6 @@ export function HireMeModal({
             setSending(false);
         }
     };
-
-    const { handleBackdropClick } = useModalDismiss({
-        isOpen,
-        onClose: () => {
-            if (!sending) onClose();
-        },
-        disableEscape: sending,
-        disableBackdrop: sending,
-    });
 
     return createPortal(
         <div

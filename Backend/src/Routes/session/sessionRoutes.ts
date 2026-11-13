@@ -1,6 +1,6 @@
 // Backend/src/Routes/session/sessionRoutes.ts
 import express, { type Request, type Response } from "express";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
 import {
     getActiveSessions,
     getSessionHistory,
@@ -210,7 +210,7 @@ sessionRouter.get("/security-events", authenticate, async (req: Request, res: Re
  * GET /api/clubs/:clubId/activity
  * Retrieve club team access audit history (restricted to club leads/admins)
  */
-sessionRouter.get("/clubs/:clubId/activity", authenticate, async (req: Request, res: Response) => {
+sessionRouter.get("/clubs/:clubId/activity", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         const clubId = String(req.params.clubId || "");
@@ -247,7 +247,7 @@ sessionRouter.get("/clubs/:clubId/activity", authenticate, async (req: Request, 
  * POST /api/clubs/:clubId/activity/log
  * Record member access to club dashboard/settings
  */
-sessionRouter.post("/clubs/:clubId/activity/log", authenticate, async (req: Request, res: Response) => {
+sessionRouter.post("/clubs/:clubId/activity/log", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         const sessionId = (req as any).sessionId || null;

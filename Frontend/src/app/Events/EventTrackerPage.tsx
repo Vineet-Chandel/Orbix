@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
     Calendar as CalendarIcon,
     List as ListIcon,
     Bell,
     Check,
-    ChevronLeft,
-    ChevronRight,
     ExternalLink,
     CalendarPlus,
     Clock,
@@ -30,11 +27,11 @@ import {
     toggleLocalReminder,
     type EventItem,
 } from "../../store";
-import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { NeoToggle } from "../../components/NeoToggle";
+import { EventTrackerCalendar, EventTrackerDayEventsModal } from "./EventTrackerCalendar";
 
 export const ALL_16_PLATFORMS = [
     { id: "leetcode", name: "LeetCode", color: "#FFA116" },
@@ -55,23 +52,6 @@ const MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
 ];
-
-const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
-// Helper: Format start to IST time string "HH:MM"
-const formatTimeIST = (dateString: string): string => {
-    try {
-        const d = new Date(dateString);
-        return d.toLocaleTimeString("en-IN", {
-            timeZone: "Asia/Kolkata",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-        });
-    } catch {
-        return "00:00";
-    }
-};
 
 // Helper: Format full IST schedule string "Mon, Oct 19 · 19:00–22:00 IST · 3h"
 const formatScheduleIST = (event: EventItem): string => {
@@ -220,6 +200,18 @@ const downloadIcsFile = (event: EventItem) => {
 
 export const EventTrackerPage: React.FC = () => {
     const dispatch = useAppDispatch();
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+
+    // Deep-link redirection: If user arrived with an event ID or college-events tab, forward to college-events view
+    useEffect(() => {
+        const eventId = searchParams.get("eventId") || searchParams.get("event");
+        const tab = searchParams.get("tab");
+        if (tab === "college-events" || eventId) {
+            navigate(`/college-events?${searchParams.toString()}`, { replace: true });
+        }
+    }, [searchParams, navigate]);
+
     const {
         allEvents,
         upNext,
@@ -282,24 +274,8 @@ export const EventTrackerPage: React.FC = () => {
         return () => window.removeEventListener("click", handleClickOutside);
     }, []);
 
-    // Helper: format day date string into human friendly format
-    const formatDayTitle = (dateStr: string) => {
-        try {
-            const [y, m, d] = dateStr.split("-").map(Number);
-            const dt = new Date(y, m - 1, d);
-            return dt.toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-            });
-        } catch {
-            return dateStr;
-        }
-    };
-
     // Active month breakdown [Year, Month (1-indexed)]
-    const [viewYear, viewMonthIndex] = useMemo(() => {
+    const [, viewMonthIndex] = useMemo(() => {
         if (!selectedMonth) {
             const d = new Date();
             return [d.getFullYear(), d.getMonth()];
@@ -309,28 +285,6 @@ export const EventTrackerPage: React.FC = () => {
     }, [selectedMonth]);
 
     const monthLabel = MONTH_NAMES[viewMonthIndex];
-
-    const currentAllowedIdx = allowedMonths.indexOf(selectedMonth);
-    const canGoPrev = currentAllowedIdx > 0;
-    const canGoNext = currentAllowedIdx !== -1 && currentAllowedIdx < allowedMonths.length - 1;
-
-    const handlePrevMonth = () => {
-        if (canGoPrev) {
-            dispatch(setSelectedMonth(allowedMonths[currentAllowedIdx - 1]));
-        }
-    };
-
-    const handleNextMonth = () => {
-        if (canGoNext) {
-            dispatch(setSelectedMonth(allowedMonths[currentAllowedIdx + 1]));
-        }
-    };
-
-    const handleResetToday = () => {
-        if (allowedMonths.includes(currentMonthStr)) {
-            dispatch(setSelectedMonth(currentMonthStr));
-        }
-    };
 
     // Base filtered events by selectedType (contests vs hackathons) and selectedPlatform
     const baseFilteredEvents = useMemo(() => {
@@ -468,111 +422,10 @@ export const EventTrackerPage: React.FC = () => {
         return countsByPlatform || {};
     }, [countsByMonthAndPlatform, selectedMonth, countsByPlatform]);
 
-    // Calendar grid generation: includes all pointers from past, present, and next months (unaffected by list view finished toggle)
-    const calendarCells = useMemo(() => {
-        const firstDayOfMonth = new Date(viewYear, viewMonthIndex, 1).getDay(); // 0 is Sun
-        const daysInMonth = new Date(viewYear, viewMonthIndex + 1, 0).getDate();
-        const prevMonthLastDay = new Date(viewYear, viewMonthIndex, 0).getDate();
-
-        const cells: Array<{
-            dayNum: number;
-            dateStr: string;
-            isCurrentMonth: boolean;
-            isToday: boolean;
-            events: EventItem[];
-        }> = [];
-
-        // Today check in IST
-        const todayDate = new Date();
-        const todayYear = todayDate.getFullYear();
-        const todayMonth = todayDate.getMonth();
-        const todayDay = todayDate.getDate();
-
-        // Previous month calculation
-        const prevDate = new Date(viewYear, viewMonthIndex - 1, 1);
-        const prevYear = prevDate.getFullYear();
-        const prevMonth = prevDate.getMonth();
-
-        // 1. Fill previous month's trailing days with actual pointers from baseFilteredEvents
-        for (let i = firstDayOfMonth - 1; i >= 0; i--) {
-            const dNum = prevMonthLastDay - i;
-            const prevDateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
-            const isToday = prevYear === todayYear && prevMonth === todayMonth && dNum === todayDay;
-
-            const dayEvents = baseFilteredEvents.filter((ev) => {
-                const evDate = new Date(ev.startTime);
-                const evDayStr = evDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-                return evDayStr === prevDateStr;
-            });
-
-            cells.push({
-                dayNum: dNum,
-                dateStr: prevDateStr,
-                isCurrentMonth: false,
-                isToday,
-                events: dayEvents,
-            });
-        }
-
-        // 2. Fill current month's days with all pointers from baseFilteredEvents
-        for (let d = 1; d <= daysInMonth; d++) {
-            const dateStr = `${viewYear}-${String(viewMonthIndex + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-            const isToday = viewYear === todayYear && viewMonthIndex === todayMonth && d === todayDay;
-
-            // Find all events starting on this day in IST (using baseFilteredEvents)
-            const dayEvents = baseFilteredEvents.filter((ev) => {
-                const evDate = new Date(ev.startTime);
-                const evDayStr = evDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
-                return evDayStr === dateStr;
-            });
-
-            cells.push({
-                dayNum: d,
-                dateStr,
-                isCurrentMonth: true,
-                isToday,
-                events: dayEvents,
-            });
-        }
-
-        // Next month calculation
-        const nextDate = new Date(viewYear, viewMonthIndex + 1, 1);
-        const nextYear = nextDate.getFullYear();
-        const nextMonth = nextDate.getMonth();
-
-        // 3. Fill next month's leading days with actual pointers from baseFilteredEvents
-        const remaining = (7 - (cells.length % 7)) % 7;
-        for (let n = 1; n <= remaining; n++) {
-            const nextDateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(n).padStart(2, "0")}`;
-            const isToday = nextYear === todayYear && nextMonth === todayMonth && n === todayDay;
-
-            const dayEvents = baseFilteredEvents.filter((ev) => {
-                const evDate = new Date(ev.startTime);
-                const evDayStr = evDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-                return evDayStr === nextDateStr;
-            });
-
-            cells.push({
-                dayNum: n,
-                dateStr: nextDateStr,
-                isCurrentMonth: false,
-                isToday,
-                events: dayEvents,
-            });
-        }
-
-        return cells;
-    }, [viewYear, viewMonthIndex, baseFilteredEvents]);
-
-    // Modal state for "+N more" contests on a day
+    // Modal state for "+N more" contests on a day (shared for List View)
     const [selectedDayEvents, setSelectedDayEvents] = useState<{ date: string; events: EventItem[] } | null>(null);
 
-    const { handleBackdropClick: handleDayEventsBackdropClick } = useModalDismiss({
-        isOpen: Boolean(selectedDayEvents),
-        onClose: () => setSelectedDayEvents(null),
-    });
-
-    // Calendar dropdown menu toggle for specific event
+    // Calendar dropdown menu toggle for specific event in List View
     const [openCalDropdownId, setOpenCalDropdownId] = useState<string | null>(null);
 
     // Reminders toggle handler
@@ -957,224 +810,21 @@ export const EventTrackerPage: React.FC = () => {
                             </div>
                         </section>
 
-                {/* 4 & 5. Unified Black Scheduler & Contest History Section */}
-                <section className="rounded-2xl sm:rounded-3xl bg-black border-2 border-black shadow-[6px_6px_0px_#000] text-white overflow-hidden">
+                {/* 4 & 5. Unified Scheduler & Contest History Section */}
+                <section className="rounded-2xl sm:rounded-3xl bg-[#0a0b0e] border-3 border-black shadow-[6px_6px_0px_#000] text-white overflow-hidden">
                     {/* Upper: The Scheduler (Calendar or List View) */}
                     <div className="p-4 sm:p-6 space-y-4">
                         {viewMode === "calendar" ? (
-                            <>
-                                {/* Month Navigator Header */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                                            {monthLabel} <span className="text-neutral-400 font-normal">{viewYear}</span>
-                                        </h3>
-                                        {selectedMonth === currentMonthStr && (
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFE566] text-black">
-                                                Present Month
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Controls: Quick 3-Month Switcher + Today button + Arrows */}
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        {/* Quick 3-Month Pills (Past, Present, Next) */}
-                                        <div className="flex items-center rounded-lg bg-neutral-900 border border-neutral-700 p-0.5">
-                                            {allowedMonths.map((mStr, idx) => {
-                                                const [y, m] = mStr.split("-").map(Number);
-                                                const isSelected = selectedMonth === mStr;
-                                                const isCurr = mStr === currentMonthStr;
-                                                const mName = MONTH_NAMES[m - 1]?.slice(0, 3) || mStr;
-                                                const tag = isCurr ? "Now" : idx === 0 ? "Past" : "Next";
-
-                                                return (
-                                                    <button
-                                                        key={mStr}
-                                                        type="button"
-                                                        onClick={() => dispatch(setSelectedMonth(mStr))}
-                                                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                                                            isSelected
-                                                                ? "bg-white text-black shadow-sm font-bold"
-                                                                : "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                                                        }`}
-                                                        title={`View ${MONTH_NAMES[m - 1]} ${y}`}
-                                                    >
-                                                        {mName} <span className="text-[10px] opacity-75">({tag})</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleResetToday}
-                                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border cursor-pointer ${selectedMonth === currentMonthStr
-                                                ? "bg-white/10 text-white border-white/20"
-                                                : "bg-neutral-900 text-neutral-300 border-neutral-700 hover:text-white hover:bg-neutral-800"
-                                                }`}
-                                        >
-                                            Today
-                                        </button>
-
-                                        <div className="flex items-center rounded-lg bg-neutral-900 border border-neutral-700 p-0.5">
-                                            {/* Previous Month Arrow */}
-                                            <button
-                                                type="button"
-                                                onClick={handlePrevMonth}
-                                                disabled={!canGoPrev}
-                                                className={`w-7 h-7 rounded-md flex items-center justify-center transition ${canGoPrev
-                                                    ? "text-neutral-300 hover:text-white hover:bg-white/10 cursor-pointer"
-                                                    : "text-neutral-600 opacity-25 cursor-not-allowed"
-                                                    }`}
-                                                title={canGoPrev ? "Previous month" : "Only 1 month before current month is permitted"}
-                                            >
-                                                <ChevronLeft className="w-4 h-4" />
-                                            </button>
-
-                                            {/* Next Month Arrow */}
-                                            <button
-                                                type="button"
-                                                onClick={handleNextMonth}
-                                                disabled={!canGoNext}
-                                                className={`w-7 h-7 rounded-md flex items-center justify-center transition ${canGoNext
-                                                    ? "text-neutral-300 hover:text-white hover:bg-white/10 cursor-pointer"
-                                                    : "text-neutral-600 opacity-25 cursor-not-allowed"
-                                                    }`}
-                                                title={canGoNext ? "Next month" : "Only 1 month after current month is permitted"}
-                                            >
-                                                <ChevronRight className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Calendar 7-Column Days Grid */}
-                                <div className="border border-neutral-800 rounded-xl overflow-hidden bg-black shadow-inner">
-                                    {/* Days of week header */}
-                                    <div className="grid grid-cols-7 border-b border-neutral-800 bg-neutral-950">
-                                        {DAY_NAMES.map((name) => (
-                                            <div
-                                                key={name}
-                                                className="py-2.5 text-center text-[11px] font-bold tracking-wider text-neutral-400 uppercase"
-                                            >
-                                                {name}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Calendar Days Matrix */}
-                                    <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-neutral-800/80 bg-black">
-                                        {calendarCells.map((cell, idx) => {
-                                            const maxVisible = 2;
-                                            const visibleEvents = cell.events.slice(0, maxVisible);
-                                            const extraCount = cell.events.length - maxVisible;
-
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    className={`min-h-[115px] sm:min-h-[135px] p-1.5 sm:p-2 flex flex-col justify-between transition-colors ${cell.isCurrentMonth
-                                                        ? cell.isToday
-                                                            ? "bg-white text-black shadow-lg ring-1 ring-white/90"
-                                                            : "bg-black hover:bg-neutral-900/50"
-                                                        : "bg-neutral-950/70 hover:bg-neutral-900/40 border-neutral-800/40 text-neutral-400"
-                                                        }`}
-                                                >
-                                                    {/* Cell Date Header */}
-                                                    <div className="flex items-center justify-between mb-1.5">
-                                                        {cell.isToday ? (
-                                                            <span className="inline-flex items-center gap-1 bg-black text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-md">
-                                                                {cell.dayNum} Today
-                                                            </span>
-                                                        ) : (
-                                                            <span className={`text-xs font-semibold pl-0.5 ${cell.isCurrentMonth ? "text-neutral-300" : "text-neutral-500"}`}>
-                                                                {cell.dayNum}
-                                                            </span>
-                                                        )}
-
-                                                        {cell.events.length > 0 && (
-                                                            <span className={`text-[10px] font-mono ${cell.isToday ? "text-neutral-600 font-bold" : cell.isCurrentMonth ? "text-neutral-400" : "text-neutral-600"}`}>
-                                                                {cell.events.length}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Contest Pills List */}
-                                                    <div className="flex-1 space-y-1 overflow-hidden">
-                                                        {visibleEvents.map((ev) => {
-                                                            const timeStr = formatTimeIST(ev.startTime);
-                                                            const isReminded = reminders.includes(ev.id);
-                                                            const isFinished = ev.status === "FINISHED" || (ev.endTimestamp && ev.endTimestamp < nowMs);
-                                                            const isLive = ev.status === "LIVE" || (ev.startTimestamp <= nowMs && ev.endTimestamp > nowMs);
-
-                                                            return (
-                                                                <div
-                                                                    key={ev.id}
-                                                                    onClick={() => setSelectedDayEvents({ date: cell.dateStr, events: cell.events })}
-                                                                    className={`group/pill flex items-center gap-1.5 p-1 sm:p-1.5 rounded-lg border transition cursor-pointer text-left shadow-sm ${
-                                                                        cell.isToday
-                                                                            ? "bg-neutral-100 hover:bg-neutral-200/90 border-neutral-300/80 text-black"
-                                                                            : isLive
-                                                                            ? "bg-rose-950/60 hover:bg-rose-900/80 border-rose-500/40 text-white"
-                                                                            : isFinished
-                                                                            ? "bg-neutral-950 hover:bg-neutral-900 border-neutral-800/60 text-neutral-400"
-                                                                            : "bg-neutral-900 hover:bg-neutral-800 border-neutral-800 hover:border-neutral-700 text-white"
-                                                                    } ${!cell.isCurrentMonth ? "opacity-75" : ""}`}
-                                                                    title={`${ev.title} on ${ev.platformName} (${timeStr} IST)${isFinished ? " · Finished" : isLive ? " · LIVE" : ""}`}
-                                                                >
-                                                                    <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                                                                        {getPortalIcon(ev.platform, "w-3.5 h-3.5")}
-                                                                    </div>
-                                                                    <span className={`text-[10px] sm:text-[11px] font-mono font-bold flex-shrink-0 ${
-                                                                        cell.isToday
-                                                                            ? "text-neutral-800 group-hover/pill:text-black"
-                                                                            : isFinished
-                                                                            ? "text-neutral-500"
-                                                                            : "text-neutral-300 group-hover/pill:text-white"
-                                                                    }`}>
-                                                                        {timeStr}
-                                                                    </span>
-                                                                    <span className={`text-[10px] sm:text-[11px] truncate font-semibold ${
-                                                                        cell.isToday
-                                                                            ? "text-neutral-900 group-hover/pill:text-black"
-                                                                            : isFinished
-                                                                            ? "text-neutral-400 group-hover/pill:text-neutral-200"
-                                                                            : "text-neutral-300 group-hover/pill:text-white"
-                                                                    }`}>
-                                                                        {ev.title}
-                                                                    </span>
-                                                                    {isLive && (
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 ml-auto flex-shrink-0 animate-pulse" />
-                                                                    )}
-                                                                    {isFinished && !cell.isToday && (
-                                                                        <span className="text-[9px] px-1 py-0.2 rounded bg-neutral-800 text-neutral-400 ml-auto flex-shrink-0 font-mono">
-                                                                            Done
-                                                                        </span>
-                                                                    )}
-                                                                    {isReminded && (
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ml-auto flex-shrink-0" />
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-
-                                                        {/* More indicator */}
-                                                        {extraCount > 0 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setSelectedDayEvents({ date: cell.dateStr, events: cell.events })}
-                                                                className={`w-full text-left pl-1 text-[10px] font-bold transition ${cell.isToday ? "text-neutral-700 hover:text-black" : "text-neutral-400 hover:text-amber-400"
-                                                                    }`}
-                                                            >
-                                                                +{extraCount} more
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </>
+                            <EventTrackerCalendar
+                                events={baseFilteredEvents}
+                                selectedMonth={selectedMonth}
+                                allowedMonths={allowedMonths}
+                                currentMonthStr={currentMonthStr}
+                                onSelectMonth={(m) => dispatch(setSelectedMonth(m))}
+                                reminders={reminders}
+                                onToggleReminder={handleToggleReminder}
+                                nowMs={nowMs}
+                            />
                         ) : (
                             /* 4b. List View Mode (Grouped by Date with Brackets) */
                             <>
@@ -1482,10 +1132,10 @@ export const EventTrackerPage: React.FC = () => {
 
                     {/* Below Section: Your Contest History */}
                     <div className="p-5 sm:p-6 space-y-5 bg-black">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-neutral-800 pb-3">
                             <div className="flex items-center gap-2">
-                                <Trophy className="w-4 h-4 text-amber-400" />
-                                <h3 className="text-base sm:text-lg font-bold text-white">
+                                <Trophy className="w-4 h-4 text-[#FFE566]" />
+                                <h3 className="text-base sm:text-lg font-black text-white">
                                     Your contest history
                                 </h3>
                             </div>
@@ -1495,7 +1145,7 @@ export const EventTrackerPage: React.FC = () => {
                                 </p>
                                 <Link
                                     to="/dashboard"
-                                    className="text-xs font-semibold text-amber-400 hover:underline flex items-center gap-1"
+                                    className="text-xs font-black text-[#FFE566] hover:underline flex items-center gap-1"
                                 >
                                     <TrendingUp className="w-3.5 h-3.5" />
                                     Rating graph
@@ -1503,44 +1153,44 @@ export const EventTrackerPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* 3 Pure Black Stat Boxes: Contests, Rating, Best Rank */}
+                        {/* 3 Midnight-Yellow Stat Boxes: Contests, Rating, Best Rank */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-center space-y-1 hover:border-neutral-700 transition">
+                            <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
                                 <div className="text-2xl sm:text-3xl font-black text-white">
                                     {userContestSummary.total}
                                 </div>
-                                <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                                <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
                                     Contests
                                 </div>
                             </div>
 
-                            <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-center space-y-1 hover:border-neutral-700 transition">
-                                <div className="text-2xl sm:text-3xl font-black text-white">
+                            <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
+                                <div className="text-2xl sm:text-3xl font-black text-[#FFE566]">
                                     {userContestSummary.rating}
                                 </div>
-                                <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                                <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
                                     Rating
                                 </div>
                             </div>
 
-                            <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-center space-y-1 hover:border-neutral-700 transition">
+                            <div className="p-4 rounded-2xl bg-[#14151B] border-2 border-black text-center space-y-1 shadow-[2px_2px_0px_#000] hover:border-[#FFE566] transition-all">
                                 <div className="text-2xl sm:text-3xl font-black text-white">
                                     {userContestSummary.bestRank}
                                 </div>
-                                <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                                <div className="text-[11px] font-black uppercase tracking-wider text-neutral-400">
                                     Best rank
                                 </div>
                             </div>
                         </div>
 
                         {/* Connect Platforms Prompt */}
-                        <div className="pt-2 text-center flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-800">
+                        <div className="pt-2 text-center flex flex-col sm:flex-row items-center justify-between gap-3 border-t-2 border-neutral-800">
                             <p className="text-xs text-neutral-400">
                                 Sync your competitive programming handles to automatically track past ratings and progress.
                             </p>
                             <Link
                                 to="/onboarding"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-amber-300 transition"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] hover:bg-yellow-300 transition-all cursor-pointer"
                             >
                                 <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                 Connect More Platforms
@@ -1557,157 +1207,13 @@ export const EventTrackerPage: React.FC = () => {
         </section>
     </div>
 
-            {/* Modal: Full Day Contest Breakdown (triggered by "+N more" or day click) */}
-            {selectedDayEvents && typeof document !== "undefined" && createPortal(
-                <div
-                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in"
-                    onClick={handleDayEventsBackdropClick}
-                >
-                    <div
-                        className="relative z-[101] w-full max-w-xl rounded-3xl bg-black border border-neutral-800 p-6 shadow-2xl space-y-4 text-white ring-1 ring-white/10 animate-in zoom-in-95"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Header */}
-                        <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-                            <div>
-                                <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                                    Contests on {formatDayTitle(selectedDayEvents.date)}
-                                </h3>
-                                <p className="text-xs text-neutral-400 font-medium mt-0.5">
-                                    {selectedDayEvents.events.length} round{selectedDayEvents.events.length > 1 ? "s" : ""} scheduled
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setSelectedDayEvents(null)}
-                                className="p-1.5 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition"
-                                title="Close dialog"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Dynamic Contest Cards List */}
-                        <div className="max-h-[60vh] overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
-                            {selectedDayEvents.events.map((ev) => {
-                                const isReminded = reminders.includes(ev.id);
-                                const timeStr = formatTimeIST(ev.startTime);
-
-                                return (
-                                    <div
-                                        key={ev.id}
-                                        className="p-3.5 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
-                                    >
-                                        <div className="flex items-center gap-3.5 min-w-0">
-                                            <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center flex-shrink-0 p-2">
-                                                {getPortalIcon(ev.platform, "w-6 h-6")}
-                                            </div>
-                                            <div className="min-w-0 space-y-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                                                        {ev.platformName}
-                                                    </span>
-                                                    {ev.division && (
-                                                        <span className="text-[10px] font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.2 rounded">
-                                                            {ev.division}
-                                                        </span>
-                                                    )}
-                                                    {ev.rated && (
-                                                        <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
-                                                            Rated
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <h4 className="text-sm font-bold text-white truncate max-w-xs sm:max-w-sm">
-                                                    {ev.title}
-                                                </h4>
-                                                <p className="text-xs text-neutral-400 font-medium">
-                                                    {timeStr} IST · {ev.durationFormatted}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Smart Actions: Remind, Inline Calendar, Open Link */}
-                                        <div className="flex items-center gap-2 flex-shrink-0 ml-auto sm:ml-0">
-                                            {/* Remind button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleToggleReminder(ev.id)}
-                                                className={`p-2 rounded-xl transition border text-xs font-semibold ${isReminded
-                                                    ? "bg-amber-400 text-black border-amber-400 shadow-sm"
-                                                    : "bg-neutral-900 text-neutral-400 hover:text-white border-neutral-800 hover:bg-neutral-800"
-                                                    }`}
-                                                title={isReminded ? "Reminder enabled" : "Set reminder"}
-                                            >
-                                                <Bell className="w-4 h-4" />
-                                            </button>
-
-                                            {/* Smart Inline Add to Calendar */}
-                                            {openCalDropdownId === `modal-${ev.id}` ? (
-                                                <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 p-1 rounded-xl shadow-xl animate-in fade-in zoom-in-95">
-                                                    <a
-                                                        href={createGoogleCalendarUrl(ev)}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        onClick={() => setOpenCalDropdownId(null)}
-                                                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-white flex items-center gap-1.5 transition"
-                                                        title="Add to Google Calendar"
-                                                    >
-                                                        <span className="w-2 h-2 rounded-full bg-blue-400" />
-                                                        Google
-                                                    </a>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            downloadIcsFile(ev);
-                                                            setOpenCalDropdownId(null);
-                                                        }}
-                                                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-white flex items-center gap-1.5 transition"
-                                                        title="Download .ics for Apple/Outlook"
-                                                    >
-                                                        <span className="w-2 h-2 rounded-full bg-amber-400" />
-                                                        .ics
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setOpenCalDropdownId(null)}
-                                                        className="p-1 rounded-lg text-neutral-400 hover:text-white transition"
-                                                        title="Close"
-                                                    >
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setOpenCalDropdownId(`modal-${ev.id}`)}
-                                                    className="p-2 rounded-xl bg-neutral-900 text-neutral-300 hover:text-white hover:bg-neutral-800 border border-neutral-800 transition flex items-center gap-1.5 text-xs font-semibold"
-                                                    title="Add to calendar"
-                                                >
-                                                    <CalendarPlus className="w-4 h-4" />
-                                                    <span className="hidden sm:inline">Add to cal</span>
-                                                </button>
-                                            )}
-
-                                            {/* Open contest link */}
-                                            <a
-                                                href={ev.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="p-2 rounded-xl bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800 transition"
-                                                title="Open contest link"
-                                            >
-                                                <ExternalLink className="w-4 h-4" />
-                                            </a>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
+            {/* Modal: Full Day Contest Breakdown for List View (Matching Midnight-Yellow theme) */}
+            <EventTrackerDayEventsModal
+                data={selectedDayEvents}
+                onClose={() => setSelectedDayEvents(null)}
+                reminders={reminders}
+                onToggleReminder={handleToggleReminder}
+            />
         </div>
     );
 };

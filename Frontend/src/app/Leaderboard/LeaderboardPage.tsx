@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAppSelector } from "../../store";
+import { useToast } from "../../context/ToastContext";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { LeaderboardHeader } from "./LeaderboardHeader";
 import { CollegeSelector } from "./CollegeSelector";
@@ -14,11 +15,13 @@ import type {
     CollegeLeaderboardResponse,
     ParticipatingCollege,
 } from "./types";
-import { Trophy, AlertCircle, Sparkles, ArrowUpRight, Building2 } from "lucide-react";
+import { Trophy, Sparkles, ArrowUpRight, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
+import { buildApiUrl } from "../../api/apiClient";
 
 export const LeaderboardPage: React.FC = () => {
+    const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
     const storedUsername = useMemo(() => {
         try {
@@ -66,7 +69,6 @@ export const LeaderboardPage: React.FC = () => {
 
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSyncing, setIsSyncing] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
 
     // -------------------------------------------------------------------------
     // 1. Initial Load: Fetch Participating Colleges & Auto-Detect User College
@@ -75,10 +77,10 @@ export const LeaderboardPage: React.FC = () => {
         let isMounted = true;
         const fetchParticipating = async () => {
             try {
-                const endpoints = [
-                    "/api/leaderboard/colleges/participating",
-                    "http://localhost:3000/api/leaderboard/colleges/participating",
-                ];
+                const primaryColleges = buildApiUrl("/api/leaderboard/colleges/participating");
+                const endpoints = import.meta.env.DEV
+                    ? [primaryColleges, "http://localhost:3000/api/leaderboard/colleges/participating"]
+                    : [primaryColleges];
                 let res: Response | null = null;
                 for (const url of endpoints) {
                     try {
@@ -176,7 +178,6 @@ export const LeaderboardPage: React.FC = () => {
     // -------------------------------------------------------------------------
     const fetchLeaderboard = useCallback(async () => {
         setIsLoading(true);
-        setError(null);
 
         try {
             const queryParams = new URLSearchParams({
@@ -211,10 +212,10 @@ export const LeaderboardPage: React.FC = () => {
                 endpointPath = `/api/leaderboard/colleges/${encodeURIComponent(selectedCollege.id)}?${queryParams.toString()}`;
             }
 
-            const endpoints = [
-                endpointPath,
-                `http://localhost:3000${endpointPath}`,
-            ];
+            const primaryRankings = buildApiUrl(endpointPath);
+            const endpoints = import.meta.env.DEV
+                ? [primaryRankings, `http://localhost:3000${endpointPath}`]
+                : [primaryRankings];
 
             let res: Response | null = null;
             for (const url of endpoints) {
@@ -227,12 +228,21 @@ export const LeaderboardPage: React.FC = () => {
             }
 
             if (!res || !res.ok) {
-                throw new Error(`Failed to load ${activeTab === "college" ? "College League" : "Global"} leaderboard (${res?.status || "network error"})`);
+                let errorDetail = "";
+                try {
+                    const errorJson = await res?.clone().json();
+                    errorDetail = errorJson?.message || "";
+                } catch {
+                    // response body wasn't JSON
+                }
+                const subject = activeTab === "college" ? "College League" : "Global";
+                const statusStr = res?.status ? ` (${res.status})` : "";
+                throw new Error(errorDetail || `Failed to load ${subject} leaderboard${statusStr}`);
             }
 
             const data = await res.json();
             if (!data.success) {
-                throw new Error(data.error || "API returned failure response");
+                throw new Error(data.error || data.message || "API returned failure response");
             }
 
             if (activeTab === "global") {
@@ -285,11 +295,14 @@ export const LeaderboardPage: React.FC = () => {
                 }
             }
         } catch (err: any) {
-            setError(err.message || "Failed to fetch leaderboard data");
+            const errorMsg = err.message || "Failed to fetch leaderboard data";
+            toast.error(errorMsg, {
+                title: activeTab === "college" ? "College League Unavailable" : "Leaderboard Unavailable",
+            });
         } finally {
             setIsLoading(false);
         }
-    }, [activeTab, selectedCollege?.id, page, limit, period, filter, debouncedSearch, currentUsername]);
+    }, [activeTab, selectedCollege?.id, page, limit, period, filter, debouncedSearch, currentUsername, toast]);
 
     useEffect(() => {
         fetchLeaderboard();
@@ -301,10 +314,10 @@ export const LeaderboardPage: React.FC = () => {
     const handleSyncNow = async () => {
         setIsSyncing(true);
         try {
-            const endpoints = [
-                "/api/leaderboard/sync",
-                "http://localhost:3000/api/leaderboard/sync",
-            ];
+            const primarySync = buildApiUrl("/api/leaderboard/sync");
+            const endpoints = import.meta.env.DEV
+                ? [primarySync, "http://localhost:3000/api/leaderboard/sync"]
+                : [primarySync];
             let res: Response | null = null;
             for (const url of endpoints) {
                 try {
@@ -321,11 +334,13 @@ export const LeaderboardPage: React.FC = () => {
 
             if (res && res.ok) {
                 await fetchLeaderboard();
+                toast.success("Leaderboard synced successfully.", { title: "Synced" });
             } else {
                 throw new Error("Sync failed or requires authentication");
             }
         } catch (err: any) {
             console.warn("Sync error:", err.message);
+            toast.error(err.message || "Failed to sync leaderboard.", { title: "Sync Failed" });
         } finally {
             setIsSyncing(false);
         }
@@ -395,24 +410,6 @@ export const LeaderboardPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ========================================================================= */}
-                        {/* ERROR BANNER */}
-                        {/* ========================================================================= */}
-                        {error && (
-                            <div className="p-4 rounded-xl bg-rose-50 border-2 border-black text-xs text-rose-950 flex items-center justify-between shadow-[3px_3px_0px_#000]">
-                                <div className="flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4 text-rose-700 shrink-0 stroke-[2.5]" />
-                                    <span className="font-extrabold">{error}</span>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => fetchLeaderboard()}
-                                    className="px-3 py-1 rounded bg-black text-white font-black text-xs border border-black hover:bg-neutral-800 transition-all cursor-pointer shadow-[1px_1px_0px_#000]"
-                                >
-                                    Retry
-                                </button>
-                            </div>
-                        )}
 
                         {/* ========================================================================= */}
                         {/* GLOBAL LEADERBOARD: CURRENT USER RANKING STRIP */}

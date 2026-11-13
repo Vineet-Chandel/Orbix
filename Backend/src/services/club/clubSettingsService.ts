@@ -4,6 +4,7 @@ import redis from "../../redis/client.js";
 import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
 import { sendSecurityNotificationEmail } from "../email/resendService.js";
 import { ManageAccountsService } from "../account/manageAccountsService.js";
+import { hasWeakPattern } from "../../validators/weakPatterns.js";
 
 export class ClubSettingsService {
     /**
@@ -67,14 +68,21 @@ export class ClubSettingsService {
 
         // Fetch counts for club events and team members
         const [eventsRes, membersRes, unreadRes] = await Promise.all([
-            query(`SELECT COUNT(*)::int AS count FROM club_events WHERE club_id = $1;`, [club.id]),
-            query(`SELECT COUNT(*)::int AS count FROM club_memberships WHERE club_id = $1 AND status = 'active';`, [club.id]),
-            query(`SELECT COUNT(*)::int AS count FROM club_inbox_messages WHERE club_id = $1 AND is_read = false AND sender_type = 'student';`, [club.id]),
+            query(`SELECT COUNT(*)::int AS count FROM club_events WHERE club_id = $1;`, [club.id]).catch(() => ({ rows: [{ count: 0 }] })),
+            query(`SELECT COUNT(*)::int AS count FROM club_memberships WHERE club_id = $1 AND status = 'active';`, [club.id]).catch(() => ({ rows: [{ count: 0 }] })),
+            query(`SELECT COUNT(*)::int AS count FROM club_inbox_messages WHERE club_id = $1 AND is_read = false AND sender_type = 'student';`, [club.id]).catch(() => ({ rows: [{ count: 0 }] })),
         ]);
 
         const eventsCount = eventsRes.rows[0]?.count || 0;
         const teamMembersCount = membersRes.rows[0]?.count || 0;
         const unreadInboxCount = unreadRes.rows[0]?.count || 0;
+
+        const resolvedPrimaryEmail =
+            club.public_email && !String(club.public_email).toLowerCase().endsWith("@club.orbix")
+                ? club.public_email
+                : user?.gmail && !String(user.gmail).toLowerCase().endsWith("@club.orbix")
+                    ? user.gmail
+                    : club.public_email || "";
 
         return {
             club: {
@@ -84,7 +92,7 @@ export class ClubSettingsService {
             user: {
                 ...user,
                 displayName: club.name,
-                primaryEmail: user?.gmail || club.public_email || "",
+                primaryEmail: resolvedPrimaryEmail,
             },
             verification: {
                 isVerifiedClub: Boolean(club.is_active),
@@ -186,10 +194,24 @@ export class ClubSettingsService {
             throw err;
         }
 
-        const hasLetter = /[a-zA-Z]/.test(newPassword);
-        const hasDigit = /\d/.test(newPassword);
-        if (!hasLetter || !hasDigit) {
-            const err: any = new Error("New password must contain a combination of letters and numbers.");
+        if (newPassword.length > 128) {
+            const err: any = new Error("New password must not exceed 128 characters.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const hasUpper = /[A-Z]/.test(newPassword);
+        const hasLower = /[a-z]/.test(newPassword);
+        const hasNumber = /[0-9]/.test(newPassword);
+        const hasSymbol = /[^A-Za-z0-9]/.test(newPassword);
+        if (!hasUpper || !hasLower || !hasNumber || !hasSymbol) {
+            const err: any = new Error("New password must include at least one uppercase letter, one lowercase letter, one number, and one special character.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (hasWeakPattern(newPassword)) {
+            const err: any = new Error("Password contains a common weak pattern. Please satisfy the password security criteria.");
             err.statusCode = 400;
             throw err;
         }

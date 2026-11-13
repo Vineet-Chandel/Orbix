@@ -223,13 +223,13 @@ export class PhoneVerificationService {
 
         const canonical = norm.canonical;
 
-        // 0. Pre-check: Enforce Phone Uniqueness Policy before sending SMS or expending quota
+        // 0. Pre-check: Enforce Phone Uniqueness Policy among club accounts (personal accounts remain independent)
         const existingUserRes = await query(
-            `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+            `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) AND account_type = 'club' LIMIT 1;`,
             [canonical]
         );
         if (existingUserRes.rows[0] && (!params.userId || existingUserRes.rows[0].id !== params.userId)) {
-            const error: any = new Error("This mobile phone number is already registered to an Orbix account.");
+            const error: any = new Error("This mobile phone number is already registered to an Orbix club account.");
             error.statusCode = 409;
             throw error;
         }
