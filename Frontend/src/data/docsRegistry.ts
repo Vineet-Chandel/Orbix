@@ -224,6 +224,34 @@ export const DOCS_FOLDERS: DocFolder[] = [
             },
         ],
     },
+    {
+        id: "student-verification",
+        name: "Student Identity & College Verification",
+        badge: "Institutional Trust",
+        icon: "GraduationCap",
+        color: "bg-[#70D6FF]",
+        description: "Official 7-step institutional student identity verification standard, document OCR assistance, dual-channel institutional email & phone OTPs, and verified badge lifecycle.",
+        files: [
+            {
+                id: "college-verification",
+                slug: "college-verification",
+                title: "Orbix College Verification: Establishing Trust in Student Identity and Institutional Affiliation",
+                subtitle: "7-Step Verification Workflow • OCR Assistance • Dual Institutional Email & Phone OTP • Manual Review & 72-Hour Safeguards",
+                folderId: "student-verification",
+                folderName: "Student Identity & College Verification",
+                badge: "Identity Standard",
+                badgeColor: "bg-[#70D6FF]",
+                image: "https://res.cloudinary.com/dj0ivep44/image/upload/v1793262961/Neon_Club_Registration_Verification_Dashboard_h0f0og.png",
+                summary: "Authoritative architectural documentation of the Orbix College Verification process for students. Explores academic document submission (ID cards & ERP profiles), automated OCR extraction assistance, independent institutional email & phone OTP verification, reviewer audit standards, status state machines, and 72-hour college change safeguards.",
+                tags: ["College Verification", "Student Identity", "Institutional Affiliation", "Document OCR", "Dual OTP", "Security & Trust", "Reviewer Audit"],
+                readTime: "11 min read",
+                updatedAt: "November 2026",
+                author: "Orbix Campus Trust & Identity Group",
+                featured: true,
+                hasInteractiveSim: true,
+            },
+        ],
+    },
 ];
 
 export const ALL_DOC_FILES: DocFile[] = DOCS_FOLDERS.flatMap((folder) => folder.files);

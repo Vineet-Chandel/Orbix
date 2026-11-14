@@ -11,6 +11,7 @@ import ProfilePrivacyDocumentary from "./documentaries/ProfilePrivacyDocumentary
 import ClubVerificationDocumentary from "./documentaries/ClubVerificationDocumentary";
 import ClubCredibilityDocumentary from "./documentaries/ClubCredibilityDocumentary";
 import CollegeChaptersDocumentary from "./documentaries/CollegeChaptersDocumentary";
+import CollegeVerificationDocumentary from "./documentaries/CollegeVerificationDocumentary";
 import {
     ArrowLeft,
     FileText,
@@ -49,7 +50,9 @@ export const DocsViewerPage: React.FC = () => {
                                 ? "club-credibility-algorithm"
                                 : activeSlug === "college-chapters" || activeSlug === "college-chapter-docs" || activeSlug === "chapters" || activeSlug === "campus-chapters" || activeSlug === "college-docs" || activeSlug === "chapter-docs"
                                     ? "college-chapters"
-                                    : activeSlug;
+                                    : activeSlug === "college-verification" || activeSlug === "student-verification" || activeSlug === "collegiate-verification" || activeSlug === "college-identity" || activeSlug === "student-identity" || activeSlug === "student-college-verification"
+                                        ? "college-verification"
+                                        : activeSlug;
 
     // Check if doc exists in registry
     const doc = getDocBySlug(resolvedSlug);
@@ -117,6 +120,8 @@ export const DocsViewerPage: React.FC = () => {
                     <ClubCredibilityDocumentary />
                 ) : resolvedSlug === "college-chapters" ? (
                     <CollegeChaptersDocumentary />
+                ) : resolvedSlug === "college-verification" ? (
+                    <CollegeVerificationDocumentary />
                 ) : doc ? (
                     <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                         <header className="space-y-4 pb-6 border-b-2 border-black/15">

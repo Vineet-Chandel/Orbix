@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Filter, X, Check } from "lucide-react";
 import type { TableColumnDefinition, ColumnFilterRule } from "./types";
+import { NeoSelect, type NeoSelectOption } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
+
+const FILTER_CONDITION_OPTIONS: NeoSelectOption[] = [
+    { value: "contains", label: "Contains" },
+    { value: "does_not_contain", label: "Does not contain" },
+    { value: "equals", label: "Equals exactly" },
+    { value: "does_not_equal", label: "Does not equal" },
+    { value: "starts_with", label: "Starts with" },
+    { value: "is_empty", label: "Is empty / blank" },
+    { value: "is_not_empty", label: "Is not empty" },
+];
 
 interface ColumnFilterPopoverProps {
     column: TableColumnDefinition;
@@ -150,18 +162,20 @@ export const ColumnFilterPopover: React.FC<ColumnFilterPopoverProps> = ({
                         {(column.options || []).map((opt) => {
                             const isChecked = selectedOptions.includes(opt);
                             return (
-                                <label
+                                <div
                                     key={opt}
-                                    className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-white text-xs font-bold text-black cursor-pointer select-none"
+                                    className="p-1 rounded-lg hover:bg-white/80 transition-colors"
                                 >
-                                    <input
-                                        type="checkbox"
+                                    <NeoCheckbox
+                                        size="sm"
+                                        colorScheme="yellow"
                                         checked={isChecked}
-                                        onChange={() => toggleOption(opt)}
-                                        className="rounded border-black text-black focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                                        onCheckedChange={() => toggleOption(opt)}
+                                        label={opt}
+                                        className="w-full"
+                                        labelClassName="text-xs font-bold text-black"
                                     />
-                                    <span className="truncate">{opt}</span>
-                                </label>
+                                </div>
                             );
                         })}
                     </div>
@@ -194,19 +208,14 @@ export const ColumnFilterPopover: React.FC<ColumnFilterPopoverProps> = ({
                             <label className="block text-[10px] font-black uppercase text-neutral-600 mb-1">
                                 Condition
                             </label>
-                            <select
+                            <NeoSelect
                                 value={operator}
-                                onChange={(e) => setOperator(e.target.value)}
-                                className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-black text-xs font-bold text-black focus:outline-hidden"
-                            >
-                                <option value="contains">Contains</option>
-                                <option value="does_not_contain">Does not contain</option>
-                                <option value="equals">Equals exactly</option>
-                                <option value="does_not_equal">Does not equal</option>
-                                <option value="starts_with">Starts with</option>
-                                <option value="is_empty">Is empty / blank</option>
-                                <option value="is_not_empty">Is not empty</option>
-                            </select>
+                                onChange={(val) => setOperator(val)}
+                                options={FILTER_CONDITION_OPTIONS}
+                                size="sm"
+                                className="w-full"
+                                triggerClassName="h-8 text-xs font-bold bg-white"
+                            />
                         </div>
 
                         {operator !== "is_empty" && operator !== "is_not_empty" && (

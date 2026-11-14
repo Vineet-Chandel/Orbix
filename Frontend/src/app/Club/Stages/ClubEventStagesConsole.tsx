@@ -13,6 +13,7 @@ import {
 import { eventLifecycleApi } from "../../../api/eventLifecycleApi";
 import type { ConfiguredStage } from "../TimelineBuilder/types";
 import { useToast } from "../../../context/ToastContext";
+import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
 
 const GithubIcon: React.FC<{ className?: string }> = ({ className = "w-3.5 h-3.5" }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -567,14 +568,13 @@ export const ClubEventStagesConsole: React.FC<ClubEventStagesConsoleProps> = ({
                         <div className="space-y-3 text-xs font-bold">
                             {overrideAction === "extend" && (
                                 <div>
-                                    <label className="block uppercase text-[10px] font-black text-black mb-1">
-                                        New Deadline Date & Time *
-                                    </label>
-                                    <input
-                                        type="datetime-local"
+                                    <NeoDateTimePicker
+                                        label="New Deadline Date & Time *"
+                                        required
                                         value={newEndsAt}
-                                        onChange={(e) => setNewEndsAt(e.target.value)}
-                                        className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black font-bold text-xs shadow-[2px_2px_0px_#000] focus:outline-hidden"
+                                        onChange={(val) => setNewEndsAt(val)}
+                                        placeholder="Pick extended deadline date & time"
+                                        mode="datetime"
                                     />
                                 </div>
                             )}
