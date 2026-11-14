@@ -165,30 +165,44 @@ export const FILTER_PRESETS: FilterPresetDefinition[] = [
 ];
 
 /**
- * Loads an HTMLImageElement from a File or Object URL safely.
+ * Loads an HTMLImageElement safely from a File, Blob, or URL string.
+ * Converts File/Blob to persistent Data URLs so they never expire or suffer from revoked object URLs.
  */
 export function loadImageElement(source: string | File | Blob): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-
-        let objectUrl: string | null = null;
-        if (typeof source === "string") {
-            img.src = source;
-        } else {
-            objectUrl = URL.createObjectURL(source);
-            img.src = objectUrl;
+        // Case A: File or Blob - Read as Data URL to guarantee persistence and eliminate CORS issues
+        if (typeof source !== "string") {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = reader.result as string;
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error("Failed to decode image from selected file."));
+                img.src = dataUrl;
+            };
+            reader.onerror = () => reject(new Error("Failed to read file from disk."));
+            reader.readAsDataURL(source);
+            return;
         }
 
-        img.onload = () => {
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
-            resolve(img);
+        // Case B: String URL or Data URL
+        const img = new Image();
+        if (!source.startsWith("data:") && !source.startsWith("blob:")) {
+            img.crossOrigin = "anonymous";
+        }
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+            // If crossOrigin failed on external CDN, retry without crossOrigin so it still displays
+            if (img.crossOrigin) {
+                const fallbackImg = new Image();
+                fallbackImg.onload = () => resolve(fallbackImg);
+                fallbackImg.onerror = () => reject(new Error("Failed to load image from URL."));
+                fallbackImg.src = source;
+            } else {
+                reject(new Error("Failed to load image from URL."));
+            }
         };
-
-        img.onerror = (err) => {
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
-            reject(new Error("Failed to load image for processing: " + err));
-        };
+        img.src = source;
     });
 }
 
@@ -231,7 +245,7 @@ export function getTemperatureOverlayColor(temperature: number): string | null {
 export async function renderTransformedImageToBlob(
     image: HTMLImageElement,
     transform: EditorTransformState,
-    cropBox: { x: number; y: number; width: number; height: number },
+    cropBoxOnScreen: { width: number; height: number },
     outputWidth: number,
     outputHeight: number,
     mimeType: "image/webp" | "image/png" | "image/jpeg" = "image/webp",
@@ -275,22 +289,39 @@ export async function renderTransformedImageToBlob(
     const scaleY = transform.flipVertical ? -1 : 1;
     ctx.scale(scaleX, scaleY);
 
-    // Compute destination draw dimensions
-    const ratioX = outputWidth / cropBox.width;
-    const ratioY = outputHeight / cropBox.height;
+    // Compute display dimensions matching AdaptiveImageCropper
+    const natW = image.naturalWidth || 600;
+    const natH = image.naturalHeight || 600;
+    const imgAspect = natW / natH;
+    const screenW = cropBoxOnScreen.width || outputWidth;
+    const screenH = cropBoxOnScreen.height || outputHeight;
 
-    const drawX = (-cropBox.x - cropBox.width / 2) * ratioX;
-    const drawY = (-cropBox.y - cropBox.height / 2) * ratioY;
-    const drawW = image.naturalWidth * transform.zoom * ratioX;
-    const drawH = image.naturalHeight * transform.zoom * ratioY;
+    let baseDisplayW = screenW;
+    let baseDisplayH = baseDisplayW / imgAspect;
 
-    ctx.drawImage(
-        image,
-        drawX,
-        drawY,
-        drawW,
-        drawH
-    );
+    if (transform.fitMode === "cover") {
+        if (baseDisplayH < screenH) {
+            baseDisplayH = screenH;
+            baseDisplayW = baseDisplayH * imgAspect;
+        }
+    } else if (transform.fitMode === "contain") {
+        if (baseDisplayH > screenH) {
+            baseDisplayH = screenH;
+            baseDisplayW = baseDisplayH * imgAspect;
+        }
+    } else {
+        baseDisplayW = Math.min(screenW, natW);
+        baseDisplayH = baseDisplayW / imgAspect;
+    }
+
+    // Ratio from screen cropbox to output canvas
+    const scaleFactor = outputWidth / screenW;
+    const drawW = baseDisplayW * transform.zoom * scaleFactor;
+    const drawH = baseDisplayH * transform.zoom * scaleFactor;
+    const drawX = -drawW / 2 + transform.pan.x * scaleFactor;
+    const drawY = -drawH / 2 + transform.pan.y * scaleFactor;
+
+    ctx.drawImage(image, drawX, drawY, drawW, drawH);
 
     ctx.restore();
 

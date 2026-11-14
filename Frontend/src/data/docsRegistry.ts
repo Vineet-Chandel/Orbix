@@ -252,6 +252,34 @@ export const DOCS_FOLDERS: DocFolder[] = [
             },
         ],
     },
+    {
+        id: "community-engagement",
+        name: "Likes & Event Sharing Engine",
+        badge: "Social Infrastructure",
+        icon: "Heart",
+        color: "bg-[#FF70A6]",
+        description: "Publication-bound blog appreciation, 3-action college event distribution (internal peer, native sheet, direct link), anti-inflation share accounting, and 3-invitation cooldown safeguards.",
+        files: [
+            {
+                id: "likes-and-event-sharing",
+                slug: "likes-and-event-sharing",
+                title: "Orbix Likes & Event Sharing: Express Appreciation, Share Opportunities & Stay Connected",
+                subtitle: "Blog Like Architecture • 3-Action Event Sharing • Idempotent Public Share Accounting • 3-Invite Cycle Cooldown",
+                folderId: "community-engagement",
+                folderName: "Likes & Event Sharing Engine",
+                badge: "Engagement Standard",
+                badgeColor: "bg-[#FF70A6]",
+                image: "/assets/likes-sharing-banner.svg",
+                summary: "Authoritative architectural documentation of the Orbix Likes and Event Sharing subsystem. Explores publication-bound blog appreciation, responsive optimistic spring physics, 3-action event distribution (Internal Connections, External Native Sheet, Copy Event Link), deterministic public share accounting rules (+1, +0, +1, +0, +0), 3-invitation cycle allowances, 1-hour cooldown timers, and deep-linked notification delivery.",
+                tags: ["Blog Likes", "Event Sharing", "Internal Invitations", "Cooldown Mechanics", "Anti-Inflation Accounting", "Notifications", "Optimistic UI"],
+                readTime: "10 min read",
+                updatedAt: "November 2026",
+                author: "Orbix Community & Growth Engineering",
+                featured: true,
+                hasInteractiveSim: true,
+            },
+        ],
+    },
 ];
 
 export const ALL_DOC_FILES: DocFile[] = DOCS_FOLDERS.flatMap((folder) => folder.files);

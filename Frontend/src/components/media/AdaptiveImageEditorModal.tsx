@@ -155,15 +155,9 @@ export const AdaptiveImageEditorModal: React.FC<AdaptiveImageEditorModalProps> =
             const targetW = config.exportTarget.width;
             const targetH = Math.round(targetW / targetRatio);
 
-            const sourceW = loadedImage.naturalWidth;
-            const sourceH = loadedImage.naturalHeight;
-
-            // Cropbox bounding box calculations
-            const cropBox = {
-                x: -transform.pan.x,
-                y: -transform.pan.y,
-                width: sourceW / transform.zoom,
-                height: sourceH / transform.zoom,
+            const cropBoxOnScreen = {
+                width: 600,
+                height: Math.round(600 / targetRatio),
             };
 
             const fileName =
@@ -174,7 +168,7 @@ export const AdaptiveImageEditorModal: React.FC<AdaptiveImageEditorModalProps> =
             const result = await renderTransformedImageToBlob(
                 loadedImage,
                 transform,
-                cropBox,
+                cropBoxOnScreen,
                 targetW,
                 targetH,
                 config.exportTarget.mimeType,

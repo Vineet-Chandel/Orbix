@@ -285,7 +285,9 @@ export const AdaptiveImageCropper: React.FC<AdaptiveImageCropperProps> = ({
     };
 
     // Compute Base Display Dimensions according to Fit Mode
-    const imgAspect = image.naturalWidth / image.naturalHeight;
+    const natW = image.naturalWidth || 600;
+    const natH = image.naturalHeight || 600;
+    const imgAspect = natW / natH;
     const effectiveFitMode = transform.fitMode || config.fit || "cover";
 
     let baseDisplayW = cropW;
@@ -303,7 +305,7 @@ export const AdaptiveImageCropper: React.FC<AdaptiveImageCropperProps> = ({
         }
     } else {
         // "original"
-        baseDisplayW = Math.min(cropW, image.naturalWidth);
+        baseDisplayW = Math.min(cropW, natW);
         baseDisplayH = baseDisplayW / imgAspect;
     }
 
@@ -353,8 +355,8 @@ export const AdaptiveImageCropper: React.FC<AdaptiveImageCropperProps> = ({
             >
                 <img
                     src={image.src}
-                    alt="Transforming Media"
-                    className="w-full h-full object-contain pointer-events-none"
+                    alt=""
+                    className="w-full h-full object-contain pointer-events-none select-none"
                     draggable={false}
                 />
 

@@ -21,6 +21,8 @@ import {
     ShieldCheck,
     Building2,
     GraduationCap,
+    Heart,
+    Share2,
 } from "lucide-react";
 
 export const DocsHubPage: React.FC = () => {
@@ -47,6 +49,11 @@ export const DocsHubPage: React.FC = () => {
                 return <Building2 className="w-5 h-5 text-black" />;
             case "GraduationCap":
                 return <GraduationCap className="w-5 h-5 text-black" />;
+            case "Heart":
+                return <Heart className="w-5 h-5 text-black fill-black" />;
+            case "Share":
+            case "Share2":
+                return <Share2 className="w-5 h-5 text-black" />;
             default:
                 return <Folder className="w-5 h-5 text-black" />;
         }
