@@ -13,10 +13,15 @@ import {
     Sparkles,
     ShieldCheck,
     ScanLine,
+    Scan,
     FlipHorizontal,
     Globe,
     Check,
     X,
+    Zap,
+    ZapOff,
+    Image as ImageIcon,
+    RefreshCw,
 } from "lucide-react";
 import jsQR from "jsqr";
 import {
@@ -44,9 +49,17 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
     const [ticketInput, setTicketInput] = useState("");
     const [isVerifying, setIsVerifying] = useState(false);
     const [cameraActive, setCameraActive] = useState(false);
+    const [isStartingCamera, setIsStartingCamera] = useState(false);
     const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [cardFormat, setCardFormat] = useState<"linkedin" | "instagram">("linkedin");
+
+    // Torch / Flashlight state
+    const [torchSupported, setTorchSupported] = useState(false);
+    const [torchOn, setTorchOn] = useState(false);
+
+    // Visual scan detection feedback
+    const [isScanSuccess, setIsScanSuccess] = useState(false);
 
     // Verified Attendee state
     const [verifiedResult, setVerifiedResult] = useState<CheckinVerifyResponse | null>(null);
@@ -56,10 +69,26 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
     // Camera Video & Canvas Refs
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const animFrameRef = useRef<number | null>(null);
     const lastScannedCodeRef = useRef<string | null>(null);
     const scanCooldownRef = useRef<boolean>(false);
+    const isScanningFrameRef = useRef<boolean>(false);
+    const barcodeDetectorRef = useRef<any>(null);
+
+    // Hardware BarcodeDetector initialization
+    useEffect(() => {
+        if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+            try {
+                barcodeDetectorRef.current = new (window as any).BarcodeDetector({
+                    formats: ["qr_code"],
+                });
+            } catch {
+                barcodeDetectorRef.current = null;
+            }
+        }
+    }, []);
 
     // Audio confirmation sound
     const playSound = useCallback((type: "success" | "warn" | "error") => {
@@ -73,13 +102,14 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
             gain.connect(ctx.destination);
 
             if (type === "success") {
+                // High-fidelity Paytm / GPay style confirmation chime
                 osc.type = "sine";
                 osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
                 osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
-                gain.gain.setValueAtTime(0.18, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.24);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.22);
+                osc.stop(ctx.currentTime + 0.24);
             } else if (type === "warn") {
                 osc.type = "triangle";
                 osc.frequency.setValueAtTime(440, ctx.currentTime);
@@ -145,99 +175,307 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
             animFrameRef.current = null;
         }
         if (streamRef.current) {
-            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current.getTracks().forEach((track) => {
+                track.stop();
+            });
             streamRef.current = null;
         }
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
+        setTorchOn(false);
+        setTorchSupported(false);
         setCameraActive(false);
+        setIsStartingCamera(false);
     }, []);
 
-    const startCamera = useCallback(async () => {
+    const startCamera = useCallback(async (targetFacingMode?: "environment" | "user") => {
+        const activeFacing = targetFacingMode || facingMode;
+
+        // Insecure context check
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setCameraError(
+                "Camera API is not supported on this browser or requires an HTTPS / localhost connection."
+            );
+            setCameraActive(false);
+            return;
+        }
+
         stopCamera();
+        setIsStartingCamera(true);
         setCameraError(null);
 
         try {
-            const constraints: MediaStreamConstraints = {
-                video: {
-                    facingMode: { ideal: facingMode },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                },
-            };
+            let stream: MediaStream | null = null;
 
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            streamRef.current = stream;
-
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.setAttribute("playsinline", "true");
-                await videoRef.current.play();
-                setCameraActive(true);
-            }
-        } catch (err: any) {
-            console.error("Camera access error:", err);
-            setCameraError(
-                err.name === "NotAllowedError"
-                    ? "Camera permission denied. Please allow camera access in browser settings or paste ticket code."
-                    : "Could not open camera stream on this device. Use manual code input below."
-            );
-            setCameraActive(false);
-        }
-    }, [facingMode, stopCamera]);
-
-    // QR Scanning Animation Loop
-    useEffect(() => {
-        if (!cameraActive) return;
-
-        const scanFrame = () => {
-            const video = videoRef.current;
-            const canvas = canvasRef.current;
-
-            if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-                const ctx = canvas.getContext("2d", { willReadFrequently: true });
-                if (ctx) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: "dontInvert",
+            // Tier 1: Preferred resolution and facingMode
+            try {
+                const preferredConstraints: MediaStreamConstraints = {
+                    video: {
+                        facingMode: activeFacing === "environment" ? { ideal: "environment" } : "user",
+                        width: { ideal: 1280, min: 640 },
+                        height: { ideal: 720, min: 480 },
+                    },
+                    audio: false,
+                };
+                stream = await navigator.mediaDevices.getUserMedia(preferredConstraints);
+            } catch (err1: any) {
+                console.warn("Preferred constraints failed, trying basic facingMode:", err1);
+                try {
+                    // Tier 2: Basic facing mode
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: activeFacing },
+                        audio: false,
                     });
-
-                    if (code && code.data && !scanCooldownRef.current) {
-                        const rawScanned = code.data.trim();
-                        // Support raw code "ORB-XXXXXX" or URL payload
-                        let candidate = rawScanned;
-                        if (rawScanned.includes("code=")) {
-                            const match = rawScanned.match(/code=([A-Za-z0-9_-]+)/);
-                            if (match) candidate = match[1];
-                        } else if (rawScanned.includes("/")) {
-                            const segments = rawScanned.split("/");
-                            candidate = segments[segments.length - 1];
-                        }
-
-                        if (candidate && candidate !== lastScannedCodeRef.current) {
-                            lastScannedCodeRef.current = candidate;
-                            scanCooldownRef.current = true;
-                            setTicketInput(candidate);
-                            handleVerify(candidate);
-
-                            // Release cooldown after 2.5 seconds
-                            setTimeout(() => {
-                                scanCooldownRef.current = false;
-                                lastScannedCodeRef.current = null;
-                            }, 2500);
-                        }
-                    }
+                } catch (err2: any) {
+                    console.warn("FacingMode fallback failed, requesting generic video:", err2);
+                    // Tier 3: Any video device available
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: false,
+                    });
                 }
             }
 
-            animFrameRef.current = requestAnimationFrame(scanFrame);
+            if (!stream) {
+                throw new Error("Unable to obtain video media stream.");
+            }
+
+            streamRef.current = stream;
+
+            // Check torch / flashlight hardware capability
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                try {
+                    const capabilities: any = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+                    setTorchSupported(Boolean(capabilities.torch));
+                } catch {
+                    setTorchSupported(false);
+                }
+            }
+
+            // Bind stream to video element
+            const video = videoRef.current;
+            if (video) {
+                video.srcObject = stream;
+                video.setAttribute("playsinline", "true");
+                video.muted = true;
+
+                // Wait for video to begin playback
+                await video.play().catch((playErr) => {
+                    console.warn("Video playback promise warning:", playErr);
+                });
+            }
+
+            setCameraActive(true);
+            setCameraError(null);
+        } catch (err: any) {
+            console.error("Camera access error:", err);
+            if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+                setCameraError(
+                    "Camera permission was denied. Please allow camera permissions in your browser address bar (lock icon) and retry."
+                );
+            } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+                setCameraError("No camera hardware found on this device. You can paste or upload QR images below.");
+            } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+                setCameraError("Camera is currently in use by another application. Please close other camera apps and retry.");
+            } else {
+                setCameraError(err.message || "Failed to initialize camera. You can paste or upload QR images below.");
+            }
+            setCameraActive(false);
+        } finally {
+            setIsStartingCamera(false);
+        }
+    }, [facingMode, stopCamera]);
+
+    // Torch / Flashlight Toggle (Paytm & GPay feature)
+    const toggleTorch = async () => {
+        if (!streamRef.current) return;
+        const track = streamRef.current.getVideoTracks()[0];
+        if (!track) return;
+
+        try {
+            const next = !torchOn;
+            await (track as any).applyConstraints({
+                advanced: [{ torch: next }],
+            });
+            setTorchOn(next);
+        } catch (err) {
+            console.warn("Torch constraint error:", err);
+            toast.info("Flashlight is not supported by this camera.");
+        }
+    };
+
+    // Camera Switch (Front/Back)
+    const handleFacingModeToggle = () => {
+        const next = facingMode === "environment" ? "user" : "environment";
+        setFacingMode(next);
+        startCamera(next);
+    };
+
+    // Robust Ticket Code Parser
+    const extractTicketCode = (raw: string): string => {
+        let clean = (raw || "").trim();
+        if (!clean) return "";
+
+        // 1. JSON payload e.g. {"ticketCode":"ORB-1234"} or {"code":"ORB-1234"}
+        if (clean.startsWith("{") && clean.endsWith("}")) {
+            try {
+                const parsed = JSON.parse(clean);
+                if (parsed.ticketCode) return String(parsed.ticketCode).trim().toUpperCase();
+                if (parsed.code) return String(parsed.code).trim().toUpperCase();
+                if (parsed.id) return String(parsed.id).trim().toUpperCase();
+            } catch {
+                // Ignore JSON parse error and continue
+            }
+        }
+
+        // 2. Query param ?code=... or &code=... or ?ticket=...
+        const codeParamMatch = clean.match(/[?&](?:code|ticket|pass|ticketCode)=([A-Za-z0-9_-]+)/i);
+        if (codeParamMatch && codeParamMatch[1]) {
+            return codeParamMatch[1].trim().toUpperCase();
+        }
+
+        // 3. URL path like /verify/ORB-1234 or /pass/ORB-1234
+        if (clean.startsWith("http://") || clean.startsWith("https://")) {
+            try {
+                const url = new URL(clean);
+                const segments = url.pathname.split("/").filter(Boolean);
+                if (segments.length > 0) {
+                    const last = segments[segments.length - 1];
+                    if (last && last.length >= 3) {
+                        return last.trim().toUpperCase();
+                    }
+                }
+            } catch {
+                // Continue
+            }
+        }
+
+        return clean.toUpperCase();
+    };
+
+    // Process a successfully decoded QR string
+    const handleDetectedCode = (rawValue: string) => {
+        if (scanCooldownRef.current) return;
+
+        const candidate = extractTicketCode(rawValue);
+        if (!candidate || candidate === lastScannedCodeRef.current) return;
+
+        lastScannedCodeRef.current = candidate;
+        scanCooldownRef.current = true;
+
+        // Visual feedback & vibration (Paytm / GPay style)
+        setIsScanSuccess(true);
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+            try {
+                navigator.vibrate([40, 60, 40]);
+            } catch {
+                // Ignore vibration errors
+            }
+        }
+
+        setTicketInput(candidate);
+        handleVerify(candidate);
+
+        // Turn off success indicator after 800ms
+        setTimeout(() => {
+            setIsScanSuccess(false);
+        }, 800);
+
+        // Cooldown before scanning another pass (2.5s)
+        setTimeout(() => {
+            scanCooldownRef.current = false;
+            lastScannedCodeRef.current = null;
+        }, 2500);
+    };
+
+    // QR Scanning Animation Loop (High Performance with BarcodeDetector + jsQR fallback)
+    useEffect(() => {
+        if (!cameraActive) return;
+
+        let active = true;
+        let lastScanTime = 0;
+
+        const scanFrame = async (timestamp: number) => {
+            if (!active) return;
+
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+
+            // Throttle scanning to every 100ms (10 checks/sec) for optimal 60fps UI and battery longevity
+            if (
+                video &&
+                !scanCooldownRef.current &&
+                !isScanningFrameRef.current &&
+                timestamp - lastScanTime > 100 &&
+                video.readyState >= 2 && // HAVE_CURRENT_DATA or higher
+                video.videoWidth > 0 &&
+                video.videoHeight > 0
+            ) {
+                lastScanTime = timestamp;
+                isScanningFrameRef.current = true;
+
+                try {
+                    let detectedCode: string | null = null;
+
+                    // 1. Hardware accelerated native BarcodeDetector
+                    if (barcodeDetectorRef.current) {
+                        try {
+                            const barcodes = await barcodeDetectorRef.current.detect(video);
+                            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                                detectedCode = barcodes[0].rawValue;
+                            }
+                        } catch {
+                            // Fallback to jsQR
+                        }
+                    }
+
+                    // 2. High-speed jsQR fallback via canvas
+                    if (!detectedCode && canvas) {
+                        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                        if (ctx) {
+                            // Downscale slightly for instantaneous JS image decoding (max 640px)
+                            const scale = Math.min(1, 640 / video.videoWidth);
+                            const targetWidth = Math.floor(video.videoWidth * scale);
+                            const targetHeight = Math.floor(video.videoHeight * scale);
+
+                            if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+                                canvas.width = targetWidth;
+                                canvas.height = targetHeight;
+                            }
+
+                            ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+                            const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+                            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                                inversionAttempts: "dontInvert",
+                            });
+
+                            if (code && code.data) {
+                                detectedCode = code.data;
+                            }
+                        }
+                    }
+
+                    if (detectedCode) {
+                        handleDetectedCode(detectedCode);
+                    }
+                } catch (scanErr) {
+                    console.warn("Scan frame error:", scanErr);
+                } finally {
+                    isScanningFrameRef.current = false;
+                }
+            }
+
+            if (active) {
+                animFrameRef.current = requestAnimationFrame(scanFrame);
+            }
         };
 
         animFrameRef.current = requestAnimationFrame(scanFrame);
 
         return () => {
+            active = false;
             if (animFrameRef.current) {
                 cancelAnimationFrame(animFrameRef.current);
                 animFrameRef.current = null;
@@ -245,12 +483,62 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
         };
     }, [cameraActive]);
 
-    // Cleanup on unmount
+    // Auto-start camera when the component mounts
     useEffect(() => {
+        startCamera();
         return () => {
             stopCamera();
         };
-    }, [stopCamera]);
+    }, []);
+
+    // Upload QR from Photos / Gallery (Paytm / GPay feature)
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new window.Image();
+            img.onload = async () => {
+                // 1. Try BarcodeDetector first
+                if (barcodeDetectorRef.current) {
+                    try {
+                        const barcodes = await barcodeDetectorRef.current.detect(img);
+                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                            handleDetectedCode(barcodes[0].rawValue);
+                            toast.success("QR code decoded successfully from image!");
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn("BarcodeDetector error on file:", e);
+                    }
+                }
+
+                // 2. Fallback to jsQR
+                const tempCanvas = document.createElement("canvas");
+                tempCanvas.width = img.width;
+                tempCanvas.height = img.height;
+                const ctx = tempCanvas.getContext("2d");
+                if (ctx) {
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                    const qr = jsQR(imageData.data, imageData.width, imageData.height);
+                    if (qr && qr.data) {
+                        handleDetectedCode(qr.data);
+                        toast.success("QR code decoded successfully from image!");
+                        return;
+                    }
+                }
+
+                toast.error("No valid QR pass found in this image. Please ensure the QR is clear and well-lit.");
+            };
+            img.src = reader.result as string;
+        };
+        reader.readAsDataURL(file);
+
+        // Reset input value
+        e.target.value = "";
+    };
 
     const handleCopy = (text: string, key: string) => {
         navigator.clipboard.writeText(text);
@@ -275,6 +563,53 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
 
     return (
         <div className="space-y-6">
+            {/* Embedded styles for authentic Paytm / GPay laser sweep and pulse animations */}
+            <style>{`
+                @keyframes orbixLaserSweep {
+                    0% {
+                        top: 2%;
+                        opacity: 0.85;
+                    }
+                    50% {
+                        top: 92%;
+                        opacity: 1;
+                    }
+                    100% {
+                        top: 2%;
+                        opacity: 0.85;
+                    }
+                }
+                .animate-orbix-laser {
+                    animation: orbixLaserSweep 2.2s ease-in-out infinite;
+                }
+                @keyframes orbixRadarPulse {
+                    0% {
+                        transform: scale(0.96);
+                        opacity: 0.9;
+                    }
+                    50% {
+                        transform: scale(1.02);
+                        opacity: 0.4;
+                    }
+                    100% {
+                        transform: scale(0.96);
+                        opacity: 0.9;
+                    }
+                }
+                .animate-orbix-radar {
+                    animation: orbixRadarPulse 2.4s ease-in-out infinite;
+                }
+            `}</style>
+
+            {/* Hidden file input for gallery/photo upload */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+            />
+
             {/* Top Terminal Ribbon */}
             <div className="p-5 rounded-3xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -284,14 +619,14 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                     <div>
                         <div className="flex items-center gap-2">
                             <h2 className="text-lg font-black text-black">
-                                Live Event Entry & QR Scanner Terminal
+                                Live Event Entry &amp; QR Scanner Terminal
                             </h2>
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-black text-[#a2ff86] animate-pulse">
                                 Live Active
                             </span>
                         </div>
                         <p className="text-xs font-bold text-neutral-600">
-                            Scan official entry pass QR code or paste ticket code for instant database identity verification & check-in.
+                            Scan official entry pass QR code or paste ticket code for instant database identity verification &amp; check-in.
                         </p>
                     </div>
                 </div>
@@ -310,102 +645,246 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
 
             {/* Split Workspace: Left Scanner/Input + Right Verified Identity Panel */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* LEFT: Camera Viewfinder & Code Input (5 cols) */}
+                {/* LEFT: Paytm / GPay Style Scanner & Code Input (5 cols) */}
                 <div className="lg:col-span-5 space-y-4">
-                    {/* Camera Scanner Box */}
+                    {/* Scanner Container Box */}
                     <div className="p-5 rounded-3xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
-                                <Camera className="w-4 h-4 text-neutral-800" />
-                                Camera Scanner
+                                <Scan className="w-4 h-4 text-neutral-800" />
+                                Live QR Scanner
                             </span>
+
                             <div className="flex items-center gap-1.5">
                                 {cameraActive && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
-                                            setTimeout(startCamera, 100);
-                                        }}
-                                        className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 text-xs font-black"
-                                        title="Switch Camera (Front/Back)"
-                                    >
-                                        <FlipHorizontal className="w-3.5 h-3.5" />
-                                    </button>
+                                    <>
+                                        {torchSupported && (
+                                            <button
+                                                type="button"
+                                                onClick={toggleTorch}
+                                                className={`p-1.5 rounded-lg border border-black text-xs font-black transition-colors ${
+                                                    torchOn ? "bg-[#FFE566] text-black" : "bg-white hover:bg-neutral-100 text-neutral-800"
+                                                }`}
+                                                title={torchOn ? "Turn Torch Off" : "Turn Torch On"}
+                                            >
+                                                {torchOn ? <Zap className="w-3.5 h-3.5 fill-black" /> : <ZapOff className="w-3.5 h-3.5" />}
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={handleFacingModeToggle}
+                                            className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 text-xs font-black"
+                                            title="Switch Camera (Front/Back)"
+                                        >
+                                            <FlipHorizontal className="w-3.5 h-3.5" />
+                                        </button>
+                                    </>
                                 )}
+
                                 <button
                                     type="button"
-                                    onClick={cameraActive ? stopCamera : startCamera}
+                                    onClick={cameraActive ? stopCamera : () => startCamera()}
+                                    disabled={isStartingCamera}
                                     className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black cursor-pointer shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 ${
                                         cameraActive
                                             ? "bg-rose-200 hover:bg-rose-300 text-black"
                                             : "bg-[#a2ff86] hover:bg-[#8cee70] text-black"
                                     }`}
                                 >
-                                    {cameraActive ? (
+                                    {isStartingCamera ? (
+                                        <>
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Starting...</span>
+                                        </>
+                                    ) : cameraActive ? (
                                         <>
                                             <CameraOff className="w-3.5 h-3.5" />
-                                            Turn Off
+                                            <span>Turn Off</span>
                                         </>
                                     ) : (
                                         <>
                                             <Camera className="w-3.5 h-3.5" />
-                                            Start Camera
+                                            <span>Start Camera</span>
                                         </>
                                     )}
                                 </button>
                             </div>
                         </div>
 
-                        {/* Viewfinder Window */}
-                        <div className="relative w-full aspect-square sm:aspect-video lg:aspect-square bg-black rounded-2xl border-2 border-black overflow-hidden flex items-center justify-center">
+                        {/* Viewfinder Window (Paytm / GPay Style Viewfinder with Orbix Aesthetics) */}
+                        <div className="relative w-full aspect-square sm:aspect-[4/3] bg-neutral-950 rounded-2xl border-3 border-black shadow-[3px_3px_0px_#000] overflow-hidden flex items-center justify-center select-none">
+                            {/* Always mounted video element so videoRef is NEVER null */}
+                            <video
+                                ref={videoRef}
+                                className={`w-full h-full object-cover transition-opacity duration-300 ${
+                                    cameraActive ? "opacity-100" : "opacity-0 absolute pointer-events-none"
+                                }`}
+                                playsInline
+                                muted
+                                autoPlay
+                            />
+                            {/* Hidden canvas for image analysis */}
+                            <canvas ref={canvasRef} className="hidden" />
+
                             {cameraActive ? (
                                 <>
-                                    <video
-                                        ref={videoRef}
-                                        className="w-full h-full object-cover"
-                                        playsInline
-                                        muted
-                                    />
-                                    {/* Hidden processing canvas */}
-                                    <canvas ref={canvasRef} className="hidden" />
+                                    {/* Top Floating Badge Bar */}
+                                    <div className="absolute top-3.5 inset-x-3.5 flex items-center justify-between z-20 pointer-events-auto">
+                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/20 shadow-md">
+                                            <span className="w-2 h-2 rounded-full bg-[#a2ff86] animate-pulse" />
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-[#a2ff86]">
+                                                {isScanSuccess ? "QR Verified!" : "Live Scanning"}
+                                            </span>
+                                        </div>
 
-                                    {/* Brutalist Scanner Viewfinder Overlay */}
-                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                        <div className="relative w-56 h-56 border-2 border-white/60 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
-                                            {/* Corner brackets */}
-                                            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-[#a2ff86] rounded-tl-lg" />
-                                            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-[#a2ff86] rounded-tr-lg" />
-                                            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-[#a2ff86] rounded-bl-lg" />
-                                            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-[#a2ff86] rounded-br-lg" />
+                                        <div className="flex items-center gap-1.5">
+                                            {torchSupported && (
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleTorch}
+                                                    className={`p-2 rounded-xl border border-black shadow-[2px_2px_0px_#000] text-xs font-black transition-all cursor-pointer ${
+                                                        torchOn
+                                                            ? "bg-[#FFE566] text-black shadow-[0_0_12px_#FFE566]"
+                                                            : "bg-black/80 hover:bg-black text-white border-white/30"
+                                                    }`}
+                                                    title={torchOn ? "Torch On" : "Torch Off"}
+                                                >
+                                                    {torchOn ? <Zap className="w-3.5 h-3.5 fill-black" /> : <ZapOff className="w-3.5 h-3.5" />}
+                                                </button>
+                                            )}
 
-                                            {/* Laser Scan Line */}
-                                            <div className="absolute left-2 right-2 h-0.5 bg-[#a2ff86] shadow-[0_0_8px_#a2ff86] animate-pulse top-1/2 -translate-y-1/2" />
+                                            <button
+                                                type="button"
+                                                onClick={handleFacingModeToggle}
+                                                className="p-2 rounded-xl border border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] text-xs font-black transition-all cursor-pointer"
+                                                title="Switch Camera (Front/Rear)"
+                                            >
+                                                <FlipHorizontal className="w-3.5 h-3.5" />
+                                            </button>
                                         </div>
                                     </div>
 
-                                    <div className="absolute bottom-3 inset-x-0 mx-auto w-max px-3 py-1 rounded-full bg-black/80 backdrop-blur-xs text-[#a2ff86] text-[10px] font-black uppercase tracking-wider border border-[#a2ff86]/50">
-                                        Align QR pass within bracket
+                                    {/* Paytm / GPay Dark Mask & Central Viewfinder Box */}
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                        <div className="relative w-52 h-52 sm:w-60 sm:h-60 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.58)] transition-all">
+                                            {/* 4 Prominent Corner Brackets (Paytm / GPay Style) */}
+                                            <div
+                                                className={`absolute -top-1 -left-1 w-8 h-8 sm:w-10 sm:h-10 border-t-4 border-l-4 rounded-tl-2xl transition-all duration-200 ${
+                                                    isScanSuccess
+                                                        ? "border-[#a2ff86] shadow-[0_0_16px_#a2ff86]"
+                                                        : "border-[#a2ff86]"
+                                                }`}
+                                            />
+                                            <div
+                                                className={`absolute -top-1 -right-1 w-8 h-8 sm:w-10 sm:h-10 border-t-4 border-r-4 rounded-tr-2xl transition-all duration-200 ${
+                                                    isScanSuccess
+                                                        ? "border-[#a2ff86] shadow-[0_0_16px_#a2ff86]"
+                                                        : "border-[#a2ff86]"
+                                                }`}
+                                            />
+                                            <div
+                                                className={`absolute -bottom-1 -left-1 w-8 h-8 sm:w-10 sm:h-10 border-b-4 border-l-4 rounded-bl-2xl transition-all duration-200 ${
+                                                    isScanSuccess
+                                                        ? "border-[#a2ff86] shadow-[0_0_16px_#a2ff86]"
+                                                        : "border-[#a2ff86]"
+                                                }`}
+                                            />
+                                            <div
+                                                className={`absolute -bottom-1 -right-1 w-8 h-8 sm:w-10 sm:h-10 border-b-4 border-r-4 rounded-br-2xl transition-all duration-200 ${
+                                                    isScanSuccess
+                                                        ? "border-[#a2ff86] shadow-[0_0_16px_#a2ff86]"
+                                                        : "border-[#a2ff86]"
+                                                }`}
+                                            />
+
+                                            {/* Continuous Laser Sweep Beam (Paytm / GPay style glowing scan line) */}
+                                            {!isScanSuccess && (
+                                                <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+                                                    <div className="absolute inset-x-0 h-16 animate-orbix-laser -mt-8 pointer-events-none">
+                                                        <div className="w-full h-full bg-gradient-to-b from-transparent via-[#a2ff86]/15 to-[#a2ff86]/45" />
+                                                        <div className="w-full h-1 bg-[#a2ff86] shadow-[0_0_14px_#a2ff86,0_0_4px_#ffffff]" />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Center Crosshair or Success Checkmark */}
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                {isScanSuccess ? (
+                                                    <div className="w-16 h-16 rounded-2xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[0_0_24px_#a2ff86] animate-in zoom-in-75 duration-200">
+                                                        <Check className="w-10 h-10 text-black stroke-[3.5]" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-6 h-6 border border-white/20 rounded-full flex items-center justify-center animate-orbix-radar">
+                                                        <div className="w-1.5 h-1.5 bg-[#a2ff86]/70 rounded-full" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom Floating Control Bar */}
+                                    <div className="absolute bottom-3 inset-x-3 flex flex-col items-center gap-2 z-20 pointer-events-auto">
+                                        <div className="px-3.5 py-1 rounded-full bg-black/85 backdrop-blur-md border border-white/20 text-white text-[11px] font-bold shadow-md flex items-center gap-1.5">
+                                            <Scan className="w-3.5 h-3.5 text-[#a2ff86]" />
+                                            <span>Align pass QR code inside bracket</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                                title="Upload QR screenshot or PDF image"
+                                            >
+                                                <ImageIcon className="w-3.5 h-3.5 text-neutral-800" />
+                                                <span>Upload QR Image</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </>
                             ) : (
-                                <div className="text-center p-6 space-y-3">
-                                    <div className="w-14 h-14 rounded-2xl bg-neutral-900 border-2 border-neutral-700 flex items-center justify-center mx-auto text-neutral-400">
+                                /* Inactive Camera Screen with Clear Troubleshooting & Options */
+                                <div className="text-center p-6 space-y-3 z-10 max-w-sm mx-auto">
+                                    <div className="w-14 h-14 rounded-2xl bg-neutral-900 border-2 border-neutral-700 flex items-center justify-center mx-auto text-[#a2ff86] shadow-[2px_2px_0px_#000]">
                                         <QrCode className="w-7 h-7" />
                                     </div>
                                     <div className="space-y-1">
                                         <h4 className="text-sm font-black text-white">Camera is Inactive</h4>
-                                        <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-                                            {cameraError || "Click 'Start Camera' to enable live video QR barcode scanning, or type/paste the code below."}
+                                        <p className="text-xs text-neutral-300 leading-relaxed">
+                                            {cameraError ||
+                                                "Click 'Enable Camera' to activate live video barcode scanning, or upload a photo of the entry pass."}
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={startCamera}
-                                        className="px-4 py-2 rounded-xl border-2 border-black bg-[#a2ff86] text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-[#8cee70]"
-                                    >
-                                        Enable Scanner Camera
-                                    </button>
+
+                                    <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                                        <button
+                                            type="button"
+                                            onClick={() => startCamera()}
+                                            disabled={isStartingCamera}
+                                            className="px-4 py-2 rounded-xl border-2 border-black bg-[#a2ff86] text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-[#8cee70] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                        >
+                                            {isStartingCamera ? (
+                                                <>
+                                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                                    <span>Starting...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Camera className="w-3.5 h-3.5" />
+                                                    <span>Enable Camera</span>
+                                                </>
+                                            )}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="px-4 py-2 rounded-xl border-2 border-black bg-white text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-neutral-100 flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                        >
+                                            <ImageIcon className="w-3.5 h-3.5" />
+                                            <span>Upload QR</span>
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -465,7 +944,7 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                                     ) : (
                                         <>
                                             <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
-                                            <span>Verify Pass & Check-In</span>
+                                            <span>Verify Pass &amp; Check-In</span>
                                         </>
                                     )}
                                 </button>
@@ -515,7 +994,7 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                             <div className="space-y-1 max-w-sm mx-auto">
                                 <h3 className="font-black text-base text-black">No Attendee Verified Yet</h3>
                                 <p className="text-xs font-bold text-neutral-600 leading-relaxed">
-                                    Aim the camera at the attendee's entry pass QR code or paste their pass ticket code on the left to verify their complete identity.
+                                    Aim the camera at the attendee's entry pass QR code, upload their ticket image, or paste their pass ticket code on the left to verify their complete identity.
                                 </p>
                             </div>
                             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/20 bg-[#FAF6EE] text-[11px] font-mono text-neutral-600">
@@ -566,7 +1045,7 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                                         onClick={() => handleVerify(attendee.ticketCode, true)}
                                         className="px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black shrink-0 cursor-pointer hover:bg-neutral-800"
                                     >
-                                        Admit & Check-In
+                                        Admit &amp; Check-In
                                     </button>
                                 )}
                             </div>
@@ -710,7 +1189,7 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                             {/* 2. Full Personal & Academic Database Information */}
                             <div className="p-5 rounded-3xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
                                 <span className="text-xs font-black uppercase tracking-wider text-black block">
-                                    All Personal & Academic Information (Database Record)
+                                    All Personal &amp; Academic Information (Database Record)
                                 </span>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -848,7 +1327,7 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                                     {/* Checked-In Timestamp */}
                                     <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-0.5 sm:col-span-2">
                                         <span className="text-[10px] uppercase font-black text-neutral-500 block">
-                                            Check-In Status & Timestamp
+                                            Check-In Status &amp; Timestamp
                                         </span>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <span
