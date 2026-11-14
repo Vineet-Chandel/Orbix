@@ -17,6 +17,8 @@ import {
     UserPlus,
     Megaphone,
     MessageSquareQuote,
+    Globe,
+    ExternalLink,
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
@@ -455,164 +457,40 @@ export const ClubSidebar = ({
                 {isProfileMenuOpen && (
                     <div
                         role="menu"
-                        className={`absolute w-64 bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-2 z-[90] text-xs animate-in fade-in duration-150 space-y-0.5 ${
+                        className={`absolute w-64 bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-2 z-[90] text-xs animate-in fade-in duration-150 space-y-1 ${
                             isExpanded
                                 ? "bottom-full left-0 mb-2 slide-in-from-bottom-2"
                                 : "bottom-0 left-[calc(100%+12px)] slide-in-from-left-2"
                         }`}
                     >
-                        <Link
-                            to="/club/dashboard"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("overview");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <LayoutDashboard className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Dashboard</span>
-                        </Link>
-
-                        <Link
-                            to="/club/analytics"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("analytics");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <TrendingUp className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Trends & Analytics</span>
-                        </Link>
-
-                        <Link
-                            to="/club/events"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("events");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <CalendarDays className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Events</span>
-                            </div>
-                        </Link>
-
-                        <Link
-                            to="/club/certificates"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("certificates");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <Award className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Certificates</span>
-                        </Link>
-
-                        <Link
-                            to="/club/feedback-surveys"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("feedback-surveys");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <MessageSquareQuote className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Feedback & Surveys</span>
-                        </Link>
-
-                        <Link
-                            to="/club/team"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("team");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <Users className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Team</span>
-                            </div>
-                            {teamPendingCount !== undefined && teamPendingCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                    {teamPendingCount}
+                        {/* Club Account Header */}
+                        <div className="px-3 py-2 border-b-2 border-black/15 mb-1.5 space-y-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="font-black text-black truncate">{club.name}</p>
+                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-[#a2ff86] text-black border border-black shrink-0">
+                                    Club Lead
                                 </span>
-                            )}
-                        </Link>
+                            </div>
+                            <p className="text-[10px] font-bold text-neutral-600 truncate">{club.college_name}</p>
+                        </div>
 
+                        {/* Unique Action 1: Public Club Page */}
                         <Link
-                            to="/club/team-workspace"
+                            to={`/clubs/${club.slug || club.clubUsername || club.id}`}
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onTabChange("team-workspace");
                                 if (onClose) onClose();
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
-                            <Layers className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Team Workspace</span>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <Globe className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                                <span className="truncate">Public Club Page</span>
+                            </div>
+                            <ExternalLink className="w-3 h-3 text-neutral-400 shrink-0" />
                         </Link>
 
-                        <Link
-                            to="/club/recruitment"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("recruitment");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <UserPlus className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Recruitment</span>
-                        </Link>
-
-                        <Link
-                            to="/club/announcements"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("announcements");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <Megaphone className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Announcement</span>
-                        </Link>
-
-                        <Link
-                            to="/club/clubs"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("clubs");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <Building2 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Campus Clubs</span>
-                        </Link>
-
-                        <Link
-                            to="/club/profile"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("profile");
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <Edit3 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Manage Profile</span>
-                        </Link>
-
+                        {/* Unique Action 2: Club Inbox */}
                         <button
                             type="button"
                             onClick={() => {
@@ -632,6 +510,7 @@ export const ClubSidebar = ({
                             )}
                         </button>
 
+                        {/* Unique Action 3: Settings & Permissions */}
                         <Link
                             to="/club/settings"
                             onClick={() => {
@@ -646,11 +525,12 @@ export const ClubSidebar = ({
                             }`}
                         >
                             <Settings className={`w-3.5 h-3.5 flex-shrink-0 ${activeTab === "settings" ? "text-black" : "text-neutral-700"}`} />
-                            <span className="truncate">Settings</span>
+                            <span className="truncate">Settings &amp; Permissions</span>
                         </Link>
 
                         <div className="my-1.5 h-0.5 bg-black/15" />
 
+                        {/* Sign Out */}
                         <button
                             type="button"
                             onClick={() => {

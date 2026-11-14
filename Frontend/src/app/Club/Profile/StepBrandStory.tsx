@@ -1,15 +1,10 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
-    UploadCloud,
-    Trash2,
-    RefreshCw,
     Sparkles,
-    Image as ImageIcon,
     Tag,
     X,
     Plus,
 } from "lucide-react";
-import { OrbixLoader } from "../../../components/ui/loader";
 import { ClubMarkdownEditor } from "./ClubMarkdownEditor";
 import { useToast } from "../../../context/ToastContext";
 import {
@@ -18,6 +13,7 @@ import {
     removeClubImage,
 } from "../../../utils/clubProfileApi";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
+import { AdaptiveImageDropzone } from "../../../components/media/AdaptiveImageDropzone";
 
 interface StepBrandStoryProps {
     clubId?: string;
@@ -63,10 +59,6 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
     const [isUploadingCover, setIsUploadingCover] = useState(false);
     const [coverProgress, setCoverProgress] = useState<number | null>(null);
 
-    // Drag-and-drop state
-    const [isDraggingLogo, setIsDraggingLogo] = useState(false);
-    const [isDraggingCover, setIsDraggingCover] = useState(false);
-
     // Tag input
     const [tagInput, setTagInput] = useState("");
 
@@ -79,9 +71,6 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
         variant?: "danger" | "warning";
         onConfirm: () => void;
     } | null>(null);
-
-    const logoInputRef = useRef<HTMLInputElement>(null);
-    const coverInputRef = useRef<HTMLInputElement>(null);
 
     const validateImageFile = (file: File): boolean => {
         const validTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
@@ -248,184 +237,32 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
                 {/* 2-Card Compact Grid for Logo & Banner */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* CARD 1: CLUB LOGO */}
-                    <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-black flex items-center gap-1.5">
-                                <ImageIcon className="w-3.5 h-3.5" />
-                                <span>Club Logo</span>
-                            </span>
-                            <span className="text-[10px] font-bold text-neutral-500">
-                                1:1 Square recommended
-                            </span>
-                        </div>
-
-                        {logoUrl ? (
-                            <div className="flex items-center gap-4 bg-white p-3.5 rounded-xl border border-black shadow-[1px_1px_0px_#000]">
-                                <div className="w-20 h-20 rounded-xl border-2 border-black bg-[#FAF6EE] overflow-hidden shrink-0 flex items-center justify-center">
-                                    <img src={logoUrl} alt="Club Logo Preview" className="w-full h-full object-cover" />
-                                </div>
-                                <div className="flex-1 min-w-0 space-y-2">
-                                    <p className="text-xs font-bold text-black truncate">Logo Uploaded</p>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => logoInputRef.current?.click()}
-                                            disabled={isUploadingLogo}
-                                            className="px-2.5 py-1 rounded-lg bg-[#a2ff86] text-black text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-[#8ee673] flex items-center gap-1 cursor-pointer"
-                                        >
-                                            <RefreshCw className="w-3 h-3" />
-                                            <span>Replace</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveLogo}
-                                            className="px-2.5 py-1 rounded-lg bg-white text-rose-600 text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-rose-50 flex items-center gap-1 cursor-pointer"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                            <span>Remove</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    setIsDraggingLogo(true);
-                                }}
-                                onDragLeave={() => setIsDraggingLogo(false)}
-                                onDrop={(e) => {
-                                    e.preventDefault();
-                                    setIsDraggingLogo(false);
-                                    if (e.dataTransfer.files?.[0]) {
-                                        handleUploadLogoFile(e.dataTransfer.files[0]);
-                                    }
-                                }}
-                                onClick={() => logoInputRef.current?.click()}
-                                className={`p-6 rounded-xl border-2 border-dashed border-black/40 bg-white flex flex-col items-center justify-center text-center cursor-pointer transition-all hover:border-black hover:bg-amber-50/40 ${
-                                    isDraggingLogo ? "border-black bg-amber-100/60 scale-[1.01]" : ""
-                                }`}
-                            >
-                                {isUploadingLogo ? (
-                                    <div className="space-y-2 flex flex-col items-center py-2 text-black">
-                                        <OrbixLoader size="sm" />
-                                        <span className="text-xs font-bold text-black">
-                                            Uploading {logoProgress !== null ? `${logoProgress}%` : "..."}
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-1.5 flex flex-col items-center">
-                                        <div className="w-10 h-10 rounded-full bg-[#FFE566] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                                            <UploadCloud className="w-5 h-5 text-black" />
-                                        </div>
-                                        <span className="text-xs font-black text-black">Click or drag club logo</span>
-                                        <span className="text-[10px] text-neutral-500 font-medium">PNG, JPG, WebP up to 5 MB</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <input
-                            ref={logoInputRef}
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            className="hidden"
-                            onChange={(e) => {
-                                if (e.target.files?.[0]) {
-                                    handleUploadLogoFile(e.target.files[0]);
-                                }
-                            }}
+                    <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000]">
+                        <AdaptiveImageDropzone
+                            placementId="club_logo"
+                            label="Club Chapter Logo"
+                            headline="Drag and drop club logo here"
+                            subtext="or click to browse your device (PNG, JPG, WebP)"
+                            value={logoUrl}
+                            onChange={handleUploadLogoFile}
+                            onRemove={handleRemoveLogo}
+                            isUploading={isUploadingLogo}
+                            uploadProgress={logoProgress}
                         />
                     </div>
 
                     {/* CARD 2: CLUB BANNER */}
-                    <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-black flex items-center gap-1.5">
-                                <ImageIcon className="w-3.5 h-3.5" />
-                                <span>Club Header Banner</span>
-                            </span>
-                            <span className="text-[10px] font-bold text-neutral-500">
-                                3:1 Wide aspect ratio
-                            </span>
-                        </div>
-
-                        {coverImageUrl ? (
-                            <div className="space-y-3 bg-white p-3.5 rounded-xl border border-black shadow-[1px_1px_0px_#000]">
-                                <div className="w-full h-24 rounded-lg border-2 border-black overflow-hidden bg-neutral-900">
-                                    <img src={coverImageUrl} alt="Club Banner Preview" className="w-full h-full object-cover" />
-                                </div>
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="text-xs font-bold text-black truncate">Banner Uploaded</span>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => coverInputRef.current?.click()}
-                                            disabled={isUploadingCover}
-                                            className="px-2.5 py-1 rounded-lg bg-[#a2ff86] text-black text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-[#8ee673] flex items-center gap-1 cursor-pointer"
-                                        >
-                                            <RefreshCw className="w-3 h-3" />
-                                            <span>Replace</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveCover}
-                                            className="px-2.5 py-1 rounded-lg bg-white text-rose-600 text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-rose-50 flex items-center gap-1 cursor-pointer"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                            <span>Remove</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    setIsDraggingCover(true);
-                                }}
-                                onDragLeave={() => setIsDraggingCover(false)}
-                                onDrop={(e) => {
-                                    e.preventDefault();
-                                    setIsDraggingCover(false);
-                                    if (e.dataTransfer.files?.[0]) {
-                                        handleUploadCoverFile(e.dataTransfer.files[0]);
-                                    }
-                                }}
-                                onClick={() => coverInputRef.current?.click()}
-                                className={`p-6 rounded-xl border-2 border-dashed border-black/40 bg-white flex flex-col items-center justify-center text-center cursor-pointer transition-all hover:border-black hover:bg-amber-50/40 ${
-                                    isDraggingCover ? "border-black bg-amber-100/60 scale-[1.01]" : ""
-                                }`}
-                            >
-                                {isUploadingCover ? (
-                                    <div className="space-y-2 flex flex-col items-center py-2 text-black">
-                                        <OrbixLoader size="sm" />
-                                        <span className="text-xs font-bold text-black">
-                                            Uploading {coverProgress !== null ? `${coverProgress}%` : "..."}
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-1.5 flex flex-col items-center">
-                                        <div className="w-10 h-10 rounded-full bg-[#FFE566] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                                            <UploadCloud className="w-5 h-5 text-black" />
-                                        </div>
-                                        <span className="text-xs font-black text-black">Click or drag banner image</span>
-                                        <span className="text-[10px] text-neutral-500 font-medium">3:1 wide ratio • up to 5 MB</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <input
-                            ref={coverInputRef}
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            className="hidden"
-                            onChange={(e) => {
-                                if (e.target.files?.[0]) {
-                                    handleUploadCoverFile(e.target.files[0]);
-                                }
-                            }}
+                    <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000]">
+                        <AdaptiveImageDropzone
+                            placementId="club_banner"
+                            label="Club Header Banner"
+                            headline="Drag and drop club banner here"
+                            subtext="or click to browse your device (2.6:1 wide ratio)"
+                            value={coverImageUrl}
+                            onChange={handleUploadCoverFile}
+                            onRemove={handleRemoveCover}
+                            isUploading={isUploadingCover}
+                            uploadProgress={coverProgress}
                         />
                     </div>
                 </div>

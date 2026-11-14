@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import { Palette, X, UploadCloud, Check, Trash2, Sparkles, RefreshCw } from "lucide-react";
+import { Palette, X, Check, Sparkles, RefreshCw } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import type { FormThemeSettings } from "../../../api/clubEventFormApi";
 import { requestFormMediaSignature, uploadFileToCloudinary } from "../../../api/clubEventFormApi";
+import { AdaptiveImageDropzone } from "../../../components/media/AdaptiveImageDropzone";
 
 export interface FormThemeDrawerProps {
     isOpen: boolean;
@@ -73,10 +74,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
 
     if (!isOpen) return null;
 
-    const handleUploadHeaderImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const handleUploadHeaderFile = async (file: File) => {
         try {
             setIsUploading(true);
             const signatureConfig = await requestFormMediaSignature(eventId, "banner");
@@ -87,7 +85,6 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
             toast.error(err.message || "Failed to upload header banner.");
         } finally {
             setIsUploading(false);
-            e.target.value = "";
         }
     };
 
@@ -146,57 +143,17 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                 <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 no-scrollbar">
                     {/* 1. Header Banner Image */}
                     <div className="space-y-2">
-                        <label className="text-xs font-black uppercase tracking-wider text-black flex items-center justify-between">
-                            <span>Form Banner Header</span>
-                            <span className="text-[10px] text-neutral-500 font-bold lowercase">Max 10 MB</span>
-                        </label>
-
-                        {headerImageUrl ? (
-                            <div className="relative rounded-2xl border-2 border-black overflow-hidden shadow-[2.5px_2.5px_0px_#000] group bg-black">
-                                <img
-                                    src={headerImageUrl}
-                                    alt="Form Header"
-                                    className="w-full h-28 object-contain"
-                                />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                                    <label className="px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-neutral-100 transition-transform active:scale-95">
-                                        Change
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleUploadHeaderImage}
-                                            disabled={isUploading}
-                                            className="hidden"
-                                        />
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={() => onChangeHeaderImage(null, null)}
-                                        className="p-1.5 rounded-xl bg-rose-400 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-rose-500 transition-transform active:scale-95"
-                                        title="Remove header image"
-                                    >
-                                        <Trash2 className="w-4 h-4 stroke-[2.5]" />
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <label className="border-2 border-dashed border-black hover:bg-amber-100/50 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-white transition-all shadow-[2px_2px_0px_#000]">
-                                <UploadCloud className="w-6 h-6 text-black stroke-[2.5]" />
-                                <span className="text-xs font-black text-black">
-                                    {isUploading ? "Uploading Banner..." : "Upload Header Banner"}
-                                </span>
-                                <span className="text-[10px] text-neutral-600 font-bold">
-                                    Recommended 1200 x 320 px (JPG, PNG, WebP)
-                                </span>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleUploadHeaderImage}
-                                    disabled={isUploading}
-                                    className="hidden"
-                                />
-                            </label>
-                        )}
+                        <AdaptiveImageDropzone
+                            placementId="form_header"
+                            label="Form Banner Header"
+                            headline="Upload Form Banner"
+                            subtext="Recommended 1200 x 320 px (JPG, PNG, WebP)"
+                            value={headerImageUrl || undefined}
+                            onChange={handleUploadHeaderFile}
+                            onRemove={() => onChangeHeaderImage(null, null)}
+                            isUploading={isUploading}
+                            className="bg-white"
+                        />
                     </div>
 
                     {/* 2. Primary Accent Color */}

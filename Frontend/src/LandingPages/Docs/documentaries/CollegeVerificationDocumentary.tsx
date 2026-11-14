@@ -210,6 +210,15 @@ export const CollegeVerificationDocumentary: React.FC = () => {
                 </div>
             </header>
 
+            {/* Banner Graphic Illustration */}
+            <div className="rounded-3xl border-2 sm:border-[3px] border-black overflow-hidden bg-white shadow-[6px_6px_0px_#000] w-full">
+                <img
+                    src="https://res.cloudinary.com/dj0ivep44/image/upload/v1794652407/3d_icon_rendering_illustration_of_id_card_floating_on_purple_background_identification_card_icon_driver_license_doctor_id_card_template_medical_identity_badge_identity_verification_person_data___Premium_Photo_z5yeae.jpg"
+                    alt="Orbix College Verification: Establishing Trust in Student Identity"
+                    className="w-full h-auto max-h-[540px] object-cover block select-none"
+                />
+            </div>
+
             {/* ========================================================================= */}
             {/* SECTION 1: WHY COLLEGE VERIFICATION MATTERS                               */}
             {/* ========================================================================= */}

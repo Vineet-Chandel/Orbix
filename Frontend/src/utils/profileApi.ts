@@ -740,11 +740,7 @@ export function uploadPhotoToCloudinary(
                 try {
                     const errRes = JSON.parse(xhr.responseText);
                     const rawMsg = errRes.error?.message || `Upload failed with HTTP ${xhr.status}`;
-                    if (rawMsg.toLowerCase().includes("invalid signature")) {
-                        reject(new Error("Cloudinary API Secret mismatch. Please verify that CLOUDINARY_API_SECRET in Backend/.env matches your Cloudinary Console API Secret."));
-                    } else {
-                        reject(new Error(rawMsg));
-                    }
+                    reject(new Error(rawMsg));
                 } catch {
                     reject(new Error(`Upload failed with HTTP ${xhr.status}`));
                 }
@@ -765,10 +761,6 @@ export function uploadPhotoToCloudinary(
         formData.append("timestamp", String(config.timestamp));
         formData.append("signature", config.signature);
         formData.append("public_id", config.publicId);
-        if (config.folder && !config.publicId.startsWith(`${config.folder}/`)) {
-            formData.append("folder", config.folder);
-        }
-        formData.append("overwrite", "true");
 
         xhr.open("POST", config.uploadUrl, true);
         xhr.send(formData);

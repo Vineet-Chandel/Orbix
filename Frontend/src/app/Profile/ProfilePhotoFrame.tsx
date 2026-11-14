@@ -10,6 +10,7 @@ import {
     useDefaultAvatar,
 } from "../../utils/profileApi";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { AdaptiveImageEditorModal } from "../../components/media/AdaptiveImageEditorModal";
 
 interface ProfilePhotoFrameProps {
     currentPhotoUrl?: string | null;
@@ -43,6 +44,10 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+
+    // Adaptive Image Editor state
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [editorSource, setEditorSource] = useState<File | string | null>(null);
 
     // Derived dimensions based on size prop
     const sizeClasses = {
@@ -78,8 +83,8 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
         };
     }, [isMenuOpen]);
 
-    // Handle Client-Side File Selection & Direct Upload Workflow
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Handle Client-Side File Selection: Opens Adaptive Image Editor
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         // Reset file input so re-selecting same file works
         e.target.value = "";
@@ -104,7 +109,13 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
             return;
         }
 
-        // 3. Start In-Frame Loading Workflow (NO Full-Page Loader!)
+        setEditorSource(file);
+        setIsEditorOpen(true);
+        setIsMenuOpen(false);
+    };
+
+    // Upload framed high-resolution file produced by Adaptive Image Editor
+    const handleUploadFramedFile = async (file: File) => {
         setIsUploading(true);
         setUploadProgress(0);
         setStatusMessage("Preparing...");
@@ -335,6 +346,25 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                             <span>Change photo</span>
                         </button>
 
+                        {/* Action 1.5: Adjust / Reposition Frame */}
+                        {Boolean(currentPhotoUrl) && (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setIsMenuOpen(false);
+                                    setEditorSource(currentPhotoUrl!);
+                                    setIsEditorOpen(true);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2.5 transition-colors cursor-pointer text-neutral-900 border-t border-neutral-100"
+                            >
+                                <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                                <span>Adjust / Reposition</span>
+                            </button>
+                        )}
+
                         {/* Action 2: Restore previous photo (conditionally rendered) */}
                         {hasPreviousPhoto && (
                             <button
@@ -376,6 +406,20 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Adaptive Image Editor Modal */}
+            {isEditorOpen && editorSource && (
+                <AdaptiveImageEditorModal
+                    isOpen={isEditorOpen}
+                    onClose={() => {
+                        setIsEditorOpen(false);
+                        setEditorSource(null);
+                    }}
+                    imageSource={editorSource}
+                    placementId="user_avatar"
+                    onConfirm={(result) => handleUploadFramedFile(result.file)}
+                />
+            )}
         </div>
     );
 };

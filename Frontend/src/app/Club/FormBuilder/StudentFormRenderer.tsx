@@ -1218,17 +1218,6 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             Submit Another
                         </button>
                     )}
-
-                    {/* Done / Close */}
-                    {onCancel && (
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            className="px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                        >
-                            Done
-                        </button>
-                    )}
                 </div>
             </div>
         );

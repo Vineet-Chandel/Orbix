@@ -12,6 +12,7 @@ import ClubVerificationDocumentary from "./documentaries/ClubVerificationDocumen
 import ClubCredibilityDocumentary from "./documentaries/ClubCredibilityDocumentary";
 import CollegeChaptersDocumentary from "./documentaries/CollegeChaptersDocumentary";
 import CollegeVerificationDocumentary from "./documentaries/CollegeVerificationDocumentary";
+import LikesEventSharingDocumentary from "./documentaries/LikesEventSharingDocumentary";
 import {
     ArrowLeft,
     FileText,
@@ -52,7 +53,9 @@ export const DocsViewerPage: React.FC = () => {
                                     ? "college-chapters"
                                     : activeSlug === "college-verification" || activeSlug === "student-verification" || activeSlug === "collegiate-verification" || activeSlug === "college-identity" || activeSlug === "student-identity" || activeSlug === "student-college-verification"
                                         ? "college-verification"
-                                        : activeSlug;
+                                        : activeSlug === "likes-and-event-sharing" || activeSlug === "likes" || activeSlug === "event-sharing" || activeSlug === "sharing" || activeSlug === "blog-likes" || activeSlug === "likes-sharing" || activeSlug === "community-engagement" || activeSlug === "likes-event-sharing"
+                                            ? "likes-and-event-sharing"
+                                            : activeSlug;
 
     // Check if doc exists in registry
     const doc = getDocBySlug(resolvedSlug);
@@ -122,6 +125,8 @@ export const DocsViewerPage: React.FC = () => {
                     <CollegeChaptersDocumentary />
                 ) : resolvedSlug === "college-verification" ? (
                     <CollegeVerificationDocumentary />
+                ) : resolvedSlug === "likes-and-event-sharing" ? (
+                    <LikesEventSharingDocumentary />
                 ) : doc ? (
                     <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                         <header className="space-y-4 pb-6 border-b-2 border-black/15">
