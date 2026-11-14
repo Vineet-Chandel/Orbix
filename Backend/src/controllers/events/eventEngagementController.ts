@@ -243,6 +243,7 @@ export async function recordEventShareHandler(req: Request, res: Response): Prom
         res.status(200).json({
             success: true,
             sharesCount: result.shareCount,
+            publicCountIncremented: result.publicCountIncremented,
             shareType: result.shareType,
             data: result,
         });

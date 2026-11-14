@@ -248,7 +248,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     initialFormRecord,
     initialEventData,
     onWizardChange,
-    onWizardBack,
+    onWizardBack: _onWizardBack,
     onWizardSubmit,
 }) => {
     const toast = useToast();
@@ -1193,7 +1193,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* TAB 1: QUESTIONS (GOOGLE FORMS BUILDER CANVAS) */}
             {/* ---------------------------------------------------------------- */}
             {activeTab === "questions" && !isPreviewOpen && (
-                <div className="relative w-full lg:pr-20 space-y-6 pb-36">
+                <div className={`relative w-full lg:pr-20 space-y-6 ${isWizardMode ? "pb-6" : "pb-36"}`}>
                     {/* Sections & Questions Matrix */}
                     {sections.map((section, sIdx) => (
                         <div key={section.id} className="space-y-4">
@@ -1359,27 +1359,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         </div>
                     ))}
 
-                    {/* Bottom Actions: Add Section & Clear Form */}
-                    <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-                        <button
-                            type="button"
-                            onClick={handleAddSection}
-                            className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs sm:text-sm shadow-[3px_3px_0px_#000] hover:shadow-[1.5px_1.5px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] cursor-pointer flex items-center gap-2 transition-all"
-                        >
-                            <Split className="w-4 h-4 stroke-[2.5]" />
-                            <span>Add Section Break</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setIsClearConfirmOpen(true)}
-                            className="px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-rose-100 text-rose-700 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
-                        >
-                            <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Clear Form</span>
-                        </button>
-                    </div>
-
                     {/* Floating Vertical Canvas Tools Palette (Desktop docked right) */}
                     <div className="hidden sm:flex flex-col fixed top-44 right-3 sm:right-4 xl:right-6 w-fit bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 border-black shadow-[3px_3px_0px_#000] rounded-2xl p-1.5 items-center gap-1.5 z-30">
                         <button
@@ -1525,8 +1504,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* Unified & Non-duplicated: AI Assistant, Templates, Theme, Preview, Save Draft, Publish Live */}
             {/* ---------------------------------------------------------------- */}
             {activeTab !== "responses" && (
-                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[95vw]">
-                    <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
+                <div className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-2rem)] md:max-w-fit w-auto">
+                    <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1 sm:p-1.5 flex items-center gap-1 sm:gap-1.5 md:gap-2">
                         {/* Circular AI Assistant Button */}
                         <button
                             type="button"
@@ -1537,11 +1516,14 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 }
                                 setIsAiModalOpen(true);
                             }}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-black font-black text-xs sm:text-sm shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 select-none"
+                            className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] sm:shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[0.5px] hover:translate-y-[0.5px] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center shrink-0 select-none text-black"
                             style={{ backgroundColor: accentColor, color: "#000" }}
                             title="AI Assistant: Generate questions with AI"
+                            aria-label="AI Assistant"
                         >
-                            <span className="font-black text-xs sm:text-sm tracking-tight text-black">AI</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" aria-hidden="true">
+                                <path fill="currentColor" d="M16.4 21h-2.154l-2-5H5.754l-2 5H1.6L8 5h2zm4.6-9v9h-2v-9zM6.554 14h4.892L9 7.885zM19.529 2.32a.507.507 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.717.32a.53.53 0 0 1 0 .962l-.758.338a4.36 4.36 0 0 0-2.22 2.25l-.246.566a.506.506 0 0 1-.934 0l-.247-.565a4.36 4.36 0 0 0-2.219-2.251l-.76-.338a.53.53 0 0 1 0-.963l.718-.32a4.37 4.37 0 0 0 2.251-2.325z"/>
+                            </svg>
                         </button>
 
                         {/* Templates Button (Merged with Question Bank & Past Questions) */}
@@ -1551,10 +1533,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 if (activeTab !== "questions") setActiveTab("questions");
                                 setIsTemplatesHubModalOpen(true);
                             }}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-0 shadow-none"
+                            className="h-8 sm:h-8.5 px-2 sm:px-2.5 md:px-3 rounded-xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 shrink-0 border-0 shadow-none whitespace-nowrap"
                             title="Templates, Question Bank & Past Questions"
                         >
-                            <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
+                            <LayoutTemplate className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] shrink-0" />
                             <span>Templates</span>
                         </button>
 
@@ -1562,17 +1544,18 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={() => setIsThemeDrawerOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none"
+                            className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none"
                             title="Theme & Colors"
+                            aria-label="Theme & Colors"
                         >
-                            <Palette className="w-4 h-4 stroke-[2.5]" />
+                            <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] shrink-0" />
                         </button>
 
                         {/* Preview Simulator Action (Text only, Borderless) */}
                         <button
                             type="button"
                             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                            className={`px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none ${isPreviewOpen
+                            className={`h-8 sm:h-8.5 px-2 sm:px-2.5 md:px-3 rounded-xl font-black text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none whitespace-nowrap ${isPreviewOpen
                                 ? "bg-black text-white dark:bg-white dark:text-black"
                                 : "bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white"
                                 }`}
@@ -1581,33 +1564,44 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <span>{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
                         </button>
 
-                        {/* Back button in Wizard Mode */}
-                        {isWizardMode && onWizardBack && (
-                            <button
-                                type="button"
-                                onClick={onWizardBack}
-                                className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-white hover:bg-neutral-100 border-2 border-black font-bold text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 h-9 shrink-0 text-black"
-                            >
-                                <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span className="hidden sm:inline">Back: Timeline</span>
-                                <span className="sm:hidden">Back</span>
-                            </button>
-                        )}
+                        {/* Add Section Break */}
+                        <button
+                            type="button"
+                            onClick={handleAddSection}
+                            className="h-8 sm:h-8.5 px-2 sm:px-2.5 md:px-3 rounded-xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 shrink-0 border-0 shadow-none whitespace-nowrap"
+                            title="Add Section Break (=)"
+                        >
+                            <Split className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] shrink-0" />
+                            <span className="hidden sm:inline">Add Section Break</span>
+                            <span className="sm:hidden">Section</span>
+                        </button>
+
+                        {/* Clear Form */}
+                        <button
+                            type="button"
+                            onClick={() => setIsClearConfirmOpen(true)}
+                            className="h-8 sm:h-8.5 px-2 sm:px-2.5 md:px-3 rounded-xl bg-transparent hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-700 dark:text-rose-400 font-bold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 shrink-0 border-0 shadow-none whitespace-nowrap"
+                            title="Clear Form and reset to a clean section"
+                        >
+                            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] shrink-0 text-rose-600 dark:text-rose-400" />
+                            <span className="hidden sm:inline">Clear Form</span>
+                            <span className="sm:hidden">Clear</span>
+                        </button>
 
                         {/* Divider */}
-                        <div className="h-5 w-[1px] bg-neutral-300 dark:bg-neutral-700 mx-0.5 shrink-0" />
+                        <div className="h-4 sm:h-5 w-[1px] bg-neutral-300 dark:bg-neutral-700 mx-0.5 shrink-0" />
 
                         {/* Save Draft (Text only, Borderless) */}
                         <button
                             type="button"
                             onClick={handleSaveForm}
                             disabled={saving || isPublishing}
-                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none h-9"
+                            className="h-8 sm:h-8.5 px-2 sm:px-2.5 md:px-3 rounded-xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none whitespace-nowrap"
                             title="Save working draft"
                         >
                             {saving ? (
                                 <>
-                                    <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
+                                    <span className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
                                     <span>Saving...</span>
                                 </>
                             ) : (
@@ -1615,32 +1609,25 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             )}
                         </button>
 
-                        {/* Publish or Next in Wizard Mode */}
-                        <button
-                            type="button"
-                            onClick={handlePublishForm}
-                            disabled={saving || isPublishing}
-                            className={`px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 h-9 ${
-                                isWizardMode
-                                    ? "bg-[#38BDF8] text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#0284C7] hover:text-white"
-                                    : "bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 border-0 shadow-none"
-                            }`}
-                            title={isWizardMode ? "Next: Select Banner" : "Publish"}
-                        >
-                            {isPublishing ? (
-                                <>
-                                    <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
-                                    <span>Publishing...</span>
-                                </>
-                            ) : isWizardMode ? (
-                                <>
-                                    <span>Next: Select Banner</span>
-                                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </>
-                            ) : (
-                                <span>Publish</span>
-                            )}
-                        </button>
+                        {/* Publish (Only in Standalone Mode) */}
+                        {!isWizardMode && (
+                            <button
+                                type="button"
+                                onClick={handlePublishForm}
+                                disabled={saving || isPublishing}
+                                className="h-8 sm:h-8.5 px-2.5 sm:px-3 md:px-3.5 rounded-xl font-black text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 disabled:opacity-50 shrink-0 whitespace-nowrap bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 border-0 shadow-none"
+                                title="Publish"
+                            >
+                                {isPublishing ? (
+                                    <>
+                                        <span className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
+                                        <span>Publishing...</span>
+                                    </>
+                                ) : (
+                                    <span>Publish</span>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

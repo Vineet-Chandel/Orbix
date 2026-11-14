@@ -174,11 +174,14 @@ export const EventShareModal: React.FC<EventShareModalProps> = ({
         try {
             const result = await onInternalShare(recipients, personalNote.trim() || undefined);
             if (result.success) {
-                toast.success(
-                    recipients.length === 1
-                        ? "Event shared with your connection!"
-                        : `Event shared with ${result.deliveredCount} connections!`
-                );
+                // Display success toast ONLY if public share count was actually incremented
+                if (result.publicCountIncremented) {
+                    toast.success(
+                        recipients.length === 1
+                            ? "Event shared with your connection!"
+                            : `Event shared with ${result.deliveredCount} connections!`
+                    );
+                }
                 onClose();
             } else {
                 toast.error(result.error || "Failed to share event with selected connections.");

@@ -35,6 +35,11 @@ import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspa
 import { EventTimelineBuilder } from "./TimelineBuilder/EventTimelineBuilder";
 import { EventWizardReviewStep } from "./TimelineBuilder/EventWizardReviewStep";
 import type { ConfiguredStage } from "./TimelineBuilder/types";
+import {
+    evaluateStepNavigation,
+    validateStep1,
+    type FormErrors,
+} from "./eventWizardNavigationGuard";
 import { fetchEventStages } from "../../api/eventLifecycleApi";
 import type {
     FormStructure,
@@ -78,17 +83,6 @@ interface FormState {
     minTeamSize: number;
     maxTeamSize: number;
 }
-
-interface FormErrors {
-    title?: string;
-    startsAt?: string;
-    endsAt?: string;
-    registrationUrl?: string;
-    venueOrLocation?: string;
-    teamSize?: string;
-}
-
-const URL_REGEX = /^(https?:\/\/)([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?(\?.*)?$/i;
 
 const DEFAULT_QUESTIONS: FormQuestion[] = [
     {
@@ -451,73 +445,11 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isOpen, isUploadingBanner, onClose]);
 
-    // Validation logic for valid details only
-    const validate = (currentForm: FormState): FormErrors => {
-        const errs: FormErrors = {};
+    // Form builder helper methods
+    const totalQuestions = formStructure.sections.reduce((acc, s) => acc + s.questions.length, 0);
 
-        // 1. Title validation
-        const trimmedTitle = currentForm.title.trim();
-        if (!trimmedTitle) {
-            errs.title = "Event title is required.";
-        } else if (trimmedTitle.length < 3) {
-            errs.title = "Title must be at least 3 characters.";
-        } else if (trimmedTitle.length > 120) {
-            errs.title = "Title cannot exceed 120 characters.";
-        }
-
-        // 2. Starts At validation
-        if (!currentForm.startsAt) {
-            errs.startsAt = "Event start date and time is required.";
-        } else {
-            const startDate = new Date(currentForm.startsAt);
-            if (isNaN(startDate.getTime())) {
-                errs.startsAt = "Please enter a valid start date and time.";
-            }
-        }
-
-        // 3. Ends At validation
-        if (currentForm.endsAt) {
-            const endDate = new Date(currentForm.endsAt);
-            if (isNaN(endDate.getTime())) {
-                errs.endsAt = "Please enter a valid end date and time.";
-            } else if (currentForm.startsAt) {
-                const startDate = new Date(currentForm.startsAt);
-                if (endDate.getTime() <= startDate.getTime()) {
-                    errs.endsAt = "End date and time must be strictly after the start date and time.";
-                }
-            }
-        }
-
-        // 4. Registration URL validation
-        if (currentForm.registrationUrl.trim()) {
-            const regUrl = currentForm.registrationUrl.trim();
-            if (!URL_REGEX.test(regUrl)) {
-                errs.registrationUrl = "Must be a valid URL starting with http:// or https:// (e.g. https://forms.gle/...)";
-            }
-        }
-
-        // 5. Venue or Location details validation for in_person / hybrid when published
-        if (currentForm.status === "published" && (currentForm.locationType === "in_person" || currentForm.locationType === "hybrid")) {
-            if (!currentForm.venueOrLocation.trim()) {
-                errs.venueOrLocation = "Venue / campus room is recommended for published in-person sessions.";
-            }
-        }
-
-        // 6. Team size validation if team event enabled
-        if (currentForm.isTeamEvent) {
-            const min = Number(currentForm.minTeamSize) || 1;
-            const max = Number(currentForm.maxTeamSize) || 4;
-            if (min < 1) {
-                errs.teamSize = "Minimum team size must be at least 1.";
-            } else if (max < min) {
-                errs.teamSize = `Maximum team size cannot be smaller than minimum (${min}).`;
-            } else if (max > 50) {
-                errs.teamSize = "Maximum team size cannot exceed 50.";
-            }
-        }
-
-        return errs;
-    };
+    // Step 1 Validation logic
+    const validate = (currentForm: FormState): FormErrors => validateStep1(currentForm).errors || {};
 
     const handleBlur = (field: string) => {
         setTouched((prev) => ({ ...prev, [field]: true }));
@@ -550,124 +482,97 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         }
     };
 
-    // Step 1 -> Step 2 Navigation (Event Info -> Timeline)
-    const handleGoToStep2 = () => {
-        setTouched({
-            title: true,
-            startsAt: true,
-            endsAt: true,
-            registrationUrl: true,
-            venueOrLocation: true,
+    // Centralized Step Navigation Guard (Sequential Forward & Unrestricted Backward)
+    const handleNavigateToStep = (targetStep: 1 | 2 | 3 | 4 | 5): boolean => {
+        const result = evaluateStepNavigation(currentStep, targetStep, {
+            form,
+            stages,
+            totalQuestions,
+            isUploadingBanner,
         });
 
-        const validationErrors = validate(form);
-        setErrors(validationErrors);
-
-        if (
-            validationErrors.title ||
-            validationErrors.startsAt ||
-            validationErrors.endsAt ||
-            validationErrors.registrationUrl
-        ) {
-            const firstError =
-                validationErrors.title ||
-                validationErrors.startsAt ||
-                validationErrors.endsAt ||
-                validationErrors.registrationUrl;
-            toast.error(firstError || "Please correct the highlighted fields before proceeding.", {
-                title: "Validation Error",
+        if (!result.allowed) {
+            if (result.blockingStep === 1) {
+                setTouched({
+                    title: true,
+                    startsAt: true,
+                    endsAt: true,
+                    registrationUrl: true,
+                    venueOrLocation: true,
+                    teamSize: true,
+                });
+                if (result.step1Errors) {
+                    setErrors(result.step1Errors);
+                }
+            }
+            toast.error(result.errorMessage || "Please complete all required fields before proceeding.", {
+                title: result.blockingStep === 1
+                    ? "Validation Error"
+                    : result.blockingStep === 2
+                    ? "Timeline Stage Required"
+                    : result.blockingStep === 3
+                    ? "Registration Form Required"
+                    : "Banner Required",
             });
-            return;
+            return false;
         }
 
-        setCurrentStep(2);
-    };
-
-    // Step 2 -> Step 3 Navigation (Timeline -> Registration Form)
-    const handleGoToStep3 = () => {
-        if (stages.length === 0) {
-            toast.error("Please configure at least 1 round/stage in your timeline.", {
-                title: "Timeline Stage Required",
-            });
-            return;
-        }
-        setCurrentStep(3);
-    };
-
-    // Step 3 -> Step 4 Navigation (Form -> Banner Studio)
-    const handleGoToStep4 = () => {
-        if (totalQuestions === 0) {
-            toast.error("The registration form cannot be empty. Please include at least 1 question for participants.", {
-                title: "Registration Form Required",
-            });
-            return;
-        }
-
-        // Ensure banner is selected; if empty, pick a random preset
-        if (!form.coverImageUrl) {
+        // When entering Step 4 or Step 5, ensure a banner exists if missing
+        if ((targetStep === 4 || targetStep === 5) && !form.coverImageUrl) {
             setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
         }
 
-        setCurrentStep(4);
+        setCurrentStep(targetStep);
+        return true;
     };
 
-    // Step 4 -> Step 5 Navigation (Banner Studio -> Review & Publish)
-    const handleGoToStep5 = () => {
-        if (!form.coverImageUrl) {
-            setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
-        }
-        setCurrentStep(5);
-    };
-
-    // Form builder helper methods
-    const totalQuestions = formStructure.sections.reduce((acc, s) => acc + s.questions.length, 0);
+    // Step navigation actions
+    const handleGoToStep2 = () => handleNavigateToStep(2);
+    const handleGoToStep3 = () => handleNavigateToStep(3);
+    const handleGoToStep4 = () => handleNavigateToStep(4);
+    const handleGoToStep5 = () => handleNavigateToStep(5);
 
     // Final Submission Handler (Atomic Launch or Edit Save)
     const handleSubmitFinal = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
-        // Validate Step 1
-        const validationErrors = validate(form);
-        if (
-            validationErrors.title ||
-            validationErrors.startsAt ||
-            validationErrors.endsAt ||
-            validationErrors.registrationUrl
-        ) {
-            setCurrentStep(1);
-            setTouched({
-                title: true,
-                startsAt: true,
-                endsAt: true,
-                registrationUrl: true,
-                venueOrLocation: true,
-            });
-            setErrors(validationErrors);
-            const firstError =
-                validationErrors.title ||
-                validationErrors.startsAt ||
-                validationErrors.endsAt ||
-                validationErrors.registrationUrl;
-            toast.error(firstError || "Please fix validation errors in Step 1.", {
-                title: "Validation Error",
-            });
-            return;
-        }
+        // Validate all preceding steps before final launch
+        const navCheck = evaluateStepNavigation(currentStep, 5, {
+            form,
+            stages,
+            totalQuestions,
+            isUploadingBanner,
+        });
 
-        // Validate Step 2 Stages
-        if (stages.length === 0) {
-            setCurrentStep(2);
-            toast.error("Please configure at least 1 stage in your event timeline.", {
-                title: "Timeline Required",
-            });
-            return;
-        }
-
-        // Validate Step 3 Form Questions
-        if (totalQuestions === 0) {
-            setCurrentStep(3);
-            toast.error("The registration form cannot be empty. Please include at least 1 question for participants.", {
-                title: "Registration Form Required",
+        if (!navCheck.allowed) {
+            if (navCheck.blockingStep === 1) {
+                setCurrentStep(1);
+                setTouched({
+                    title: true,
+                    startsAt: true,
+                    endsAt: true,
+                    registrationUrl: true,
+                    venueOrLocation: true,
+                    teamSize: true,
+                });
+                if (navCheck.step1Errors) {
+                    setErrors(navCheck.step1Errors);
+                }
+            } else if (navCheck.blockingStep === 2) {
+                setCurrentStep(2);
+            } else if (navCheck.blockingStep === 3) {
+                setCurrentStep(3);
+            } else if (navCheck.blockingStep === 4) {
+                setCurrentStep(4);
+            }
+            toast.error(navCheck.errorMessage || "Please fix validation errors before proceeding.", {
+                title: navCheck.blockingStep === 1
+                    ? "Validation Error"
+                    : navCheck.blockingStep === 2
+                    ? "Timeline Required"
+                    : navCheck.blockingStep === 3
+                    ? "Registration Form Required"
+                    : "Banner Required",
             });
             return;
         }
@@ -728,27 +633,26 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                     <div className="truncate">
                         <div className="flex items-center gap-2">
-                            <h2 className="text-base sm:text-lg lg:text-xl font-black text-black tracking-tight truncate">
+                            <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-black tracking-tight truncate">
                                 {editingEvent ? "Edit Club Event" : "Create New Club Event"}
                             </h2>
                             <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shrink-0 ${
-                                    form.status === "published"
-                                        ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
-                                        : form.status === "completed"
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shrink-0 ${form.status === "published"
+                                    ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                    : form.status === "completed"
                                         ? "bg-sky-300 text-black shadow-[1px_1px_0px_#000]"
                                         : form.status === "draft"
-                                        ? "bg-amber-300 text-black shadow-[1px_1px_0px_#000]"
-                                        : "bg-rose-300 text-black shadow-[1px_1px_0px_#000]"
-                                }`}
+                                            ? "bg-amber-300 text-black shadow-[1px_1px_0px_#000]"
+                                            : "bg-rose-300 text-black shadow-[1px_1px_0px_#000]"
+                                    }`}
                             >
                                 {form.status === "published"
                                     ? "Live Stage"
                                     : form.status === "completed"
-                                    ? "Completed Stage"
-                                    : form.status === "draft"
-                                    ? "Draft Stage"
-                                    : "Cancelled Stage"}
+                                        ? "Completed Stage"
+                                        : form.status === "draft"
+                                            ? "Draft Stage"
+                                            : "Cancelled Stage"}
                             </span>
                         </div>
                         <p className="text-[11px] sm:text-xs text-neutral-600 font-medium truncate">
@@ -756,12 +660,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                 currentStep === 1
                                     ? "Event Information & Schedule"
                                     : currentStep === 2
-                                    ? "Timeline & Round Architecture"
-                                    : currentStep === 3
-                                    ? "Registration Form Builder"
-                                    : currentStep === 4
-                                    ? "Banner Selection & Preview"
-                                    : "Review & Publish"
+                                        ? "Timeline & Round Architecture"
+                                        : currentStep === 3
+                                            ? "Registration Form Builder"
+                                            : currentStep === 4
+                                                ? "Banner Selection & Preview"
+                                                : "Review & Publish"
                             }
                         </p>
                     </div>
@@ -773,12 +677,11 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     <div className="flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1 overflow-x-auto max-w-full">
                         <button
                             type="button"
-                            onClick={() => setCurrentStep(1)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
-                                currentStep === 1
-                                    ? "bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
-                            }`}
+                            onClick={() => handleNavigateToStep(1)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 1
+                                ? "bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                }`}
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">1</span>
                             <span>Event Info</span>
@@ -786,12 +689,11 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                         <button
                             type="button"
-                            onClick={handleGoToStep2}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
-                                currentStep === 2
-                                    ? "bg-[#C084FC] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
-                            }`}
+                            onClick={() => handleNavigateToStep(2)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 2
+                                ? "bg-[#C084FC] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                }`}
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">2</span>
                             <span>Timeline ({stages.length})</span>
@@ -799,12 +701,11 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                         <button
                             type="button"
-                            onClick={handleGoToStep3}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
-                                currentStep === 3
-                                    ? "bg-[#A2FF86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
-                            }`}
+                            onClick={() => handleNavigateToStep(3)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 3
+                                ? "bg-[#A2FF86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                }`}
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">3</span>
                             <span>Form ({totalQuestions})</span>
@@ -812,12 +713,11 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                         <button
                             type="button"
-                            onClick={handleGoToStep4}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
-                                currentStep === 4
-                                    ? "bg-[#38BDF8] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
-                            }`}
+                            onClick={() => handleNavigateToStep(4)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 4
+                                ? "bg-[#38BDF8] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                }`}
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">4</span>
                             <span>Banner</span>
@@ -825,12 +725,11 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                         <button
                             type="button"
-                            onClick={handleGoToStep5}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
-                                currentStep === 5
-                                    ? "bg-[#FDE047] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
-                            }`}
+                            onClick={() => handleNavigateToStep(5)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 5
+                                ? "bg-[#FDE047] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                }`}
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">5</span>
                             <span>Review</span>
@@ -846,29 +745,27 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
                                 Step 1 of 5
                             </span>
-                            <h3 className="text-base sm:text-lg font-black text-black">Event Information & Schedule</h3>
+                            <h3 className="text-lg sm:text-xl md:text-2xl font-black text-black">Event Information & Schedule</h3>
                         </div>
-                        <span className="text-[11px] font-bold text-neutral-500 bg-white px-2.5 py-1 rounded-lg border border-black/30 shadow-[1px_1px_0px_#000]">
+                        <span className="text-[13px] font-bold text-neutral-500">
                             * Required Fields
                         </span>
                     </div>
 
                     {/* Scope Indicator Banner */}
                     <div
-                        className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
-                            form.scope === "PAN_INDIA"
-                                ? "bg-amber-50/70"
-                                : "bg-sky-50/80"
-                        }`}
+                        className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${form.scope === "PAN_INDIA"
+                            ? "bg-amber-50/70"
+                            : "bg-sky-50/80"
+                            }`}
                     >
                         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
                             <div
-                                className={`w-11 h-11 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0 ${
-                                    form.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#38BDF8] text-black"
-                                }`}
+                                className={`w-11 h-11 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0 ${form.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#38BDF8] text-black"
+                                    }`}
                             >
                                 {form.scope === "PAN_INDIA" ? (
                                     <Globe2 className="w-5 h-5 stroke-[2.5]" />
@@ -879,11 +776,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span
-                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] whitespace-nowrap shrink-0 ${
-                                            form.scope === "PAN_INDIA"
-                                                ? "bg-[#FF9933] text-black"
-                                                : "bg-[#38BDF8] text-black"
-                                        }`}
+                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] whitespace-nowrap shrink-0 ${form.scope === "PAN_INDIA"
+                                            ? "bg-[#FF9933] text-black"
+                                            : "bg-[#38BDF8] text-black"
+                                            }`}
                                     >
                                         {form.scope === "PAN_INDIA" ? "Pan India Reach" : "Campus Exclusive"}
                                     </span>
@@ -927,13 +823,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                         Event Title *
                                     </label>
                                     <span
-                                        className={`text-[10px] font-mono font-bold ${
-                                            form.title.length > 120
-                                                ? "text-rose-600"
-                                                : form.title.length >= 3
+                                        className={`text-[10px] font-mono font-bold ${form.title.length > 120
+                                            ? "text-rose-600"
+                                            : form.title.length >= 3
                                                 ? "text-emerald-700"
                                                 : "text-neutral-500"
-                                        }`}
+                                            }`}
                                     >
                                         {form.title.length}/120
                                     </span>
@@ -946,11 +841,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     onBlur={() => handleBlur("title")}
                                     maxLength={120}
                                     placeholder="e.g. Masterclass: System Design & Microservices Architecture"
-                                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${
-                                        touched.title && errors.title
-                                            ? "border-rose-500 bg-rose-50/50"
-                                            : "border-black focus:ring-2 focus:ring-[#a2ff86]"
-                                    }`}
+                                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${touched.title && errors.title
+                                        ? "border-rose-500 bg-rose-50/50"
+                                        : "border-black focus:ring-2 focus:ring-[#a2ff86]"
+                                        }`}
                                 />
                                 {touched.title && errors.title && (
                                     <p className="text-[11px] font-bold text-rose-600 mt-1.5 flex items-center gap-1">
@@ -964,7 +858,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
                                 <div className="flex items-center gap-2 pb-2 border-b border-black/10">
                                     <Calendar className="w-4 h-4 text-neutral-700" />
-                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                    <h4 className="text-sm font-black uppercase tracking-wider text-black">
                                         Schedule & Timings
                                     </h4>
                                 </div>
@@ -1027,7 +921,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
                                 <div className="flex items-center gap-2 pb-2 border-b border-black/10">
                                     <MapPin className="w-4 h-4 text-neutral-700" />
-                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                    <h4 className="text-sm font-black uppercase tracking-wider text-black">
                                         Location & Venue
                                     </h4>
                                 </div>
@@ -1080,14 +974,13 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                 <div className="flex items-center justify-between pb-2 border-b border-black/10">
                                     <div className="flex items-center gap-2">
                                         <Users className="w-4 h-4 text-neutral-800" />
-                                        <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                        <h4 className="text-sm font-black uppercase tracking-wider text-black">
                                             Registration Format
                                         </h4>
                                     </div>
                                     <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] ${
-                                            form.isTeamEvent ? "bg-[#a2ff86] text-black" : "bg-[#FAF6EE] text-neutral-700"
-                                        }`}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] ${form.isTeamEvent ? "bg-[#a2ff86] text-black" : "bg-[#FAF6EE] text-neutral-700"
+                                            }`}
                                     >
                                         {form.isTeamEvent ? "Team Event" : "Solo / Individual"}
                                     </span>
@@ -1097,11 +990,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setForm((prev) => ({ ...prev, isTeamEvent: false }))}
-                                        className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-1 ${
-                                            !form.isTeamEvent
-                                                ? "bg-[#FAF6EE] border-black shadow-[2px_2px_0px_#000] ring-2 ring-black"
-                                                : "bg-white border-black/30 hover:border-black text-neutral-600"
-                                        }`}
+                                        className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-1 ${!form.isTeamEvent
+                                            ? "bg-[#FAF6EE] border-black shadow-[2px_2px_0px_#000] ring-2 ring-black"
+                                            : "bg-white border-black/30 hover:border-black text-neutral-600"
+                                            }`}
                                     >
                                         <div className="flex items-center gap-1.5">
                                             <User className="w-4 h-4 text-black" />
@@ -1115,11 +1007,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setForm((prev) => ({ ...prev, isTeamEvent: true }))}
-                                        className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-1 ${
-                                            form.isTeamEvent
-                                                ? "bg-[#a2ff86]/30 border-black shadow-[2px_2px_0px_#000] ring-2 ring-black"
-                                                : "bg-white border-black/30 hover:border-black text-neutral-600"
-                                        }`}
+                                        className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col gap-1 ${form.isTeamEvent
+                                            ? "bg-[#a2ff86]/30 border-black shadow-[2px_2px_0px_#000] ring-2 ring-black"
+                                            : "bg-white border-black/30 hover:border-black text-neutral-600"
+                                            }`}
                                     >
                                         <div className="flex items-center gap-1.5">
                                             <Users className="w-4 h-4 text-black" />
@@ -1268,11 +1159,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     }
                                     onBlur={() => handleBlur("registrationUrl")}
                                     placeholder="https://forms.gle/... or https://unstop.com/..."
-                                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${
-                                        touched.registrationUrl && errors.registrationUrl
-                                            ? "border-rose-500 bg-rose-50/50"
-                                            : "border-black focus:ring-2 focus:ring-[#a2ff86]"
-                                    }`}
+                                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${touched.registrationUrl && errors.registrationUrl
+                                        ? "border-rose-500 bg-rose-50/50"
+                                        : "border-black focus:ring-2 focus:ring-[#a2ff86]"
+                                        }`}
                                 />
                                 {touched.registrationUrl && errors.registrationUrl ? (
                                     <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
@@ -1334,11 +1224,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setForm({ ...form, status: "published" })}
-                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                            form.status === "published"
-                                                ? "bg-emerald-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                        }`}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${form.status === "published"
+                                            ? "bg-emerald-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-black">Published</span>
@@ -1349,11 +1238,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setForm({ ...form, status: "draft" })}
-                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                            form.status === "draft"
-                                                ? "bg-amber-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                        }`}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${form.status === "draft"
+                                            ? "bg-amber-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-black">Draft</span>
@@ -1364,11 +1252,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setForm({ ...form, status: "completed" })}
-                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                            form.status === "completed"
-                                                ? "bg-sky-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                        }`}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${form.status === "completed"
+                                            ? "bg-sky-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-black">Completed</span>
@@ -1379,11 +1266,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setForm({ ...form, status: "cancelled" })}
-                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                            form.status === "cancelled"
-                                                ? "bg-rose-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                        }`}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${form.status === "cancelled"
+                                            ? "bg-rose-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-black">Cancelled</span>
@@ -1424,10 +1310,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
                                 Step 2 of 5
                             </span>
-                            <h3 className="text-base sm:text-lg font-black text-black">Event Timeline & Stage Architecture</h3>
+                            <h3 className="text-lg sm:text-xl md:text-2xl font-black text-black">Event Timeline & Stage Architecture</h3>
                             <p className="text-xs text-neutral-600 font-medium mt-0.5">
                                 Structure rounds, deadlines, participant eligibility, and submission requirements.
                             </p>
@@ -1474,7 +1360,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 3: REGISTRATION FORM BUILDER WORKSPACE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 3 && (
-                <div className="w-full">
+                <div className="w-full space-y-6">
                     <EventFormBuilderWorkspace
                         eventId={editingEvent?.id || "create-draft"}
                         club={{ id: clubId, name: clubName, logoUrl: clubLogoUrl }}
@@ -1502,6 +1388,27 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         onWizardBack={() => setCurrentStep(2)}
                         onWizardSubmit={() => handleGoToStep4()}
                     />
+
+                    {/* Step 3 Footer */}
+                    <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between pb-28">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentStep(2)}
+                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back: Timeline</span>
+                        </button>
+                        <OrbixButton
+                            type="button"
+                            onClick={handleGoToStep4}
+                            variant="lime"
+                            iconRight={<ArrowRight className="w-4 h-4" />}
+                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000] whitespace-nowrap shrink-0"
+                        >
+                            Next: Select Banner
+                        </OrbixButton>
+                    </div>
                 </div>
             )}
 
@@ -1512,10 +1419,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
                                 Step 4 of 5
                             </span>
-                            <h3 className="text-base sm:text-lg font-black text-black">Event Banner Studio & Live Preview</h3>
+                            <h3 className="text-lg sm:text-xl md:text-2xl font-black text-black">Event Banner Studio & Live Preview</h3>
                             <p className="text-xs text-neutral-600 font-medium mt-0.5">
                                 Select from 5 high-vibe developer SVG banners, or upload a custom flyer for this event.
                             </p>
@@ -1532,7 +1439,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             {/* 1. Custom Flyer Dropzone Space (At the upper side) */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                    <h4 className="text-sm font-black uppercase tracking-wider text-black">
                                         Upload Custom Event Flyer
                                     </h4>
                                     <span className="text-[10px] font-bold text-neutral-500">
@@ -1559,7 +1466,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <div className="pt-4 border-t-2 border-black/10 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                        <h4 className="text-sm font-black uppercase tracking-wider text-black">
                                             Or Choose from 5 Curated Developer Banners
                                         </h4>
                                         <p className="text-[11px] text-neutral-600 font-medium">
@@ -1590,11 +1497,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                                     setForm((prev) => ({ ...prev, coverImageUrl: banner.dataUrl }));
                                                     toast.success(`Selected banner: "${banner.title}"`);
                                                 }}
-                                                className={`group relative rounded-2xl border-2 cursor-pointer transition-all overflow-hidden ${
-                                                    isSelected
-                                                        ? "border-black shadow-[4px_4px_0px_#000] ring-4 ring-[#A2FF86] bg-neutral-900"
-                                                        : "border-black/50 hover:border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] bg-white hover:translate-y-[-1px]"
-                                                }`}
+                                                className={`group relative rounded-2xl border-2 cursor-pointer transition-all overflow-hidden ${isSelected
+                                                    ? "border-black shadow-[4px_4px_0px_#000] ring-4 ring-[#A2FF86] bg-neutral-900"
+                                                    : "border-black/50 hover:border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] bg-white hover:translate-y-[-1px]"
+                                                    }`}
                                             >
                                                 {/* Aspect 16:9 Banner Thumbnail */}
                                                 <div className="aspect-[16/9] w-full overflow-hidden bg-neutral-950 relative">
@@ -1620,7 +1526,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                                                 <div className="p-2.5 bg-white border-t-2 border-black flex items-center justify-between">
                                                     <div className="truncate">
-                                                        <h5 className="text-xs font-black text-black truncate">{banner.title}</h5>
+                                                        <h5 className="text-sm font-black text-black truncate">{banner.title}</h5>
                                                         <span className="text-[10px] font-bold text-neutral-500 truncate block">
                                                             {banner.category}
                                                         </span>
@@ -1638,7 +1544,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                         {/* 5 Columns: Live Catalog Card Preview */}
                         <div className="lg:col-span-5 space-y-3">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-1.5">
                                 <Sparkles className="w-4 h-4 text-amber-500" />
                                 <span>Real-Time Catalog Preview</span>
                             </h4>
@@ -1697,10 +1603,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
                                 Step 5 of 5
                             </span>
-                            <h3 className="text-base sm:text-lg font-black text-black">Pre-Flight Review & Launch Checklist</h3>
+                            <h3 className="text-lg sm:text-xl md:text-2xl font-black text-black">Pre-Flight Review & Launch Checklist</h3>
                             <p className="text-xs text-neutral-600 font-medium mt-0.5">
                                 Verify all event configurations, schedule milestones, and communication channels before publishing.
                             </p>
@@ -1712,7 +1618,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         stages={stages}
                         formQuestions={formStructure.sections.flatMap((s) => s.questions)}
                         collegeName={collegeName}
-                        onJumpToStep={(st) => setCurrentStep(st)}
+                        onJumpToStep={(st) => handleNavigateToStep(st as any)}
                     />
 
                     {/* Step 5 Footer */}
