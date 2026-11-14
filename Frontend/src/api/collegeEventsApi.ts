@@ -340,6 +340,28 @@ export async function updateApplicantStatus(
 }
 
 /**
+ * Club staff batch updates multiple applicant statuses at once (accept all or reject all)
+ */
+export async function batchUpdateApplicantStatus(
+    eventId: string,
+    registrationIds: string[],
+    status: "registered" | "rejected",
+    reviewNotes?: string
+): Promise<{ count: number; registrations: any[] }> {
+    const res = await fetch(`/api/club/events/${eventId}/applications/batch`, {
+        method: "PATCH",
+        headers: getAuthHeaders(true),
+        credentials: "include",
+        body: JSON.stringify({ registrationIds, status, reviewNotes }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to batch update applicant statuses.");
+    }
+    return { count: data.count || registrationIds.length, registrations: data.registrations || [] };
+}
+
+/**
  * URL for exporting applications as CSV
  */
 export function getEventApplicationsExportUrl(eventId: string): string {

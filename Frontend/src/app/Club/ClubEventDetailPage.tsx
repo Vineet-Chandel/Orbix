@@ -42,6 +42,7 @@ import { useToast } from "../../context/ToastContext";
 import {
     fetchClubEventApplications,
     updateApplicantStatus,
+    batchUpdateApplicantStatus,
     type ClubEventApplicantRow,
     type ClubEventApplicationsResponse,
 } from "../../api/collegeEventsApi";
@@ -381,6 +382,54 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             });
         } catch (err: any) {
             toast.error(err?.message || "Failed to update applicant status.");
+        } finally {
+            setUpdatingApplicantId(null);
+        }
+    };
+
+    // Handle Batch Applicant Status Change (Accept All or Reject All)
+    const handleBatchApplicantStatusChange = async (
+        applicants: ClubEventApplicantRow[],
+        nextStatus: "registered" | "rejected",
+        reviewNotes?: string
+    ) => {
+        if (!event || applicants.length === 0) return;
+        try {
+            const applicantIds = applicants.map((a) => a.id);
+            setUpdatingApplicantId("batch");
+            await batchUpdateApplicantStatus(event.id, applicantIds, nextStatus, reviewNotes);
+            const actionWord = nextStatus === "registered" ? "accepted" : "rejected";
+            toast.success(`Successfully ${actionWord} ${applicants.length} applicant(s).`);
+
+            const idSet = new Set(applicantIds);
+            setAppsData((prev) => {
+                if (!prev) return prev;
+                const updatedApps = prev.applications.map((a) =>
+                    idSet.has(a.id)
+                        ? {
+                              ...a,
+                              status: nextStatus,
+                          }
+                        : a
+                );
+                return {
+                    ...prev,
+                    summary: {
+                        ...prev.summary,
+                        total: updatedApps.length,
+                        pending: updatedApps.filter((a) => a.status === "pending").length,
+                        registered: updatedApps.filter((a) => a.status === "registered").length,
+                        attended: updatedApps.filter((a) => a.status === "attended").length,
+                        waitlisted: updatedApps.filter((a) => a.status === "waitlisted").length,
+                        rejected: updatedApps.filter((a) => a.status === "rejected").length,
+                        cancelled: updatedApps.filter((a) => a.status === "cancelled").length,
+                    },
+                    applications: updatedApps,
+                };
+            });
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to batch update applicants.");
+            throw err;
         } finally {
             setUpdatingApplicantId(null);
         }
@@ -1211,6 +1260,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     onSetColumnFilter={setColumnFilter}
                                     onStatusChange={handleApplicantStatusChange}
                                     updatingApplicantId={updatingApplicantId}
+                                    eventId={event?.id}
+                                    onBatchStatusChange={handleBatchApplicantStatusChange}
                                 />
                             )}
                         </div>

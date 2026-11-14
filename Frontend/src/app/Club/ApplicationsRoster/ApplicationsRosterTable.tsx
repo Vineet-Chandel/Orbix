@@ -11,8 +11,10 @@ import {
     ExternalLink,
     Paperclip,
     Users,
+    X,
 } from "lucide-react";
 import type { ClubEventApplicantRow } from "../../../api/collegeEventsApi";
+import { batchUpdateApplicantStatus } from "../../../api/collegeEventsApi";
 import type {
     TableColumnDefinition,
     ColumnFilterRule,
@@ -21,6 +23,8 @@ import type {
 } from "./types";
 import { ColumnFilterPopover } from "./ColumnFilterPopover";
 import { ApplicationDetailModal } from "./ApplicationDetailModal";
+import { BatchActionModal } from "./BatchActionModal";
+import { useToast } from "../../../context/ToastContext";
 
 interface ApplicationsRosterTableProps {
     applications: ClubEventApplicantRow[];
@@ -34,6 +38,12 @@ interface ApplicationsRosterTableProps {
         status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled"
     ) => Promise<void>;
     updatingApplicantId: string | null;
+    eventId?: string;
+    onBatchStatusChange?: (
+        applicants: ClubEventApplicantRow[],
+        status: "registered" | "rejected",
+        reviewNotes?: string
+    ) => Promise<void>;
 }
 
 export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = ({
@@ -45,13 +55,23 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
     onSetColumnFilter,
     onStatusChange,
     updatingApplicantId,
+    eventId,
+    onBatchStatusChange,
 }) => {
+    const toast = useToast();
+
     // Detail Inspection Modal State
     const [selectedApplicant, setSelectedApplicant] = useState<ClubEventApplicantRow | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     // Active column filter popover state
     const [openFilterColumnId, setOpenFilterColumnId] = useState<string | null>(null);
+
+    // Multi-Selection State for Bulk Actions
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [batchModalAction, setBatchModalAction] = useState<"registered" | "rejected" | null>(null);
+    const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+    const [isBatchUpdating, setIsBatchUpdating] = useState(false);
 
     const handleOpenDetail = (app: ClubEventApplicantRow) => {
         setSelectedApplicant(app);
@@ -64,9 +84,133 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
         return applications.find((a) => a.id === selectedApplicant.id) || selectedApplicant;
     }, [applications, selectedApplicant]);
 
+    // Selected applicants & counts by status
+    const selectedApplicants = useMemo(() => {
+        return applications.filter((a) => selectedIds.has(a.id));
+    }, [applications, selectedIds]);
+
+    const selectedCounts = useMemo(() => {
+        let pending = 0;
+        let accepted = 0;
+        let rejected = 0;
+        let other = 0;
+        for (const a of selectedApplicants) {
+            if (a.status === "pending") pending++;
+            else if (a.status === "registered" || a.status === "attended") accepted++;
+            else if (a.status === "rejected") rejected++;
+            else other++;
+        }
+        return {
+            total: selectedApplicants.length,
+            pending,
+            accepted,
+            rejected,
+            other,
+        };
+    }, [selectedApplicants]);
+
+    // Quick select lists from current visible applications
+    const pendingApps = useMemo(() => applications.filter((a) => a.status === "pending"), [applications]);
+    const acceptedApps = useMemo(
+        () => applications.filter((a) => a.status === "registered" || a.status === "attended"),
+        [applications]
+    );
+    const rejectedApps = useMemo(() => applications.filter((a) => a.status === "rejected"), [applications]);
+
+    // Core validation rule requested:
+    // "option of accept and reject both arises for the set of rows only when it is valid for all
+    //  if the no. of rows are already accepted all make it reject all
+    //  and if all rejected make all accepted"
+    const canAcceptAll = selectedCounts.total > 0 && selectedCounts.accepted === 0;
+    const canRejectAll = selectedCounts.total > 0 && selectedCounts.rejected === 0;
+
+    const handleToggleSelectRow = (id: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleToggleSelectAll = () => {
+        if (selectedIds.size === applications.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(applications.map((a) => a.id)));
+        }
+    };
+
+    const handleSelectAll = () => {
+        setSelectedIds(new Set(applications.map((a) => a.id)));
+    };
+
+    const handleSelectByStatus = (status: "pending" | "registered" | "rejected") => {
+        const matches = applications.filter((a) =>
+            status === "registered" ? a.status === "registered" || a.status === "attended" : a.status === status
+        );
+        setSelectedIds(new Set(matches.map((a) => a.id)));
+    };
+
+    const handleClearSelection = () => {
+        setSelectedIds(new Set());
+    };
+
+    const handleOpenBatchModal = (action: "registered" | "rejected") => {
+        setBatchModalAction(action);
+        setIsBatchModalOpen(true);
+    };
+
+    const handleConfirmBatchAction = async (reviewNotes?: string) => {
+        if (!batchModalAction || selectedApplicants.length === 0) return;
+        try {
+            setIsBatchUpdating(true);
+            if (onBatchStatusChange) {
+                await onBatchStatusChange(selectedApplicants, batchModalAction, reviewNotes);
+            } else if (eventId) {
+                await batchUpdateApplicantStatus(
+                    eventId,
+                    selectedApplicants.map((a) => a.id),
+                    batchModalAction,
+                    reviewNotes
+                );
+                // Also trigger individual state sync
+                for (const app of selectedApplicants) {
+                    await onStatusChange(app, batchModalAction);
+                }
+            } else {
+                for (const app of selectedApplicants) {
+                    await onStatusChange(app, batchModalAction);
+                }
+            }
+            setSelectedIds(new Set());
+            setIsBatchModalOpen(false);
+            setBatchModalAction(null);
+        } catch (err: any) {
+            console.error("Batch update failed:", err);
+            toast.error(err?.message || "Failed to batch update applicants.");
+        } finally {
+            setIsBatchUpdating(false);
+        }
+    };
+
     // Build the ordered table column definitions
     const columns: TableColumnDefinition[] = useMemo(() => {
-        // Group A: Review & Action (Sticky Column 1)
+        // Group 0: Row Selection Checkbox (Sticky Left 0)
+        const colSelect: TableColumnDefinition = {
+            id: "select",
+            label: "",
+            group: "select",
+            type: "select",
+            width: "w-[48px]",
+            minWidth: "min-w-[48px]",
+            sortable: false,
+            filterable: false,
+            sticky: "left",
+            stickyOffset: 0,
+        };
+
+        // Group A: Review & Action (Sticky Column 1, Left 48)
         const colAction: TableColumnDefinition = {
             id: "action",
             label: "REVIEW & ACTION",
@@ -77,10 +221,10 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
             sortable: false,
             filterable: false,
             sticky: "left",
-            stickyOffset: 0,
+            stickyOffset: 48,
         };
 
-        // Group B: Status (Sticky Column 2)
+        // Group B: Status (Sticky Column 2, Left 238)
         const colStatus: TableColumnDefinition = {
             id: "status",
             label: "STATUS",
@@ -92,7 +236,7 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
             filterable: true,
             options: ["Pending", "Accepted", "Checked-In", "Rejected", "Waitlisted"],
             sticky: "left",
-            stickyOffset: 190,
+            stickyOffset: 238,
         };
 
         // Group C: Student Personal Information (Exact sequence)
@@ -205,11 +349,30 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
             filterable: false,
         };
 
-        return [colAction, colStatus, ...groupCColumns, ...groupDColumns, colTimestamp];
+        return [colSelect, colAction, colStatus, ...groupCColumns, ...groupDColumns, colTimestamp];
     }, [dynamicQuestions]);
 
     const renderCellContent = (app: ClubEventApplicantRow, col: TableColumnDefinition) => {
-        // GROUP A: REVIEW & ACTION (Sticky Left 0)
+        // GROUP 0: SELECTION CHECKBOX (Sticky Left 0)
+        if (col.id === "select") {
+            const isSelected = selectedIds.has(app.id);
+            return (
+                <div
+                    className="flex items-center justify-center py-1"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelectRow(app.id)}
+                        className="w-4 h-4 rounded border-2 border-black accent-black cursor-pointer shadow-[1px_1px_0px_#000]"
+                        aria-label={`Select ${app.applicantName}`}
+                    />
+                </div>
+            );
+        }
+
+        // GROUP A: REVIEW & ACTION (Sticky Left 48)
         if (col.id === "action") {
             const isRowUpdating = updatingApplicantId === app.id;
             return (
@@ -570,21 +733,180 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
 
     return (
         <>
+            {/* TOP BULK SELECTION & ACTION TOOLBAR */}
+            <div className="p-3 bg-[#FAF6EE] border-b-2 border-black flex flex-wrap items-center justify-between gap-3 select-none">
+                {/* Left: Selection Counter & Status Badges */}
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-black text-[#FFE566] font-black text-xs flex items-center justify-center shadow-[1px_1px_0px_#000]">
+                            {selectedCounts.total}
+                        </span>
+                        <span className="text-xs font-black text-black">
+                            {selectedCounts.total === 0
+                                ? "No applicants selected"
+                                : `${selectedCounts.total} of ${applications.length} selected`}
+                        </span>
+                    </div>
+
+                    {selectedCounts.total > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap pl-2 border-l-2 border-black/20 text-[10px] font-black uppercase">
+                            {selectedCounts.pending > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-800 shadow-[0.5px_0.5px_0px_#000]">
+                                    {selectedCounts.pending} Pending
+                                </span>
+                            )}
+                            {selectedCounts.accepted > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-950 border border-emerald-800 shadow-[0.5px_0.5px_0px_#000]">
+                                    {selectedCounts.accepted} Accepted
+                                </span>
+                            )}
+                            {selectedCounts.rejected > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-950 border border-rose-800 shadow-[0.5px_0.5px_0px_#000]">
+                                    {selectedCounts.rejected} Rejected
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Right: Contextual Bulk Actions */}
+                <div className="flex items-center gap-2 flex-wrap">
+                    {selectedCounts.total === 0 ? (
+                        /* Quick select shortcuts when 0 selected */
+                        <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                            <span className="text-[11px] font-bold text-neutral-500 mr-1 hidden sm:inline">
+                                Quick select:
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleSelectAll}
+                                className="px-2.5 py-1 rounded-lg border border-black bg-white hover:bg-neutral-100 font-bold text-[11px] shadow-[1px_1px_0px_#000] cursor-pointer"
+                            >
+                                All ({applications.length})
+                            </button>
+                            {pendingApps.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectByStatus("pending")}
+                                    className="px-2.5 py-1 rounded-lg border border-amber-800 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-[11px] shadow-[1px_1px_0px_#000] cursor-pointer"
+                                >
+                                    Pending ({pendingApps.length})
+                                </button>
+                            )}
+                            {acceptedApps.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectByStatus("registered")}
+                                    className="px-2.5 py-1 rounded-lg border border-emerald-800 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-bold text-[11px] shadow-[1px_1px_0px_#000] cursor-pointer"
+                                >
+                                    Accepted ({acceptedApps.length})
+                                </button>
+                            )}
+                            {rejectedApps.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectByStatus("rejected")}
+                                    className="px-2.5 py-1 rounded-lg border border-rose-800 bg-rose-100 hover:bg-rose-200 text-rose-950 font-bold text-[11px] shadow-[1px_1px_0px_#000] cursor-pointer"
+                                >
+                                    Rejected ({rejectedApps.length})
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        /* Active Batch Actions */
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Accept All: Arises when valid for all selected (e.g. all pending or all rejected) */}
+                            {canAcceptAll && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenBatchModal("registered")}
+                                    disabled={isBatchUpdating}
+                                    className="px-3 py-1.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5 transition-all"
+                                    title={`Accept all ${selectedCounts.total} selected applicants`}
+                                >
+                                    <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Accept All ({selectedCounts.total})</span>
+                                </button>
+                            )}
+
+                            {/* Reject All: Arises when valid for all selected (e.g. all pending or all accepted) */}
+                            {canRejectAll && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenBatchModal("rejected")}
+                                    disabled={isBatchUpdating}
+                                    className="px-3 py-1.5 rounded-xl bg-[#ffb4b4] hover:bg-rose-200 text-rose-950 font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5 transition-all"
+                                    title={`Reject all ${selectedCounts.total} selected applicants`}
+                                >
+                                    <XCircle className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Reject All ({selectedCounts.total})</span>
+                                </button>
+                            )}
+
+                            {/* Incompatible mixed selection message */}
+                            {!canAcceptAll && !canRejectAll && (
+                                <span className="text-[11px] font-bold text-rose-800 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-400">
+                                    Selection has both Accepted and Rejected applicants. Choose a uniform group to proceed.
+                                </span>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={handleClearSelection}
+                                className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-neutral-700 hover:text-black font-bold text-xs border border-black shadow-[1px_1px_0px_#000] cursor-pointer"
+                            >
+                                Deselect All
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <div className="overflow-x-auto relative">
                 <table className="w-full text-left text-xs border-collapse">
                     <thead>
                         <tr className="bg-[#FAF6EE] border-b-2 border-black text-[11px] font-black uppercase text-neutral-700 tracking-wider">
                             {columns.map((col) => {
+                                const isSelect = col.id === "select";
                                 const isAction = col.id === "action";
                                 const isStatus = col.id === "status";
                                 const isSorted = sort?.columnId === col.id;
                                 const hasRule = !!columnFilters[col.id];
 
-                                const stickyStyle: React.CSSProperties = isAction
+                                const stickyStyle: React.CSSProperties = isSelect
                                     ? { position: "sticky", left: 0, zIndex: 30 }
-                                    : isStatus
-                                        ? { position: "sticky", left: 190, zIndex: 30 }
-                                        : {};
+                                    : isAction
+                                        ? { position: "sticky", left: 48, zIndex: 30 }
+                                        : isStatus
+                                            ? { position: "sticky", left: 238, zIndex: 30 }
+                                            : {};
+
+                                if (isSelect) {
+                                    const isAllSelected = applications.length > 0 && selectedIds.size === applications.length;
+                                    const isSomeSelected = selectedIds.size > 0 && selectedIds.size < applications.length;
+
+                                    return (
+                                        <th
+                                            key={col.id}
+                                            style={stickyStyle}
+                                            className="py-3 px-2 bg-[#FAF6EE] select-none text-center w-[48px] min-w-[48px]"
+                                        >
+                                            <div className="flex items-center justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isAllSelected}
+                                                    ref={(el) => {
+                                                        if (el) el.indeterminate = isSomeSelected;
+                                                    }}
+                                                    onChange={handleToggleSelectAll}
+                                                    className="w-4 h-4 rounded border-2 border-black accent-black cursor-pointer shadow-[1px_1px_0px_#000]"
+                                                    title={isAllSelected ? "Deselect all" : "Select all"}
+                                                    aria-label="Select all applicants"
+                                                />
+                                            </div>
+                                        </th>
+                                    );
+                                }
 
                                 return (
                                     <th
@@ -672,40 +994,114 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
                                 </td>
                             </tr>
                         ) : (
-                            applications.map((app) => (
-                                <tr
-                                    key={app.id}
-                                    className="group hover:bg-neutral-50/90 transition-colors"
-                                >
-                                    {columns.map((col) => {
-                                        const isAction = col.id === "action";
-                                        const isStatus = col.id === "status";
-                                        const stickyStyle: React.CSSProperties = isAction
-                                            ? { position: "sticky", left: 0, zIndex: 10 }
-                                            : isStatus
-                                                ? { position: "sticky", left: 190, zIndex: 10 }
-                                                : {};
+                            applications.map((app) => {
+                                const isRowSelected = selectedIds.has(app.id);
 
-                                        return (
-                                            <td
-                                                key={col.id}
-                                                style={stickyStyle}
-                                                className={`py-3 px-3.5 bg-white group-hover:bg-neutral-50 transition-colors ${col.minWidth || "min-w-[140px]"
-                                                    } ${col.width || ""} ${isStatus
-                                                        ? "border-r-2 border-black shadow-[3px_0px_0px_rgba(0,0,0,0.06)]"
-                                                        : ""
+                                return (
+                                    <tr
+                                        key={app.id}
+                                        className={`group transition-colors ${
+                                            isRowSelected
+                                                ? "bg-[#FFF9E6] hover:bg-[#FFF3CC]"
+                                                : "hover:bg-neutral-50/90"
+                                        }`}
+                                    >
+                                        {columns.map((col) => {
+                                            const isSelect = col.id === "select";
+                                            const isAction = col.id === "action";
+                                            const isStatus = col.id === "status";
+                                            const stickyStyle: React.CSSProperties = isSelect
+                                                ? { position: "sticky", left: 0, zIndex: 10 }
+                                                : isAction
+                                                    ? { position: "sticky", left: 48, zIndex: 10 }
+                                                    : isStatus
+                                                        ? { position: "sticky", left: 238, zIndex: 10 }
+                                                        : {};
+
+                                            return (
+                                                <td
+                                                    key={col.id}
+                                                    style={stickyStyle}
+                                                    className={`py-3 px-3.5 transition-colors ${
+                                                        isRowSelected
+                                                            ? "bg-[#FFF9E6] group-hover:bg-[#FFF3CC]"
+                                                            : "bg-white group-hover:bg-neutral-50"
+                                                    } ${col.minWidth || "min-w-[140px]"} ${col.width || ""} ${
+                                                        isStatus
+                                                            ? "border-r-2 border-black shadow-[3px_0px_0px_rgba(0,0,0,0.06)]"
+                                                            : ""
                                                     }`}
-                                            >
-                                                {renderCellContent(app, col)}
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))
+                                                >
+                                                    {renderCellContent(app, col)}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
             </div>
+
+            {/* FLOATING BOTTOM ACTION DOCK (Visible on Scroll when Items are Selected) */}
+            {selectedCounts.total > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[95vw] sm:max-w-xl w-full px-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+                    <div className="p-3 sm:p-3.5 bg-[#FAF6EE] border-3 border-black shadow-[6px_6px_0px_#000] rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-7 h-7 rounded-xl bg-black text-[#FFE566] font-black text-xs flex items-center justify-center shadow-[1px_1px_0px_#000] shrink-0">
+                                {selectedCounts.total}
+                            </span>
+                            <div className="min-w-0">
+                                <span className="font-black text-xs text-black block truncate">
+                                    {selectedCounts.total} Applicant{selectedCounts.total > 1 ? "s" : ""} Selected
+                                </span>
+                                <span className="text-[10px] text-neutral-600 font-bold truncate block">
+                                    {selectedCounts.pending > 0 && `${selectedCounts.pending} Pending `}
+                                    {selectedCounts.accepted > 0 && `${selectedCounts.accepted} Accepted `}
+                                    {selectedCounts.rejected > 0 && `${selectedCounts.rejected} Rejected`}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                            {canAcceptAll && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenBatchModal("registered")}
+                                    disabled={isBatchUpdating}
+                                    className="px-3 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                >
+                                    <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Accept All ({selectedCounts.total})</span>
+                                </button>
+                            )}
+
+                            {canRejectAll && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenBatchModal("rejected")}
+                                    disabled={isBatchUpdating}
+                                    className="px-3 py-2 rounded-xl bg-[#ffb4b4] hover:bg-rose-200 text-rose-950 font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                >
+                                    <XCircle className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Reject All ({selectedCounts.total})</span>
+                                </button>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={handleClearSelection}
+                                className="p-2 rounded-xl bg-white hover:bg-neutral-100 text-black border border-black shadow-[1px_1px_0px_#000] cursor-pointer"
+                                title="Clear selection"
+                                aria-label="Clear selection"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Application Detail / Inspection Modal */}
             <ApplicationDetailModal
@@ -715,6 +1111,19 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
                 onClose={() => setIsDetailModalOpen(false)}
                 onStatusChange={onStatusChange}
                 isUpdating={updatingApplicantId === activeSelectedApplicant?.id}
+            />
+
+            {/* Batch Action Confirmation Modal */}
+            <BatchActionModal
+                isOpen={isBatchModalOpen}
+                onClose={() => {
+                    setIsBatchModalOpen(false);
+                    setBatchModalAction(null);
+                }}
+                actionType={batchModalAction}
+                selectedApplicants={selectedApplicants}
+                onConfirm={handleConfirmBatchAction}
+                isUpdating={isBatchUpdating}
             />
         </>
     );

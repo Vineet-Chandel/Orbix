@@ -3,5 +3,6 @@ export * from "./useApplicationsFilterSort";
 export * from "./ColumnFilterPopover";
 export * from "./ActiveFiltersBar";
 export * from "./ApplicationDetailModal";
+export * from "./BatchActionModal";
 export * from "./exportRosterUtils";
 export * from "./ApplicationsRosterTable";

@@ -3965,6 +3965,197 @@ clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount
 });
 
 /**
+ * PATCH /api/club/events/:eventId/applications/batch
+ * Bulk updates multiple applicant statuses at once (accept all or reject all).
+ */
+clubRouter.patch("/events/:eventId/applications/batch", authenticate, requireClubAccount, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
+
+        const { registrationIds, status, reviewNotes } = req.body;
+        const userId = req.user!.id;
+
+        if (!Array.isArray(registrationIds) || registrationIds.length === 0) {
+            return res.status(400).json({ success: false, message: "registrationIds array is required and cannot be empty." });
+        }
+
+        const validIds = registrationIds.filter((id) =>
+            typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+        );
+        if (validIds.length === 0) {
+            return res.status(400).json({ success: false, message: "No valid UUIDs found in registrationIds." });
+        }
+
+        const allowedStatuses = ["registered", "rejected"];
+        if (!status || !allowedStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Valid batch status is required: 'registered' (Accept) or 'rejected' (Reject).`,
+            });
+        }
+
+        const eventRes = await query(
+            `SELECT e.id, e.club_id, e.title, vc.name AS "clubName", vc.slug AS "clubSlug", e.starts_at, e.venue_or_location
+             FROM club_events e
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE e.id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        if (!eventRes.rows[0]) return res.status(404).json({ success: false, message: "Event not found." });
+
+        const staffClub = await getStaffClub(userId, eventRes.rows[0].club_id);
+        if (!staffClub) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        // Enforce Minor Protection when accepting in batch
+        let eligibleIds = validIds;
+        if (status === "registered") {
+            const consentCheck = await query(
+                `SELECT id, applicant_name
+                 FROM club_event_registrations
+                 WHERE id = ANY($1::uuid[]) AND event_id = $2::uuid
+                   AND is_attendee_under_18 = true
+                   AND guardian_consent_status != 'verified';`,
+                [validIds, eventId]
+            );
+            if (consentCheck.rows.length > 0) {
+                const blockedNames = consentCheck.rows.map((r: any) => r.applicant_name).join(", ");
+                const blockedSet = new Set(consentCheck.rows.map((r: any) => r.id));
+                eligibleIds = validIds.filter((id) => !blockedSet.has(id));
+                if (eligibleIds.length === 0) {
+                    return res.status(400).json({
+                        success: false,
+                        code: "GUARDIAN_CONSENT_REQUIRED",
+                        message: `Cannot accept selected applicant(s) under 18 years without verified guardian consent: ${blockedNames}.`,
+                    });
+                }
+            }
+        }
+
+        const updateRes = await query(
+            `UPDATE club_event_registrations
+             SET status = $1::varchar,
+                 reviewed_at = NOW(),
+                 reviewed_by_user_id = $2::uuid,
+                 review_notes = COALESCE($3, review_notes),
+                 updated_at = NOW()
+             WHERE id = ANY($4::uuid[]) AND event_id = $5::uuid
+             RETURNING id, user_id AS "userId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                       department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                       status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
+            [status, userId, reviewNotes || null, eligibleIds, eventId]
+        );
+
+        const updatedRows = updateRes.rows;
+
+        // Background dispatch notifications for updated applicants
+        try {
+            const userIds = updatedRows.map((r: any) => r.userId).filter(Boolean);
+            if (userIds.length > 0) {
+                const usersRes = await query(`SELECT id, username FROM users WHERE id = ANY($1::uuid[]);`, [userIds]);
+                const userMap = new Map(usersRes.rows.map((u: any) => [u.id, u.username]));
+
+                const eventTitle = eventRes.rows[0].title;
+                const clubName = eventRes.rows[0].clubName;
+                const clubSlug = eventRes.rows[0].clubSlug;
+                const startsAt = eventRes.rows[0].starts_at;
+                const venueOrLocation = eventRes.rows[0].venue_or_location;
+
+                for (const updatedRow of updatedRows) {
+                    const username = userMap.get(updatedRow.userId);
+                    if (!username) continue;
+
+                    if (status === "registered") {
+                        await query(
+                            `INSERT INTO user_notifications (
+                                user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                            ) VALUES (
+                                $1::uuid, $1::uuid, $2,
+                                'Application Accepted! 🎉',
+                                $3,
+                                'club_event',
+                                'application_approved',
+                                $4::jsonb,
+                                $5,
+                                false,
+                                NOW()
+                            ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                            [
+                                updatedRow.userId,
+                                username,
+                                `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now ready!`,
+                                JSON.stringify({
+                                    eventId,
+                                    registrationId: updatedRow.id,
+                                    ticketCode: updatedRow.ticketCode,
+                                    eventTitle,
+                                    clubName,
+                                    clubSlug: clubSlug || "",
+                                    startsAt,
+                                    venueOrLocation,
+                                    applicantName: updatedRow.applicantName,
+                                    rollNumber: updatedRow.rollNumber,
+                                    department: updatedRow.department,
+                                    action: "application_approved",
+                                    status: "registered",
+                                }),
+                                `app-approved-${updatedRow.id}-${Date.now()}`,
+                            ]
+                        ).catch(() => {});
+                    } else if (status === "rejected") {
+                        await query(
+                            `INSERT INTO user_notifications (
+                                user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                            ) VALUES (
+                                $1::uuid, $1::uuid, $2,
+                                'Application Update',
+                                $3,
+                                'club_event',
+                                'application_rejected',
+                                $4::jsonb,
+                                $5,
+                                false,
+                                NOW()
+                            ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                            [
+                                updatedRow.userId,
+                                username,
+                                `Your application for "${eventTitle}" was not selected by ${clubName}.`,
+                                JSON.stringify({
+                                    eventId,
+                                    registrationId: updatedRow.id,
+                                    eventTitle,
+                                    clubName,
+                                    action: "application_rejected",
+                                    status: "rejected",
+                                }),
+                                `app-rejected-${updatedRow.id}-${Date.now()}`,
+                            ]
+                        ).catch(() => {});
+                    }
+                }
+            }
+        } catch (notifErr) {
+            console.warn("Batch applicant notifications warning (non-fatal):", notifErr);
+        }
+
+        const actionWord = status === "registered" ? "accepted" : "rejected";
+        return res.json({
+            success: true,
+            message: `Successfully ${actionWord} ${updatedRows.length} applicant(s).`,
+            count: updatedRows.length,
+            registrations: updatedRows,
+        });
+    } catch (err: any) {
+        console.error("Batch update applicant status error:", err);
+        return res.status(500).json({ success: false, message: "Failed to batch update applicant status." });
+    }
+});
+
+/**
  * PATCH /api/club/events/:eventId/applications/:registrationId
  * Updates status of an applicant (pending, registered, attended, waitlisted, rejected, cancelled).
  */
