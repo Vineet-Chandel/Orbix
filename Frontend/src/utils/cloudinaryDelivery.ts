@@ -1,15 +1,18 @@
 /**
  * Cloudinary Delivery & Performance Optimization Helper
- * Ensures responsive dimensions, modern formats (WebP/AVIF via f_auto), and dynamic compression (q_auto).
+ * Ensures responsive dimensions, modern formats (WebP/AVIF via f_auto), dynamic compression (q_auto),
+ * responsive srcset generation, and focal gravity delivery.
  * Eliminates downloading multi-megabyte raw assets when displaying thumbnails or previews.
  */
 
 export interface CloudinaryTransformOptions {
     width?: number;
     height?: number;
-    crop?: "fill" | "limit" | "fit" | "thumb" | "scale";
+    crop?: "fill" | "limit" | "fit" | "thumb" | "scale" | "lfill" | "mfit";
     quality?: "auto" | "auto:good" | "auto:eco" | "auto:low" | number;
     format?: "auto" | "webp" | "avif" | "png" | "jpg";
+    gravity?: "auto" | "face" | "center" | "north" | "south" | "east" | "west" | string;
+    dpr?: number | "auto";
 }
 
 /**
@@ -33,12 +36,16 @@ export function getOptimizedCloudinaryUrl(
         crop = width && height ? "fill" : "limit",
         quality = "auto",
         format = "auto",
+        gravity,
+        dpr = "auto",
     } = options || {};
 
     const transforms: string[] = [`f_${format}`, `q_${quality}`];
+    if (dpr) transforms.push(`dpr_${dpr}`);
     if (width) transforms.push(`w_${width}`);
     if (height) transforms.push(`h_${height}`);
-    if (width || height) transforms.push(`c_${crop}`);
+    if (crop) transforms.push(`c_${crop}`);
+    if (gravity) transforms.push(`g_${gravity}`);
 
     const transformStr = transforms.join(",");
 
@@ -59,10 +66,53 @@ export function getOptimizedCloudinaryUrl(
 }
 
 /**
+ * Generates an HTML srcset string for responsive <img> or <picture> elements.
+ * e.g. "url_320 320w, url_640 640w, url_1200 1200w"
+ */
+export function getCloudinarySrcSet(
+    url: string | null | undefined,
+    widths: number[] = [320, 640, 960, 1200, 1600],
+    options?: Omit<CloudinaryTransformOptions, "width">
+): string {
+    if (!url) return "";
+    return widths
+        .map((w) => `${getOptimizedCloudinaryUrl(url, { ...options, width: w })} ${w}w`)
+        .join(", ");
+}
+
+/**
  * Optimized header banner delivery (standard 1200px max width with q_auto, f_auto)
  */
 export function getCloudinaryBannerUrl(url?: string | null): string {
     return getOptimizedCloudinaryUrl(url, { width: 1200, crop: "limit", quality: "auto" });
+}
+
+/**
+ * Optimized Event Banner delivery matching Orbix 2.4:1 aspect ratio
+ */
+export function getCloudinaryEventBannerUrl(
+    url?: string | null,
+    variant: "card" | "hero" | "pass" = "hero"
+): string {
+    if (variant === "card") {
+        return getOptimizedCloudinaryUrl(url, { width: 640, height: 266, crop: "fit", quality: "auto" });
+    }
+    if (variant === "pass") {
+        return getOptimizedCloudinaryUrl(url, { width: 480, height: 200, crop: "fit", quality: "auto" });
+    }
+    return getOptimizedCloudinaryUrl(url, { width: 1440, height: 600, crop: "fit", quality: "auto" });
+}
+
+/**
+ * Optimized Club Header Banner delivery (2.6:1 wide hero)
+ */
+export function getCloudinaryClubBannerUrl(
+    url?: string | null,
+    breakpoint: "mobile" | "desktop" = "desktop"
+): string {
+    const width = breakpoint === "mobile" ? 640 : 1440;
+    const height = breakpoint === "mobile" ? 246 : 553;
+    return getOptimizedCloudinaryUrl(url, { width, height, crop: "fill", quality: "auto", gravity: "auto" });
 }
 
 /**
@@ -73,8 +123,14 @@ export function getCloudinaryThumbnailUrl(url?: string | null, size = 300): stri
 }
 
 /**
- * Optimized avatar delivery (150px square crop)
+ * Optimized avatar delivery with automatic facial gravity detection (g_face)
  */
-export function getCloudinaryAvatarUrl(url?: string | null): string {
-    return getOptimizedCloudinaryUrl(url, { width: 150, height: 150, crop: "thumb", quality: "auto" });
+export function getCloudinaryAvatarUrl(url?: string | null, size = 160): string {
+    return getOptimizedCloudinaryUrl(url, {
+        width: size,
+        height: size,
+        crop: "thumb",
+        gravity: "face",
+        quality: "auto",
+    });
 }
