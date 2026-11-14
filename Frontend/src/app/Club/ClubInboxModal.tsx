@@ -14,6 +14,12 @@ import {
     Send,
     ExternalLink,
     AlertTriangle,
+    CheckSquare,
+    Trash2,
+    Check,
+    MoreVertical,
+    ArrowLeft,
+    MailOpen,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "../../context/ToastContext";
@@ -87,6 +93,35 @@ export default function ClubInboxModal({
     const [blockConfirmUser, setBlockConfirmUser] = useState<{ id: string; username: string; name: string } | null>(null);
     const [blockReason, setBlockReason] = useState("");
     const [isExecutingModeration, setIsExecutingModeration] = useState(false);
+
+    // Multi-selection state
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedConvIds, setSelectedConvIds] = useState<Set<string>>(new Set());
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        conv: ConversationSummary;
+    } | null>(null);
+
+    // Close context menu on outside click or escape
+    useEffect(() => {
+        if (!contextMenu) return;
+        const handleClose = () => setContextMenu(null);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setContextMenu(null);
+        };
+        window.addEventListener("click", handleClose);
+        window.addEventListener("contextmenu", handleClose);
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("click", handleClose);
+            window.removeEventListener("contextmenu", handleClose);
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [contextMenu]);
 
     // Fetch conversation list
     const fetchConversations = async (tab = activeTab) => {
@@ -272,6 +307,152 @@ export default function ClubInboxModal({
         }
     };
 
+    // Right click context menu handler
+    const handleContextMenu = (e: React.MouseEvent, conv: ConversationSummary) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const menuWidth = 200;
+        const menuHeight = 160;
+        const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+        const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+        setContextMenu({ x: Math.max(10, x), y: Math.max(10, y), conv });
+    };
+
+    // Toggle Read / Unread for single conversation
+    const handleToggleReadSingle = async (conv: ConversationSummary) => {
+        setContextMenu(null);
+        const newReadState = !conv.isReadByClub;
+        setConversations((prev) =>
+            prev.map((c) => (c.id === conv.id ? { ...c, isReadByClub: newReadState } : c))
+        );
+        try {
+            await fetch(`/api/club/inbox/${conv.id}/read`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ isRead: newReadState }),
+            });
+            toast.info(newReadState ? "Marked as read." : "Marked as unread.");
+            const unread = conversations
+                .map((c) => (c.id === conv.id ? { ...c, isReadByClub: newReadState } : c))
+                .filter((c) => !c.isReadByClub && !c.isMuted).length;
+            if (onUnreadCountChange) onUnreadCountChange(unread);
+        } catch {
+            toast.error("Failed to update status.");
+        }
+    };
+
+    // Delete single conversation from context menu
+    const handleDeleteSingle = async (conv: ConversationSummary) => {
+        setContextMenu(null);
+        setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+        if (selectedConvId === conv.id) {
+            setSelectedConvId(null);
+            setSelectedConvDetails(null);
+            setMessages([]);
+        }
+        try {
+            const res = await fetch(`/api/club/inbox/${conv.id}`, {
+                method: "DELETE",
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error("Failed");
+            toast.info("Conversation deleted.");
+            const unread = conversations
+                .filter((c) => c.id !== conv.id)
+                .filter((c) => !c.isReadByClub && !c.isMuted).length;
+            if (onUnreadCountChange) onUnreadCountChange(unread);
+        } catch {
+            toast.error("Failed to delete conversation.");
+            fetchConversations(activeTab);
+        }
+    };
+
+    // Enter multi-select mode starting with this conversation
+    const handleStartSelectWithConv = (conv: ConversationSummary) => {
+        setContextMenu(null);
+        setIsSelectionMode(true);
+        setSelectedConvIds(new Set([conv.id]));
+    };
+
+    // Toggle multi-select of a conversation
+    const handleToggleSelectConv = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSelectedConvIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    // Select All / Deselect All visible conversations
+    const handleToggleSelectAll = (visibleIds: string[]) => {
+        const isAllSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedConvIds.has(id));
+        if (isAllSelected) {
+            setSelectedConvIds(new Set());
+        } else {
+            setSelectedConvIds(new Set(visibleIds));
+        }
+    };
+
+    // Bulk Mark as Read / Unread
+    const handleBulkMarkRead = async (isRead: boolean) => {
+        if (selectedConvIds.size === 0) return;
+        const ids = Array.from(selectedConvIds);
+        setConversations((prev) =>
+            prev.map((c) => (selectedConvIds.has(c.id) ? { ...c, isReadByClub: isRead } : c))
+        );
+        try {
+            await fetch("/api/club/inbox/bulk-read", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ conversationIds: ids, isRead }),
+            });
+            toast.info(isRead ? `${ids.length} marked as read.` : `${ids.length} marked as unread.`);
+            const unread = conversations
+                .map((c) => (selectedConvIds.has(c.id) ? { ...c, isReadByClub: isRead } : c))
+                .filter((c) => !c.isReadByClub && !c.isMuted).length;
+            if (onUnreadCountChange) onUnreadCountChange(unread);
+        } catch {
+            toast.error("Failed to update conversations.");
+        }
+    };
+
+    // Bulk Delete
+    const handleBulkDelete = async () => {
+        if (selectedConvIds.size === 0) return;
+        const ids = Array.from(selectedConvIds);
+        setIsBulkDeleting(true);
+        try {
+            setConversations((prev) => prev.filter((c) => !selectedConvIds.has(c.id)));
+            if (selectedConvId && selectedConvIds.has(selectedConvId)) {
+                setSelectedConvId(null);
+                setSelectedConvDetails(null);
+                setMessages([]);
+            }
+            await fetch("/api/club/inbox/bulk-delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ conversationIds: ids }),
+            });
+            toast.success(`${ids.length} inquiry/inquiries deleted.`);
+            setSelectedConvIds(new Set());
+            setIsSelectionMode(false);
+            const unread = conversations
+                .filter((c) => !selectedConvIds.has(c.id))
+                .filter((c) => !c.isReadByClub && !c.isMuted).length;
+            if (onUnreadCountChange) onUnreadCountChange(unread);
+        } catch {
+            toast.error("Failed to delete conversations.");
+            fetchConversations(activeTab);
+        } finally {
+            setIsBulkDeleting(false);
+        }
+    };
+
     const { handleBackdropClick } = useModalDismiss({
         isOpen: isOpen && !blockConfirmUser,
         onClose,
@@ -372,15 +553,32 @@ export default function ClubInboxModal({
                         </button>
                     </div>
 
-                    <div className="relative max-w-xs w-full">
-                        <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search sender, subject..."
-                            className="w-full pl-9 pr-3 py-1.5 rounded-xl border-2 border-black bg-white text-xs font-bold text-black placeholder:text-neutral-400 focus:outline-none shadow-[2px_2px_0px_#000]"
-                        />
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="relative max-w-xs w-full">
+                            <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search sender, subject..."
+                                className="w-full pl-9 pr-3 py-1.5 rounded-xl border-2 border-black bg-white text-xs font-bold text-black placeholder:text-neutral-400 focus:outline-none shadow-[2px_2px_0px_#000]"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsSelectionMode(!isSelectionMode);
+                                if (isSelectionMode) setSelectedConvIds(new Set());
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                                isSelectionMode
+                                    ? "bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "bg-white text-black hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000]"
+                            }`}
+                        >
+                            <CheckSquare className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span className="hidden xs:inline">{isSelectionMode ? "Cancel" : "Select"}</span>
+                        </button>
                     </div>
                 </div>
 
@@ -388,10 +586,70 @@ export default function ClubInboxModal({
                 <div className="flex-1 flex overflow-hidden">
                     {/* Left Pane: Conversation List */}
                     <div
-                        className={`w-full sm:w-80 md:w-96 border-r-2 border-black bg-white flex flex-col overflow-y-auto ${
-                            selectedConvId ? "hidden sm:flex" : "flex"
+                        className={`w-full lg:w-96 border-r-2 border-black bg-white flex flex-col overflow-y-auto ${
+                            selectedConvId ? "hidden lg:flex" : "flex"
                         }`}
                     >
+                        {/* Multi-Select Action Toolbar */}
+                        {isSelectionMode && (
+                            <div className="p-3 bg-amber-50 border-b-2 border-black flex items-center justify-between gap-2 flex-wrap shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleSelectAll(filteredConversations.map((c) => c.id))}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                                    >
+                                        <CheckSquare className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>
+                                            {filteredConversations.length > 0 && filteredConversations.every((c) => selectedConvIds.has(c.id))
+                                                ? "Deselect All"
+                                                : "Select All"}
+                                        </span>
+                                    </button>
+                                    <span className="text-xs font-black text-black">
+                                        {selectedConvIds.size} selected
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleBulkMarkRead(true)}
+                                        disabled={selectedConvIds.size === 0}
+                                        className="px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] disabled:opacity-50 cursor-pointer"
+                                    >
+                                        Mark Read
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleBulkMarkRead(false)}
+                                        disabled={selectedConvIds.size === 0}
+                                        className="px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] disabled:opacity-50 cursor-pointer"
+                                    >
+                                        Mark Unread
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleBulkDelete}
+                                        disabled={selectedConvIds.size === 0 || isBulkDeleting}
+                                        className="px-2.5 py-1 rounded-xl bg-rose-500 hover:bg-rose-600 text-white border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Delete</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsSelectionMode(false);
+                                            setSelectedConvIds(new Set());
+                                        }}
+                                        className="px-2.5 py-1 rounded-xl bg-black text-white border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {loadingList ? (
                             <div className="p-8 flex items-center justify-center text-black">
                                 <OrbixLoader size="sm" />
@@ -429,17 +687,40 @@ export default function ClubInboxModal({
                                         <button
                                             key={conv.id}
                                             type="button"
-                                            onClick={() => loadConversation(conv.id)}
+                                            onClick={() => {
+                                                if (isSelectionMode) {
+                                                    handleToggleSelectConv(conv.id);
+                                                } else {
+                                                    loadConversation(conv.id);
+                                                }
+                                            }}
+                                            onContextMenu={(e) => handleContextMenu(e, conv)}
                                             className={`w-full p-4 text-left transition-colors cursor-pointer flex items-start gap-3 relative ${
-                                                isSelected
+                                                isSelectionMode && selectedConvIds.has(conv.id)
+                                                    ? "bg-amber-100/80"
+                                                    : isSelected
                                                     ? "bg-[#FFE566] text-black"
                                                     : !conv.isReadByClub
                                                     ? "bg-amber-50/70 hover:bg-neutral-100"
                                                     : "hover:bg-neutral-50"
                                             }`}
                                         >
+                                            {/* Checkbox in selection mode */}
+                                            {isSelectionMode && (
+                                                <div
+                                                    onClick={(e) => handleToggleSelectConv(conv.id, e)}
+                                                    className={`w-5 h-5 rounded-lg border-2 border-black flex items-center justify-center shrink-0 self-center transition-colors cursor-pointer ${
+                                                        selectedConvIds.has(conv.id)
+                                                            ? "bg-black text-white shadow-[1px_1px_0px_#000]"
+                                                            : "bg-white hover:bg-neutral-100"
+                                                    }`}
+                                                >
+                                                    {selectedConvIds.has(conv.id) && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                                </div>
+                                            )}
+
                                             {/* Unread dot */}
-                                            {!conv.isReadByClub && !isSelected && (
+                                            {!conv.isReadByClub && !isSelected && !isSelectionMode && (
                                                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border border-black absolute top-4 right-4" />
                                             )}
 
@@ -453,17 +734,30 @@ export default function ClubInboxModal({
                                             </div>
 
                                             {/* Details */}
-                                            <div className="flex-1 min-w-0 pr-2">
+                                            <div className="flex-1 min-w-0 pr-1">
                                                 <div className="flex items-center justify-between gap-1 mb-0.5">
                                                     <span className="font-black text-xs truncate text-black">
                                                         {displayName}
                                                     </span>
-                                                    <span className="text-[10px] font-bold text-neutral-500 shrink-0">
-                                                        {new Date(conv.lastMessageAt).toLocaleDateString(undefined, {
-                                                            month: "short",
-                                                            day: "numeric",
-                                                        })}
-                                                    </span>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <span className="text-[10px] font-bold text-neutral-500">
+                                                            {new Date(conv.lastMessageAt).toLocaleDateString(undefined, {
+                                                                month: "short",
+                                                                day: "numeric",
+                                                            })}
+                                                        </span>
+                                                        {!isSelectionMode && (
+                                                            <span
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onClick={(e) => handleContextMenu(e, conv)}
+                                                                className="p-1 rounded-lg hover:bg-black/10 transition-colors text-neutral-600 hover:text-black cursor-pointer inline-flex items-center justify-center"
+                                                                title="Options"
+                                                            >
+                                                                <MoreVertical className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 <div className="flex items-center gap-1.5 mb-1">
@@ -497,7 +791,7 @@ export default function ClubInboxModal({
                     </div>
 
                     {/* Right Pane: Selected Conversation Thread */}
-                    <div className={`flex-1 flex flex-col bg-[#FAF6EE] ${!selectedConvId ? "hidden sm:flex" : "flex"}`}>
+                    <div className={`flex-1 flex flex-col bg-[#FAF6EE] ${!selectedConvId ? "hidden lg:flex" : "flex"}`}>
                         {!selectedConvId ? (
                             <div className="my-auto text-center p-8 space-y-3">
                                 <div className="w-14 h-14 rounded-3xl bg-white border-2 border-black mx-auto flex items-center justify-center text-neutral-400 shadow-[4px_4px_0px_#000]">
@@ -519,9 +813,10 @@ export default function ClubInboxModal({
                                             <button
                                                 type="button"
                                                 onClick={() => setSelectedConvId(null)}
-                                                className="sm:hidden p-1.5 rounded-lg border-2 border-black"
+                                                className="lg:hidden px-2.5 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 flex items-center gap-1.5 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
                                             >
-                                                <X className="w-4 h-4" />
+                                                <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Back</span>
                                             </button>
 
                                             <div className="w-10 h-10 rounded-2xl border-2 border-black bg-emerald-200 overflow-hidden font-black text-xs flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
@@ -698,6 +993,50 @@ export default function ClubInboxModal({
                     </div>
                 </div>
             </div>
+
+            {/* Context Menu Popup */}
+            {contextMenu && (
+                <div
+                    className="fixed z-[999] bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] p-1.5 min-w-[190px] animate-in fade-in zoom-in-95 duration-100"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        type="button"
+                        onClick={() => handleToggleReadSingle(contextMenu.conv)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                    >
+                        {contextMenu.conv.isReadByClub ? (
+                            <>
+                                <Mail className="w-4 h-4 stroke-[2.5] text-amber-600" />
+                                <span>Mark as Unread</span>
+                            </>
+                        ) : (
+                            <>
+                                <MailOpen className="w-4 h-4 stroke-[2.5] text-emerald-600" />
+                                <span>Mark as Read</span>
+                            </>
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleStartSelectWithConv(contextMenu.conv)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                    >
+                        <CheckSquare className="w-4 h-4 stroke-[2.5] text-sky-600" />
+                        <span>Select Message</span>
+                    </button>
+                    <div className="my-1 border-t-2 border-black/10" />
+                    <button
+                        type="button"
+                        onClick={() => handleDeleteSingle(contextMenu.conv)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
+                    >
+                        <Trash2 className="w-4 h-4 stroke-[2.5]" />
+                        <span>Delete</span>
+                    </button>
+                </div>
+            )}
 
             {/* Block Confirmation Modal */}
             {blockConfirmUser && (

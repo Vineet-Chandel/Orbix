@@ -561,6 +561,36 @@ export async function markNotificationsAsRead(notificationIds?: string[]): Promi
 }
 
 /**
+ * Mark notifications as unread
+ */
+export async function markNotificationsAsUnread(notificationIds: string[]): Promise<boolean> {
+    try {
+        await apiFetch("/api/notifications/mark-unread", {
+            method: "POST",
+            body: JSON.stringify({ notificationIds }),
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Bulk delete notifications
+ */
+export async function deleteNotificationsBulk(notificationIds: string[]): Promise<boolean> {
+    try {
+        await apiFetch("/api/notifications/bulk-delete", {
+            method: "POST",
+            body: JSON.stringify({ notificationIds }),
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Delete a notification
  */
 export async function deleteNotification(id: string): Promise<boolean> {

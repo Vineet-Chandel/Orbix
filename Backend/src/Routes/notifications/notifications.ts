@@ -275,6 +275,85 @@ notificationsRouter.post("/mark-read", authenticate, async (req: Request, res: R
 });
 
 /**
+ * POST /api/notifications/mark-unread
+ * Marks notifications as unread.
+ * Body: { notificationIds: string[] }
+ */
+notificationsRouter.post("/mark-unread", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        const userIdentifier = (authUser.username || "").toLowerCase();
+        const userGmail = (authUser.gmail || "").toLowerCase();
+        const userId = authUser.id || null;
+        const { notificationIds } = req.body;
+
+        if (Array.isArray(notificationIds) && notificationIds.length > 0) {
+            await query(
+                `UPDATE user_notifications
+                 SET is_read = false, read_at = NULL
+                 WHERE (user_id = $1 OR LOWER(username) = $2 OR LOWER(username) = $3) AND id = ANY($4::uuid[]);`,
+                [userId, userIdentifier, userGmail, notificationIds]
+            );
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Notifications marked as unread",
+        });
+    } catch (err: any) {
+        console.error("POST /api/notifications/mark-unread error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to mark notifications as unread",
+            error: err.message,
+        });
+    }
+});
+
+/**
+ * POST /api/notifications/bulk-delete
+ * Deletes multiple notifications belonging to the authenticated user.
+ * Body: { notificationIds: string[] }
+ */
+notificationsRouter.post("/bulk-delete", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        const userIdentifier = (authUser.username || "").toLowerCase();
+        const userGmail = (authUser.gmail || "").toLowerCase();
+        const userId = authUser.id || null;
+        const { notificationIds } = req.body;
+
+        if (Array.isArray(notificationIds) && notificationIds.length > 0) {
+            await query(
+                `DELETE FROM user_notifications
+                 WHERE (user_id = $1 OR LOWER(username) = $2 OR LOWER(username) = $3) AND id = ANY($4::uuid[]);`,
+                [userId, userIdentifier, userGmail, notificationIds]
+            );
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Notifications deleted",
+        });
+    } catch (err: any) {
+        console.error("POST /api/notifications/bulk-delete error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete notifications",
+            error: err.message,
+        });
+    }
+});
+
+/**
  * DELETE /api/notifications/:id
  * Deletes a notification belonging to the authenticated user.
  */

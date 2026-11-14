@@ -1,6 +1,5 @@
 import React from "react";
 import {
-    Heart,
     Clock,
     MapPin,
     ExternalLink,
@@ -55,7 +54,7 @@ export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelec
                                     Syncing...
                                 </span>
                             )}
-                            <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-white/95 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center">
+                            <div className="absolute top-2.5 right-2.5 px-3 py-1 rounded-full bg-white/95 border-2 border-black shadow-[2px_2px_0px_#000] flex items-center backdrop-blur-sm">
                                 <EventActionRow
                                     eventId={ev.id}
                                     eventTitle={ev.title}
@@ -148,16 +147,12 @@ export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelec
                     {/* Event-wise Key Analytics Metrics */}
                     <div className="mt-3 flex items-center gap-2 text-xs font-bold flex-wrap">
                         <span className="inline-flex items-center gap-1 text-sky-950 bg-sky-50 px-2 py-0.5 rounded-md border border-black/20">
-                            <Users className="w-3 h-3 text-sky-700 stroke-[2.5]" />
+                            <Users className="w-3.5 h-3.5 text-sky-700 stroke-[2.5]" />
                             <span>{ev.registrationsCount || 0} RSVPs</span>
                         </span>
                         <span className="inline-flex items-center gap-1 text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded-md border border-black/20">
-                            <UserCheck className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
+                            <UserCheck className="w-3.5 h-3.5 text-emerald-700 stroke-[2.5]" />
                             <span>{ev.attendeesCount || 0} Attended</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-rose-950 bg-rose-50 px-2 py-0.5 rounded-md border border-black/20">
-                            <Heart className="w-3 h-3 text-rose-600 fill-rose-600 stroke-[2.5]" />
-                            <span>{ev.likesCount || 0} Likes</span>
                         </span>
                         {(ev.rejectedCount ?? 0) > 0 && (
                             <span className="inline-flex items-center gap-1 text-rose-950 bg-rose-50 px-2 py-0.5 rounded-md border border-black/20">

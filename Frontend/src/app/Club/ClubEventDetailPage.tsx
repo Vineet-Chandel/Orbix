@@ -762,15 +762,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             : "Cancelled"}
                     </span>
 
-                    <EventActionRow
-                        eventId={event.id}
-                        eventTitle={event.title}
-                        eventSummary={event.summary || undefined}
-                        initialLikeCount={(event as any).likesCount}
-                        initialShareCount={(event as any).sharesCount}
-                        size="md"
-                    />
-
                     <button
                         type="button"
                         onClick={() => setIsEditModalOpen(true)}
@@ -827,6 +818,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     {/* Event Identity & Metadata */}
                     <div className="space-y-3 min-w-0 w-full">
+                        {/* Host Club & Scope Badges */}
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-950 border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
                                 <Building2 className="w-3 h-3 text-emerald-700" />
@@ -847,6 +839,10 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     Campus Only
                                 </span>
                             )}
+                        </div>
+
+                        {/* Event Engagement Actions (Like & Share) */}
+                        <div className="mt-3.5 mb-1.5 flex items-center">
                             <EventActionRow
                                 eventId={event.id}
                                 eventTitle={event.title}

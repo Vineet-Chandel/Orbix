@@ -4858,6 +4858,64 @@ clubRouter.patch("/inbox/:conversationId/archive", authenticate, requireClubAcco
     }
 });
 
+/**
+ * DELETE /api/club/inbox/:conversationId
+ */
+clubRouter.delete("/inbox/:conversationId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { conversationId } = req.params;
+        await query(`DELETE FROM club_conversations WHERE id = $1 AND club_id = $2;`, [conversationId, club.id]);
+
+        return res.json({ success: true, message: "Conversation deleted." });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to delete conversation." });
+    }
+});
+
+/**
+ * POST /api/club/inbox/bulk-delete
+ */
+clubRouter.post("/inbox/bulk-delete", authenticate, requireClubAccount, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { conversationIds } = req.body;
+        if (Array.isArray(conversationIds) && conversationIds.length > 0) {
+            await query(`DELETE FROM club_conversations WHERE id = ANY($1::uuid[]) AND club_id = $2;`, [conversationIds, club.id]);
+        }
+
+        return res.json({ success: true, message: "Conversations deleted." });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to delete conversations." });
+    }
+});
+
+/**
+ * POST /api/club/inbox/bulk-read
+ */
+clubRouter.post("/inbox/bulk-read", authenticate, requireClubAccount, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { conversationIds, isRead = true } = req.body;
+        if (Array.isArray(conversationIds) && conversationIds.length > 0) {
+            await query(
+                `UPDATE club_conversations SET is_read_by_club = $1, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND club_id = $3;`,
+                [Boolean(isRead), conversationIds, club.id]
+            );
+        }
+
+        return res.json({ success: true, message: "Conversations read state updated." });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to update read state." });
+    }
+});
+
 // Moderation Endpoints
 clubRouter.post("/moderation/mute", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {

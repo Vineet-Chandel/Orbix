@@ -856,56 +856,46 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         </span>
                     </div>
 
-                    {/* Scope Indicator Banner (Phase 2) */}
+                    {/* Scope Indicator Banner */}
                     <div
-                        className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
                             form.scope === "PAN_INDIA"
-                                ? "bg-gradient-to-r from-orange-50 via-white to-emerald-50 border-orange-500"
-                                : "bg-sky-50 border-sky-600"
+                                ? "bg-amber-50/70"
+                                : "bg-sky-50/80"
                         }`}
                     >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start sm:items-center gap-3.5 min-w-0">
                             <div
-                                className={`w-11 h-11 rounded-2xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 ${
+                                className={`w-11 h-11 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0 ${
                                     form.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#38BDF8] text-black"
                                 }`}
                             >
                                 {form.scope === "PAN_INDIA" ? (
-                                    <Globe2 className="w-5 h-5 stroke-[2.3]" />
+                                    <Globe2 className="w-5 h-5 stroke-[2.5]" />
                                 ) : (
-                                    <GraduationCap className="w-5 h-5 stroke-[2.3]" />
+                                    <GraduationCap className="w-5 h-5 stroke-[2.5]" />
                                 )}
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 ${
+                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] whitespace-nowrap shrink-0 ${
                                             form.scope === "PAN_INDIA"
                                                 ? "bg-[#FF9933] text-black"
                                                 : "bg-[#38BDF8] text-black"
                                         }`}
                                     >
-                                        {form.scope === "PAN_INDIA" ? (
-                                            <>
-                                                <Globe2 className="w-3 h-3" />
-                                                <span>Pan India Reach</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <GraduationCap className="w-3 h-3" />
-                                                <span>Campus Only</span>
-                                            </>
-                                        )}
+                                        {form.scope === "PAN_INDIA" ? "Pan India Reach" : "Campus Exclusive"}
                                     </span>
-                                    <span className="text-xs font-black text-black">
+                                    <span className="text-xs sm:text-sm font-black text-black">
                                         {form.scope === "PAN_INDIA"
                                             ? "National Discovery & Cross-College Participation"
                                             : `Exclusive to ${collegeName || "Host Campus"}`}
                                     </span>
                                 </div>
-                                <p className="text-[11px] text-neutral-600 font-medium mt-0.5">
+                                <p className="text-xs text-neutral-600 font-medium mt-1">
                                     {form.scope === "PAN_INDIA"
-                                        ? "Students from colleges throughout India can discover and register for this session."
+                                        ? "Students from colleges throughout India can discover and register for this event."
                                         : `Registration restricted exclusively to verified students of ${collegeName || "your college"}.`}
                                 </p>
                             </div>
@@ -920,9 +910,9 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                         scope: prev.scope === "PAN_INDIA" ? "CAMPUS" : "PAN_INDIA",
                                     }))
                                 }
-                                className="px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-[11px] font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-all shrink-0 self-start sm:self-center"
+                                className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[0.5px] active:translate-y-[0.5px] cursor-pointer transition-all shrink-0 self-start sm:self-center whitespace-nowrap"
                             >
-                                Switch to {form.scope === "PAN_INDIA" ? "Campus Only" : "Pan India"}
+                                Switch to {form.scope === "PAN_INDIA" ? "Campus Exclusive" : "Pan India"}
                             </button>
                         )}
                     </div>
@@ -1671,6 +1661,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     collegeName={collegeName || "Your College Campus"}
                                     eventId={editingEvent?.id}
                                     slug={editingEvent?.slug}
+                                    showShareButton={false}
                                 />
                             </div>
                         </div>
@@ -1714,9 +1705,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                 Verify all event configurations, schedule milestones, and communication channels before publishing.
                             </p>
                         </div>
-                        <span className="text-xs font-black uppercase px-3 py-1 rounded-xl border-2 border-black bg-emerald-300 text-black shadow-[1.5px_1.5px_0px_#000]">
-                            Ready for Launch
-                        </span>
                     </div>
 
                     <EventWizardReviewStep
