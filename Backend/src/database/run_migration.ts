@@ -160,6 +160,15 @@ export const MIGRATION_SIGNATURES: Record<string, { tables?: string[]; columns?:
     "061_club_event_shares.sql": {
         tables: ["club_event_shares"],
     },
+    "063_event_share_count_semantics.sql": {
+        columns: ["club_event_shares.share_type", "club_event_shares.recipient_user_id"],
+    },
+    "064_unique_internal_event_shares.sql": {
+        columns: ["club_event_shares.share_type", "club_event_shares.recipient_user_id"],
+    },
+    "065_club_event_shares_account_type.sql": {
+        columns: ["club_event_shares.account_type"],
+    },
 };
 
 /**

@@ -1,12 +1,54 @@
 // Backend/src/services/events/eventEngagementService.ts
 import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
+import { dispatchNotification } from "../notification/quotaService.js";
+
+export type EventShareType = "internal" | "external" | "copy_link";
 
 export interface EventEngagementInfo {
     eventId: string;
     likeCount: number;
     likedByViewer: boolean;
     shareCount: number;
+}
+
+export interface RecipientShareOutcome {
+    recipientUserId: string;
+    success: boolean;
+    isNewCount?: boolean | undefined;
+    error?: string | undefined;
+}
+
+export interface RecordEventShareOptions {
+    eventIdOrSlug: string;
+    idempotencyKey: string;
+    userId?: string | null | undefined;
+    accountType?: string | undefined;
+    shareType?: EventShareType | undefined;
+    platform?: string | undefined;
+    recipientUserId?: string | null | undefined;
+    recipientUserIds?: string[] | undefined;
+    message?: string | undefined;
+    note?: string | undefined;
+    rateLimitIdentifier?: string | undefined;
+}
+
+export interface RecordEventShareResult {
+    eventId: string;
+    shareCount: number;
+    shareType: EventShareType;
+    platform: string;
+    recipientUserId?: string | null | undefined;
+    recipientUserIds?: string[] | undefined;
+    successfulDeliveries?: number | undefined;
+    failedDeliveries?: number | undefined;
+    deliveryOutcomes?: RecipientShareOutcome[] | undefined;
+    counts: {
+        publicShares: number;
+        internalShares: number;
+        externalShares: number;
+        linkCopies: number;
+    };
 }
 
 const COUNT_CACHE_TTL = 3600; // 1 hour
@@ -135,7 +177,7 @@ export async function getEventEngagement(
         SELECT
             e.id AS "eventId",
             (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likeCount",
-            (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = e.id) AS "shareCount",
+            (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = e.id AND share_type IN ('internal', 'external') AND (account_type IS NULL OR account_type != 'club')) AS "shareCount",
             CASE
                 WHEN $2::uuid IS NOT NULL THEN
                     EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $2::uuid)
@@ -246,6 +288,8 @@ export async function getBatchEventEngagement(
             SELECT event_id, COUNT(*)::int AS count
             FROM club_event_shares
             WHERE event_id IN (SELECT id FROM target_events)
+              AND share_type IN ('internal', 'external')
+              AND (account_type IS NULL OR account_type != 'club')
             GROUP BY event_id
         ),
         viewer_likes AS (
@@ -320,7 +364,7 @@ export async function likeEvent(
     const countsRes = await query(
         `SELECT
             (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = $1::uuid) AS "likeCount",
-            (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = $1::uuid) AS "shareCount";`,
+            (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = $1::uuid AND share_type IN ('internal', 'external') AND (account_type IS NULL OR account_type != 'club')) AS "shareCount";`,
         [eventId]
     );
 
@@ -370,7 +414,7 @@ export async function unlikeEvent(
     const countsRes = await query(
         `SELECT
             (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = $1::uuid) AS "likeCount",
-            (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = $1::uuid) AS "shareCount";`,
+            (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = $1::uuid AND share_type IN ('internal', 'external') AND (account_type IS NULL OR account_type != 'club')) AS "shareCount";`,
         [eventId]
     );
 
@@ -422,25 +466,121 @@ export async function toggleEventLike(
 }
 
 /**
- * Records a successful share action with idempotency duplicate prevention.
- * Supports both authenticated users and guests (userId = null).
- * Enforces rate limiting against abuse.
+ * Verifies whether actor and recipient have an active accepted connection in user_relationships.
+ */
+export async function areUsersConnected(userId1: string, userId2: string): Promise<boolean> {
+    if (!isValidUuid(userId1) || !isValidUuid(userId2)) return false;
+    const res = await query(
+        `SELECT 1 FROM user_relationships
+         WHERE ((user_low_id = $1::uuid AND user_high_id = $2::uuid) OR (user_low_id = $2::uuid AND user_high_id = $1::uuid))
+           AND status = 'connected'
+         LIMIT 1;`,
+        [userId1, userId2]
+    );
+    return res.rows.length > 0;
+}
+
+/**
+ * Records an event share action with strict semantic differentiation:
+ * 1. 'internal': Internal Orbix peer sharing (persisted message/notification required)
+ * 2. 'external': Completed native/external sharing (e.g. Web Share API resolved)
+ * 3. 'copy_link': Successful clipboard link copy (tracked separately, NEVER increments public share count)
+ *
+ * Public share count includes ONLY 'internal' and 'external' shares.
+ * Guarantees duplicate prevention via PostgreSQL UNIQUE constraint (event_id, idempotency_key).
  */
 export async function recordEventShare(
-    eventIdOrSlug: string,
-    idempotencyKey: string,
-    userId?: string | null,
-    platform = "web_share",
-    rateLimitIdentifier?: string
-): Promise<{ eventId: string; shareCount: number }> {
+    optsOrId: string | RecordEventShareOptions,
+    idempotencyKeyParam?: string,
+    userIdParam?: string | null,
+    shareTypeOrPlatformParam?: string,
+    recipientUserIdOrRateLimitParam?: string | null,
+    maybeRateLimitParam?: string
+): Promise<RecordEventShareResult> {
+    let eventIdOrSlug: string;
+    let idempotencyKey: string;
+    let userId: string | null = null;
+    let callerAccountType: string | undefined = undefined;
+    let shareType: EventShareType = "external";
+    let platform = "web_share";
+    let recipientUserId: string | null = null;
+    let recipientUserIds: string[] | undefined = undefined;
+    let customMessage: string | undefined = undefined;
+    let rateLimitIdentifier: string | undefined = undefined;
+
+    if (typeof optsOrId === "object" && optsOrId !== null) {
+        eventIdOrSlug = optsOrId.eventIdOrSlug;
+        idempotencyKey = optsOrId.idempotencyKey;
+        userId = optsOrId.userId || null;
+        callerAccountType = optsOrId.accountType;
+        shareType = optsOrId.shareType || (optsOrId.platform === "clipboard" ? "copy_link" : "external");
+        platform = optsOrId.platform || (shareType === "copy_link" ? "clipboard" : shareType === "internal" ? "orbix_peer" : "web_share");
+        recipientUserId = optsOrId.recipientUserId || null;
+        recipientUserIds = optsOrId.recipientUserIds;
+        customMessage = optsOrId.message || optsOrId.note;
+        rateLimitIdentifier = optsOrId.rateLimitIdentifier;
+    } else {
+        eventIdOrSlug = optsOrId;
+        idempotencyKey = idempotencyKeyParam || "";
+        userId = userIdParam || null;
+        const rawTypeOrPlatform = shareTypeOrPlatformParam || "web_share";
+        if (rawTypeOrPlatform === "internal" || rawTypeOrPlatform === "copy_link" || rawTypeOrPlatform === "external") {
+            shareType = rawTypeOrPlatform;
+            platform = shareType === "copy_link" ? "clipboard" : shareType === "internal" ? "orbix_peer" : "web_share";
+            recipientUserId = recipientUserIdOrRateLimitParam || null;
+            rateLimitIdentifier = maybeRateLimitParam;
+        } else if (rawTypeOrPlatform === "clipboard") {
+            shareType = "copy_link";
+            platform = "clipboard";
+            rateLimitIdentifier = recipientUserIdOrRateLimitParam || undefined;
+        } else {
+            shareType = "external";
+            platform = rawTypeOrPlatform;
+            rateLimitIdentifier = recipientUserIdOrRateLimitParam || undefined;
+        }
+    }
+
     const eventId = await resolveEventId(eventIdOrSlug);
     if (!eventId) {
         throw new Error("Event not found");
     }
 
+    // Verify event exists and is eligible for sharing
+    const eventCheck = await query(
+        `SELECT id, title, slug, status FROM club_events WHERE id = $1::uuid;`,
+        [eventId]
+    );
+    if (eventCheck.rows.length === 0) {
+        throw new Error("Event not found");
+    }
+    const eventRow = eventCheck.rows[0];
+    if (eventRow.status === "cancelled") {
+        throw new Error("Cancelled events cannot be shared");
+    }
+    const eventTitle = eventRow.title || "Campus Event";
+    const eventSlug = eventRow.slug || "";
+
     const cleanKey = String(idempotencyKey || "").trim();
     if (!cleanKey || cleanKey.length < 8 || cleanKey.length > 128) {
         throw new Error("Invalid share idempotency key");
+    }
+
+    const isUuidUser = isValidUuid(userId);
+    let resolvedAccountType = "personal";
+
+    if (isUuidUser && userId) {
+        const userRes = await query(`SELECT account_type FROM users WHERE id = $1::uuid LIMIT 1;`, [userId]);
+        if (userRes.rows.length > 0) {
+            resolvedAccountType = userRes.rows[0].account_type === "club" ? "club" : "personal";
+        }
+    }
+    if (callerAccountType === "club") {
+        resolvedAccountType = "club";
+    }
+
+    // Strict account-type enforcement: club accounts are restricted to external sharing only
+    if (resolvedAccountType === "club" && shareType === "internal") {
+        throw new Error("Club accounts are restricted to external sharing only");
     }
 
     // Rate limiting check
@@ -454,12 +594,30 @@ export async function recordEventShare(
             }
             if (currentHits > MAX_SHARES_PER_WINDOW) {
                 const countRes = await query(
-                    `SELECT COUNT(*)::int AS count FROM club_event_shares WHERE event_id = $1::uuid;`,
+                    `SELECT
+                        (COUNT(*) FILTER (WHERE share_type IN ('internal', 'external') AND (account_type IS NULL OR account_type != 'club')))::int AS public_shares,
+                        (COUNT(*) FILTER (WHERE share_type = 'internal'))::int AS internal_shares,
+                        (COUNT(*) FILTER (WHERE share_type = 'external'))::int AS external_shares,
+                        (COUNT(*) FILTER (WHERE share_type = 'copy_link'))::int AS link_copies
+                     FROM club_event_shares WHERE event_id = $1::uuid;`,
                     [eventId]
                 );
+                const countRow = countRes.rows[0] || {};
+                const currentPublicCount = Number(countRow.public_shares) || 0;
                 return {
                     eventId,
-                    shareCount: Number(countRes.rows[0]?.count) || 0,
+                    shareCount: currentPublicCount,
+                    shareType,
+                    platform,
+                    recipientUserId,
+                    successfulDeliveries: 0,
+                    failedDeliveries: 0,
+                    counts: {
+                        publicShares: currentPublicCount,
+                        internalShares: Number(countRow.internal_shares) || 0,
+                        externalShares: Number(countRow.external_shares) || 0,
+                        linkCopies: Number(countRow.link_copies) || 0,
+                    },
                 };
             }
         } catch {
@@ -467,35 +625,196 @@ export async function recordEventShare(
         }
     }
 
-    const isUuidUser = isValidUuid(userId);
+    // 1. Internal Orbix Sharing Validation & Message Persistence
+    if (shareType === "internal") {
+        if (!isUuidUser || !userId) {
+            throw new Error("Authentication required for internal Orbix sharing");
+        }
 
-    // Atomic insertion: duplicate idempotency keys safely ignored
+        const recipientsList: string[] = [];
+        if (Array.isArray(recipientUserIds) && recipientUserIds.length > 0) {
+            for (const r of recipientUserIds) {
+                const s = String(r || "").trim();
+                if (s && !recipientsList.includes(s)) recipientsList.push(s);
+            }
+        }
+        if (recipientsList.length === 0 && recipientUserId) {
+            const s = String(recipientUserId).trim();
+            if (s) recipientsList.push(s);
+        }
+
+        if (recipientsList.length === 0) {
+            throw new Error("At least one recipient user ID required for internal sharing");
+        }
+
+        const deliveryOutcomes: RecipientShareOutcome[] = [];
+        let successfulDeliveries = 0;
+        let failedDeliveries = 0;
+
+        for (const targetId of recipientsList) {
+            if (!isValidUuid(targetId)) {
+                deliveryOutcomes.push({ recipientUserId: targetId, success: false, error: "Invalid recipient user ID" });
+                failedDeliveries++;
+                continue;
+            }
+
+            if (targetId.toLowerCase() === userId.toLowerCase()) {
+                deliveryOutcomes.push({ recipientUserId: targetId, success: false, error: "Cannot share an event with yourself" });
+                failedDeliveries++;
+                continue;
+            }
+
+            // Connection eligibility validation: verify connection exists in user_relationships
+            const isConnected = await areUsersConnected(userId, targetId);
+            if (!isConnected) {
+                deliveryOutcomes.push({ recipientUserId: targetId, success: false, error: "Recipient is not a connected peer" });
+                failedDeliveries++;
+                continue;
+            }
+
+            // Persist message via dispatchNotification
+            const itemKey = recipientsList.length > 1 ? `${cleanKey}-${targetId.slice(0, 8)}` : cleanKey;
+            const notifResult = await dispatchNotification({
+                recipientId: targetId,
+                actorId: userId,
+                title: `Event Shared: ${eventTitle}`,
+                body: customMessage
+                    ? `${customMessage}\n\nShared the event "${eventTitle}" with you.`
+                    : `Shared the event "${eventTitle}" with you.`,
+                notificationType: "event_share",
+                metadata: {
+                    eventId,
+                    eventTitle,
+                    eventSlug,
+                    shareType: "internal",
+                    note: customMessage || null,
+                    url: `/college-events?event=${encodeURIComponent(eventId)}`,
+                    idempotencyKey: itemKey,
+                },
+                idempotencyKey: `event-share-${eventId}-${itemKey}`,
+                isUserInitiated: true,
+            });
+
+            if (!notifResult.success) {
+                deliveryOutcomes.push({ recipientUserId: targetId, success: false, error: notifResult.error || "Failed to deliver message" });
+                failedDeliveries++;
+                continue;
+            }
+
+            // Record internal share ONLY after message persistence succeeds.
+            // PostgreSQL partial unique index enforces: exactly 1 counted internal share per (event_id, user_id, recipient_user_id).
+            // On conflict (unique internal share already exists, or request idempotency hit), DO NOTHING.
+            // Delivery was successful, counting is an idempotent no-op.
+            const insertShareRes = await query(
+                `INSERT INTO club_event_shares (event_id, user_id, idempotency_key, share_type, platform, recipient_user_id, account_type)
+                 VALUES ($1::uuid, $2::uuid, $3, 'internal', $4, $5::uuid, $6)
+                 ON CONFLICT DO NOTHING
+                 RETURNING id;`,
+                [eventId, userId, itemKey, platform.slice(0, 50), targetId, resolvedAccountType]
+            );
+
+            successfulDeliveries++;
+            const isNewCount = insertShareRes.rows.length > 0;
+            deliveryOutcomes.push({ recipientUserId: targetId, success: true, isNewCount });
+        }
+
+        // If all selected recipients failed, throw the first error
+        if (recipientsList.length > 0 && successfulDeliveries === 0) {
+            const firstErr = deliveryOutcomes[0]?.error || "Failed to share event internally";
+            throw new Error(firstErr);
+        }
+
+        // Retrieve authoritative counts
+        const countRes = await query(
+            `SELECT
+                (COUNT(*) FILTER (WHERE share_type IN ('internal', 'external') AND (account_type IS NULL OR account_type != 'club')))::int AS public_shares,
+                (COUNT(*) FILTER (WHERE share_type = 'internal'))::int AS internal_shares,
+                (COUNT(*) FILTER (WHERE share_type = 'external'))::int AS external_shares,
+                (COUNT(*) FILTER (WHERE share_type = 'copy_link'))::int AS link_copies
+             FROM club_event_shares
+             WHERE event_id = $1::uuid;`,
+            [eventId]
+        );
+
+        const countRow = countRes.rows[0] || {};
+        const publicShareCount = Number(countRow.public_shares) || 0;
+
+        if (isRedisReady()) {
+            try {
+                await redis.set(getShareCountKey(eventId), publicShareCount.toString(), "EX", COUNT_CACHE_TTL);
+            } catch {}
+        }
+
+        return {
+            eventId,
+            shareCount: publicShareCount,
+            shareType,
+            platform,
+            recipientUserId: recipientsList.length === 1 ? recipientsList[0] : null,
+            recipientUserIds: recipientsList,
+            successfulDeliveries,
+            failedDeliveries,
+            deliveryOutcomes,
+            counts: {
+                publicShares: publicShareCount,
+                internalShares: Number(countRow.internal_shares) || 0,
+                externalShares: Number(countRow.external_shares) || 0,
+                linkCopies: Number(countRow.link_copies) || 0,
+            },
+        };
+    }
+
+    // 2. External and Copy-Link Sharing
     await query(
-        `INSERT INTO club_event_shares (event_id, user_id, idempotency_key, platform)
-         VALUES ($1::uuid, $2::uuid, $3, $4)
+        `INSERT INTO club_event_shares (event_id, user_id, idempotency_key, share_type, platform, recipient_user_id, account_type)
+         VALUES ($1::uuid, $2::uuid, $3, $4, $5, NULL, $6)
          ON CONFLICT (event_id, idempotency_key) DO NOTHING;`,
-        [eventId, isUuidUser ? userId : null, cleanKey, platform.slice(0, 50)]
+        [
+            eventId,
+            isUuidUser ? userId : null,
+            cleanKey,
+            shareType,
+            platform.slice(0, 50),
+            resolvedAccountType,
+        ]
     );
 
-    // Retrieve fresh authoritative share count
+    // 3. Retrieve authoritative counts (public share count EXCLUDES 'copy_link' and club accounts)
     const countRes = await query(
-        `SELECT COUNT(*)::int AS count FROM club_event_shares WHERE event_id = $1::uuid;`,
+        `SELECT
+            (COUNT(*) FILTER (WHERE share_type IN ('internal', 'external') AND (account_type IS NULL OR account_type != 'club')))::int AS public_shares,
+            (COUNT(*) FILTER (WHERE share_type = 'internal'))::int AS internal_shares,
+            (COUNT(*) FILTER (WHERE share_type = 'external'))::int AS external_shares,
+            (COUNT(*) FILTER (WHERE share_type = 'copy_link'))::int AS link_copies
+         FROM club_event_shares
+         WHERE event_id = $1::uuid;`,
         [eventId]
     );
 
-    const shareCount = Number(countRes.rows[0]?.count) || 0;
+    const countRow = countRes.rows[0] || {};
+    const publicShareCount = Number(countRow.public_shares) || 0;
 
-    // Update Redis cache immediately
+    // 4. Update Redis cache immediately with authoritative public share count
     if (isRedisReady()) {
         try {
-            await redis.set(getShareCountKey(eventId), shareCount.toString(), "EX", COUNT_CACHE_TTL);
+            await redis.set(getShareCountKey(eventId), publicShareCount.toString(), "EX", COUNT_CACHE_TTL);
         } catch {
-            // Safe to ignore
+            // Safe to ignore if Redis fails; PostgreSQL remains authoritative
         }
     }
 
     return {
         eventId,
-        shareCount,
+        shareCount: publicShareCount,
+        shareType,
+        platform,
+        recipientUserId: null,
+        successfulDeliveries: 1,
+        counts: {
+            publicShares: publicShareCount,
+            internalShares: Number(countRow.internal_shares) || 0,
+            externalShares: Number(countRow.external_shares) || 0,
+            linkCopies: Number(countRow.link_copies) || 0,
+        },
     };
 }

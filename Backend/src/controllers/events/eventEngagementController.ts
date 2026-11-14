@@ -187,15 +187,26 @@ export async function toggleEventLikeHandler(req: Request, res: Response): Promi
 
 /**
  * POST /api/events/:eventId/shares
- * Records a successful share action with idempotency.
- * Supports both authenticated users and guests.
+ * Records a verified share action with strict semantic differentiation:
+ * 1. 'internal': Internal Orbix peer sharing (requires authenticated user + valid recipient)
+ * 2. 'external': Completed native/external sharing (Web Share API resolved)
+ * 3. 'copy_link': Successful clipboard link copy (tracked separately, does not increment public shareCount)
  */
 export async function recordEventShareHandler(req: Request, res: Response): Promise<void> {
     try {
         const eventId = getCleanParam(req.params.eventId);
         const idempotencyKey = getCleanParam(req.body?.idempotencyKey) || `key-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-        const platform = getCleanParam(req.body?.platform) || "web_share";
-        const userId = req.user?.id || null;
+        const rawShareType = getCleanParam(req.body?.shareType);
+        const rawPlatform = getCleanParam(req.body?.platform);
+        const recipientUserId = getCleanParam(req.body?.recipientUserId) || null;
+        const rawRecipientIds = req.body?.recipientUserIds;
+        const recipientUserIds = Array.isArray(rawRecipientIds)
+            ? rawRecipientIds.map((id: any) => getCleanParam(id)).filter(Boolean)
+            : undefined;
+        const note = getCleanParam(req.body?.note) || getCleanParam(req.body?.message) || undefined;
+        const authUser = req.user as any;
+        const userId = authUser?.id || null;
+        const accountType = authUser?.accountType || authUser?.account_type || undefined;
         const ip = req.ip || req.socket.remoteAddress || "unknown_ip";
 
         if (!eventId) {
@@ -203,16 +214,48 @@ export async function recordEventShareHandler(req: Request, res: Response): Prom
             return;
         }
 
+        // Normalize shareType and platform
+        let shareType: "internal" | "external" | "copy_link" = "external";
+        if (rawShareType === "internal" || rawShareType === "copy_link" || rawShareType === "external") {
+            shareType = rawShareType;
+        } else if (rawPlatform === "clipboard") {
+            shareType = "copy_link";
+        } else if (rawPlatform === "internal" || recipientUserId || (recipientUserIds && recipientUserIds.length > 0)) {
+            shareType = "internal";
+        }
+
+        const platform = rawPlatform || (shareType === "copy_link" ? "clipboard" : shareType === "internal" ? "orbix_peer" : "web_share");
         const rateLimitIdentifier = userId || `ip_${ip}`;
-        const result = await recordEventShare(eventId, idempotencyKey, userId, platform, rateLimitIdentifier);
+
+        const result = await recordEventShare({
+            eventIdOrSlug: eventId,
+            idempotencyKey,
+            userId,
+            accountType,
+            shareType,
+            platform,
+            recipientUserId,
+            recipientUserIds,
+            note,
+            rateLimitIdentifier,
+        });
 
         res.status(200).json({
             success: true,
             sharesCount: result.shareCount,
+            shareType: result.shareType,
             data: result,
         });
     } catch (err: any) {
         console.error("[eventEngagementController] recordEventShareHandler error:", err);
-        res.status(500).json({ success: false, message: err.message || "Failed to record event share" });
+        const statusCode =
+            err.message?.includes("Authentication required") ? 401 :
+            err.message?.includes("Club accounts are restricted") || err.message?.includes("restricted to external sharing only") ? 403 :
+            err.message?.includes("not a connected peer") ? 403 :
+            err.message?.includes("Notification limit reached") || err.message?.includes("Share limit reached") || err.code === "NOTIFICATION_LIMIT_REACHED" ? 429 :
+            err.message?.includes("not found") ? 404 :
+            err.message?.includes("required") || err.message?.includes("Cannot share") || err.message?.includes("Invalid") ? 400 :
+            500;
+        res.status(statusCode).json({ success: false, message: err.message || "Failed to record event share" });
     }
 }

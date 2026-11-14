@@ -4,6 +4,8 @@ import { relationshipEvents } from "../relationship/relationshipEvents.js";
 
 export const MAX_USER_NOTIFICATIONS_PER_PAIR_PER_24H = 3;
 export const NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours in ms
+export const EVENT_SHARE_WINDOW_MS = 60 * 60 * 1000; // 1 hour (cooldown window)
+export const MAX_EVENT_SHARES_PER_WINDOW = 3; // 3 successful shares per window
 
 export interface QuotaCheckResult {
     allowed: boolean;
@@ -23,6 +25,8 @@ export interface DispatchNotificationOptions {
     metadata?: Record<string, any>;
     idempotencyKey?: string | null;
     isUserInitiated?: boolean;
+    windowMs?: number;
+    maxAllowance?: number;
 }
 
 /**
@@ -39,15 +43,122 @@ function getPairAdvisoryLockKey(actorId: string, recipientId: string): string {
 }
 
 /**
- * Checks rolling 24-hour quota for user-initiated notifications between actor and recipient.
+ * Evaluates event-share cooldown quota based on authoritative persisted notification timestamps.
+ * A complete 1-hour cooldown activates immediately upon the 3rd successful invitation in a cycle.
+ * Reset time is strictly: third_successful_share_created_at + EVENT_SHARE_WINDOW_MS.
+ */
+export function evaluateEventShareQuota(
+    notificationTimestamps: (Date | string)[],
+    now: Date = new Date(),
+    windowMs: number = EVENT_SHARE_WINDOW_MS,
+    maxAllowance: number = MAX_EVENT_SHARES_PER_WINDOW
+): QuotaCheckResult {
+    let cycleCount = 0;
+    let cooldownUntil: Date | null = null;
+    let lastShareTime: number | null = null;
+
+    for (const raw of notificationTimestamps) {
+        const ts = raw instanceof Date ? raw : new Date(raw);
+        const timeMs = ts.getTime();
+
+        // 1. If currently in a cooldown and this notification occurred after cooldown expiry:
+        if (cooldownUntil && timeMs >= cooldownUntil.getTime()) {
+            cycleCount = 0;
+            cooldownUntil = null;
+            lastShareTime = null;
+        }
+        // 2. Or if not in a cooldown, but more than windowMs passed since last share:
+        else if (!cooldownUntil && lastShareTime !== null && timeMs - lastShareTime >= windowMs) {
+            cycleCount = 0;
+            lastShareTime = null;
+        }
+
+        cycleCount++;
+        lastShareTime = timeMs;
+
+        // When maxAllowance (3) is reached, activate 1-hour cooldown starting from this 3rd share!
+        if (cycleCount >= maxAllowance) {
+            cooldownUntil = new Date(timeMs + windowMs);
+        }
+    }
+
+    const nowMs = now.getTime();
+
+    // Check if we are currently inside an active cooldown
+    if (cooldownUntil) {
+        if (nowMs < cooldownUntil.getTime()) {
+            const retryAfterSeconds = Math.max(1, Math.ceil((cooldownUntil.getTime() - nowMs) / 1000));
+            return {
+                allowed: false,
+                remainingQuota: 0,
+                currentCount: maxAllowance,
+                retryAfterSeconds,
+                nextResetAt: cooldownUntil,
+            };
+        } else {
+            // Cooldown has expired at `now`! Allowance resets to maxAllowance.
+            return {
+                allowed: true,
+                remainingQuota: maxAllowance,
+                currentCount: 0,
+            };
+        }
+    }
+
+    // If not in a cooldown, check if an unexhausted cycle has timed out (> windowMs since last share)
+    if (lastShareTime !== null && nowMs - lastShareTime >= windowMs) {
+        return {
+            allowed: true,
+            remainingQuota: maxAllowance,
+            currentCount: 0,
+        };
+    }
+
+    return {
+        allowed: cycleCount < maxAllowance,
+        remainingQuota: Math.max(0, maxAllowance - cycleCount),
+        currentCount: cycleCount,
+    };
+}
+
+/**
+ * Checks quota for user-initiated notifications between actor and recipient.
+ * For 'event_share': evaluates cycle cooldown starting strictly from the 3rd successful share.
+ * For other notifications: evaluates rolling 24-hour quota.
  */
 export async function checkNotificationQuota(
     actorId: string,
-    recipientId: string
+    recipientId: string,
+    notificationType?: string,
+    customWindowMs?: number,
+    customMaxAllowance?: number,
+    eventId?: string
 ): Promise<QuotaCheckResult> {
-    const windowStart = new Date(Date.now() - NOTIFICATION_WINDOW_MS);
+    const isEventShare = notificationType === "event_share";
+    const windowMs = customWindowMs ?? (isEventShare ? EVENT_SHARE_WINDOW_MS : NOTIFICATION_WINDOW_MS);
+    const maxAllowance = customMaxAllowance ?? (isEventShare ? MAX_EVENT_SHARES_PER_WINDOW : MAX_USER_NOTIFICATIONS_PER_PAIR_PER_24H);
 
-    // Query active count within the rolling window and the oldest notification timestamp in window
+    if (isEventShare) {
+        const rowsRes = await query(
+            `SELECT created_at
+             FROM user_notifications
+             WHERE actor_id = $1
+               AND recipient_id = $2
+               AND is_user_initiated = true
+               AND notification_type = 'event_share'
+               AND (
+                   ($3::text IS NOT NULL AND metadata IS NOT NULL AND metadata->>'eventId' = $3)
+                   OR ($3::text IS NULL)
+               )
+             ORDER BY created_at ASC;`,
+            [actorId, recipientId, eventId || null]
+        );
+        const timestamps = rowsRes.rows.map((r: any) => new Date(r.created_at));
+        return evaluateEventShareQuota(timestamps, new Date(), windowMs, maxAllowance);
+    }
+
+    // Standard rolling window check for other notifications
+    const windowStart = new Date(Date.now() - windowMs);
     const result = await query(
         `SELECT
             COUNT(*)::int AS count,
@@ -63,10 +174,10 @@ export async function checkNotificationQuota(
     const count = result.rows[0]?.count ?? 0;
     const oldestInWindow = result.rows[0]?.oldest_in_window ? new Date(result.rows[0].oldest_in_window) : null;
 
-    if (count >= MAX_USER_NOTIFICATIONS_PER_PAIR_PER_24H) {
+    if (count >= maxAllowance) {
         const nextResetAt = oldestInWindow
-            ? new Date(oldestInWindow.getTime() + NOTIFICATION_WINDOW_MS)
-            : new Date(Date.now() + NOTIFICATION_WINDOW_MS);
+            ? new Date(oldestInWindow.getTime() + windowMs)
+            : new Date(Date.now() + windowMs);
         const retryAfterSeconds = Math.max(1, Math.ceil((nextResetAt.getTime() - Date.now()) / 1000));
 
         return {
@@ -80,7 +191,7 @@ export async function checkNotificationQuota(
 
     return {
         allowed: true,
-        remainingQuota: MAX_USER_NOTIFICATIONS_PER_PAIR_PER_24H - count,
+        remainingQuota: maxAllowance - count,
         currentCount: count,
     };
 }
@@ -123,41 +234,84 @@ export async function dispatchNotification(opts: DispatchNotificationOptions): P
             const lockHash = getPairAdvisoryLockKey(opts.actorId, opts.recipientId);
             await client.query(`SELECT pg_advisory_xact_lock($1::bigint);`, [lockHash]);
 
-            const windowStart = new Date(Date.now() - NOTIFICATION_WINDOW_MS);
-            const countRes = await client.query(
-                `SELECT
-                    COUNT(*)::int AS count,
-                    MIN(created_at) AS oldest_in_window
-                 FROM user_notifications
-                 WHERE actor_id = $1
-                   AND recipient_id = $2
-                   AND is_user_initiated = true
-                   AND created_at > $3;`,
-                [opts.actorId, opts.recipientId, windowStart]
-            );
+            const isEventShare = opts.notificationType === "event_share";
+            const windowMs = opts.windowMs ?? (isEventShare ? EVENT_SHARE_WINDOW_MS : NOTIFICATION_WINDOW_MS);
+            const maxAllowance = opts.maxAllowance ?? (isEventShare ? MAX_EVENT_SHARES_PER_WINDOW : MAX_USER_NOTIFICATIONS_PER_PAIR_PER_24H);
 
-            const count = countRes.rows[0]?.count ?? 0;
-            if (count >= MAX_USER_NOTIFICATIONS_PER_PAIR_PER_24H) {
-                const oldestInWindow = countRes.rows[0]?.oldest_in_window ? new Date(countRes.rows[0].oldest_in_window) : null;
-                const nextResetAt = oldestInWindow
-                    ? new Date(oldestInWindow.getTime() + NOTIFICATION_WINDOW_MS)
-                    : new Date(Date.now() + NOTIFICATION_WINDOW_MS);
-                const retryAfterSeconds = Math.max(1, Math.ceil((nextResetAt.getTime() - Date.now()) / 1000));
+            if (isEventShare) {
+                const eventId = opts.metadata?.eventId as string | undefined;
+                const rowsRes = await client.query(
+                    `SELECT created_at
+                     FROM user_notifications
+                     WHERE actor_id = $1
+                       AND recipient_id = $2
+                       AND is_user_initiated = true
+                       AND notification_type = 'event_share'
+                       AND (
+                           ($3::text IS NOT NULL AND metadata IS NOT NULL AND metadata->>'eventId' = $3)
+                           OR ($3::text IS NULL)
+                       )
+                     ORDER BY created_at ASC;`,
+                    [opts.actorId, opts.recipientId, eventId || null]
+                );
+                const timestamps = rowsRes.rows.map((r: any) => new Date(r.created_at));
+                const quotaCheck = evaluateEventShareQuota(timestamps, new Date(), windowMs, maxAllowance);
 
-                await client.query("ROLLBACK;");
+                if (!quotaCheck.allowed) {
+                    await client.query("ROLLBACK;");
+                    const retryAfterSeconds = quotaCheck.retryAfterSeconds || 1;
 
-                relationshipEvents.logEvent("notification_limit_reached", {
-                    actorId: opts.actorId,
-                    targetUserId: opts.recipientId,
-                    metadata: { count, retryAfterSeconds },
-                });
+                    relationshipEvents.logEvent("notification_limit_reached", {
+                        actorId: opts.actorId,
+                        targetUserId: opts.recipientId,
+                        metadata: { count: maxAllowance, retryAfterSeconds, notificationType: opts.notificationType },
+                    });
 
-                return {
-                    success: false,
-                    code: "NOTIFICATION_LIMIT_REACHED",
-                    error: `Notification limit reached for this user (maximum ${MAX_USER_NOTIFICATIONS_PER_PAIR_PER_24H} notifications per 24-hour rolling window).`,
-                    retryAfterSeconds,
-                };
+                    return {
+                        success: false,
+                        code: "NOTIFICATION_LIMIT_REACHED",
+                        error: `Notification limit reached for this user (maximum ${maxAllowance} notifications per 1-hour cooldown window).`,
+                        retryAfterSeconds,
+                    };
+                }
+            } else {
+                // Standard rolling window check for other notifications
+                const windowStart = new Date(Date.now() - windowMs);
+                const countRes = await client.query(
+                    `SELECT
+                        COUNT(*)::int AS count,
+                        MIN(created_at) AS oldest_in_window
+                     FROM user_notifications
+                     WHERE actor_id = $1
+                       AND recipient_id = $2
+                       AND is_user_initiated = true
+                       AND created_at > $3;`,
+                    [opts.actorId, opts.recipientId, windowStart]
+                );
+
+                const count = countRes.rows[0]?.count ?? 0;
+                if (count >= maxAllowance) {
+                    const oldestInWindow = countRes.rows[0]?.oldest_in_window ? new Date(countRes.rows[0].oldest_in_window) : null;
+                    const nextResetAt = oldestInWindow
+                        ? new Date(oldestInWindow.getTime() + windowMs)
+                        : new Date(Date.now() + windowMs);
+                    const retryAfterSeconds = Math.max(1, Math.ceil((nextResetAt.getTime() - Date.now()) / 1000));
+
+                    await client.query("ROLLBACK;");
+
+                    relationshipEvents.logEvent("notification_limit_reached", {
+                        actorId: opts.actorId,
+                        targetUserId: opts.recipientId,
+                        metadata: { count, retryAfterSeconds, notificationType: opts.notificationType },
+                    });
+
+                    return {
+                        success: false,
+                        code: "NOTIFICATION_LIMIT_REACHED",
+                        error: `Notification limit reached for this user (maximum ${maxAllowance} notifications per 24-hour rolling window).`,
+                        retryAfterSeconds,
+                    };
+                }
             }
         }
 

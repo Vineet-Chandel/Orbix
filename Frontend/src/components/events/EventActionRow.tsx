@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Heart, Share2 } from "lucide-react";
 import { useEventEngagement } from "../../hooks/useEventEngagement";
 import { OrbixLoader } from "../ui/loader";
+import { EventShareModal } from "./EventShareModal";
 
 export type EventActionRowSize = "sm" | "md" | "lg" | "xl";
 
@@ -86,6 +87,8 @@ export const EventActionRow: React.FC<EventActionRowProps> = ({
         isSharing,
         toggleLike,
         shareEvent,
+        copyEventLink,
+        shareEventInternally,
     } = useEventEngagement(eventId, {
         eventTitle,
         eventSummary,
@@ -93,6 +96,8 @@ export const EventActionRow: React.FC<EventActionRowProps> = ({
         initialLiked,
         initialShareCount,
     });
+
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     const config = SIZE_CONFIG[size];
     const formattedLikeCount = formatCompactNumber(likeCount);
@@ -107,7 +112,7 @@ export const EventActionRow: React.FC<EventActionRowProps> = ({
     const handleShareClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
-        shareEvent();
+        setIsShareModalOpen(true);
     };
 
     return (
@@ -193,6 +198,19 @@ export const EventActionRow: React.FC<EventActionRowProps> = ({
                     )}
                 </span>
             </motion.button>
+
+            {/* 3. Event Share Modal */}
+            <EventShareModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                eventId={eventId}
+                eventTitle={eventTitle}
+                eventSummary={eventSummary}
+                shareCount={shareCount}
+                onInternalShare={shareEventInternally}
+                onNativeShare={shareEvent}
+                onCopyLink={copyEventLink}
+            />
         </div>
     );
 };

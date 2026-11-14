@@ -621,12 +621,29 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         };
     }, [appsData]);
 
-    const handleCopyShareLink = () => {
+    const handleCopyShareLink = async () => {
         const url = `${window.location.origin}/college-events?event=${event?.id}`;
-        navigator.clipboard.writeText(url);
-        setCopiedShareLink(true);
-        toast.success("Event link copied to clipboard!");
-        setTimeout(() => setCopiedShareLink(false), 2000);
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopiedShareLink(true);
+            toast.success("Event link copied to clipboard!");
+            setTimeout(() => setCopiedShareLink(false), 2000);
+
+            if (event?.id) {
+                const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+                const headers: Record<string, string> = { "Content-Type": "application/json" };
+                if (token) headers["Authorization"] = `Bearer ${token}`;
+                const idempotencyKey = `copy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                fetch(`/api/events/${encodeURIComponent(event.id)}/shares`, {
+                    method: "POST",
+                    headers,
+                    credentials: "include",
+                    body: JSON.stringify({ idempotencyKey, shareType: "copy_link", platform: "clipboard" }),
+                }).catch(() => {});
+            }
+        } catch {
+            toast.error("Failed to copy event link to clipboard.");
+        }
     };
 
     // ACCESS DENIED SCREEN

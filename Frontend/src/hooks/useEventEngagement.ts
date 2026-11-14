@@ -3,6 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "../store";
 import { useToast } from "../context/ToastContext";
 
+export interface InternalShareResponse {
+    success: boolean;
+    deliveredCount: number;
+    sharesCount?: number;
+    error?: string;
+}
+
 export interface EventEngagementState {
     likeCount: number;
     likedByViewer: boolean;
@@ -12,6 +19,8 @@ export interface EventEngagementState {
     isSharing: boolean;
     toggleLike: () => Promise<void>;
     shareEvent: () => Promise<boolean>;
+    copyEventLink: () => Promise<boolean>;
+    shareEventInternally: (recipientUserIds: string | string[], note?: string) => Promise<InternalShareResponse>;
 }
 
 export interface CachedEventState {
@@ -336,7 +345,7 @@ export function useEventEngagement(
         await executeLikeMutation(!likedByViewer);
     }, [isAuthenticated, user, cleanId, likedByViewer, executeLikeMutation, navigate, toast]);
 
-    // User-triggered share click
+    // User-triggered external share click (with cancellation protection & clipboard fallback)
     const shareEvent = useCallback(async (): Promise<boolean> => {
         if (!cleanId || isSharing) return false;
         setIsSharing(true);
@@ -348,15 +357,25 @@ export function useEventEngagement(
             url: canonicalUrl,
         };
 
-        const generateIdempotencyKey = () => `share-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        const generateIdempotencyKey = (prefix = "share") =>
+            `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-        // Backend record helper
-        const recordShareSuccess = async (platform: string) => {
-            const idempotencyKey = generateIdempotencyKey();
-            // Optimistic update
-            const nextShareCount = shareCount + 1;
-            setShareCount(nextShareCount);
-            notifyListeners(cleanId, { likeCount, likedByViewer, shareCount: nextShareCount });
+        // Backend record helper: only external shares increment public count; link copies do NOT!
+        const recordShareToServer = async (
+            shareType: "external" | "copy_link",
+            platform: string
+        ) => {
+            const idempotencyKey = generateIdempotencyKey(shareType === "external" ? "ext" : "copy");
+
+            const isClubUser = user?.accountType === "club";
+
+            // ONLY optimistically increment for verified external shares by normal/guest users!
+            // Club account shares never increment the public share count!
+            if (shareType === "external" && !isClubUser) {
+                const nextShareCount = shareCount + 1;
+                setShareCount(nextShareCount);
+                notifyListeners(cleanId, { likeCount, likedByViewer, shareCount: nextShareCount });
+            }
 
             try {
                 const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
@@ -367,43 +386,56 @@ export function useEventEngagement(
                     method: "POST",
                     headers,
                     credentials: "include",
-                    body: JSON.stringify({ idempotencyKey, platform }),
+                    body: JSON.stringify({ idempotencyKey, shareType, platform }),
                 });
 
                 if (res.ok) {
                     const data = await res.json();
                     if (data?.sharesCount !== undefined) {
-                        setShareCount(Number(data.sharesCount));
-                        notifyListeners(cleanId, { likeCount, likedByViewer, shareCount: Number(data.sharesCount) });
+                        const serverCount = Number(data.sharesCount);
+                        setShareCount(serverCount);
+                        notifyListeners(cleanId, { likeCount, likedByViewer, shareCount: serverCount });
                     }
                 }
             } catch (err) {
-                console.warn("[useEventEngagement] Failed to record share count:", err);
+                console.warn("[useEventEngagement] Failed to record share action:", err);
+                if (shareType === "external" && !isClubUser) {
+                    setShareCount(shareCount);
+                    notifyListeners(cleanId, { likeCount, likedByViewer, shareCount });
+                }
             }
         };
 
         try {
-            // 1. Try Native Web Share API
+            // 1. Try Native Web Share API if supported
             if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
                 try {
                     await navigator.share(shareData);
-                    // Successfully completed native share
-                    await recordShareSuccess("web_share");
+                    // Successfully completed native external share
+                    await recordShareToServer("external", "web_share");
                     toast.success("Event shared successfully!");
                     return true;
                 } catch (shareErr: any) {
-                    // Gracefully ignore user cancellation without recording or showing error
-                    if (shareErr?.name === "AbortError") {
+                    // User cancelled/dismissed or share aborted:
+                    // DO NOT record anything, DO NOT increment count, DO NOT fall through to copy link!
+                    const isUserCancel =
+                        shareErr?.name === "AbortError" ||
+                        shareErr?.name === "NotAllowedError" ||
+                        String(shareErr?.message || "").toLowerCase().includes("abort") ||
+                        String(shareErr?.message || "").toLowerCase().includes("cancel");
+
+                    if (isUserCancel) {
                         return false;
                     }
-                    // For other errors, fall through to clipboard copy
+                    // For genuine API invocation failures (not user dismissals), safely fall through to clipboard
                 }
             }
 
-            // 2. Clipboard API Fallback
+            // 2. Clipboard API Fallback (Desktop / unsupported native share)
             if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
                 await navigator.clipboard.writeText(canonicalUrl);
-                await recordShareSuccess("clipboard");
+                // Link copies must NOT increment public share count!
+                await recordShareToServer("copy_link", "clipboard");
                 toast.success("Event link copied to clipboard!");
                 return true;
             } else {
@@ -418,7 +450,7 @@ export function useEventEngagement(
                 document.body.removeChild(textarea);
 
                 if (successful) {
-                    await recordShareSuccess("clipboard");
+                    await recordShareToServer("copy_link", "clipboard");
                     toast.success("Event link copied to clipboard!");
                     return true;
                 }
@@ -433,6 +465,114 @@ export function useEventEngagement(
         }
     }, [cleanId, isSharing, options?.eventTitle, options?.eventSummary, shareCount, likeCount, likedByViewer, toast]);
 
+    // User-triggered direct copy link action (tracked separately, NEVER increments public count)
+    const copyEventLink = useCallback(async (): Promise<boolean> => {
+        if (!cleanId) return false;
+        const canonicalUrl = `${window.location.origin}/college-events?event=${encodeURIComponent(cleanId)}`;
+
+        try {
+            if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(canonicalUrl);
+            } else {
+                const textarea = document.createElement("textarea");
+                textarea.value = canonicalUrl;
+                textarea.style.position = "fixed";
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+                textarea.select();
+                const successful = document.execCommand("copy");
+                document.body.removeChild(textarea);
+                if (!successful) throw new Error("Clipboard copy unsupported");
+            }
+
+            // Record link copy separately in background without affecting public share count
+            const idempotencyKey = `copy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
+            fetch(`/api/events/${encodeURIComponent(cleanId)}/shares`, {
+                method: "POST",
+                headers,
+                credentials: "include",
+                body: JSON.stringify({ idempotencyKey, shareType: "copy_link", platform: "clipboard" }),
+            }).catch((err) => console.warn("[useEventEngagement] Failed to record link copy:", err));
+
+            toast.success("Event link copied to clipboard!");
+            return true;
+        } catch (err: any) {
+            console.error("[useEventEngagement] Copy link failed:", err);
+            toast.error("Failed to copy event link.");
+            return false;
+        }
+    }, [cleanId, toast]);
+
+    // User-triggered internal Orbix share to peer(s)
+    const shareEventInternally = useCallback(
+        async (
+            recipientUserIds: string | string[],
+            note?: string
+        ): Promise<InternalShareResponse> => {
+            if (!cleanId) return { success: false, deliveredCount: 0, error: "Missing event identifier" };
+
+            const targetList = Array.isArray(recipientUserIds)
+                ? recipientUserIds.filter(Boolean)
+                : (recipientUserIds ? [recipientUserIds] : []);
+
+            if (targetList.length === 0) {
+                return { success: false, deliveredCount: 0, error: "Please select at least one recipient" };
+            }
+
+            if (!isAuthenticated || !user) {
+                toast.info("Please sign in to share events with peers.", { title: "Authentication Required" });
+                return { success: false, deliveredCount: 0, error: "Authentication required" };
+            }
+
+            if (user?.accountType === "club") {
+                return { success: false, deliveredCount: 0, error: "Club accounts are restricted to external sharing only" };
+            }
+
+            const idempotencyKey = `int-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+            try {
+                const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+                const headers: Record<string, string> = { "Content-Type": "application/json" };
+                if (token) headers["Authorization"] = `Bearer ${token}`;
+
+                const res = await fetch(`/api/events/${encodeURIComponent(cleanId)}/shares`, {
+                    method: "POST",
+                    headers,
+                    credentials: "include",
+                    body: JSON.stringify({
+                        idempotencyKey,
+                        shareType: "internal",
+                        platform: "orbix_peer",
+                        recipientUserIds: targetList,
+                        note: note || undefined,
+                    }),
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => null);
+                    throw new Error(errData?.message || "Failed to share event internally.");
+                }
+
+                const data = await res.json();
+                const serverCount = data?.sharesCount !== undefined ? Number(data.sharesCount) : shareCount;
+                const deliveredCount = Number(data?.data?.successfulDeliveries ?? targetList.length);
+
+                setShareCount(serverCount);
+                notifyListeners(cleanId, { likeCount, likedByViewer, shareCount: serverCount });
+
+                return { success: true, deliveredCount, sharesCount: serverCount };
+            } catch (err: any) {
+                console.error("[useEventEngagement] Internal share failed:", err);
+                return { success: false, deliveredCount: 0, error: err.message || "Failed to share event with peer." };
+            }
+        },
+        [cleanId, isAuthenticated, user, shareCount, likeCount, likedByViewer, toast]
+    );
+
     return {
         likeCount,
         likedByViewer,
@@ -442,5 +582,7 @@ export function useEventEngagement(
         isSharing,
         toggleLike,
         shareEvent,
+        copyEventLink,
+        shareEventInternally,
     };
 }
