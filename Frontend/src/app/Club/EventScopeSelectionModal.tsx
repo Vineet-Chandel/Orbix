@@ -11,6 +11,7 @@ import {
     Clock,
     Lock,
     ShieldAlert,
+    Calendar,
 } from "lucide-react";
 import {
     fetchEventCreationEligibility,
@@ -27,25 +28,117 @@ export interface EventScopeSelectionModalProps {
     initialEligibility?: ClubEventCreationEligibility | null;
 }
 
-function formatRemaining(ms: number): string {
-    if (ms <= 0) return "0s";
+interface TimeParts {
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+}
+
+function breakDownRemaining(ms: number): TimeParts {
+    if (ms <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
     const totalSeconds = Math.floor(ms / 1000);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-
-    if (days > 0) {
-        return `${days}d ${hours}h ${minutes}m`;
-    }
-    if (hours > 0) {
-        return `${hours}h ${minutes}m ${seconds}s`;
-    }
-    if (minutes > 0) {
-        return `${minutes}m ${seconds}s`;
-    }
-    return `${seconds}s`;
+    return { days, hours, minutes, seconds };
 }
+
+function padTwo(n: number): string {
+    return n.toString().padStart(2, "0");
+}
+
+interface CreationCooldownCardProps {
+    timeParts: TimeParts;
+    unlockFormattedDate: string;
+    onViewWarningModal: () => void;
+}
+
+const CreationCooldownCard: React.FC<CreationCooldownCardProps> = ({
+    timeParts,
+    unlockFormattedDate,
+    onViewWarningModal,
+}) => {
+    return (
+        <div
+            onClick={(e) => {
+                e.stopPropagation();
+                onViewWarningModal();
+            }}
+            className="mt-3 p-4 sm:p-5 rounded-2xl bg-amber-50 border-3 border-black shadow-[4px_4px_0px_#000] text-center transition-all hover:bg-amber-100/70 cursor-pointer"
+        >
+            {/* Header: Badge & View Warning Modal URL */}
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-black shadow-[1.5px_1.5px_0px_#000]">
+                    <Clock
+                        className="w-3.5 h-3.5 text-black animate-spin"
+                        style={{ animationDuration: "8s" }}
+                    />
+                    <span>Creation Cooldown Active</span>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onViewWarningModal();
+                    }}
+                    className="text-[10px] sm:text-[11px] uppercase underline text-amber-900 hover:text-black font-black transition-colors cursor-pointer"
+                >
+                    View Warning Modal →
+                </button>
+            </div>
+
+            {/* Narrative Context */}
+            <p className="text-[11px] sm:text-xs font-bold text-neutral-700 leading-relaxed max-w-md mx-auto">
+                You recently published an event. To safeguard event quality, reduce feed clutter, and uphold community credibility, a waiting duration is enforced.
+            </p>
+
+            {/* Prominent Digital Countdown Box */}
+            <div className="mt-3.5 grid grid-cols-4 gap-2 max-w-sm mx-auto">
+                <div className="p-2 sm:p-2.5 bg-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
+                    <div className="text-xl sm:text-2xl font-black text-black tabular-nums">
+                        {padTwo(timeParts.days)}
+                    </div>
+                    <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-neutral-500 mt-0.5">
+                        Days
+                    </div>
+                </div>
+                <div className="p-2 sm:p-2.5 bg-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
+                    <div className="text-xl sm:text-2xl font-black text-black tabular-nums">
+                        {padTwo(timeParts.hours)}
+                    </div>
+                    <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-neutral-500 mt-0.5">
+                        Hours
+                    </div>
+                </div>
+                <div className="p-2 sm:p-2.5 bg-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
+                    <div className="text-xl sm:text-2xl font-black text-black tabular-nums">
+                        {padTwo(timeParts.minutes)}
+                    </div>
+                    <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-neutral-500 mt-0.5">
+                        Mins
+                    </div>
+                </div>
+                <div className="p-2 sm:p-2.5 bg-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
+                    <div className="text-xl sm:text-2xl font-black text-amber-600 tabular-nums">
+                        {padTwo(timeParts.seconds)}
+                    </div>
+                    <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-neutral-500 mt-0.5">
+                        Secs
+                    </div>
+                </div>
+            </div>
+
+            {/* Unlock Date & Time Marker */}
+            <div className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border-2 border-black text-[10px] sm:text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
+                <Calendar className="w-3.5 h-3.5 text-neutral-700 shrink-0" />
+                <span>Unlocks on: {unlockFormattedDate}</span>
+            </div>
+        </div>
+    );
+};
 
 export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> = ({
     isOpen,
@@ -95,6 +188,18 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
     const panIndiaInCooldown = panIndiaRemainingMs > 0;
     const panIndiaScorePassed = eligibility ? eligibility.panIndia.scorePassed : true;
     const panIndiaEligible = eligibility ? (panIndiaScorePassed && !panIndiaInCooldown) : true;
+    const panIndiaTimeParts = breakDownRemaining(panIndiaRemainingMs);
+    const panIndiaUnlockFormattedDate = panIndiaExpiresAtMs
+        ? new Date(panIndiaExpiresAtMs).toLocaleString(undefined, {
+              weekday: "long",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+          })
+        : "Available immediately";
 
     // Campus live calculations (12 hours cooldown)
     const campusExpiresAtMs = eligibility?.campus?.cooldownExpiresAt
@@ -104,6 +209,18 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
     const campusInCooldown = campusRemainingMs > 0;
     const campusScorePassed = eligibility ? eligibility.campus.scorePassed : true;
     const campusEligible = eligibility ? (campusScorePassed && !campusInCooldown) : true;
+    const campusTimeParts = breakDownRemaining(campusRemainingMs);
+    const campusUnlockFormattedDate = campusExpiresAtMs
+        ? new Date(campusExpiresAtMs).toLocaleString(undefined, {
+              weekday: "long",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+          })
+        : "Available immediately";
 
     const handleCardClick = (scope: "PAN_INDIA" | "CAMPUS") => {
         if (scope === "PAN_INDIA") {
@@ -225,34 +342,13 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                     </div>
                                 </div>
 
-                                {/* Cooldown Alert Banner */}
+                                {/* Creation Cooldown Active Card */}
                                 {panIndiaInCooldown && (
-                                    <div
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setWarningScope("PAN_INDIA");
-                                        }}
-                                        className="mt-3 p-3 rounded-xl bg-amber-100 hover:bg-amber-200 border-2 border-black shadow-[2px_2px_0px_#000] text-amber-950 transition-colors"
-                                    >
-                                        <div className="flex items-center justify-between gap-2 text-xs font-black">
-                                            <div className="flex items-center gap-1.5">
-                                                <Clock
-                                                    className="w-4 h-4 text-amber-800 animate-spin"
-                                                    style={{ animationDuration: "6s" }}
-                                                />
-                                                <span>3-Day Cooldown Active</span>
-                                            </div>
-                                            <span className="text-[10px] uppercase underline text-amber-900 font-black">
-                                                View Warning Modal →
-                                            </span>
-                                        </div>
-                                        <p className="text-[11px] font-bold mt-1 text-amber-900 leading-tight">
-                                            Next Pan-India event can be created in{" "}
-                                            <span className="font-black text-black bg-white px-1.5 py-0.5 rounded border border-black inline-block mt-0.5">
-                                                {formatRemaining(panIndiaRemainingMs)}
-                                            </span>
-                                        </p>
-                                    </div>
+                                    <CreationCooldownCard
+                                        timeParts={panIndiaTimeParts}
+                                        unlockFormattedDate={panIndiaUnlockFormattedDate}
+                                        onViewWarningModal={() => setWarningScope("PAN_INDIA")}
+                                    />
                                 )}
 
                                 {/* Score Restricted Alert Banner */}
@@ -314,42 +410,39 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                 </div>
                             </div>
 
-                            {/* CTA Button: Always clickable so users can see full warning modal if restricted */}
-                            <div className="mt-6 pt-4 relative z-10">
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!panIndiaEligible) {
-                                            setWarningScope("PAN_INDIA");
-                                            return;
-                                        }
-                                        onSelectScope("PAN_INDIA");
-                                    }}
-                                    className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm border-2 border-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                        panIndiaEligible
-                                            ? "bg-[#FF9933] hover:bg-[#ff881a] text-black shadow-[3px_3px_0px_#000] group-hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-                                            : "bg-[#FFE566] hover:bg-[#ffd833] text-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-                                    }`}
-                                >
-                                    {panIndiaInCooldown ? (
-                                        <>
-                                            <Clock className="w-4 h-4" />
-                                            <span>Cooldown Active ({formatRemaining(panIndiaRemainingMs)}) — View Details</span>
-                                        </>
-                                    ) : !panIndiaScorePassed ? (
-                                        <>
-                                            <Lock className="w-4 h-4" />
-                                            <span>Locked: Score &lt; 50 — View Eligibility Notice</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span>Create Pan India Event</span>
-                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </>
-                                    )}
-                                </button>
-                            </div>
+                            {/* CTA Button: Shown only when not on cooldown */}
+                            {!panIndiaInCooldown && (
+                                <div className="mt-6 pt-4 relative z-10">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!panIndiaEligible) {
+                                                setWarningScope("PAN_INDIA");
+                                                return;
+                                            }
+                                            onSelectScope("PAN_INDIA");
+                                        }}
+                                        className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm border-2 border-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                            panIndiaEligible
+                                                ? "bg-[#FF9933] hover:bg-[#ff881a] text-black shadow-[3px_3px_0px_#000] group-hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                                                : "bg-[#FFE566] hover:bg-[#ffd833] text-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                                        }`}
+                                    >
+                                        {!panIndiaScorePassed ? (
+                                            <>
+                                                <Lock className="w-4 h-4" />
+                                                <span>Locked: Score &lt; 50 — View Eligibility Notice</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>Create Pan India Event</span>
+                                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* CARD 2: CAMPUS ONLY */}
@@ -414,34 +507,13 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                     </div>
                                 </div>
 
-                                {/* Cooldown Alert Banner */}
+                                {/* Creation Cooldown Active Card */}
                                 {campusInCooldown && (
-                                    <div
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setWarningScope("CAMPUS");
-                                        }}
-                                        className="mt-3 p-3 rounded-xl bg-amber-100 hover:bg-amber-200 border-2 border-black shadow-[2px_2px_0px_#000] text-amber-950 transition-colors"
-                                    >
-                                        <div className="flex items-center justify-between gap-2 text-xs font-black">
-                                            <div className="flex items-center gap-1.5">
-                                                <Clock
-                                                    className="w-4 h-4 text-amber-800 animate-spin"
-                                                    style={{ animationDuration: "6s" }}
-                                                />
-                                                <span>12-Hour Cooldown Active</span>
-                                            </div>
-                                            <span className="text-[10px] uppercase underline text-amber-900 font-black">
-                                                View Warning Modal →
-                                            </span>
-                                        </div>
-                                        <p className="text-[11px] font-bold mt-1 text-amber-900 leading-tight">
-                                            Next Campus event can be created in{" "}
-                                            <span className="font-black text-black bg-white px-1.5 py-0.5 rounded border border-black inline-block mt-0.5">
-                                                {formatRemaining(campusRemainingMs)}
-                                            </span>
-                                        </p>
-                                    </div>
+                                    <CreationCooldownCard
+                                        timeParts={campusTimeParts}
+                                        unlockFormattedDate={campusUnlockFormattedDate}
+                                        onViewWarningModal={() => setWarningScope("CAMPUS")}
+                                    />
                                 )}
 
                                 {/* Score Restricted Alert Banner */}
@@ -505,42 +577,39 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                 </div>
                             </div>
 
-                            {/* CTA Button: Always clickable so users can see full warning modal if restricted */}
-                            <div className="mt-6 pt-4 relative z-10">
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!campusEligible) {
-                                            setWarningScope("CAMPUS");
-                                            return;
-                                        }
-                                        onSelectScope("CAMPUS");
-                                    }}
-                                    className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm border-2 border-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                        campusEligible
-                                            ? "bg-[#38BDF8] hover:bg-[#2cb0eb] text-black shadow-[3px_3px_0px_#000] group-hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-                                            : "bg-[#FFE566] hover:bg-[#ffd833] text-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-                                    }`}
-                                >
-                                    {campusInCooldown ? (
-                                        <>
-                                            <Clock className="w-4 h-4" />
-                                            <span>Cooldown Active ({formatRemaining(campusRemainingMs)}) — View Details</span>
-                                        </>
-                                    ) : !campusScorePassed ? (
-                                        <>
-                                            <Lock className="w-4 h-4" />
-                                            <span>Locked: Score &lt; 20 — View Eligibility Notice</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span>Create Campus Event</span>
-                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </>
-                                    )}
-                                </button>
-                            </div>
+                            {/* CTA Button: Shown only when not on cooldown */}
+                            {!campusInCooldown && (
+                                <div className="mt-6 pt-4 relative z-10">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!campusEligible) {
+                                                setWarningScope("CAMPUS");
+                                                return;
+                                            }
+                                            onSelectScope("CAMPUS");
+                                        }}
+                                        className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm border-2 border-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                            campusEligible
+                                                ? "bg-[#38BDF8] hover:bg-[#2cb0eb] text-black shadow-[3px_3px_0px_#000] group-hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                                                : "bg-[#FFE566] hover:bg-[#ffd833] text-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                                        }`}
+                                    >
+                                        {!campusScorePassed ? (
+                                            <>
+                                                <Lock className="w-4 h-4" />
+                                                <span>Locked: Score &lt; 20 — View Eligibility Notice</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>Create Campus Event</span>
+                                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
