@@ -40,8 +40,10 @@ export interface RecentProblemRecord {
     platformName?: string;
     timestamp: number; // unix epoch seconds
     solvedAt?: string; // ISO string
+    exactDate?: string;
     url?: string;
     difficulty?: "Easy" | "Medium" | "Hard" | null;
+    topic?: string | null;
 }
 
 export interface PortalProfileData {
@@ -277,7 +279,7 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
                     for (const [k, v] of Object.entries(parsed)) {
                         const cnt = typeof v === "number" ? v : parseInt(String(v), 10) || 0;
                         if (cnt > 0) {
-                            submissionCalendar[k] = (submissionCalendar[k] || 0) + cnt;
+                            submissionCalendar[k] = Math.max(submissionCalendar[k] || 0, cnt);
                         }
                     }
                 }
@@ -1839,6 +1841,25 @@ export async function calculateUnifiedSubmissions(
         effectiveRows = rows;
     }
 
+    const CODING_PRACTICE_PLATFORMS = new Set([
+        "leetcode",
+        "codeforces",
+        "codechef",
+        "geeksforgeeks",
+        "hackerrank",
+        "atcoder",
+        "spoj",
+        "cses",
+        "code360",
+        "codingninjas",
+    ]);
+
+    // Strictly filter out GitHub and any non-coding platforms
+    effectiveRows = effectiveRows.filter((r: any) => {
+        const p = (r.portal || "").toLowerCase().trim();
+        return CODING_PRACTICE_PLATFORMS.has(p);
+    });
+
     const platformBreakdown: Record<string, {
         name: string;
         portal: string;
@@ -1980,12 +2001,18 @@ export async function calculateUnifiedSubmissions(
                         const ms = key.length <= 11 ? num * 1000 : num;
                         const d = new Date(ms);
                         if (!isNaN(d.getTime())) {
-                            dateStr = d.toISOString().split("T")[0] || key;
+                            const y = d.getUTCFullYear();
+                            const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+                            const day = String(d.getUTCDate()).padStart(2, "0");
+                            dateStr = `${y}-${m}-${day}`;
                         }
                     } else if (key.includes("/") || key.includes(".")) {
                         const d = new Date(key);
                         if (!isNaN(d.getTime())) {
-                            dateStr = d.toISOString().split("T")[0] || key;
+                            const y = d.getUTCFullYear();
+                            const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+                            const day = String(d.getUTCDate()).padStart(2, "0");
+                            dateStr = `${y}-${m}-${day}`;
                         }
                     } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(key)) {
                         const parts = key.split("-");
@@ -2044,7 +2071,12 @@ export async function calculateUnifiedSubmissions(
                             const num = parseInt(key, 10);
                             const ms = key.length <= 11 ? num * 1000 : num;
                             const d = new Date(ms);
-                            if (!isNaN(d.getTime())) dateStr = d.toISOString().split("T")[0] || key;
+                            if (!isNaN(d.getTime())) {
+                                const y = d.getUTCFullYear();
+                                const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+                                const day = String(d.getUTCDate()).padStart(2, "0");
+                                dateStr = `${y}-${m}-${day}`;
+                            }
                         } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(key)) {
                             const parts = key.split("-");
                             dateStr = `${parts[0]}-${(parts[1] || "1").padStart(2, "0")}-${(parts[2] || "1").padStart(2, "0")}`;
@@ -2362,6 +2394,7 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
 
         const cleanUser = username.toLowerCase().trim();
         const cacheKey = `user:submissions:unified:${cleanUser}`;
+        const cooldownKey = `user:submissions:cooldown:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         // Parse clientPortals if provided
@@ -2390,7 +2423,37 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
             }
         }
 
-        // Check Redis cache first for lightning-fast sub-millisecond response
+        // Check 1-hour cooldown in Redis
+        let cooldownTtl = 0;
+        if (redis && redis.status === "ready") {
+            try {
+                cooldownTtl = await redis.ttl(cooldownKey);
+                if (cooldownTtl < 0) cooldownTtl = 0;
+            } catch {
+                cooldownTtl = 0;
+            }
+        }
+
+        // 1. If forceRefresh is requested but cooldown is active, return cached data without hitting external APIs
+        if (forceRefresh && cooldownTtl > 0 && redis && redis.status === "ready") {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    return res.status(200).json({
+                        ...parsed,
+                        isCooldownActive: true,
+                        cooldownRemaining: cooldownTtl,
+                        cooldownExpiresAt: Date.now() + cooldownTtl * 1000,
+                        message: `Cooldown active. Platform data can be refetched in ${Math.ceil(cooldownTtl / 60)} minutes.`,
+                    });
+                }
+            } catch {
+                // fall through
+            }
+        }
+
+        // 2. Normal non-force read: check Redis cache (1 hour TTL)
         if (!forceRefresh && redis && redis.status === "ready") {
             try {
                 const cached = await redis.get(cacheKey);
@@ -2428,75 +2491,14 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
                         }
                     }
 
-                    // Cache Integrity Check: Verify that connected platforms with submissions actually have dailyMerged entries
-                    if (!cacheMismatched && parsed.platformBreakdown && parsed.dailyMerged) {
-                        for (const [portal, stat] of Object.entries(parsed.platformBreakdown as Record<string, any>)) {
-                            if (portal === "github") continue;
-                            const subCount = Math.max(stat.submissions || 0, stat.solved || 0);
-                            if (subCount > 5) {
-                                const hasDays = Object.values(parsed.dailyMerged as Record<string, any>).some((day: any) =>
-                                    (day.platforms && day.platforms.includes(portal.toLowerCase())) ||
-                                    (day.platformCounts && (day.platformCounts[portal.toLowerCase()] || 0) > 0)
-                                );
-                                if (!hasDays) {
-                                    // Corrupted cache detected: platform reports submissions but dailyMerged has 0 entries
-                                    cacheMismatched = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
                     if (!cacheMismatched) {
-                        res.status(200).json({ success: true, ...parsed });
-
-                        // Background revalidation: if cached response is older than 3 minutes, re-verify in background
-                        const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
-                        if (cacheAge > 3 * 60 * 1000 && !activeSubmissionsRefreshes.has(cleanUser)) {
-                            activeSubmissionsRefreshes.add(cleanUser);
-                            calculateUnifiedSubmissions(username, Object.keys(clientPortals).length > 0 ? clientPortals : undefined)
-                                .then(async (fresh) => {
-                                    // CRITICAL CACHE GUARD: Never overwrite a rich cache with a degraded or truncated one!
-                                    const oldDays = Object.keys(parsed.dailyMerged || {}).length;
-                                    const newDays = Object.keys(fresh.dailyMerged || {}).length;
-                                    if (oldDays > 10 && newDays < oldDays * 0.7) {
-                                        console.warn(`[Submissions Cache Guard] Rejecting degraded background cache update for ${cleanUser} (${newDays} days vs ${oldDays} days)`);
-                                        return;
-                                    }
-
-                                    // Verify no connected platform lost its submissions
-                                    for (const [p, s] of Object.entries(parsed.platformBreakdown || {})) {
-                                        if (p === "github") continue;
-                                        const sub = (s as any).submissions || 0;
-                                        if (sub > 10) {
-                                            const hadDays = Object.values(parsed.dailyMerged || {}).some((d: any) => d.platforms?.includes(p));
-                                            const hasDaysNow = Object.values(fresh.dailyMerged || {}).some((d: any) => d.platforms?.includes(p));
-                                            if (hadDays && !hasDaysNow) {
-                                                console.warn(`[Submissions Cache Guard] Rejecting degraded cache update for ${cleanUser}: platform ${p} lost submissions calendar`);
-                                                return;
-                                            }
-                                        }
-                                    }
-
-                                    if (
-                                        fresh.totalSubmissions !== parsed.totalSubmissions ||
-                                        fresh.activeDays !== parsed.activeDays ||
-                                        fresh.dayStreak !== parsed.dayStreak ||
-                                        Object.keys(fresh.dailyMerged).length !== Object.keys(parsed.dailyMerged).length
-                                    ) {
-                                        if (redis && redis.status === "ready") {
-                                            await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
-                                        }
-                                    }
-                                })
-                                .catch((err) => {
-                                    console.error("Background submissions re-verification error:", err);
-                                })
-                                .finally(() => {
-                                    activeSubmissionsRefreshes.delete(cleanUser);
-                                });
-                        }
-                        return;
+                        return res.status(200).json({
+                            success: true,
+                            ...parsed,
+                            isCooldownActive: cooldownTtl > 0,
+                            cooldownRemaining: Math.max(0, cooldownTtl),
+                            cooldownExpiresAt: cooldownTtl > 0 ? Date.now() + cooldownTtl * 1000 : undefined,
+                        });
                     }
                 }
             } catch {
@@ -2504,24 +2506,35 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
             }
         }
 
-        // Cache miss or force refresh or platform set changed
+        // 3. Cache miss, platform set changed, or valid forceRefresh:
         const responseData = await calculateUnifiedSubmissions(
             username,
             Object.keys(clientPortals).length > 0 ? clientPortals : undefined
         );
 
-        // Cache in Redis for 30 minutes (1800s) if valid and not empty
+        // Cache in Redis for 1 hour (3600s), and if forceRefresh, enforce 1-hour cooldown
+        let activeCooldownRemaining = 0;
         if (redis && redis.status === "ready") {
             try {
-                const hasSubmissions = (responseData.totalSubmissions || 0) > 0 || Object.keys(responseData.platformBreakdown || {}).length > 0;
-                const ttl = hasSubmissions ? 1800 : 30; // short TTL retry if degraded
-                await redis.set(cacheKey, JSON.stringify(responseData), "EX", ttl);
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 3600);
+                if (forceRefresh) {
+                    await redis.set(cooldownKey, "1", "EX", 3600);
+                    activeCooldownRemaining = 3600;
+                } else if (cooldownTtl > 0) {
+                    activeCooldownRemaining = cooldownTtl;
+                }
             } catch {
                 // Non-fatal
             }
         }
 
-        return res.status(200).json(responseData);
+        return res.status(200).json({
+            ...responseData,
+            isCooldownActive: activeCooldownRemaining > 0,
+            cooldownRemaining: activeCooldownRemaining,
+            cooldownExpiresAt: activeCooldownRemaining > 0 ? Date.now() + activeCooldownRemaining * 1000 : undefined,
+            message: forceRefresh ? "Platform submissions synchronized successfully." : undefined,
+        });
     } catch (err: any) {
         console.error("Unified submissions endpoint error:", err);
         return res.status(500).json({

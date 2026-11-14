@@ -9,7 +9,10 @@ interface RecentlySolvedCardProps {
 }
 
 export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, isLoading }) => {
-    const list = data?.recentlySolved || [];
+    // Strictly filter out any github entries
+    const list = (data?.recentlySolved || []).filter(
+        (item) => item && item.portal && item.portal.toLowerCase() !== "github"
+    );
 
     const handleOpenProblem = (url?: string) => {
         if (url && typeof window !== "undefined") {
@@ -74,10 +77,25 @@ export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, is
                                         </span>
                                     </div>
 
-                                    {/* Right: Relative Time */}
-                                    <span className="text-xs sm:text-sm text-black flex-shrink-0 font-bold font-mono bg-[#FAF6EE] border border-black px-2 py-0.5 rounded shadow-[1px_1px_0px_#000]">
-                                        {item.relativeTime}
-                                    </span>
+                                    {/* Right: Difficulty badge + Relative Time */}
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        {item.difficulty && (
+                                            <span
+                                                className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000] hidden sm:inline-flex ${
+                                                    item.difficulty === "Easy"
+                                                        ? "bg-[#a2ff86] text-black"
+                                                        : item.difficulty === "Medium"
+                                                        ? "bg-[#FFE566] text-black"
+                                                        : "bg-[#FF6B6B] text-black"
+                                                }`}
+                                            >
+                                                {item.difficulty}
+                                            </span>
+                                        )}
+                                        <span className="text-xs sm:text-sm text-black flex-shrink-0 font-bold font-mono bg-[#FAF6EE] border border-black px-2 py-0.5 rounded shadow-[1px_1px_0px_#000]">
+                                            {item.relativeTime}
+                                        </span>
+                                    </div>
                                 </div>
                             ))}
                         </div>

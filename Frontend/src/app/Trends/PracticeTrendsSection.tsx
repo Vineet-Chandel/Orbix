@@ -4,6 +4,7 @@ import { TrendingUp, RefreshCw, Plus } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchContestPerformance } from "../../store";
 import { PlatformRatingHistoryCard } from "./PlatformRatingHistoryCard";
 import { PracticeActivityOverview } from "./PracticeActivityOverview";
+import { RecentlySolvedTrendsCard } from "./RecentlySolvedTrendsCard";
 import type { PlatformContestAnalytics } from "../../store/contestsSlice";
 
 interface PracticeTrendsSectionProps {
@@ -96,6 +97,12 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
         <div className="space-y-8">
             {/* Top Practice Activity Overview Block */}
             <PracticeActivityOverview
+                connectedPortals={connectedPortals}
+                username={effectiveUser}
+            />
+
+            {/* Recently Solved Questions Section */}
+            <RecentlySolvedTrendsCard
                 connectedPortals={connectedPortals}
                 username={effectiveUser}
             />

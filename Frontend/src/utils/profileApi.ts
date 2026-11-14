@@ -1095,6 +1095,7 @@ export interface ExploreResponse {
     limit: number;
     totalPages: number;
     users: ExploreDeveloper[];
+    availableColleges?: string[];
 }
 
 export interface PrivacyAuditResponse {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock, GraduationCap, Clock, XCircle, AlertTriangle } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock, GraduationCap, Clock, XCircle, AlertTriangle, ExternalLink } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile, getInstitutionById, updateResumeVisibility, type InstitutionItem } from "../../utils/profileApi";
@@ -89,6 +89,11 @@ export default function ProfileManager() {
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
     const platformSync = usePlatformSync();
+
+    // Canonical public profile showcase link for this developer
+    const publicProfilePath = user?.username
+        ? `/profile/u/${encodeURIComponent(user.username)}`
+        : "/demo";
 
     // Profile Edit Form State
     const [firstName, setFirstName] = useState(user?.firstName || "");
@@ -624,7 +629,7 @@ export default function ProfileManager() {
                         {/* ========================================================================= */}
                         {/* PAGE HEADER: Neo-Brutalist Heading */}
                         {/* ========================================================================= */}
-                        <div className="pb-5 border-b-2 border-black/55 flex items-center justify-between gap-4">
+                        <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-3">
                                     <button
@@ -646,6 +651,21 @@ export default function ProfileManager() {
                                 <p className="text-xs sm:text-sm font-bold text-neutral-700 max-w-2xl">
                                     Manage your developer showcase, social cards, verified directory affiliation, and recruiter contact visibility.
                                 </p>
+                            </div>
+
+                            {/* Public Profile Redirection Button */}
+                            <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
+                                <Link
+                                    to={publicProfilePath}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-white hover:bg-[#FAF6EE] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] transition-all cursor-pointer select-none group"
+                                    title={`View your public profile showcase (@${user?.username || "user"})`}
+                                >
+                                    <Globe className="w-4 h-4 text-black stroke-[2.5]" />
+                                    <span>View Public Profile</span>
+                                    <ExternalLink className="w-3.5 h-3.5 text-black stroke-[2.5] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                </Link>
                             </div>
                         </div>
 

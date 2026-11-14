@@ -9,10 +9,12 @@ import {
     CheckCircle2,
     ArrowRight,
     Trophy,
+    RotateCw,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUnifiedSubmissions, invalidateSubmissions } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
 import {
+    CODING_PRACTICE_PLATFORMS,
     aggregateClientPortalsSubmissions,
     buildWeeklySubmissionColumns,
     calculateUnifiedStreak,
@@ -36,18 +38,63 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     const effectiveUser = (username || "").trim();
     const dispatch = useAppDispatch();
     const remoteData = useAppSelector((state) => state.submissions.dataByUser[effectiveUser]);
+    const isLoading = useAppSelector((state) => state.submissions.loadingByUser[effectiveUser]);
+
+    const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+
+    // Calculate cooldown seconds from remoteData
+    useEffect(() => {
+        if (remoteData?.cooldownExpiresAt) {
+            const diff = Math.ceil((remoteData.cooldownExpiresAt - Date.now()) / 1000);
+            setCooldownSeconds(diff > 0 ? diff : 0);
+        } else if (remoteData?.cooldownRemaining) {
+            setCooldownSeconds(remoteData.cooldownRemaining > 0 ? remoteData.cooldownRemaining : 0);
+        } else {
+            setCooldownSeconds(0);
+        }
+    }, [remoteData?.cooldownExpiresAt, remoteData?.cooldownRemaining]);
+
+    // Timer tick down every 1 second when cooldown is active
+    useEffect(() => {
+        if (cooldownSeconds <= 0) return;
+        const timer = setInterval(() => {
+            setCooldownSeconds((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [cooldownSeconds]);
+
+    const formatCooldownTime = (secs: number) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        if (m > 0) {
+            return `${m}m ${s < 10 ? `0${s}` : s}s`;
+        }
+        return `${s}s`;
+    };
+
+    const handleSyncClick = () => {
+        if (cooldownSeconds > 0 || isLoading || !effectiveUser) return;
+        dispatch(invalidateSubmissions(effectiveUser));
+        dispatch(fetchUnifiedSubmissions({ username: effectiveUser, force: true, portals: connectedPortals }));
+    };
 
     const weeksCount = 52; // Full 1 Year activity heatmap
 
     const user = useAppSelector((state) => state.user.user);
 
-    // Map of currently active connected portals and usernames (strictly excluding GitHub)
+    // Map of currently active connected portals and usernames (strictly targeting verified coding platforms)
     const activePortalsMap = useMemo(() => {
         const map = new Map<string, string>();
         if (connectedPortals && typeof connectedPortals === "object") {
             for (const [k, v] of Object.entries(connectedPortals)) {
                 const lk = k.toLowerCase().trim();
-                if (lk === "github" || lk.startsWith("_") || lk === "theme") continue;
+                if (!CODING_PRACTICE_PLATFORMS.has(lk)) continue;
                 const handle = (v?.username || v?.portal_username || "").trim().toLowerCase();
                 if (handle) map.set(lk, handle);
             }
@@ -56,7 +103,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
         if (map.size === 0 && user?.platforms && Array.isArray(user.platforms)) {
             for (const p of user.platforms) {
                 const lk = (p.portal || "").toLowerCase().trim();
-                if (lk === "github") continue;
+                if (!CODING_PRACTICE_PLATFORMS.has(lk)) continue;
                 const handle = (p.portalUsername || p.portal_username || p.username || "").trim().toLowerCase();
                 if (handle) map.set(lk, handle);
             }
@@ -253,7 +300,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     );
                     if (sum > 0) cellCount = sum;
                 }
-                if (cellCount <= 0) cellCount = 1;
+                if (cellCount <= 0) continue; // STRICT: never fabricate active days
 
                 const effectivePlatforms = filteredPlatforms.length > 0 ? filteredPlatforms : entryPlatforms;
 
@@ -289,12 +336,14 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
         // Production unified streak algorithm across all active platforms
         const computedStreak = calculateUnifiedStreak(sanitizedMap);
 
-        // Synchronize with remote server metrics if available and larger
-        if (remoteData?.dayStreak && remoteData.dayStreak > computedStreak.currentStreak) {
-            computedStreak.currentStreak = remoteData.dayStreak;
-        }
-        if (remoteData?.maxStreak && remoteData.maxStreak > computedStreak.maxStreak) {
-            computedStreak.maxStreak = remoteData.maxStreak;
+        // Synchronize with remote server metrics if available and larger ONLY when selectedPortal === "all"
+        if (selectedPortal === "all") {
+            if (remoteData?.dayStreak && remoteData.dayStreak > computedStreak.currentStreak) {
+                computedStreak.currentStreak = remoteData.dayStreak;
+            }
+            if (remoteData?.maxStreak && remoteData.maxStreak > computedStreak.maxStreak) {
+                computedStreak.maxStreak = remoteData.maxStreak;
+            }
         }
         computedStreak.maxStreak = Math.max(computedStreak.maxStreak, computedStreak.currentStreak);
 
@@ -393,7 +442,35 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-5 flex-shrink-0">
+                <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0 flex-wrap justify-end">
+                    {/* Sync / Refetch Platforms Button with 1-Hour Cooldown */}
+                    <button
+                        type="button"
+                        onClick={handleSyncClick}
+                        disabled={cooldownSeconds > 0 || isLoading}
+                        title={
+                            cooldownSeconds > 0
+                                ? `Platform sync cooldown active (${formatCooldownTime(cooldownSeconds)} remaining)`
+                                : "Sync and refetch fresh submissions from all connected coding platforms"
+                        }
+                        className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-black border-2 border-black transition-all shadow-[2px_2px_0px_#000] select-none ${
+                            cooldownSeconds > 0
+                                ? "bg-neutral-100 text-neutral-500 border-neutral-400 cursor-not-allowed opacity-80"
+                                : isLoading
+                                ? "bg-[#FFE566] text-black cursor-wait"
+                                : "bg-[#FAF6EE] hover:bg-[#FFE566] text-black active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                        }`}
+                    >
+                        <RotateCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                        <span>
+                            {isLoading
+                                ? "Syncing..."
+                                : cooldownSeconds > 0
+                                ? `Cooldown (${formatCooldownTime(cooldownSeconds)})`
+                                : "Sync Platforms"}
+                        </span>
+                    </button>
+
                     {/* Total Submissions Metric */}
                     <div className="text-left md:text-right">
                         <span className="text-3xl sm:text-4xl font-mono font-black text-black block leading-none">

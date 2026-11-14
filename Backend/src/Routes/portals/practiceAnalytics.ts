@@ -22,8 +22,11 @@ export interface RecentSolveItem {
     platformName: string;
     timestamp: number;
     solvedAt: string;
+    exactDate?: string;
     url: string;
     relativeTime: string;
+    difficulty?: "Easy" | "Medium" | "Hard" | null;
+    topic?: string | null;
 }
 
 export interface DsaTopicItem {
@@ -114,6 +117,117 @@ function formatRelativeTime(timestampSeconds: number): string {
     return "just now";
 }
 
+function formatExactDate(timestampSeconds: number): string {
+    if (!timestampSeconds || isNaN(timestampSeconds)) return "";
+    const ms = timestampSeconds > 1e11 ? timestampSeconds : timestampSeconds * 1000;
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-US", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+}
+
+// Bounded in-memory cache for LeetCode question metadata (difficulty & topic)
+const leetcodeQuestionCache = new Map<string, { difficulty: "Easy" | "Medium" | "Hard"; topic: string }>();
+
+const LEETCODE_DIFFICULTY_LOOKUP: Record<string, { difficulty: "Easy" | "Medium" | "Hard"; topic: string }> = {
+    "two-sum": { difficulty: "Easy", topic: "Array" },
+    "valid-parentheses": { difficulty: "Easy", topic: "Stack" },
+    "merge-two-sorted-lists": { difficulty: "Easy", topic: "Linked List" },
+    "best-time-to-buy-and-sell-stock": { difficulty: "Easy", topic: "Array" },
+    "valid-palindrome": { difficulty: "Easy", topic: "Two Pointers" },
+    "invert-binary-tree": { difficulty: "Easy", topic: "Tree" },
+    "maximum-depth-of-binary-tree": { difficulty: "Easy", topic: "Tree" },
+    "climbing-stairs": { difficulty: "Easy", topic: "Dynamic Programming" },
+    "contains-duplicate": { difficulty: "Easy", topic: "Array" },
+    "reverse-linked-list": { difficulty: "Easy", topic: "Linked List" },
+    "add-two-numbers": { difficulty: "Medium", topic: "Linked List" },
+    "longest-substring-without-repeating-characters": { difficulty: "Medium", topic: "Sliding Window" },
+    "longest-palindromic-substring": { difficulty: "Medium", topic: "Dynamic Programming" },
+    "container-with-most-water": { difficulty: "Medium", topic: "Two Pointers" },
+    "3sum": { difficulty: "Medium", topic: "Two Pointers" },
+    "remove-nth-node-from-end-of-list": { difficulty: "Medium", topic: "Linked List" },
+    "search-in-rotated-sorted-array": { difficulty: "Medium", topic: "Binary Search" },
+    "combination-sum": { difficulty: "Medium", topic: "Backtracking" },
+    "group-anagrams": { difficulty: "Medium", topic: "Hash Table" },
+    "maximum-subarray": { difficulty: "Medium", topic: "Dynamic Programming" },
+    "spiral-matrix": { difficulty: "Medium", topic: "Matrix" },
+    "jump-game": { difficulty: "Medium", topic: "Greedy" },
+    "merge-intervals": { difficulty: "Medium", topic: "Intervals" },
+    "word-search": { difficulty: "Medium", topic: "Backtracking" },
+    "coin-change": { difficulty: "Medium", topic: "Dynamic Programming" },
+    "number-of-islands": { difficulty: "Medium", topic: "Graph" },
+    "course-schedule": { difficulty: "Medium", topic: "Graph" },
+    "lru-cache": { difficulty: "Medium", topic: "Design" },
+    "kth-largest-element-in-an-array": { difficulty: "Medium", topic: "Heap" },
+    "median-of-two-sorted-arrays": { difficulty: "Hard", topic: "Binary Search" },
+    "regular-expression-matching": { difficulty: "Hard", topic: "Dynamic Programming" },
+    "merge-k-sorted-lists": { difficulty: "Hard", topic: "Linked List" },
+    "trapping-rain-water": { difficulty: "Hard", topic: "Two Pointers" },
+    "first-missing-positive": { difficulty: "Hard", topic: "Array" },
+    "n-queens": { difficulty: "Hard", topic: "Backtracking" },
+    "word-ladder": { difficulty: "Hard", topic: "Graph" },
+    "word-ladder-ii": { difficulty: "Hard", topic: "Graph" },
+    "sliding-window-maximum": { difficulty: "Hard", topic: "Sliding Window" },
+    "binary-tree-maximum-path-sum": { difficulty: "Hard", topic: "Tree" },
+};
+
+async function getLeetCodeQuestionDetails(titleSlug: string): Promise<{ difficulty: "Easy" | "Medium" | "Hard"; topic: string } | null> {
+    if (!titleSlug) return null;
+    const slug = titleSlug.toLowerCase().trim();
+    if (leetcodeQuestionCache.has(slug)) {
+        return leetcodeQuestionCache.get(slug)!;
+    }
+    if (LEETCODE_DIFFICULTY_LOOKUP[slug]) {
+        const item = LEETCODE_DIFFICULTY_LOOKUP[slug]!;
+        leetcodeQuestionCache.set(slug, item);
+        return item;
+    }
+    try {
+        const res = await fetch("https://leetcode.com/graphql", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            },
+            body: JSON.stringify({
+                query: `query questionData($titleSlug: String!) {
+                    question(titleSlug: $titleSlug) {
+                        difficulty
+                        topicTags {
+                            name
+                        }
+                    }
+                }`,
+                variables: { titleSlug: slug },
+            }),
+            signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) {
+            const data = (await res.json()) as any;
+            const q = data?.data?.question;
+            if (q) {
+                const diff = (q.difficulty === "Easy" || q.difficulty === "Medium" || q.difficulty === "Hard") ? q.difficulty : "Medium";
+                const topic = (Array.isArray(q.topicTags) && q.topicTags.length > 0 && q.topicTags[0]?.name)
+                    ? q.topicTags[0].name
+                    : "Algorithms";
+                const detail = { difficulty: diff, topic };
+                if (leetcodeQuestionCache.size > 2000) {
+                    const firstKey = leetcodeQuestionCache.keys().next().value;
+                    if (firstKey) leetcodeQuestionCache.delete(firstKey);
+                }
+                leetcodeQuestionCache.set(slug, detail);
+                return detail;
+            }
+        }
+    } catch {
+        // Safe fallback
+    }
+    return null;
+}
+
 const PLATFORM_NAMES: Record<string, string> = {
     leetcode: "LeetCode",
     codechef: "CodeChef",
@@ -121,7 +235,30 @@ const PLATFORM_NAMES: Record<string, string> = {
     hackerrank: "HackerRank",
     geeksforgeeks: "GeeksforGeeks",
     atcoder: "AtCoder",
+    code360: "Code360",
+    interviewbit: "InterviewBit",
+    cses: "CSES",
     spoj: "SPOJ",
+};
+
+const CF_TAG_MAPPING: Record<string, string> = {
+    "strings": "String",
+    "math": "Math",
+    "dp": "Dynamic Programming",
+    "sortings": "Sorting",
+    "greedy": "Greedy",
+    "dfs and similar": "Depth-First Search",
+    "binary search": "Binary Search",
+    "graphs": "Graph",
+    "trees": "Tree",
+    "data structures": "Data Structures",
+    "two pointers": "Two Pointers",
+    "implementation": "Implementation",
+    "brute force": "Brute Force",
+    "number theory": "Math",
+    "combinatorics": "Math",
+    "geometry": "Geometry",
+    "bitmasks": "Bit Manipulation",
 };
 
 /**
@@ -149,10 +286,10 @@ export async function calculateUserPracticeAnalytics(
     }
 
     // 1. Resolve connected portals from Database with clientPortals fallback
-    let portalRows: Array<{ portal: string; portal_username: string; stats?: any }> = [];
+    let portalRows: Array<{ portal: string; portal_username: string; stats?: any; snapshot?: any }> = [];
     try {
         const res = await query(
-            `SELECT portal, portal_username, stats
+            `SELECT portal, portal_username, stats, snapshot
              FROM user_links
              WHERE LOWER(username) = LOWER($1)
              ORDER BY id ASC;`,
@@ -277,13 +414,33 @@ export async function calculateUserPracticeAnalytics(
                 // Recent AC solves
                 const rawRecent = lcData?.data?.recentAcSubmissionList || [];
                 const seenSlugs = new Set<string>();
+                const uniqueRecentItems: any[] = [];
                 for (const item of rawRecent) {
                     if (!item || !item.title) continue;
                     const slug = (item.titleSlug || "").toLowerCase();
                     if (seenSlugs.has(slug)) continue;
                     seenSlugs.add(slug);
+                    uniqueRecentItems.push(item);
+                }
 
+                // Dynamically fetch question difficulty and topic in parallel with bounded cache
+                const lcDetails = await Promise.allSettled(
+                    uniqueRecentItems.map((item) => {
+                        const slug = (item.titleSlug || "").toLowerCase();
+                        return getLeetCodeQuestionDetails(slug);
+                    })
+                );
+
+                for (let i = 0; i < uniqueRecentItems.length; i++) {
+                    const item = uniqueRecentItems[i];
+                    const slug = (item.titleSlug || "").toLowerCase();
+                    const detailRes = lcDetails[i];
+                    const detail = detailRes?.status === "fulfilled" ? detailRes.value : null;
+
+                    const difficulty = detail?.difficulty || LEETCODE_DIFFICULTY_LOOKUP[slug]?.difficulty || null;
+                    const topic = detail?.topic || LEETCODE_DIFFICULTY_LOOKUP[slug]?.topic || "Problem Solving";
                     const ts = parseInt(item.timestamp, 10) || Math.floor(Date.now() / 1000);
+
                     recentSubmissionsList.push({
                         id: `leetcode-${item.id || slug}`,
                         title: item.title,
@@ -291,8 +448,11 @@ export async function calculateUserPracticeAnalytics(
                         platformName: "LeetCode",
                         timestamp: ts,
                         solvedAt: new Date(ts * 1000).toISOString(),
+                        exactDate: formatExactDate(ts),
                         url: `https://leetcode.com/problems/${slug}/`,
                         relativeTime: formatRelativeTime(ts),
+                        difficulty,
+                        topic,
                     });
                 }
             }
@@ -319,6 +479,7 @@ export async function calculateUserPracticeAnalytics(
                 const cfData = (await cfRes.json()) as any;
                 if (cfData.status === "OK" && Array.isArray(cfData.result)) {
                     const seenProblems = new Set<string>();
+                    let cfRecentCount = 0;
                     for (const sub of cfData.result) {
                         if (sub.verdict !== "OK" || !sub.problem) continue;
                         const pId = `${sub.problem.contestId || ""}-${sub.problem.index || ""}`;
@@ -350,8 +511,27 @@ export async function calculateUserPracticeAnalytics(
                             cfTagCounts[tag] = (cfTagCounts[tag] || 0) + 1;
                         }
 
-                        // Add to recent solves if within latest 10
-                        if (recentSubmissionsList.length < 15 && sub.creationTimeSeconds) {
+                        // Add to recent solves if within latest 20
+                        if (cfRecentCount < 20 && sub.creationTimeSeconds) {
+                            cfRecentCount++;
+                            let cfDifficulty: "Easy" | "Medium" | "Hard" = "Medium";
+                            if (typeof sub.problem.rating === "number") {
+                                if (sub.problem.rating < 1200) cfDifficulty = "Easy";
+                                else if (sub.problem.rating <= 1800) cfDifficulty = "Medium";
+                                else cfDifficulty = "Hard";
+                            } else if (sub.problem.index) {
+                                const idxChar = String(sub.problem.index).charAt(0).toUpperCase();
+                                if (idxChar === "A" || idxChar === "B") cfDifficulty = "Easy";
+                                else if (idxChar === "C" || idxChar === "D") cfDifficulty = "Medium";
+                                else cfDifficulty = "Hard";
+                            }
+
+                            let cfTopic = "Competitive Programming";
+                            if (Array.isArray(sub.problem.tags) && sub.problem.tags.length > 0) {
+                                const firstTag = sub.problem.tags[0].toLowerCase();
+                                cfTopic = CF_TAG_MAPPING[firstTag] || (firstTag.charAt(0).toUpperCase() + firstTag.slice(1));
+                            }
+
                             recentSubmissionsList.push({
                                 id: `codeforces-${pId}`,
                                 title: sub.problem.name || pId,
@@ -359,10 +539,13 @@ export async function calculateUserPracticeAnalytics(
                                 platformName: "Codeforces",
                                 timestamp: sub.creationTimeSeconds,
                                 solvedAt: new Date(sub.creationTimeSeconds * 1000).toISOString(),
+                                exactDate: formatExactDate(sub.creationTimeSeconds),
                                 url: sub.problem.contestId
                                     ? `https://codeforces.com/contest/${sub.problem.contestId}/problem/${sub.problem.index}`
-                                    : "https://codeforces.com",
+                                    : "https://codeforces.com/problemset",
                                 relativeTime: formatRelativeTime(sub.creationTimeSeconds),
+                                difficulty: cfDifficulty,
+                                topic: cfTopic,
                             });
                         }
                     }
@@ -462,12 +645,54 @@ export async function calculateUserPracticeAnalytics(
     // Ensure sorted descending
     platformBreakdown.sort((a, b) => b.count - a.count);
 
+    // Collect recent solves from other connected platforms stored in DB snapshots
+    for (const r of portalRows) {
+        const p = (r.portal || "").toLowerCase().trim();
+        if (p === "github" || p === "leetcode" || p === "codeforces") continue; // GitHub is strictly excluded!
+        const snapshot = r.snapshot;
+        if (snapshot && typeof snapshot === "object") {
+            const subs = snapshot.recentSubmissions;
+            if (Array.isArray(subs)) {
+                for (const s of subs) {
+                    if (!s || !s.title || (s.portal && s.portal.toLowerCase() === "github")) continue;
+                    const ts = s.timestamp || Math.floor(Date.now() / 1000);
+                    let diff = s.difficulty;
+                    if (!diff) {
+                        const lowTitle = s.title.toLowerCase();
+                        if (lowTitle.includes("easy") || lowTitle.includes("basic") || lowTitle.includes("school")) diff = "Easy";
+                        else if (lowTitle.includes("hard")) diff = "Hard";
+                        else diff = "Medium";
+                    }
+                    const topic = s.topic || (p === "geeksforgeeks" ? "DSA Practice" : p === "hackerrank" ? "Problem Solving" : "Algorithms");
+                    recentSubmissionsList.push({
+                        id: s.id || `${p}-${s.title.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+                        title: s.title,
+                        portal: p,
+                        platformName: PLATFORM_NAMES[p] || (p.charAt(0).toUpperCase() + p.slice(1)),
+                        timestamp: ts,
+                        solvedAt: s.solvedAt || new Date(ts * 1000).toISOString(),
+                        exactDate: s.exactDate || formatExactDate(ts),
+                        url: s.url || `https://${p}.com`,
+                        relativeTime: formatRelativeTime(ts),
+                        difficulty: diff,
+                        topic,
+                    });
+                }
+            }
+        }
+    }
+
+    // Strictly filter out any github entries
+    const nonGithubRecent = recentSubmissionsList.filter(
+        (item) => item && item.portal && item.portal.toLowerCase() !== "github"
+    );
+
     // Sort recent submissions strictly chronological (newest first)
-    recentSubmissionsList.sort((a, b) => b.timestamp - a.timestamp);
+    nonGithubRecent.sort((a, b) => b.timestamp - a.timestamp);
     const deduplicatedRecentSolves: RecentSolveItem[] = [];
     const seenRecentTitles = new Set<string>();
-    for (const item of recentSubmissionsList) {
-        const k = item.title.toLowerCase().trim();
+    for (const item of nonGithubRecent) {
+        const k = `${item.portal}:${item.title.toLowerCase().trim()}`;
         if (!seenRecentTitles.has(k)) {
             seenRecentTitles.add(k);
             deduplicatedRecentSolves.push(item);
@@ -475,26 +700,6 @@ export async function calculateUserPracticeAnalytics(
     }
 
     // Dynamic DSA Topics (LeetCode + Codeforces)
-    const cfTagMapping: Record<string, string> = {
-        "strings": "String",
-        "math": "Math",
-        "dp": "Dynamic Programming",
-        "sortings": "Sorting",
-        "greedy": "Greedy",
-        "dfs and similar": "Depth-First Search",
-        "binary search": "Binary Search",
-        "graphs": "Graph",
-        "trees": "Tree",
-        "data structures": "Data Structures",
-        "two pointers": "Two Pointers",
-        "implementation": "Implementation",
-        "brute force": "Brute Force",
-        "number theory": "Math",
-        "combinatorics": "Math",
-        "geometry": "Geometry",
-        "bitmasks": "Bit Manipulation",
-    };
-
     const mergedTopics: Record<string, number> = {};
     for (const [tag, count] of Object.entries(leetCodeTopicCounts)) {
         if (count > 0) {
@@ -503,7 +708,7 @@ export async function calculateUserPracticeAnalytics(
     }
     for (const [cfTag, count] of Object.entries(cfTagCounts)) {
         if (count > 0) {
-            const mapped = cfTagMapping[cfTag.toLowerCase()] || cfTag;
+            const mapped = CF_TAG_MAPPING[cfTag.toLowerCase()] || cfTag;
             mergedTopics[mapped] = (mergedTopics[mapped] || 0) + count;
         }
     }
@@ -780,7 +985,7 @@ export async function calculateUserPracticeAnalytics(
             total: donutTotal,
         },
         platformBreakdown,
-        recentlySolved: deduplicatedRecentSolves.slice(0, 10),
+        recentlySolved: deduplicatedRecentSolves.slice(0, 20),
         dsaTopics: topDsaTopicsList,
         topicStrength,
         trends,

@@ -13,6 +13,10 @@ export interface UnifiedSubmissionsData {
     dailyMerged: Record<string, { count: number; platforms: string[] }>;
     connectedPlatformsCount: number;
     timestamp?: string;
+    cooldownRemaining?: number;
+    isCooldownActive?: boolean;
+    cooldownExpiresAt?: number;
+    message?: string;
 }
 
 export interface SubmissionsState {
@@ -162,6 +166,10 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
                                 data.connectedPlatformsCount ||
                                 Object.keys(data.platformBreakdown || {}).length,
                             timestamp: data.timestamp || new Date().toISOString(),
+                            cooldownRemaining: data.cooldownRemaining,
+                            isCooldownActive: data.isCooldownActive,
+                            cooldownExpiresAt: data.cooldownExpiresAt,
+                            message: data.message,
                         };
                     }
                 }
@@ -256,10 +264,8 @@ export const submissionsSlice = createSlice({
                     const prev = state.dataByUser[user];
                     const next = { ...action.payload };
 
-                    // Client-side cache guard:
-                    // If previously stored data had significantly more daily calendar days (e.g. from an earlier successful fetch),
-                    // merge the daily calendar so that a temporary glitch or server timeout never zeroes out historical submissions
-                    if (prev && prev.dailyMerged && Object.keys(prev.dailyMerged).length > Object.keys(next.dailyMerged || {}).length) {
+                    // If force refresh is true, do not merge old degraded/bloated cache - use clean source data!
+                    if (!action.meta.arg.force && prev && prev.dailyMerged && Object.keys(prev.dailyMerged).length > Object.keys(next.dailyMerged || {}).length) {
                         next.dailyMerged = {
                             ...prev.dailyMerged,
                             ...(next.dailyMerged || {}),

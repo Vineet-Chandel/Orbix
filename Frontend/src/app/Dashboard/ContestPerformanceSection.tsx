@@ -11,7 +11,6 @@ import {
     CheckCircle2,
     RefreshCw,
     X,
-    ExternalLink,
     ChevronRight,
     Sparkles,
     AlertCircle,
@@ -691,19 +690,19 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                     </h4>
                                     <p className="text-xs text-neutral-500 leading-relaxed">
                                         {activePlatform?.statusMessage ||
-                                            `Participate in a rated contest on ${activePlatform?.portalName} to start tracking your rating progression.`}
+                                            (activePlatform?.portalName
+                                                ? `Participate in a rated contest on ${activePlatform.portalName} to start tracking your rating progression.`
+                                                : "Participate in rated coding contests and campus hackathons to start tracking your rating progression.")}
                                     </p>
                                 </div>
                                 <div className="pt-2">
-                                    <a
-                                        href={activePlatform?.exploreContestsUrl || `https://${activePlatform?.portal}.com`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <Link
+                                        to="/events"
                                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
                                     >
-                                        <span>Explore contests</span>
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                    </a>
+                                        <span>View Contests</span>
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                    </Link>
                                 </div>
                             </div>
                         )}

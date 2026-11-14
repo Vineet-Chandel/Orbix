@@ -22,8 +22,11 @@ export interface RecentSolveItem {
     platformName: string;
     timestamp: number;
     solvedAt: string;
+    exactDate?: string;
     url: string;
     relativeTime: string;
+    difficulty?: "Easy" | "Medium" | "Hard" | null;
+    topic?: string | null;
 }
 
 export interface DsaTopicItem {

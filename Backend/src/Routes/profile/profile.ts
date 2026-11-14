@@ -1498,6 +1498,22 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
             };
         });
 
+        // Distinct colleges query across all public developers so the client can filter without losing other colleges
+        let availableColleges: string[] = [];
+        try {
+            const collegesRes = await query(
+                `SELECT DISTINCT TRIM(u.college) as college
+                 FROM users u
+                 WHERE u.is_public IS TRUE 
+                   AND u.college IS NOT NULL 
+                   AND TRIM(u.college) != ''
+                 ORDER BY college ASC;`
+            );
+            availableColleges = collegesRes.rows.map((r: any) => r.college).filter(Boolean);
+        } catch (colErr) {
+            console.warn("Failed to retrieve distinct explore colleges:", colErr);
+        }
+
         return res.status(200).json({
             success: true,
             total,
@@ -1505,6 +1521,7 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
             limit: limitNum,
             totalPages: Math.ceil(total / limitNum) || 1,
             users,
+            availableColleges,
         });
     } catch (err: any) {
         console.error("Explore profiles error:", err);

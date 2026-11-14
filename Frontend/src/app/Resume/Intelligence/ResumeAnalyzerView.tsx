@@ -4,18 +4,17 @@ import {
     AlertCircle,
     XCircle,
     Sparkles,
-    ShieldCheck,
     TrendingUp,
     Code2,
     Brain,
     HelpCircle,
-    Check,
     Lightbulb,
     Target,
     Calculator,
     ArrowRight,
-    Briefcase,
-    FileCheck2
+    FileCheck2,
+    Layers,
+    ListChecks,
 } from "lucide-react";
 import type { ComprehensiveIntelligenceReport } from "../../../utils/resumeIntelligenceApi";
 import { ExplainScoreModal } from "./ExplainScoreModal";
@@ -36,6 +35,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
     onUploadClick: _onUploadClick,
     onProfileSyncSuccess,
 }) => {
+    const [activeTab, setActiveTab] = useState<"improvements" | "skills" | "checks">("improvements");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [isExplainModalOpen, setIsExplainModalOpen] = useState(false);
     const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
@@ -68,22 +68,21 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
         roleIntelligence,
         profileSyncProposal,
         detectedSkills,
-        strengths,
         improvements,
         checks,
         missingKeywords,
         roleSpecificTips,
     } = report;
 
-    // Use 7 dimensions if scoring object exists, else fallback to scoreBreakdown
+    // Dimensions
     const dims = scoring?.dimensions;
-    const impactScore = dims?.impactAndMetrics?.score ?? report.scoreBreakdown?.impactAndMetrics ?? 0;
-    const technicalScore = dims?.technicalDepth?.score ?? report.scoreBreakdown?.technicalDepth ?? 0;
-    const roleScore = dims?.targetRoleAlignment?.score ?? report.scoreBreakdown?.targetRoleAlignment ?? 0;
-    const atsScore = dims?.atsStructure?.score ?? report.scoreBreakdown?.atsParsability ?? 0;
-    const clarityScore = dims?.clarityAndActionWriting?.score ?? report.scoreBreakdown?.clarityAndStructure ?? 0;
-    const verifiedScore = dims?.verifiedProfiles?.score ?? report.scoreBreakdown?.verifiedProfiles ?? 0;
-    const contactScore = dims?.contactAndCompleteness?.score ?? report.scoreBreakdown?.contactCompleteness ?? 100;
+    const impactDim = dims?.impactAndMetrics;
+    const techDim = dims?.technicalDepth;
+    const roleDim = dims?.targetRoleAlignment;
+    const atsDim = dims?.atsStructure;
+    const clarityDim = dims?.clarityAndActionWriting;
+    const verifiedDim = dims?.verifiedProfiles;
+    const contactDim = dims?.contactAndCompleteness;
 
     const roleName = roleIntelligence?.primaryTargetRole || report.targetRoleDetected || "Software Engineer";
     const seniority = roleIntelligence?.seniorityLevel || report.experienceLevel || "Mid-Level";
@@ -113,10 +112,36 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
         }
     };
 
+    // Helper for dimension progress bar colors
+    const getDimBarColor = (key: string) => {
+        switch (key) {
+            case "impactAndMetrics": return "bg-[#FFE566]";
+            case "technicalDepth": return "bg-[#a2ff86]";
+            case "targetRoleAlignment": return "bg-emerald-400";
+            case "atsStructure": return "bg-blue-400";
+            case "clarityAndActionWriting": return "bg-purple-400";
+            case "verifiedProfiles": return "bg-indigo-400";
+            case "contactAndCompleteness": return "bg-amber-400";
+            default: return "bg-[#FFE566]";
+        }
+    };
+
+    const dimensionCards = [
+        { key: "impactAndMetrics", label: "Impact & Quantified Achievements", dim: impactDim, defaultWeight: 0.25 },
+        { key: "technicalDepth", label: "Technical Depth & Evidence", dim: techDim, defaultWeight: 0.20 },
+        { key: "targetRoleAlignment", label: "Target Role Alignment", dim: roleDim, defaultWeight: 0.20 },
+        { key: "atsStructure", label: "ATS Structure & Parseability", dim: atsDim, defaultWeight: 0.10 },
+        { key: "clarityAndActionWriting", label: "Clarity & Action Writing", dim: clarityDim, defaultWeight: 0.10 },
+        { key: "verifiedProfiles", label: "Verified Profiles & Work Evidence", dim: verifiedDim, defaultWeight: 0.10 },
+        { key: "contactAndCompleteness", label: "Contact & Resume Completeness", dim: contactDim, defaultWeight: 0.05 },
+    ];
+
+    const isDenominatorNormalized = scoring && scoring.totalAssessedWeight < 1.0;
+
     return (
         <div className="space-y-6">
             {/* ========================================================================= */}
-            {/* 1. HERO SCORE & EXECUTIVE SUMMARY CARD */}
+            {/* 1. HERO SCORE & EXECUTIVE SUMMARY CARD                                    */}
             {/* ========================================================================= */}
             <div className="p-5 sm:p-6 lg:p-7 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b-2 border-black/10">
@@ -134,9 +159,12 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase border-2 shadow-[1px_1px_0px_#000] ${getScoreBadgeColor(overallScore)}`}>
                                     {scoreGrade}
                                 </span>
-                                {scoring && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-neutral-100 text-neutral-700 border border-neutral-300">
-                                        Model {scoring.scoringVersion}
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-neutral-100 text-neutral-700 border border-neutral-300">
+                                    Model {scoring?.scoringVersion || "v3.0.0"}
+                                </span>
+                                {isDenominatorNormalized && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                        Denominator Re-Weighted ({Math.round(scoring.totalAssessedWeight * 100)}%)
                                     </span>
                                 )}
                             </div>
@@ -149,6 +177,12 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                                     <>
                                         <span>•</span>
                                         <span>Exp: <strong className="text-black">{roleIntelligence.estimatedYearsExperience} yr(s)</strong></span>
+                                    </>
+                                )}
+                                {roleIntelligence?.secondaryTargetRole && (
+                                    <>
+                                        <span>•</span>
+                                        <span className="text-neutral-500">Alt: {roleIntelligence.secondaryTargetRole}</span>
                                     </>
                                 )}
                             </p>
@@ -188,9 +222,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                     <p>{summary}</p>
                 </div>
 
-                {/* ========================================================================= */}
-                {/* 2. PROFILE SYNC CALLOUT BANNER (If missing fields detected) */}
-                {/* ========================================================================= */}
+                {/* Profile Sync Banner (If missing fields detected) */}
                 {profileSyncProposal && profileSyncProposal.hasMissingFields && (
                     <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-400 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[2px_2px_0px_#000]">
                         <div className="flex items-center gap-3 min-w-0">
@@ -210,7 +242,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                         <button
                             type="button"
                             onClick={() => setIsSyncModalOpen(true)}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#FDD835] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition shrink-0"
+                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#FDD835] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition shrink-0 cursor-pointer"
                         >
                             <span>Review & Sync</span>
                             <ArrowRight className="w-3.5 h-3.5" />
@@ -219,426 +251,426 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                 )}
 
                 {/* ========================================================================= */}
-                {/* 3. SEVEN-DIMENSION SCORE BREAKDOWN BARS */}
+                {/* 2. SEVEN-DIMENSION SCORE BREAKDOWN BARS                                   */}
                 {/* ========================================================================= */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                            7-Dimension Weighted Scoring Model
+                        <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-black" />
+                            <span>7-Dimension Authoritative Scoring Model (v3.0.0)</span>
                         </h4>
                         <span className="text-[11px] font-mono text-neutral-500">
-                            Strict 100% Normalized Weighting
+                            {isDenominatorNormalized
+                                ? `Dynamic Denominator: ${Math.round(scoring.totalAssessedWeight * 100)}% Assessed`
+                                : "100% Normalized Weighting"}
                         </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {/* Dim 1: Impact (25%) */}
-                        <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-neutral-700">Impact & Quantified Achievements</span>
-                                <span className="font-mono font-black">{impactScore}%</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
-                                <div className="h-full bg-[#FFE566]" style={{ width: `${impactScore}%` }} />
-                            </div>
-                            <div className="text-[10px] text-neutral-500 font-mono flex justify-between">
-                                <span>Weight: 25%</span>
-                                <span>Contr: {(impactScore * 0.25).toFixed(1)} pts</span>
-                            </div>
-                        </div>
+                        {dimensionCards.map((card, idx) => {
+                            const isAssessed = card.dim?.assessed ?? true;
+                            const score = isAssessed ? (card.dim?.score ?? 0) : 0;
+                            const weightPct = Math.round((card.dim?.weight ?? card.defaultWeight) * 100);
+                            const contr = isAssessed ? (score * (card.dim?.weight ?? card.defaultWeight)).toFixed(1) : "0.0";
+                            const isLastSpan = idx === 6;
 
-                        {/* Dim 2: Technical Depth (20%) */}
-                        <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-neutral-700">Technical Depth & Evidence</span>
-                                <span className="font-mono font-black">{technicalScore}%</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
-                                <div className="h-full bg-[#a2ff86]" style={{ width: `${technicalScore}%` }} />
-                            </div>
-                            <div className="text-[10px] text-neutral-500 font-mono flex justify-between">
-                                <span>Weight: 20%</span>
-                                <span>Contr: {(technicalScore * 0.20).toFixed(1)} pts</span>
-                            </div>
-                        </div>
+                            return (
+                                <div
+                                    key={card.key}
+                                    className={`p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5 ${isLastSpan ? "sm:col-span-2 lg:col-span-3" : ""}`}
+                                >
+                                    <div className="flex items-center justify-between text-xs font-bold gap-2">
+                                        <span className="text-neutral-800 truncate">{card.label}</span>
+                                        {isAssessed ? (
+                                            <span className="font-mono font-black shrink-0">{score}%</span>
+                                        ) : (
+                                            <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-700 shrink-0">
+                                                Unassessed
+                                            </span>
+                                        )}
+                                    </div>
 
-                        {/* Dim 3: Target Role Alignment (20%) */}
-                        <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-neutral-700">Target Role Alignment</span>
-                                <span className="font-mono font-black">{roleScore}%</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
-                                <div className="h-full bg-emerald-400" style={{ width: `${roleScore}%` }} />
-                            </div>
-                            <div className="text-[10px] text-neutral-500 font-mono flex justify-between">
-                                <span>Weight: 20%</span>
-                                <span>Contr: {(roleScore * 0.20).toFixed(1)} pts</span>
-                            </div>
-                        </div>
+                                    {/* Progress Bar */}
+                                    <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
+                                        {isAssessed ? (
+                                            <div
+                                                className={`h-full ${getDimBarColor(card.key)} transition-all duration-500`}
+                                                style={{ width: `${score}%` }}
+                                            />
+                                        ) : (
+                                            <div className="h-full bg-neutral-300 w-full opacity-40 [background-image:linear-gradient(45deg,rgba(0,0,0,0.1)_25%,transparent_25%,transparent_50%,rgba(0,0,0,0.1)_50%,rgba(0,0,0,0.1)_75%,transparent_75%,transparent)] [background-size:8px_8px]" />
+                                        )}
+                                    </div>
 
-                        {/* Dim 4: ATS Structure (10%) */}
-                        <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-neutral-700">ATS Structure & Parseability</span>
-                                <span className="font-mono font-black">{atsScore}%</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
-                                <div className="h-full bg-blue-400" style={{ width: `${atsScore}%` }} />
-                            </div>
-                            <div className="text-[10px] text-neutral-500 font-mono flex justify-between">
-                                <span>Weight: 10%</span>
-                                <span>Contr: {(atsScore * 0.10).toFixed(1)} pts</span>
-                            </div>
-                        </div>
-
-                        {/* Dim 5: Clarity & Action-Oriented (10%) */}
-                        <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-neutral-700">Clarity & Action Writing</span>
-                                <span className="font-mono font-black">{clarityScore}%</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
-                                <div className="h-full bg-purple-400" style={{ width: `${clarityScore}%` }} />
-                            </div>
-                            <div className="text-[10px] text-neutral-500 font-mono flex justify-between">
-                                <span>Weight: 10%</span>
-                                <span>Contr: {(clarityScore * 0.10).toFixed(1)} pts</span>
-                            </div>
-                        </div>
-
-                        {/* Dim 6: Verified Profiles (10%) */}
-                        <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-neutral-700">Verified Profiles & Evidence</span>
-                                <span className="font-mono font-black">{verifiedScore}%</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
-                                <div className="h-full bg-indigo-400" style={{ width: `${verifiedScore}%` }} />
-                            </div>
-                            <div className="text-[10px] text-neutral-500 font-mono flex justify-between">
-                                <span>Weight: 10%</span>
-                                <span>Contr: {(verifiedScore * 0.10).toFixed(1)} pts</span>
-                            </div>
-                        </div>
-
-                        {/* Dim 7: Contact & Completeness (5%) */}
-                        <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-1.5 sm:col-span-2 lg:col-span-3">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-neutral-700">Contact & Metadata Completeness</span>
-                                <span className="font-mono font-black">{contactScore}%</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-neutral-200 overflow-hidden border border-black/20">
-                                <div className="h-full bg-amber-400" style={{ width: `${contactScore}%` }} />
-                            </div>
-                            <div className="text-[10px] text-neutral-500 font-mono flex justify-between">
-                                <span>Weight: 5%</span>
-                                <span>Contr: {(contactScore * 0.05).toFixed(1)} pts</span>
-                            </div>
-                        </div>
+                                    <div className="text-[10px] text-neutral-600 font-mono flex justify-between gap-2">
+                                        {isAssessed ? (
+                                            <>
+                                                <span>Weight: {weightPct}%</span>
+                                                <span>Contr: {contr} pts</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="text-amber-700 font-semibold">Excluded from denominator</span>
+                                                <span className="text-neutral-500">Weight re-normalized</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
 
             {/* ========================================================================= */}
-            {/* 4. ROLE & SENIORITY INTELLIGENCE CARD */}
+            {/* 3. DEVELOPER FOCUS WORKSPACE (MINIMAL, ZERO CLUTTER TABBED INTERFACE)     */}
             {/* ========================================================================= */}
-            {roleIntelligence && (
-                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-3">
-                    <div className="flex items-center gap-2">
-                        <Briefcase className="w-5 h-5 text-black stroke-[2.5]" />
-                        <h3 className="text-base sm:text-lg font-black text-black">
-                            Role & Seniority Intelligence
+            <div className="p-5 sm:p-6 lg:p-7 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-6">
+                {/* Navigation Segmented Controller */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/10">
+                    <div>
+                        <h3 className="text-lg sm:text-xl font-black text-black">
+                            Actionable Resume Diagnostics
                         </h3>
+                        <p className="text-xs text-neutral-600 font-medium">
+                            Grounded analysis, verified technical competencies, and ATS compliance signals.
+                        </p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-3.5 rounded-xl bg-neutral-50 border border-black/10 space-y-1">
-                            <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                                Primary Role Target
-                            </div>
-                            <div className="text-sm font-black text-black">
-                                {roleIntelligence.primaryTargetRole}
-                            </div>
-                            {roleIntelligence.secondaryTargetRole && (
-                                <div className="text-xs text-neutral-600">
-                                    Secondary: {roleIntelligence.secondaryTargetRole}
-                                </div>
+                    {/* Segmented Tab Buttons */}
+                    <div className="inline-flex items-center p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black uppercase tracking-wider shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("improvements")}
+                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                                activeTab === "improvements"
+                                    ? "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black"
+                            }`}
+                        >
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            <span>Actionable Fixes</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-black text-white font-mono">
+                                {(improvements || []).length}
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("skills")}
+                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                                activeTab === "skills"
+                                    ? "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black"
+                            }`}
+                        >
+                            <Code2 className="w-3.5 h-3.5" />
+                            <span>Tech Stack & Gaps</span>
+                            {missingKeywords && missingKeywords.length > 0 && (
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-600 text-white font-mono">
+                                    {missingKeywords.length}
+                                </span>
                             )}
-                        </div>
+                        </button>
 
-                        <div className="p-3.5 rounded-xl bg-neutral-50 border border-black/10 space-y-1">
-                            <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                                Seniority Assessment
-                            </div>
-                            <div className="text-sm font-black text-black">
-                                {roleIntelligence.seniorityLevel}
-                            </div>
-                            <div className="text-xs text-neutral-600">
-                                Estimated Practical Experience: {roleIntelligence.estimatedYearsExperience} yr(s)
-                            </div>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("checks")}
+                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                                activeTab === "checks"
+                                    ? "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black"
+                            }`}
+                        >
+                            <ListChecks className="w-3.5 h-3.5" />
+                            <span>ATS Compliance</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-200 text-black font-mono">
+                                {(checks || []).length}
+                            </span>
+                        </button>
                     </div>
-
-                    {roleIntelligence.evidenceHighlights && roleIntelligence.evidenceHighlights.length > 0 && (
-                        <div className="pt-2 text-xs space-y-1 text-neutral-700">
-                            <div className="font-bold text-black text-[11px] uppercase tracking-wider">
-                                Supporting Evidence Highlights:
-                            </div>
-                            <ul className="list-disc pl-5 space-y-0.5">
-                                {roleIntelligence.evidenceHighlights.map((e, idx) => (
-                                    <li key={idx}>{e}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
                 </div>
-            )}
 
-            {/* ========================================================================= */}
-            {/* 5. EXTRACTED TECHNICAL SKILLS PILLS */}
-            {/* ========================================================================= */}
-            {detectedSkills && (
-                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Code2 className="w-5 h-5 text-black stroke-[2.5]" />
-                        <h3 className="text-base sm:text-lg font-black text-black">
-                            Extracted Technical Skills & Competencies
-                        </h3>
+                {/* ========================================================================= */}
+                {/* TAB 1: ACTIONABLE IMPROVEMENTS & GOOGLE XYZ REWRITES                      */}
+                {/* ========================================================================= */}
+                {activeTab === "improvements" && (
+                    <div className="space-y-5 animate-fadeIn">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                                Grounded Bullet Rewrites ({filteredImprovements.length})
+                            </span>
+
+                            {/* Category Filter Pills */}
+                            <div className="inline-flex items-center p-0.5 rounded-lg bg-neutral-100 border border-black/20 text-[11px] font-bold self-start sm:self-center">
+                                {["all", "metrics", "action_verbs", "technical_depth", "role_alignment"].map((cat) => (
+                                    <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() => setSelectedCategory(cat)}
+                                        className={`px-2.5 py-1 rounded capitalize cursor-pointer transition ${
+                                            selectedCategory === cat
+                                                ? "bg-black text-white"
+                                                : "text-neutral-700 hover:text-black"
+                                        }`}
+                                    >
+                                        {cat === "all" ? "All" : cat.replace("_", " ")}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {filteredImprovements.length === 0 ? (
+                            <div className="p-8 rounded-xl bg-neutral-50 border border-black/10 text-center text-xs text-neutral-600 font-medium">
+                                No improvements found for this category. Excellent formulation!
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-4">
+                                {filteredImprovements.map((imp, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="p-4 sm:p-5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-3"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <h4 className="text-sm font-black text-black">
+                                                {imp.title}
+                                            </h4>
+                                            <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-[#FFE566] text-black border border-black shrink-0">
+                                                {imp.category?.replace("_", " ")}
+                                            </span>
+                                        </div>
+
+                                        <p className="text-xs text-neutral-700">
+                                            <strong className="text-neutral-900">Issue:</strong> {imp.issue}
+                                        </p>
+                                        <p className="text-xs text-neutral-700">
+                                            <strong className="text-neutral-900">Recommendation:</strong> {imp.suggestion}
+                                        </p>
+
+                                        {/* Grounded Before vs After Rewrite Example */}
+                                        {imp.exampleBefore && imp.exampleAfter && (
+                                            <div className="mt-2 pt-2 border-t border-black/10 space-y-2 text-xs font-mono">
+                                                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-950">
+                                                    <span className="font-bold text-[10px] uppercase text-rose-800 block mb-0.5">
+                                                        Original Resume Excerpt:
+                                                    </span>
+                                                    "{imp.exampleBefore}"
+                                                </div>
+                                                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-950">
+                                                    <span className="font-bold text-[10px] uppercase text-emerald-800 block mb-0.5">
+                                                        Grounded XYZ Rewrite (Google Formula):
+                                                    </span>
+                                                    "{imp.exampleAfter}"
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Role-Specific Architecture Tips */}
+                        {roleSpecificTips && roleSpecificTips.length > 0 && (
+                            <div className="p-4 rounded-xl bg-white border border-black/20 space-y-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                                    <Target className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>Engineering Architecture Recommendations for {roleName}</span>
+                                </span>
+                                <ul className="text-xs text-neutral-700 space-y-1.5 list-disc pl-5">
+                                    {roleSpecificTips.map((tip, idx) => (
+                                        <li key={idx}>{tip}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
+                )}
 
-                    <div className="space-y-3">
-                        {detectedSkills.languages && detectedSkills.languages.length > 0 && (
-                            <div>
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 block mb-1.5">
-                                    Languages ({detectedSkills.languages.length})
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {detectedSkills.languages.map((item, idx) => (
-                                        <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FAF6EE] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                            {item}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {detectedSkills.frameworks && detectedSkills.frameworks.length > 0 && (
-                            <div>
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 block mb-1.5">
-                                    Frameworks & Libraries ({detectedSkills.frameworks.length})
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {detectedSkills.frameworks.map((item, idx) => (
-                                        <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-black border border-black shadow-[1px_1px_0px_#000]">
-                                            {item}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {detectedSkills.databasesAndTools && detectedSkills.databasesAndTools.length > 0 && (
-                            <div>
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 block mb-1.5">
-                                    Databases & Developer Tools ({detectedSkills.databasesAndTools.length})
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {detectedSkills.databasesAndTools.map((item, idx) => (
-                                        <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-black border border-black shadow-[1px_1px_0px_#000]">
-                                            {item}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
+                {/* ========================================================================= */}
+                {/* TAB 2: TECHNICAL SKILLS & HIGH-DEMAND KEYWORD GAPS                        */}
+                {/* ========================================================================= */}
+                {activeTab === "skills" && (
+                    <div className="space-y-6 animate-fadeIn">
+                        {/* High-demand Missing Keywords Warning Callout */}
                         {missingKeywords && missingKeywords.length > 0 && (
-                            <div className="pt-2 border-t border-black/10">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 block mb-1.5">
-                                    Recommended High-Demand Keywords to Add
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
+                            <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-400 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-rose-950">
+                                        High-Demand Recruiter Keywords Missing for {roleName}
+                                    </h4>
+                                </div>
+                                <p className="text-xs text-rose-900 leading-relaxed">
+                                    Recruiters scanning for {roleName} positions look for these core technical competencies. Add them to your projects or skills section if you possess practical experience:
+                                </p>
+                                <div className="flex flex-wrap gap-1.5 pt-1">
                                     {missingKeywords.map((kw, idx) => (
-                                        <span key={idx} className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-900 border border-rose-300">
+                                        <span
+                                            key={idx}
+                                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-rose-950 border border-rose-300 shadow-[1px_1px_0px_#f43f5e]"
+                                        >
                                             + {kw}
                                         </span>
                                     ))}
                                 </div>
                             </div>
                         )}
-                    </div>
-                </div>
-            )}
 
-            {/* ========================================================================= */}
-            {/* 6. KEY STRENGTHS & ACTIONABLE RECOMMENDATIONS */}
-            {/* ========================================================================= */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Left: Strengths */}
-                <div className="lg:col-span-5 p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-4">
-                    <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-700 stroke-[2.5]" />
-                        <h3 className="text-base sm:text-lg font-black text-black">
-                            Profile Strengths ({(strengths || []).length})
-                        </h3>
-                    </div>
-
-                    <div className="space-y-3">
-                        {(strengths || []).map((s, idx) => (
-                            <div key={idx} className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-400 space-y-1">
-                                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950">
-                                    <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" />
-                                    <span>{s.title}</span>
-                                </div>
-                                <p className="text-xs text-neutral-700 leading-relaxed pl-5">
-                                    {s.description}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-
-                    {roleSpecificTips && roleSpecificTips.length > 0 && (
-                        <div className="pt-3 border-t border-black/10 space-y-2">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-neutral-800 flex items-center gap-1">
-                                <Target className="w-3.5 h-3.5" />
-                                <span>Role-Specific Architecture Tips</span>
-                            </span>
-                            <ul className="text-xs text-neutral-600 space-y-1.5 list-disc pl-4">
-                                {roleSpecificTips.map((tip, idx) => (
-                                    <li key={idx}>{tip}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-
-                {/* Right: Actionable Improvements & Rewrites */}
-                <div className="lg:col-span-7 p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-black stroke-[2.5]" />
-                            <h3 className="text-base sm:text-lg font-black text-black">
-                                Grounded Improvements ({filteredImprovements.length})
-                            </h3>
-                        </div>
-
-                        {/* Category Filter */}
-                        <div className="inline-flex items-center p-0.5 rounded-lg bg-neutral-100 border border-black/20 text-[11px] font-bold">
-                            <button
-                                type="button"
-                                onClick={() => setSelectedCategory("all")}
-                                className={`px-2 py-0.5 rounded ${selectedCategory === "all" ? "bg-black text-white" : "text-neutral-700"}`}
-                            >
-                                All
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setSelectedCategory("metrics")}
-                                className={`px-2 py-0.5 rounded ${selectedCategory === "metrics" ? "bg-black text-white" : "text-neutral-700"}`}
-                            >
-                                Metrics
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setSelectedCategory("action_verbs")}
-                                className={`px-2 py-0.5 rounded ${selectedCategory === "action_verbs" ? "bg-black text-white" : "text-neutral-700"}`}
-                            >
-                                Verbs
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setSelectedCategory("technical_depth")}
-                                className={`px-2 py-0.5 rounded ${selectedCategory === "technical_depth" ? "bg-black text-white" : "text-neutral-700"}`}
-                            >
-                                Tech
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        {filteredImprovements.map((imp, idx) => (
-                            <div key={idx} className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
-                                <div className="flex items-start justify-between gap-2">
-                                    <h4 className="text-sm font-black text-black">
-                                        {imp.title}
-                                    </h4>
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-[#FFE566] text-black border border-black shrink-0">
-                                        {imp.category?.replace("_", " ")}
-                                    </span>
-                                </div>
-
-                                <p className="text-xs text-neutral-700">
-                                    <strong className="text-neutral-900">Issue:</strong> {imp.issue}
-                                </p>
-                                <p className="text-xs text-neutral-700">
-                                    <strong className="text-neutral-900">Recommendation:</strong> {imp.suggestion}
-                                </p>
-
-                                {/* Grounded Before vs After Rewrite Example if present */}
-                                {imp.exampleBefore && imp.exampleAfter && (
-                                    <div className="mt-2 pt-2 border-t border-black/10 space-y-1.5 text-xs font-mono">
-                                        <div className="p-2 rounded bg-rose-50 border border-rose-200 text-rose-900">
-                                            <span className="font-bold text-[10px] uppercase text-rose-700 block mb-0.5">Original Excerpt:</span>
-                                            "{imp.exampleBefore}"
+                        {/* Extracted Skills Categorized */}
+                        {detectedSkills ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Languages */}
+                                {detectedSkills.languages && detectedSkills.languages.length > 0 && (
+                                    <div className="p-4 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-2">
+                                        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-neutral-700">
+                                            <span>Languages</span>
+                                            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-800">
+                                                {detectedSkills.languages.length}
+                                            </span>
                                         </div>
-                                        <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-950">
-                                            <span className="font-bold text-[10px] uppercase text-emerald-700 block mb-0.5">Grounded Recommended Rewrite:</span>
-                                            "{imp.exampleAfter}"
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {detectedSkills.languages.map((item, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-black border border-black shadow-[1px_1px_0px_#000]"
+                                                >
+                                                    {item}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Frameworks */}
+                                {detectedSkills.frameworks && detectedSkills.frameworks.length > 0 && (
+                                    <div className="p-4 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-2">
+                                        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-neutral-700">
+                                            <span>Frameworks & Libraries</span>
+                                            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-800">
+                                                {detectedSkills.frameworks.length}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {detectedSkills.frameworks.map((item, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]"
+                                                >
+                                                    {item}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Databases & Developer Tools */}
+                                {detectedSkills.databasesAndTools && detectedSkills.databasesAndTools.length > 0 && (
+                                    <div className="p-4 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-2 md:col-span-2">
+                                        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-neutral-700">
+                                            <span>Databases, Cloud & Dev Tools</span>
+                                            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-800">
+                                                {detectedSkills.databasesAndTools.length}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {detectedSkills.databasesAndTools.map((item, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-950 border border-blue-400 shadow-[1px_1px_0px_#3b82f6]"
+                                                >
+                                                    {item}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Engineering Concepts */}
+                                {detectedSkills.concepts && detectedSkills.concepts.length > 0 && (
+                                    <div className="p-4 rounded-xl bg-[#FAF6EE] border border-black/20 space-y-2 md:col-span-2">
+                                        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-neutral-700">
+                                            <span>Systems Architecture & Engineering Concepts</span>
+                                            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-800">
+                                                {detectedSkills.concepts.length}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {detectedSkills.concepts.map((item, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-950 border border-purple-400 shadow-[1px_1px_0px_#a855f7]"
+                                                >
+                                                    {item}
+                                                </span>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
                             </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* ========================================================================= */}
-            {/* 7. ATS & RECRUITER COMPLIANCE CHECKS */}
-            {/* ========================================================================= */}
-            {checks && checks.length > 0 && (
-                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-4">
-                    <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-5 h-5 text-black stroke-[2.5]" />
-                        <h3 className="text-base sm:text-lg font-black text-black">
-                            ATS & Recruiter Compliance Checks
-                        </h3>
-                    </div>
-
-                    <div className="divide-y-2 divide-black/10">
-                        {checks.map((c) => (
-                            <div key={c.id} className="py-3 sm:py-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                                <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                    <div className="mt-0.5 shrink-0">
-                                        {getCheckIcon(c.status)}
-                                    </div>
-                                    <div className="space-y-1 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-sm font-black text-black">{c.label}</span>
-                                            <span className={`px-2 py-0.2 rounded text-[10px] font-black uppercase border ${c.status === "pass" ? "bg-[#a2ff86] border-black text-black" : c.status === "warn" ? "bg-[#FFE566] border-black text-black" : "bg-rose-200 border-black text-rose-900"}`}>
-                                                {c.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-neutral-600">{c.description}</p>
-                                        <p className="text-xs text-neutral-800 font-medium">
-                                            <span className="font-bold">Evidence:</span> {c.evidence}
-                                        </p>
-                                        {c.recommendation && c.status !== "pass" && (
-                                            <p className="text-xs text-amber-800 font-medium">
-                                                <span className="font-bold">Fix:</span> {c.recommendation}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="shrink-0 sm:text-right pl-7 sm:pl-0">
-                                    <span className="font-mono text-sm font-black text-black">{c.score}%</span>
-                                </div>
+                        ) : (
+                            <div className="p-8 rounded-xl bg-neutral-50 border border-black/10 text-center text-xs text-neutral-600">
+                                No technical skills explicitly extracted from the document.
                             </div>
-                        ))}
+                        )}
                     </div>
-                </div>
-            )}
+                )}
+
+                {/* ========================================================================= */}
+                {/* TAB 3: ATS & RECRUITER COMPLIANCE CHECKS                                  */}
+                {/* ========================================================================= */}
+                {activeTab === "checks" && (
+                    <div className="space-y-4 animate-fadeIn">
+                        {checks && checks.length > 0 ? (
+                            <div className="divide-y-2 divide-black/10">
+                                {checks.map((c) => (
+                                    <div
+                                        key={c.id}
+                                        className="py-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                                    >
+                                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                                            <div className="mt-0.5 shrink-0">
+                                                {getCheckIcon(c.status)}
+                                            </div>
+                                            <div className="space-y-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-black text-black">{c.label}</span>
+                                                    <span
+                                                        className={`px-2 py-0.2 rounded text-[10px] font-black uppercase border ${
+                                                            c.status === "pass"
+                                                                ? "bg-[#a2ff86] border-black text-black"
+                                                                : c.status === "warn"
+                                                                    ? "bg-[#FFE566] border-black text-black"
+                                                                    : "bg-rose-200 border-black text-rose-900"
+                                                        }`}
+                                                    >
+                                                        {c.status}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-neutral-600">{c.description}</p>
+                                                <p className="text-xs text-neutral-800 font-medium">
+                                                    <span className="font-bold">Evidence:</span> {c.evidence}
+                                                </p>
+                                                {c.recommendation && c.status !== "pass" && (
+                                                    <p className="text-xs text-amber-900 font-semibold">
+                                                        <span className="font-bold">Fix:</span> {c.recommendation}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="shrink-0 sm:text-right pl-7 sm:pl-0">
+                                            <span className="font-mono text-sm font-black text-black">{c.score}%</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-8 rounded-xl bg-neutral-50 border border-black/10 text-center text-xs text-neutral-600">
+                                No ATS compliance checks recorded.
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Explain Score Modal */}
             <ExplainScoreModal
