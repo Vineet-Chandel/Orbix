@@ -277,35 +277,35 @@ export const LikesEventSharingDocumentary: React.FC = () => {
                         <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider block">
                             Blog Appreciation
                         </span>
-                        <span className="text-sm font-black text-black">Publication-Bound ID</span>
+                        <span className="text-sm font-black text-black block">Publication-Bound ID</span>
                     </div>
                     <div className="p-3 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-0.5">
                         <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider block">
                             Sharing Vectors
                         </span>
-                        <span className="text-sm font-black text-black">3 Available Actions</span>
+                        <span className="text-sm font-black text-black block">3 Available Actions</span>
                     </div>
                     <div className="p-3 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-0.5">
                         <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider block">
                             Anti-Inflation
                         </span>
-                        <span className="text-sm font-black text-black">Unique Public Metric</span>
+                        <span className="text-sm font-black text-black block">Unique Public Metric</span>
                     </div>
                     <div className="p-3 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-0.5">
                         <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider block">
                             Cycle Allowance
                         </span>
-                        <span className="text-sm font-black text-black">3 Invites / 1h Cooldown</span>
+                        <span className="text-sm font-black text-black block">3 Invites / 1h Cooldown</span>
                     </div>
                 </div>
             </header>
 
             {/* Banner Graphic Illustration */}
-            <div className="rounded-3xl border-2 sm:border-[3px] border-black overflow-hidden bg-black shadow-[6px_6px_0px_#000] w-full">
+            <div className="rounded-3xl border-2 sm:border-[3px] border-black overflow-hidden bg-[#FAF6EE] shadow-[6px_6px_0px_#000] w-full">
                 <img
-                    src="/assets/likes-sharing-banner.svg"
+                    src="https://res.cloudinary.com/dj0ivep44/image/upload/v1794652483/Heart_Likes_and_Shares_xhioui.png"
                     alt="Orbix Likes and Event Sharing Architecture"
-                    className="w-full h-auto block select-none"
+                    className="w-full h-auto max-h-[540px] object-cover block select-none"
                 />
             </div>
 
@@ -1242,41 +1242,63 @@ export const LikesEventSharingDocumentary: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Interactive Metrics Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-1">
-                                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                        {/* Interactive Metrics Grid (Regular & Uniform Layout) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between min-h-[96px] space-y-2">
+                                <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider">
                                     Recipient Connection
                                 </span>
-                                <span className="text-sm font-black text-black block truncate">Priya Patel (@priya_dev)</span>
+                                <div className="space-y-0.5 min-w-0">
+                                    <span className="text-sm sm:text-base font-black text-black block truncate leading-tight">
+                                        Priya Patel
+                                    </span>
+                                    <span className="text-[11px] font-mono font-bold text-neutral-500 block truncate">
+                                        @priya_dev
+                                    </span>
+                                </div>
                             </div>
-                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-1">
-                                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
+
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between min-h-[96px] space-y-2">
+                                <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider">
                                     Cycle Progress
                                 </span>
-                                <span className="text-xl font-black text-black font-mono">
-                                    {invitationCycleCount} / 3 <span className="text-xs text-neutral-500 font-sans">Used</span>
-                                </span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-2xl font-black text-black font-mono leading-tight">
+                                        {invitationCycleCount} / 3
+                                    </span>
+                                    <span className="text-xs font-bold text-neutral-500 font-mono">
+                                        Used
+                                    </span>
+                                </div>
                             </div>
-                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-1">
-                                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
+
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between min-h-[96px] space-y-2">
+                                <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider">
                                     Cooldown Timer
                                 </span>
-                                <span
-                                    className={`text-xl font-black font-mono ${
-                                        isCooldownActive ? "text-red-600 animate-pulse" : "text-neutral-400"
-                                    }`}
-                                >
-                                    {isCooldownActive ? formatSeconds(cooldownSecondsRemaining) : "Inactive"}
-                                </span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span
+                                        className={`text-2xl font-black font-mono leading-tight ${
+                                            isCooldownActive ? "text-red-600 animate-pulse" : "text-neutral-400"
+                                        }`}
+                                    >
+                                        {isCooldownActive ? formatSeconds(cooldownSecondsRemaining) : "Inactive"}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-1">
-                                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
+
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between min-h-[96px] space-y-2">
+                                <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase tracking-wider">
                                     Event Public Shares
                                 </span>
-                                <span className="text-xl font-black text-emerald-600 font-mono">
-                                    {simulationPublicShareCount}
-                                </span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-2xl font-black text-emerald-600 font-mono leading-tight">
+                                        {simulationPublicShareCount}
+                                    </span>
+                                    <span className="text-xs font-bold text-neutral-500 font-mono">
+                                        Shares
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
