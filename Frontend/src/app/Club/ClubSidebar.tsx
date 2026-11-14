@@ -310,90 +310,90 @@ export const ClubSidebar = ({
         <aside
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 border-black text-black px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] ${
-                isExpanded
-                    ? "w-64 sm:w-[264px] shadow-[6px_6px_0px_#000]"
-                    : "w-[68px] sm:w-[72px] shadow-[4px_4px_0px_#000]"
+            className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 border-black text-black px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isOpen
+                    ? "fixed top-2 sm:top-3 left-2 sm:left-3 z-[60] w-[280px] max-w-[calc(100vw-1rem)] shadow-[6px_6px_0px_#000]"
+                    : isExpanded
+                    ? "absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] w-64 sm:w-[264px] shadow-[6px_6px_0px_#000]"
+                    : "absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] w-[68px] sm:w-[72px] shadow-[4px_4px_0px_#000]"
             }`}
         >
-            {/* Top Brand Header */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto no-scrollbar overflow-x-hidden">
-                <div
-                    className={`flex items-center pb-3 pt-0.5 border-b-2 border-black/15 overflow-x-hidden ${
-                        isExpanded ? "px-1 justify-start" : "justify-center"
+            {/* Top Brand Header (Fixed, Never Scrolls) */}
+            <div
+                className={`flex-shrink-0 pb-3 pt-0.5 border-b-2 border-black/15 flex items-center ${
+                    isExpanded ? "px-1 justify-between" : "justify-center"
+                }`}
+            >
+                <Link
+                    to="/club/dashboard"
+                    onClick={() => {
+                        onTabChange("overview");
+                        if (onClose) onClose();
+                    }}
+                    className={`flex items-center group cursor-pointer ${
+                        isExpanded ? "gap-2.5 min-w-0 flex-1" : "justify-center mx-auto"
                     }`}
+                    title="Orbix — Empowering Dev Workflows"
                 >
-                    <Link
-                        to="/club/dashboard"
-                        onClick={() => {
-                            onTabChange("overview");
-                            if (onClose) onClose();
-                        }}
-                        className={`flex items-center group cursor-pointer overflow-x-hidden ${
-                            isExpanded ? "gap-3 min-w-0" : "justify-center mx-auto"
-                        }`}
-                        title="Orbix — Empowering Dev Workflows"
-                    >
-                        {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
-                        <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                            <OrbixLogo className="w-full h-full text-black" />
-                        </div>
+                    {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
+                    <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <OrbixLogo className="w-full h-full text-black" />
+                    </div>
 
-                        {/* Title and Subtitle with overflow-x-hidden and whitespace-nowrap */}
+                    {/* Title and Subtitle with overflow-x-hidden and whitespace-nowrap */}
+                    {isExpanded && (
+                        <div className="flex flex-col min-w-0 overflow-hidden text-left animate-fadeIn">
+                            <span className="text-xl sm:text-2xl font-black tracking-tight text-black leading-tight truncate">
+                                Orbix
+                            </span>
+                            <span className="text-[10px] sm:text-[11px] font-bold text-neutral-600 truncate">
+                                Empowering Dev Workflows
+                            </span>
+                        </div>
+                    )}
+                </Link>
+
+                {/* Mobile Close Button */}
+                {onClose && isExpanded && (
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="lg:hidden p-1.5 text-black hover:bg-black/10 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[0.5px] active:translate-y-[0.5px] transition-all cursor-pointer flex-shrink-0 ml-1.5"
+                        aria-label="Close Sidebar"
+                    >
+                        <X className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                )}
+            </div>
+
+            {/* Category-Wise Navigation Groups (Scrollable) */}
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar overflow-x-hidden pt-2.5 pb-2 px-0.5 pr-1 space-y-1">
+                {clubCategories.map((category, index) => (
+                    <div key={category.id} className="space-y-0.5">
+                        {/* Divider between categories */}
+                        {index > 0 && (
+                            <div
+                                className={`my-2 h-0.5 bg-black/15 overflow-x-hidden ${
+                                    isExpanded ? "w-full" : "w-8 mx-auto"
+                                }`}
+                            />
+                        )}
+
+                        {/* Category Header Label (rendered when expanded) */}
                         {isExpanded && (
-                            <div className="flex flex-col min-w-0 overflow-x-hidden text-left animate-fadeIn">
-                                <span className="text-2xl font-black tracking-tight text-black leading-tight whitespace-nowrap truncate">
-                                    Orbix
-                                </span>
-                                <span className="text-[11px] font-bold text-neutral-600 whitespace-nowrap truncate">
-                                    Empowering Dev Workflows
+                            <div className="px-2 pt-1 pb-1">
+                                <span className="text-[10px] font-black tracking-wider uppercase text-neutral-500 font-mono select-none block truncate">
+                                    {category.label}
                                 </span>
                             </div>
                         )}
-                    </Link>
 
-                    {/* Mobile Close Button */}
-                    {onClose && (
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="lg:hidden p-1.5 text-black hover:bg-black/10 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer ml-auto"
-                            aria-label="Close Sidebar"
-                        >
-                            <X className="w-4 h-4 stroke-[2.5]" />
-                        </button>
-                    )}
-                </div>
-
-                {/* Category-Wise Navigation Groups */}
-                <div className="pt-2.5 pb-2 px-0.5 pr-1.5 space-y-1">
-                    {clubCategories.map((category, index) => (
-                        <div key={category.id} className="space-y-0.5">
-                            {/* Divider between categories */}
-                            {index > 0 && (
-                                <div
-                                    className={`my-2 h-0.5 bg-black/15 overflow-x-hidden ${
-                                        isExpanded ? "w-full" : "w-8 mx-auto"
-                                    }`}
-                                />
-                            )}
-
-                            {/* Category Header Label (rendered when expanded) */}
-                            {isExpanded && (
-                                <div className="px-2 pt-1 pb-1">
-                                    <span className="text-[10px] font-black tracking-wider uppercase text-neutral-500 font-mono select-none block truncate">
-                                        {category.label}
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* Category items */}
-                            <div className="space-y-1">
-                                {category.items.map(renderNavItem)}
-                            </div>
+                        {/* Category items */}
+                        <div className="space-y-1">
+                            {category.items.map(renderNavItem)}
                         </div>
-                    ))}
-                </div>
+                    </div>
+                ))}
             </div>
 
             {/* Bottom Section: Club Profile Card (DEAD CENTER avatar when collapsed) */}

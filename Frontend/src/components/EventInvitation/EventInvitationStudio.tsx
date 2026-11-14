@@ -19,6 +19,7 @@ export interface EventInvitationStudioProps extends EventInvitationData {
     className?: string;
     defaultFormat?: InvitationFormat;
     defaultFace?: InvitationFace;
+    showShareButton?: boolean;
 }
 
 export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (props) => {
@@ -26,6 +27,7 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
         defaultFormat = "portrait",
         defaultFace = "front",
         className = "",
+        showShareButton = true,
     } = props;
 
     const toast = useToast();
@@ -389,7 +391,9 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
                     type="button"
                     onClick={() => handleDownload(face)}
                     disabled={isExporting}
-                    className="h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50"
+                    className={`h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50 ${
+                        !showShareButton ? "flex-1" : ""
+                    }`}
                     title={`Download ${face === "front" ? "Front Poster" : "Back QR Pass"}`}
                 >
                     {isExporting ? (
@@ -409,15 +413,17 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
                 </button>
 
                 {/* 3. Native Share */}
-                <button
-                    type="button"
-                    onClick={handleShare}
-                    disabled={isSharing}
-                    className="h-11 flex items-center justify-center gap-2 px-3 rounded-xl bg-[#FFE566] hover:bg-[#FDD835] text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50"
-                >
-                    <Share2 className="w-4 h-4 stroke-[2.5]" />
-                    <span>Share Invitation</span>
-                </button>
+                {showShareButton && (
+                    <button
+                        type="button"
+                        onClick={handleShare}
+                        disabled={isSharing}
+                        className="h-11 flex items-center justify-center gap-2 px-3 rounded-xl bg-[#FFE566] hover:bg-[#FDD835] text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50"
+                    >
+                        <Share2 className="w-4 h-4 stroke-[2.5]" />
+                        <span>Share Invitation</span>
+                    </button>
+                )}
             </div>
 
             {/* Hidden Off-Screen Unscaled Nodes for Exact Native Pixel-Perfect High-Res Retina Export */}

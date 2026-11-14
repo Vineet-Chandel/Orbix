@@ -2,6 +2,7 @@
 import React from "react";
 import { Filter, Search, X, Shield, Activity } from "lucide-react";
 import { NeoSelect, type NeoSelectOption } from "../../../../../components/NeoSelect";
+import { NeoDateTimePicker } from "../../../../../components/NeoDateTimePicker";
 import type {
     WorkspaceDepartment,
     WorkspaceHistoryRecordType,
@@ -189,21 +190,23 @@ export const HistoryFilterToolbar: React.FC<HistoryFilterToolbarProps> = ({
 
                 <div className="flex items-center gap-1.5 ml-auto">
                     <span className="text-[11px] font-black text-neutral-500 uppercase">Date:</span>
-                    <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => onStartDateChange(e.target.value)}
-                        aria-label="Start date"
-                        className="px-2 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg text-[11px] font-bold text-black focus:outline-none focus:bg-white"
-                    />
+                    <div className="w-36">
+                        <NeoDateTimePicker
+                            mode="date"
+                            value={startDate}
+                            onChange={onStartDateChange}
+                            placeholder="From..."
+                        />
+                    </div>
                     <span className="text-[11px] font-black text-neutral-400">to</span>
-                    <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => onEndDateChange(e.target.value)}
-                        aria-label="End date"
-                        className="px-2 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg text-[11px] font-bold text-black focus:outline-none focus:bg-white"
-                    />
+                    <div className="w-36">
+                        <NeoDateTimePicker
+                            mode="date"
+                            value={endDate}
+                            onChange={onEndDateChange}
+                            placeholder="To..."
+                        />
+                    </div>
                 </div>
             </div>
         </div>

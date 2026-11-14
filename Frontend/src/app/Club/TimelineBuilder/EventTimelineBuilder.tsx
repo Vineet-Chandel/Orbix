@@ -15,6 +15,41 @@ import {
 } from "lucide-react";
 import type { ConfiguredStage, StageType, StageEligibility, StageActionType } from "./types";
 import { STAGE_TEMPLATES, type StageTemplateDefinition } from "./StageTemplates";
+import { NeoSelect, type NeoSelectOption } from "../../../components/NeoSelect";
+import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
+
+const STAGE_CATEGORY_OPTIONS: NeoSelectOption[] = [
+    { value: "registration", label: "Registration" },
+    { value: "team_formation", label: "Team Formation" },
+    { value: "submission", label: "Submission Round" },
+    { value: "screening", label: "Screening & Review" },
+    { value: "evaluation", label: "Evaluation Round" },
+    { value: "development", label: "Development Sprint" },
+    { value: "presentation", label: "Presentation / Pitch" },
+    { value: "offline_finale", label: "Offline Finale" },
+    { value: "results", label: "Results Announcement" },
+    { value: "certificates", label: "Certificate Distribution" },
+    { value: "custom", label: "Custom Stage" },
+];
+
+const STAGE_ELIGIBILITY_OPTIONS: NeoSelectOption[] = [
+    { value: "all_registered", label: "All Registered Participants" },
+    { value: "accepted_only", label: "Accepted / Approved Only" },
+    { value: "shortlisted_only", label: "Shortlisted From Previous Round" },
+    { value: "selected_teams_only", label: "Selected Teams Only" },
+];
+
+const STAGE_ACTION_OPTIONS: NeoSelectOption[] = [
+    { value: "registration", label: "Initial Registration" },
+    { value: "submit_idea", label: "Submit Project / Idea" },
+    { value: "upload_docs", label: "Upload Pitch Deck / Document" },
+    { value: "submit_project", label: "Submit Code & Demo Links" },
+    { value: "attend_live", label: "Attend Presentation / Finale" },
+    { value: "view_results", label: "View Verified Results" },
+    { value: "internal_review", label: "Internal Organizer / Judge Only" },
+    { value: "none", label: "No Action Required" },
+];
 
 interface EventTimelineBuilderProps {
     stages: ConfiguredStage[];
@@ -397,23 +432,14 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
 
                                     <div className="space-y-1">
                                         <label className="text-xs font-black text-black block">Stage Category / Type</label>
-                                        <select
+                                        <NeoSelect
                                             value={activeStage.type}
-                                            onChange={(e) => handleUpdateActiveStage("type", e.target.value as StageType)}
-                                            className="w-full px-3 py-2 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:outline-hidden focus:bg-white"
-                                        >
-                                            <option value="registration">Registration</option>
-                                            <option value="team_formation">Team Formation</option>
-                                            <option value="submission">Submission Round</option>
-                                            <option value="screening">Screening & Review</option>
-                                            <option value="evaluation">Evaluation Round</option>
-                                            <option value="development">Development Sprint</option>
-                                            <option value="presentation">Presentation / Pitch</option>
-                                            <option value="offline_finale">Offline Finale</option>
-                                            <option value="results">Results Announcement</option>
-                                            <option value="certificates">Certificate Distribution</option>
-                                            <option value="custom">Custom Stage</option>
-                                        </select>
+                                            onChange={(val) => handleUpdateActiveStage("type", val as StageType)}
+                                            options={STAGE_CATEGORY_OPTIONS}
+                                            size="sm"
+                                            className="w-full"
+                                            triggerClassName="font-bold bg-[#FAF6EE] text-xs"
+                                        />
                                     </div>
                                 </div>
 
@@ -448,23 +474,25 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                                 </span>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                        <label className="text-[11px] font-bold text-neutral-700 block">Round Starts At *</label>
-                                        <input
-                                            type="datetime-local"
+                                    <div>
+                                        <NeoDateTimePicker
+                                            label="Round Starts At *"
+                                            required
                                             value={activeStage.startsAt}
-                                            onChange={(e) => handleUpdateActiveStage("startsAt", e.target.value)}
-                                            className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-white border-2 border-black rounded-lg shadow-[1.5px_1.5px_0px_#000] focus:outline-hidden"
+                                            onChange={(val) => handleUpdateActiveStage("startsAt", val)}
+                                            placeholder="Pick round start date & time"
+                                            mode="datetime"
                                         />
                                     </div>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[11px] font-bold text-neutral-700 block">Submission Deadline (Ends At) *</label>
-                                        <input
-                                            type="datetime-local"
+                                    <div>
+                                        <NeoDateTimePicker
+                                            label="Submission Deadline (Ends At) *"
+                                            required
                                             value={activeStage.endsAt}
-                                            onChange={(e) => handleUpdateActiveStage("endsAt", e.target.value)}
-                                            className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-white border-2 border-black rounded-lg shadow-[1.5px_1.5px_0px_#000] focus:outline-hidden"
+                                            onChange={(val) => handleUpdateActiveStage("endsAt", val)}
+                                            placeholder="Pick submission deadline"
+                                            mode="datetime"
                                         />
                                     </div>
                                 </div>
@@ -473,41 +501,33 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                             {/* Eligibility & Participant Action Rules */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-black text-black flex items-center gap-1">
+                                    <label className="text-xs font-black text-black flex items-center gap-1 mb-1">
                                         <Shield className="w-3.5 h-3.5" />
                                         <span>Round Eligibility</span>
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={activeStage.eligibilityType}
-                                        onChange={(e) => handleUpdateActiveStage("eligibilityType", e.target.value as StageEligibility)}
-                                        className="w-full px-3 py-2 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:outline-hidden focus:bg-white"
-                                    >
-                                        <option value="all_registered">All Registered Participants</option>
-                                        <option value="accepted_only">Accepted / Approved Only</option>
-                                        <option value="shortlisted_only">Shortlisted From Previous Round</option>
-                                        <option value="selected_teams_only">Selected Teams Only</option>
-                                    </select>
+                                        onChange={(val) => handleUpdateActiveStage("eligibilityType", val as StageEligibility)}
+                                        options={STAGE_ELIGIBILITY_OPTIONS}
+                                        size="sm"
+                                        className="w-full"
+                                        triggerClassName="font-bold bg-[#FAF6EE] text-xs"
+                                    />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-black text-black flex items-center gap-1">
+                                    <label className="text-xs font-black text-black flex items-center gap-1 mb-1">
                                         <FileCheck className="w-3.5 h-3.5" />
                                         <span>Participant Action</span>
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={activeStage.actionType}
-                                        onChange={(e) => handleUpdateActiveStage("actionType", e.target.value as StageActionType)}
-                                        className="w-full px-3 py-2 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:outline-hidden focus:bg-white"
-                                    >
-                                        <option value="registration">Initial Registration</option>
-                                        <option value="submit_idea">Submit Project / Idea</option>
-                                        <option value="upload_docs">Upload Pitch Deck / Document</option>
-                                        <option value="submit_project">Submit Code & Demo Links</option>
-                                        <option value="attend_live">Attend Presentation / Finale</option>
-                                        <option value="view_results">View Verified Results</option>
-                                        <option value="internal_review">Internal Organizer / Judge Only</option>
-                                        <option value="none">No Action Required</option>
-                                    </select>
+                                        onChange={(val) => handleUpdateActiveStage("actionType", val as StageActionType)}
+                                        options={STAGE_ACTION_OPTIONS}
+                                        size="sm"
+                                        className="w-full"
+                                        triggerClassName="font-bold bg-[#FAF6EE] text-xs"
+                                    />
                                 </div>
                             </div>
 
@@ -517,38 +537,32 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                                     Submission Policies & Controls
                                 </span>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={activeStage.requirements.allowResubmission}
-                                            onChange={(e) => handleUpdateRequirement("allowResubmission", e.target.checked)}
-                                            className="w-4 h-4 accent-black rounded"
-                                        />
-                                        <span>Allow Resubmissions before Deadline</span>
-                                    </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+                                    <NeoCheckbox
+                                        size="sm"
+                                        colorScheme="green"
+                                        checked={activeStage.requirements.allowResubmission}
+                                        onCheckedChange={(checked) => handleUpdateRequirement("allowResubmission", checked)}
+                                        label="Allow Resubmissions before Deadline"
+                                    />
 
                                     {isTeamEvent && (
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={activeStage.requirements.leaderOnlySubmit}
-                                                onChange={(e) => handleUpdateRequirement("leaderOnlySubmit", e.target.checked)}
-                                                className="w-4 h-4 accent-black rounded"
-                                            />
-                                            <span>Team Leader Only can Submit</span>
-                                        </label>
+                                        <NeoCheckbox
+                                            size="sm"
+                                            colorScheme="yellow"
+                                            checked={activeStage.requirements.leaderOnlySubmit}
+                                            onCheckedChange={(checked) => handleUpdateRequirement("leaderOnlySubmit", checked)}
+                                            label="Team Leader Only can Submit"
+                                        />
                                     )}
 
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={activeStage.requirements.requireApprovalToAdvance}
-                                            onChange={(e) => handleUpdateRequirement("requireApprovalToAdvance", e.target.checked)}
-                                            className="w-4 h-4 accent-black rounded"
-                                        />
-                                        <span>Organizer Approval Required to Advance</span>
-                                    </label>
+                                    <NeoCheckbox
+                                        size="sm"
+                                        colorScheme="cyan"
+                                        checked={activeStage.requirements.requireApprovalToAdvance}
+                                        onCheckedChange={(checked) => handleUpdateRequirement("requireApprovalToAdvance", checked)}
+                                        label="Organizer Approval Required to Advance"
+                                    />
                                 </div>
                             </div>
                         </div>

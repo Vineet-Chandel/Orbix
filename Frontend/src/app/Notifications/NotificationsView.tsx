@@ -40,6 +40,10 @@ import {
     Sparkles,
     Download,
     Share2,
+    ArrowLeft,
+    MoreVertical,
+    CheckSquare,
+    MailOpen,
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { downloadPassPdf } from "../../utils/passPdfGenerator";
@@ -54,6 +58,8 @@ import {
     fetchNotifications,
     deleteNotification,
     markNotificationsAsRead,
+    markNotificationsAsUnread,
+    deleteNotificationsBulk,
     type UserNotification,
 } from "../../utils/profileApi";
 import { RelationshipActionButton } from "../../components/RelationshipActionButton";
@@ -107,6 +113,18 @@ export const NotificationsView: React.FC = () => {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [actingInvitationId, setActingInvitationId] = useState<string | null>(null);
 
+    // Multi-selection state
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        item: UserNotification;
+    } | null>(null);
+
     // Interactive security session termination from inbox
     const [terminatedSessionIds, setTerminatedSessionIds] = useState<Set<string>>(new Set());
     const [isTerminatingSession, setIsTerminatingSession] = useState<string | null>(null);
@@ -114,6 +132,23 @@ export const NotificationsView: React.FC = () => {
     const [revealedCertificates, setRevealedCertificates] = useState<Record<string, boolean>>({});
     const [selectedGroupCertIndex, setSelectedGroupCertIndex] = useState<number>(0);
     const [isDownloadingPass, setIsDownloadingPass] = useState(false);
+
+    // Close context menu on outside click or escape
+    useEffect(() => {
+        if (!contextMenu) return;
+        const handleClose = () => setContextMenu(null);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setContextMenu(null);
+        };
+        window.addEventListener("click", handleClose);
+        window.addEventListener("contextmenu", handleClose);
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("click", handleClose);
+            window.removeEventListener("contextmenu", handleClose);
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [contextMenu]);
 
     const handleDownloadPassPdf = async (eventTitle?: string) => {
         if (isDownloadingPass) return;
@@ -173,11 +208,14 @@ export const NotificationsView: React.FC = () => {
                     window.dispatchEvent(new Event("orbix_notifications_updated"));
                 }
 
-                // If queryId is provided, select it; otherwise select first item if none selected
+                // If queryId is provided, select it; otherwise on desktop select first item if none selected
                 if (queryId && res.notifications?.some((n) => n.id === queryId)) {
                     setSelectedId(queryId);
                 } else if (!selectedId && res.notifications && res.notifications.length > 0) {
-                    setSelectedId(res.notifications[0].id);
+                    // Only auto-select first on desktop (>= 1024px) so mobile/tablet sees list first
+                    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+                        setSelectedId(res.notifications[0].id);
+                    }
                 }
             } catch (err) {
                 console.error("Failed to load notifications:", err);
@@ -202,8 +240,137 @@ export const NotificationsView: React.FC = () => {
 
     // Handle selecting a notification
     const handleSelect = (notif: UserNotification) => {
+        if (isSelectionMode) {
+            handleToggleSelectItem(notif.id);
+            return;
+        }
         setSelectedId(notif.id);
         setSearchParams({ id: notif.id }, { replace: true });
+    };
+
+    // Right click context menu handler
+    const handleContextMenu = (e: React.MouseEvent, item: UserNotification) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const menuWidth = 200;
+        const menuHeight = 160;
+        const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+        const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+        setContextMenu({ x: Math.max(10, x), y: Math.max(10, y), item });
+    };
+
+    // Toggle Read / Unread for single item
+    const handleToggleReadSingle = async (item: UserNotification) => {
+        setContextMenu(null);
+        const newReadState = !item.isRead;
+        setNotifications((prev) =>
+            prev.map((n) => (n.id === item.id ? { ...n, isRead: newReadState } : n))
+        );
+        if (newReadState) {
+            await markNotificationsAsRead([item.id]);
+        } else {
+            await markNotificationsAsUnread([item.id]);
+        }
+        toast.info(newReadState ? "Marked as read." : "Marked as unread.");
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("orbix_notifications_updated"));
+        }
+    };
+
+    // Delete single item from context menu
+    const handleDeleteSingle = async (item: UserNotification) => {
+        setContextMenu(null);
+        setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+        if (selectedId === item.id) {
+            const remaining = notifications.filter((n) => n.id !== item.id);
+            setSelectedId(remaining[0]?.id || null);
+        }
+        await deleteNotification(item.id);
+        toast.info("Notification deleted.");
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("orbix_notifications_updated"));
+        }
+    };
+
+    // Enter multi-select mode starting with this item
+    const handleStartSelectWithItem = (item: UserNotification) => {
+        setContextMenu(null);
+        setIsSelectionMode(true);
+        setSelectedItemIds(new Set([item.id]));
+    };
+
+    // Toggle multi-select of an item
+    const handleToggleSelectItem = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSelectedItemIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    // Select All / Deselect All visible items
+    const handleToggleSelectAll = (visibleIds: string[]) => {
+        const isAllSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedItemIds.has(id));
+        if (isAllSelected) {
+            setSelectedItemIds(new Set());
+        } else {
+            setSelectedItemIds(new Set(visibleIds));
+        }
+    };
+
+    // Bulk Mark as Read
+    const handleBulkMarkRead = async () => {
+        if (selectedItemIds.size === 0) return;
+        const ids = Array.from(selectedItemIds);
+        setNotifications((prev) =>
+            prev.map((n) => (selectedItemIds.has(n.id) ? { ...n, isRead: true } : n))
+        );
+        await markNotificationsAsRead(ids);
+        toast.success(`${ids.length} marked as read.`);
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("orbix_notifications_updated"));
+        }
+    };
+
+    // Bulk Mark as Unread
+    const handleBulkMarkUnread = async () => {
+        if (selectedItemIds.size === 0) return;
+        const ids = Array.from(selectedItemIds);
+        setNotifications((prev) =>
+            prev.map((n) => (selectedItemIds.has(n.id) ? { ...n, isRead: false } : n))
+        );
+        await markNotificationsAsUnread(ids);
+        toast.info(`${ids.length} marked as unread.`);
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("orbix_notifications_updated"));
+        }
+    };
+
+    // Bulk Delete
+    const handleBulkDelete = async () => {
+        if (selectedItemIds.size === 0) return;
+        const ids = Array.from(selectedItemIds);
+        setIsBulkDeleting(true);
+        try {
+            setNotifications((prev) => prev.filter((n) => !selectedItemIds.has(n.id)));
+            if (selectedId && selectedItemIds.has(selectedId)) {
+                const remaining = notifications.filter((n) => !selectedItemIds.has(n.id));
+                setSelectedId(remaining[0]?.id || null);
+            }
+            await deleteNotificationsBulk(ids);
+            toast.success(`${ids.length} notification${ids.length > 1 ? "s" : ""} deleted.`);
+            setSelectedItemIds(new Set());
+            setIsSelectionMode(false);
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("orbix_notifications_updated"));
+            }
+        } catch {
+            toast.error("Failed to delete notifications.");
+        } finally {
+            setIsBulkDeleting(false);
+        }
     };
 
     // Handle delete
@@ -653,7 +820,11 @@ export const NotificationsView: React.FC = () => {
             {/* Main Split-Pane Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start min-h-[600px]">
                 {/* Left Column: Messages List (lg:col-span-5) */}
-                <div className="lg:col-span-5 flex flex-col rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden min-h-[580px]">
+                <div
+                    className={`flex flex-col rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden min-h-[580px] lg:col-span-5 ${
+                        selectedId ? "hidden lg:flex" : "flex"
+                    }`}
+                >
                     {/* Search & Filter Header */}
                     <div className="p-4 border-b-2 border-black bg-[#FAF6EE] space-y-3">
                         {/* Search input */}
@@ -668,84 +839,163 @@ export const NotificationsView: React.FC = () => {
                             />
                         </div>
 
-                        {/* Filter Tabs */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Filter Tabs & Select Mode Toggle */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={() => setFilter("all")}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        filter === "all"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                    }`}
+                                >
+                                    All ({totalCount})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFilter("requests")}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        filter === "requests"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                    }`}
+                                >
+                                    Requests ({requestsCount})
+                                </button>
+                                {securityCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilter("security")}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                            filter === "security"
+                                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                    >
+                                        Security ({securityCount})
+                                    </button>
+                                )}
+                                {teamInvCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilter("teams")}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                            filter === "teams"
+                                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                    >
+                                        Teams ({teamInvCount})
+                                    </button>
+                                )}
+                                {inquiryCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilter("inquiries")}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                            filter === "inquiries"
+                                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                    >
+                                        Recruiter ({inquiryCount})
+                                    </button>
+                                )}
+                                {unreadCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilter("unread")}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                            filter === "unread"
+                                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                    >
+                                        Unread ({unreadCount})
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Select Mode Toggle */}
                             <button
                                 type="button"
-                                onClick={() => setFilter("all")}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                    filter === "all"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                onClick={() => {
+                                    setIsSelectionMode(!isSelectionMode);
+                                    if (isSelectionMode) setSelectedItemIds(new Set());
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    isSelectionMode
+                                        ? "bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-white text-black hover:bg-neutral-100 border-2 border-black shadow-[1px_1px_0px_#000]"
                                 }`}
                             >
-                                All ({totalCount})
+                                <CheckSquare className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>{isSelectionMode ? "Cancel" : "Select"}</span>
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setFilter("requests")}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                    filter === "requests"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
-                                }`}
-                            >
-                                Requests ({requestsCount})
-                            </button>
-                            {securityCount > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => setFilter("security")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                        filter === "security"
-                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
-                                    }`}
-                                >
-                                    Security ({securityCount})
-                                </button>
-                            )}
-                            {teamInvCount > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => setFilter("teams")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                        filter === "teams"
-                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
-                                    }`}
-                                >
-                                    Teams ({teamInvCount})
-                                </button>
-                            )}
-                            {inquiryCount > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => setFilter("inquiries")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                        filter === "inquiries"
-                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
-                                    }`}
-                                >
-                                    Recruiter ({inquiryCount})
-                                </button>
-                            )}
-                            {unreadCount > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => setFilter("unread")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                        filter === "unread"
-                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
-                                    }`}
-                                >
-                                    Unread ({unreadCount})
-                                </button>
-                            )}
                         </div>
                     </div>
+
+                    {/* Multi-Select Action Toolbar */}
+                    {isSelectionMode && (
+                        <div className="p-3 bg-amber-50 border-b-2 border-black flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleSelectAll(filteredNotifications.map((n) => n.id))}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                                >
+                                    <CheckSquare className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>
+                                        {filteredNotifications.length > 0 && filteredNotifications.every((n) => selectedItemIds.has(n.id))
+                                            ? "Deselect All"
+                                            : "Select All"}
+                                    </span>
+                                </button>
+                                <span className="text-xs font-black text-black">
+                                    {selectedItemIds.size} selected
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={handleBulkMarkRead}
+                                    disabled={selectedItemIds.size === 0}
+                                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] disabled:opacity-50 cursor-pointer"
+                                >
+                                    Mark Read
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleBulkMarkUnread}
+                                    disabled={selectedItemIds.size === 0}
+                                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] disabled:opacity-50 cursor-pointer"
+                                >
+                                    Mark Unread
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleBulkDelete}
+                                    disabled={selectedItemIds.size === 0 || isBulkDeleting}
+                                    className="px-2.5 py-1 rounded-xl bg-rose-500 hover:bg-rose-600 text-white border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Delete</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsSelectionMode(false);
+                                        setSelectedItemIds(new Set());
+                                    }}
+                                    className="px-2.5 py-1 rounded-xl bg-black text-white border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                                >
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Messages Scroll Area */}
                     <div className="flex-1 overflow-y-auto divide-y-2 divide-black/10 max-h-[660px]">
@@ -834,13 +1084,25 @@ export const NotificationsView: React.FC = () => {
                                     <div
                                         key={item.id}
                                         onClick={() => handleSelect(item)}
-                                        className={`group relative p-4 text-left transition-all cursor-pointer border-l-4 ${
+                                        onContextMenu={(e) => handleContextMenu(e, item)}
+                                        className={`group relative p-3.5 sm:p-4 text-left transition-all cursor-pointer border-l-4 select-none ${
                                             isSelected
                                                 ? "bg-[#FAF6EE] border-l-black"
                                                 : "hover:bg-[#FAF6EE]/50 border-l-transparent"
                                         }`}
                                     >
                                         <div className="flex items-start gap-3">
+                                            {/* Checkbox in selection mode */}
+                                            {isSelectionMode && (
+                                                <div
+                                                    onClick={(e) => handleToggleSelectItem(item.id, e)}
+                                                    className={`w-5 h-5 rounded-md border-2 border-black flex items-center justify-center shrink-0 mt-2.5 cursor-pointer shadow-[1px_1px_0px_#000] transition-colors ${
+                                                        selectedItemIds.has(item.id) ? "bg-[#a2ff86]" : "bg-white"
+                                                    }`}
+                                                >
+                                                    {selectedItemIds.has(item.id) && <Check className="w-3.5 h-3.5 stroke-[3] text-black" />}
+                                                </div>
+                                            )}
                                             {/* Thumbnail Icon / Avatar */}
                                             {isSecurity ? (
                                                 <div className={`relative w-10 h-10 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5 ${
@@ -1033,19 +1295,29 @@ export const NotificationsView: React.FC = () => {
                                                 </p>
                                             </div>
 
-                                            {/* Timestamp & delete icon on hover */}
+                                            {/* Timestamp & actions */}
                                             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                                                 <span className="text-[10px] text-neutral-500 font-mono font-bold">
                                                     {formatRelativeTime(item.createdAt)}
                                                 </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => handleDelete(e, item.id)}
-                                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-black hover:text-rose-600 bg-white hover:bg-rose-50 rounded-lg border border-black shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
-                                                    title="Delete message"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5 stroke-[2]" />
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleContextMenu(e, item)}
+                                                        className="p-1 text-black hover:bg-neutral-100 rounded-lg border border-black/30 shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
+                                                        title="Options"
+                                                    >
+                                                        <MoreVertical className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleDelete(e, item.id)}
+                                                        className="opacity-0 group-hover:opacity-100 p-1 text-black hover:text-rose-600 bg-white hover:bg-rose-50 rounded-lg border border-black shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
+                                                        title="Delete message"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5 stroke-[2]" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1056,7 +1328,36 @@ export const NotificationsView: React.FC = () => {
                 </div>
 
                 {/* Right Column: Message Detail Pane (lg:col-span-7) */}
-                <div className="lg:col-span-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden flex flex-col min-h-[580px]">
+                <div
+                    className={`rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden flex flex-col min-h-[580px] lg:col-span-7 ${
+                        !selectedId ? "hidden lg:flex" : "flex"
+                    }`}
+                >
+                    {/* Mobile/Tablet Back Bar */}
+                    <div className="lg:hidden p-3 bg-[#FAF6EE] border-b-2 border-black flex items-center justify-between gap-3 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSelectedId(null);
+                                setSearchParams({}, { replace: true });
+                            }}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] active:translate-x-[0.5px] active:translate-y-[0.5px] cursor-pointer"
+                        >
+                            <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+                            <span>Back to Inbox</span>
+                        </button>
+                        {activeItem && (
+                            <button
+                                type="button"
+                                onClick={(e) => handleDelete(e, activeItem.id)}
+                                className="p-1.5 text-rose-600 bg-white hover:bg-rose-50 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1 text-xs font-black"
+                                title="Delete notification"
+                            >
+                                <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Delete</span>
+                            </button>
+                        )}
+                    </div>
                     {activeItem ? (
                         (() => {
                             const isConnAccepted = isConnectionAcceptedItem(activeItem);
@@ -2888,6 +3189,50 @@ export const NotificationsView: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Context Menu Popup */}
+            {contextMenu && (
+                <div
+                    className="fixed z-[999] bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] p-1.5 min-w-[190px] animate-in fade-in zoom-in-95 duration-100"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        type="button"
+                        onClick={() => handleToggleReadSingle(contextMenu.item)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                    >
+                        {contextMenu.item.isRead ? (
+                            <>
+                                <Mail className="w-4 h-4 stroke-[2.5] text-amber-600" />
+                                <span>Mark as Unread</span>
+                            </>
+                        ) : (
+                            <>
+                                <MailOpen className="w-4 h-4 stroke-[2.5] text-emerald-600" />
+                                <span>Mark as Read</span>
+                            </>
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleStartSelectWithItem(contextMenu.item)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                    >
+                        <CheckSquare className="w-4 h-4 stroke-[2.5] text-sky-600" />
+                        <span>Select Notification</span>
+                    </button>
+                    <div className="my-1 border-t-2 border-black/10" />
+                    <button
+                        type="button"
+                        onClick={() => handleDeleteSingle(contextMenu.item)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
+                    >
+                        <Trash2 className="w-4 h-4 stroke-[2.5]" />
+                        <span>Delete</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

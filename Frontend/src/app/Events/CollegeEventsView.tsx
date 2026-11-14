@@ -416,7 +416,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                         )}
 
                         {/* Compact Action Row Overlay (Like & Share) */}
-                        <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full border-2 border-black bg-white/95 shadow-[1.5px_1.5px_0px_#000] flex items-center backdrop-blur-sm">
+                        <div className="absolute top-2.5 right-2.5 px-3 py-1 rounded-full border-2 border-black bg-white/95 shadow-[2px_2px_0px_#000] flex items-center backdrop-blur-sm">
                             <EventActionRow
                                 eventId={ev.id}
                                 eventTitle={ev.title}

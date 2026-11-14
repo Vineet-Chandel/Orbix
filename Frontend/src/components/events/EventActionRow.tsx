@@ -23,11 +23,11 @@ const SIZE_CONFIG: Record<
     { icon: string; text: string; gap: string; rowGap: string; loaderSize: number }
 > = {
     sm: {
-        icon: "w-3.5 h-3.5 sm:w-4 sm:h-4",
-        text: "text-xs font-bold",
-        gap: "gap-1.5",
-        rowGap: "gap-3 sm:gap-3.5",
-        loaderSize: 13,
+        icon: "w-5 h-5 sm:w-5.5 sm:h-5.5",
+        text: "text-sm sm:text-base font-black",
+        gap: "gap-1.5 sm:gap-2",
+        rowGap: "gap-3.5 sm:gap-4.5",
+        loaderSize: 16,
     },
     md: {
         icon: "w-6 h-6 sm:w-7 sm:h-7",
@@ -144,8 +144,8 @@ export const EventActionRow: React.FC<EventActionRowProps> = ({
                     <Heart
                         className={`${config.icon} transition-colors duration-150 drop-shadow-sm ${
                             likedByViewer
-                                ? "fill-rose-500 text-rose-500 stroke-rose-500 stroke-[1.5]"
-                                : "fill-none text-neutral-900 dark:text-neutral-100 group-hover:text-rose-500 stroke-[2.2]"
+                                ? "fill-rose-500 text-rose-500 stroke-rose-500 stroke-[2]"
+                                : "fill-none text-rose-500 dark:text-rose-400 group-hover:fill-rose-500/20 stroke-[2.5]"
                         }`}
                     />
                 </motion.div>
@@ -181,7 +181,7 @@ export const EventActionRow: React.FC<EventActionRowProps> = ({
             >
                 <div className="flex items-center justify-center shrink-0">
                     <Share2
-                        className={`${config.icon} transition-colors duration-150 text-neutral-900 dark:text-neutral-100 group-hover:text-blue-500 stroke-[2.2] drop-shadow-sm`}
+                        className={`${config.icon} transition-colors duration-150 text-blue-500 dark:text-blue-400 group-hover:text-blue-600 stroke-[2.5] drop-shadow-sm`}
                     />
                 </div>
                 <span

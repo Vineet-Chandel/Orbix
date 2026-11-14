@@ -28,6 +28,7 @@ export interface EventLiveListingCardProps {
     className?: string;
     defaultFormat?: InvitationFormat;
     defaultFace?: InvitationFace;
+    showShareButton?: boolean;
 }
 
 /**
