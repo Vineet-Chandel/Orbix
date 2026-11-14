@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import type { ConfiguredStage } from "./types";
 import type { FormQuestion } from "../../../api/clubEventFormApi";
-import type { ClubEventStatus } from "../../../store/clubEventsSlice";
+import type { ClubEventStatus, EventSponsor } from "../../../store/clubEventsSlice";
+import { Building2 } from "lucide-react";
 
 interface EventWizardReviewStepProps {
     form: {
@@ -27,20 +28,24 @@ interface EventWizardReviewStepProps {
         isTeamEvent: boolean;
         minTeamSize: number;
         maxTeamSize: number;
+        sponsors?: EventSponsor[];
     };
     stages: ConfiguredStage[];
     formQuestions: FormQuestion[];
+    sponsors?: EventSponsor[];
     collegeName?: string;
-    onJumpToStep: (stepNumber: 1 | 2 | 3 | 4) => void;
+    onJumpToStep: (stepNumber: 1 | 2 | 3 | 4 | 5) => void;
 }
 
 export const EventWizardReviewStep: React.FC<EventWizardReviewStepProps> = ({
     form,
     stages,
     formQuestions,
+    sponsors: propSponsors,
     collegeName,
     onJumpToStep,
 }) => {
+    const sponsors = propSponsors || form.sponsors || [];
     // Validation checks
     const hasTitle = Boolean(form.title.trim());
     const hasValidEventDates = Boolean(form.startsAt && (!form.endsAt || new Date(form.endsAt) >= new Date(form.startsAt)));
@@ -167,6 +172,54 @@ export const EventWizardReviewStep: React.FC<EventWizardReviewStepProps> = ({
                             ))}
                         </div>
                     </div>
+
+                    {/* Event Sponsors & Partners Summary */}
+                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase text-neutral-500">
+                                Event Sponsors & Partners ({sponsors.length})
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => onJumpToStep(5)}
+                                className="text-xs font-black text-indigo-700 hover:underline cursor-pointer"
+                            >
+                                {sponsors.length > 0 ? "Edit Sponsors →" : "Add Sponsors →"}
+                            </button>
+                        </div>
+
+                        {sponsors.length > 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {sponsors.map((sp, idx) => {
+                                    const spImg = sp.logoUrl || sp.imageUrl;
+                                    return (
+                                        <div
+                                            key={sp.id || idx}
+                                            className="p-2.5 rounded-xl bg-[#FAF6EE] border border-black/20 flex items-center gap-2 text-xs font-bold min-w-0"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg border border-black bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                                {spImg ? (
+                                                    <img src={spImg} alt={sp.name} className="w-full h-full object-contain p-0.5" />
+                                                ) : (
+                                                    <Building2 className="w-4 h-4 text-neutral-400" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <span className="text-black font-black truncate block text-[11px]">{sp.name || "Sponsor"}</span>
+                                                {sp.description && (
+                                                    <span className="text-[10px] text-neutral-500 truncate block font-normal">{sp.description}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-neutral-500 font-medium italic">
+                                No sponsors configured. (Optional — can proceed to publish)
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 {/* Right: Validation Checklist & Banner (5 cols) */}
@@ -231,6 +284,19 @@ export const EventWizardReviewStep: React.FC<EventWizardReviewStepProps> = ({
                                 <span className="text-emerald-700 flex items-center gap-1 font-black">
                                     <CheckCircle2 className="w-3.5 h-3.5" /> {formQuestions.length} Fields Active
                                 </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <span className="text-neutral-700">Event Sponsors & Partners</span>
+                                {sponsors.length > 0 ? (
+                                    <span className="text-emerald-700 flex items-center gap-1 font-black">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> {sponsors.length} Linked
+                                    </span>
+                                ) : (
+                                    <span className="text-neutral-500 flex items-center gap-1 font-bold">
+                                        Optional (0 Added)
+                                    </span>
+                                )}
                             </div>
 
                             <div className="flex items-center justify-between">

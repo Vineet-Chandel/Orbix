@@ -1,3 +1,5 @@
+import type { EventSponsor } from "../store/clubEventsSlice";
+
 export interface CollegeEventItem {
     id: string;
     clubId: string;
@@ -17,6 +19,7 @@ export interface CollegeEventItem {
     isTeamEvent?: boolean;
     minTeamSize?: number;
     maxTeamSize?: number;
+    sponsors?: EventSponsor[];
     teamId?: string | null;
     teamRole?: "leader" | "member" | null;
     publishedAt: string | null;

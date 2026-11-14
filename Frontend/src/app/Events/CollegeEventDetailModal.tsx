@@ -20,6 +20,7 @@ import {
     Globe2,
     GraduationCap,
     Lock,
+    Sparkles,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
@@ -85,7 +86,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
 
     return createPortal(
         <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
-            <div className="relative w-full max-w-5xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
+            <div className="relative w-[92vw] sm:w-[90vw] max-w-[90vw] 2xl:max-w-[1500px] bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
@@ -448,6 +449,96 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                             </div>
                         </div>
                     </div>
+
+                    {/* Event Sponsors & Partners Section (Smart visibility: entirely vanishes if 0 sponsors) */}
+                    {event.sponsors && event.sponsors.length > 0 && (
+                        <div className="p-5 sm:p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex items-center justify-between border-b-2 border-black/10 pb-3">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-black" />
+                                    <h2 className="font-black text-base sm:text-lg text-black tracking-tight">
+                                        Event Partners & Sponsors
+                                    </h2>
+                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                        {event.sponsors.length}
+                                    </span>
+                                </div>
+                                <span className="text-[11px] font-bold text-neutral-500 hidden sm:inline">
+                                    Click any partner card to visit their official website
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                                {event.sponsors.map((sponsor, index) => {
+                                    const sponsorImage = sponsor.logoUrl || sponsor.imageUrl || "";
+                                    const rawLink = sponsor.websiteUrl || sponsor.link || "";
+                                    const hasLink = Boolean(rawLink && rawLink.trim());
+                                    const redirectUrl = hasLink
+                                        ? /^https?:\/\//i.test(rawLink.trim())
+                                            ? rawLink.trim()
+                                            : `https://${rawLink.trim()}`
+                                        : undefined;
+
+                                    const CardContent = (
+                                        <div
+                                            className={`p-3 sm:p-4 rounded-xl border-2 border-black bg-[#FAF6EE] flex flex-col items-center text-center justify-between gap-2.5 h-full transition-all group ${
+                                                hasLink
+                                                    ? "hover:-translate-y-1 hover:shadow-[4px_4px_0px_#000] hover:bg-white cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                                    : "shadow-[2px_2px_0px_#000]"
+                                            }`}
+                                        >
+                                            {/* Image container */}
+                                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl border-2 border-black bg-white overflow-hidden flex items-center justify-center p-1.5 shadow-[2px_2px_0px_#000] shrink-0 group-hover:scale-105 transition-transform">
+                                                {sponsorImage ? (
+                                                    <img
+                                                        src={sponsorImage}
+                                                        alt={sponsor.name}
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                ) : (
+                                                    <Building2 className="w-8 h-8 text-neutral-400" />
+                                                )}
+                                            </div>
+
+                                            {/* Text block */}
+                                            <div className="space-y-1 w-full min-w-0">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <h4 className="font-black text-xs sm:text-sm text-black truncate leading-tight group-hover:text-indigo-600 transition-colors">
+                                                        {sponsor.name || "Sponsor Partner"}
+                                                    </h4>
+                                                    {hasLink && (
+                                                        <ExternalLink className="w-3 h-3 text-neutral-500 opacity-60 group-hover:opacity-100 group-hover:text-indigo-600 shrink-0" />
+                                                    )}
+                                                </div>
+                                                {sponsor.description && (
+                                                    <p className="text-[10px] sm:text-[11px] font-medium text-neutral-600 line-clamp-2 leading-snug">
+                                                        {sponsor.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+
+                                    return hasLink ? (
+                                        <a
+                                            key={sponsor.id || `sp_pub_${index}`}
+                                            href={redirectUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block h-full"
+                                            title={`Visit ${sponsor.name || "sponsor"} (${redirectUrl})`}
+                                        >
+                                            {CardContent}
+                                        </a>
+                                    ) : (
+                                        <div key={sponsor.id || `sp_pub_${index}`} className="block h-full">
+                                            {CardContent}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>,

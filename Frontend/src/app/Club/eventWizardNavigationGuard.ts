@@ -179,6 +179,13 @@ export const validateStep4 = (coverImageUrl?: string | null, isUploadingBanner?:
 };
 
 /**
+ * Validates Step 5: Event Sponsors & Partners (Optional)
+ */
+export const validateStep5 = (_sponsors?: Array<unknown> | null): StepValidationResult => {
+    return { isValid: true };
+};
+
+/**
  * Centralized sequential navigation guard.
  *
  * Rules:
@@ -239,7 +246,7 @@ export const evaluateStepNavigation = (
         }
     }
 
-    // Forward Step 5 requires Step 4 valid
+    // Forward Step 5+ requires Step 4 valid
     if (targetStep >= 5) {
         const step4 = validateStep4(state.form.coverImageUrl, state.isUploadingBanner);
         if (!step4.isValid) {
@@ -248,6 +255,19 @@ export const evaluateStepNavigation = (
                 targetStep,
                 blockingStep: 4,
                 errorMessage: step4.errorMessage || "Please select or upload a banner for your event.",
+            };
+        }
+    }
+
+    // Forward Step 6 requires Step 5 valid
+    if (targetStep >= 6) {
+        const step5 = validateStep5();
+        if (!step5.isValid) {
+            return {
+                allowed: false,
+                targetStep,
+                blockingStep: 5,
+                errorMessage: step5.errorMessage || "Please verify your sponsors configuration.",
             };
         }
     }
@@ -266,5 +286,5 @@ export const getMaxPermittedStep = (state: WizardNavigationState): number => {
     if (!validateStep2(state.stages).isValid) return 2;
     if (!validateStep3(state.totalQuestions).isValid) return 3;
     if (!validateStep4(state.form.coverImageUrl, state.isUploadingBanner).isValid) return 4;
-    return 5;
+    return 6;
 };

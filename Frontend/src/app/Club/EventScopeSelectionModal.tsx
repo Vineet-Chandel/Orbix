@@ -249,7 +249,7 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                 role="dialog"
             >
                 <div
-                    className="relative w-full max-w-4xl bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] overflow-hidden my-auto"
+                    className="relative w-[90vw] max-w-[90vw] bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] overflow-hidden my-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header Section */}
@@ -349,6 +349,19 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                         unlockFormattedDate={panIndiaUnlockFormattedDate}
                                         onViewWarningModal={() => setWarningScope("PAN_INDIA")}
                                     />
+                                )}
+
+                                {/* Cooldown Notice when Limit is Not Reached */}
+                                {!panIndiaInCooldown && (
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-amber-50 border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-bold text-neutral-800">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                                            <span>3-day cooldown applies after event is created</span>
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black shrink-0">
+                                            3-Day Cooldown
+                                        </span>
+                                    </div>
                                 )}
 
                                 {/* Score Restricted Alert Banner */}
@@ -514,6 +527,19 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                         unlockFormattedDate={campusUnlockFormattedDate}
                                         onViewWarningModal={() => setWarningScope("CAMPUS")}
                                     />
+                                )}
+
+                                {/* Cooldown Notice when Limit is Not Reached */}
+                                {!campusInCooldown && (
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-sky-50 border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-bold text-neutral-800">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Clock className="w-4 h-4 text-sky-600 shrink-0" />
+                                            <span>12-hour cooldown applies after event is created</span>
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#38BDF8]/30 border border-black text-black shrink-0">
+                                            12-Hour Cooldown
+                                        </span>
+                                    </div>
                                 )}
 
                                 {/* Score Restricted Alert Banner */}
