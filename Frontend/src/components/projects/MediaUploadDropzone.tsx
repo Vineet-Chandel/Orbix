@@ -8,6 +8,7 @@ import {
     MoveUp,
     MoveDown,
     Plus,
+    Crop,
 } from "lucide-react";
 import {
     requestProjectMediaSignature,
@@ -15,6 +16,7 @@ import {
 } from "../../api/projectApi";
 import type { ProjectGalleryImage, ExtractedScreenshot } from "../../types/project";
 import { NeoSelect } from "../NeoSelect";
+import { AdaptiveImageEditorModal } from "../media/AdaptiveImageEditorModal";
 
 interface MediaUploadDropzoneProps {
     coverImageUrl: string;
@@ -35,6 +37,10 @@ export const MediaUploadDropzone: React.FC<MediaUploadDropzoneProps> = ({
     const [uploadTarget, setUploadTarget] = useState<"cover" | "gallery">("cover");
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
+
+    // Adaptive Image Editor state for Project Cover
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [editorSource, setEditorSource] = useState<File | string | null>(null);
 
     // Direct URL inputs
     const [directCoverUrl, setDirectCoverUrl] = useState(coverImageUrl);
@@ -69,6 +75,13 @@ export const MediaUploadDropzone: React.FC<MediaUploadDropzoneProps> = ({
             return;
         }
 
+        // If uploadTarget is cover, route through the Adaptive Image Editor
+        if (uploadTarget === "cover") {
+            setEditorSource(file);
+            setIsEditorOpen(true);
+            return;
+        }
+
         setIsUploading(true);
         setUploadProgress(10);
         setUploadError(null);
@@ -79,23 +92,44 @@ export const MediaUploadDropzone: React.FC<MediaUploadDropzoneProps> = ({
                 setUploadProgress(percent);
             });
 
-            if (uploadTarget === "cover") {
-                onCoverImageChange(result.secureUrl);
-                setDirectCoverUrl(result.secureUrl);
-            } else {
-                const newImg: ProjectGalleryImage = {
-                    id: `img_${Date.now()}`,
-                    url: result.secureUrl,
-                    caption: file.name.replace(/\.[^/.]+$/, ""),
-                    type: "screenshot",
-                    displayOrder: galleryImages.length,
-                };
-                onGalleryImagesChange([...galleryImages, newImg]);
-            }
+            const newImg: ProjectGalleryImage = {
+                id: `img_${Date.now()}`,
+                url: result.secureUrl,
+                caption: file.name.replace(/\.[^/.]+$/, ""),
+                type: "screenshot",
+                displayOrder: galleryImages.length,
+            };
+            onGalleryImagesChange([...galleryImages, newImg]);
         } catch (err: any) {
             console.error("Image upload failed:", err);
             setUploadError(
                 err.message || "Failed to upload image to cloud storage. You can enter an image URL directly below."
+            );
+        } finally {
+            setIsUploading(false);
+            setUploadProgress(null);
+        }
+    };
+
+    // Confirmed framed cover from Adaptive Image Editor
+    const handleCoverFramedConfirm = async (cropResult: { file: File; blob: Blob; dataUrl: string }) => {
+        setIsEditorOpen(false);
+        setEditorSource(null);
+        setIsUploading(true);
+        setUploadProgress(10);
+        setUploadError(null);
+
+        try {
+            const config = await requestProjectMediaSignature();
+            const result = await uploadProjectMediaToCloudinary(config, cropResult.file, (percent) => {
+                setUploadProgress(percent);
+            });
+            onCoverImageChange(result.secureUrl);
+            setDirectCoverUrl(result.secureUrl);
+        } catch (err: any) {
+            console.error("Framed cover upload failed:", err);
+            setUploadError(
+                err.message || "Failed to upload framed cover image."
             );
         } finally {
             setIsUploading(false);
@@ -231,11 +265,22 @@ export const MediaUploadDropzone: React.FC<MediaUploadDropzoneProps> = ({
                                     "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80";
                             }}
                         />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEditorSource(coverImageUrl);
+                                    setIsEditorOpen(true);
+                                }}
+                                className="px-3 py-1.5 bg-[#FFE566] border-2 border-black text-black font-black text-xs uppercase shadow-[2px_2px_0px_#000] flex items-center gap-1.5 hover:bg-[#ffd500]"
+                            >
+                                <Crop className="w-3.5 h-3.5" />
+                                Adjust Frame
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => triggerFilePicker("cover")}
-                                className="px-3 py-1.5 bg-[#a2ff86] border-2 border-black text-black font-black text-xs uppercase shadow-[2px_2px_0px_#000]"
+                                className="px-3 py-1.5 bg-[#a2ff86] border-2 border-black text-black font-black text-xs uppercase shadow-[2px_2px_0px_#000] hover:bg-[#86efac]"
                             >
                                 Replace File
                             </button>
@@ -481,6 +526,18 @@ export const MediaUploadDropzone: React.FC<MediaUploadDropzoneProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Adaptive Image Editor for Project Cover */}
+            <AdaptiveImageEditorModal
+                isOpen={isEditorOpen}
+                onClose={() => {
+                    setIsEditorOpen(false);
+                    setEditorSource(null);
+                }}
+                imageSource={editorSource}
+                placementId="project_cover"
+                onConfirm={handleCoverFramedConfirm}
+            />
         </div>
     );
 };
