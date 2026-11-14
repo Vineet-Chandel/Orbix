@@ -7,6 +7,7 @@ export interface InternalShareResponse {
     success: boolean;
     deliveredCount: number;
     sharesCount?: number;
+    publicCountIncremented?: boolean;
     error?: string;
 }
 
@@ -364,7 +365,7 @@ export function useEventEngagement(
         const recordShareToServer = async (
             shareType: "external" | "copy_link",
             platform: string
-        ) => {
+        ): Promise<{ success: boolean; publicCountIncremented: boolean }> => {
             const idempotencyKey = generateIdempotencyKey(shareType === "external" ? "ext" : "copy");
 
             const isClubUser = user?.accountType === "club";
@@ -396,13 +397,19 @@ export function useEventEngagement(
                         setShareCount(serverCount);
                         notifyListeners(cleanId, { likeCount, likedByViewer, shareCount: serverCount });
                     }
+                    const publicCountIncremented = Boolean(
+                        data?.publicCountIncremented ?? data?.data?.publicCountIncremented
+                    );
+                    return { success: true, publicCountIncremented };
                 }
+                return { success: false, publicCountIncremented: false };
             } catch (err) {
                 console.warn("[useEventEngagement] Failed to record share action:", err);
                 if (shareType === "external" && !isClubUser) {
                     setShareCount(shareCount);
                     notifyListeners(cleanId, { likeCount, likedByViewer, shareCount });
                 }
+                return { success: false, publicCountIncremented: false };
             }
         };
 
@@ -412,8 +419,11 @@ export function useEventEngagement(
                 try {
                     await navigator.share(shareData);
                     // Successfully completed native external share
-                    await recordShareToServer("external", "web_share");
-                    toast.success("Event shared successfully!");
+                    const recordResult = await recordShareToServer("external", "web_share");
+                    // Display success toast ONLY if public count was actually incremented!
+                    if (recordResult.publicCountIncremented) {
+                        toast.success("Event shared successfully!");
+                    }
                     return true;
                 } catch (shareErr: any) {
                     // User cancelled/dismissed or share aborted:
@@ -560,11 +570,14 @@ export function useEventEngagement(
                 const data = await res.json();
                 const serverCount = data?.sharesCount !== undefined ? Number(data.sharesCount) : shareCount;
                 const deliveredCount = Number(data?.data?.successfulDeliveries ?? targetList.length);
+                const publicCountIncremented = Boolean(
+                    data?.publicCountIncremented ?? data?.data?.publicCountIncremented
+                );
 
                 setShareCount(serverCount);
                 notifyListeners(cleanId, { likeCount, likedByViewer, shareCount: serverCount });
 
-                return { success: true, deliveredCount, sharesCount: serverCount };
+                return { success: true, deliveredCount, sharesCount: serverCount, publicCountIncremented };
             } catch (err: any) {
                 console.error("[useEventEngagement] Internal share failed:", err);
                 return { success: false, deliveredCount: 0, error: err.message || "Failed to share event with peer." };

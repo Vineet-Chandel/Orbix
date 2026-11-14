@@ -36,6 +36,7 @@ export interface RecordEventShareOptions {
 export interface RecordEventShareResult {
     eventId: string;
     shareCount: number;
+    publicCountIncremented: boolean;
     shareType: EventShareType;
     platform: string;
     recipientUserId?: string | null | undefined;
@@ -607,6 +608,7 @@ export async function recordEventShare(
                 return {
                     eventId,
                     shareCount: currentPublicCount,
+                    publicCountIncremented: false,
                     shareType,
                     platform,
                     recipientUserId,
@@ -738,6 +740,7 @@ export async function recordEventShare(
 
         const countRow = countRes.rows[0] || {};
         const publicShareCount = Number(countRow.public_shares) || 0;
+        const publicCountIncremented = deliveryOutcomes.some((d) => d.isNewCount === true);
 
         if (isRedisReady()) {
             try {
@@ -748,6 +751,7 @@ export async function recordEventShare(
         return {
             eventId,
             shareCount: publicShareCount,
+            publicCountIncremented,
             shareType,
             platform,
             recipientUserId: recipientsList.length === 1 ? recipientsList[0] : null,
@@ -765,10 +769,11 @@ export async function recordEventShare(
     }
 
     // 2. External and Copy-Link Sharing
-    await query(
+    const insertRes = await query(
         `INSERT INTO club_event_shares (event_id, user_id, idempotency_key, share_type, platform, recipient_user_id, account_type)
          VALUES ($1::uuid, $2::uuid, $3, $4, $5, NULL, $6)
-         ON CONFLICT (event_id, idempotency_key) DO NOTHING;`,
+         ON CONFLICT (event_id, idempotency_key) DO NOTHING
+         RETURNING id;`,
         [
             eventId,
             isUuidUser ? userId : null,
@@ -777,6 +782,17 @@ export async function recordEventShare(
             platform.slice(0, 50),
             resolvedAccountType,
         ]
+    );
+
+    const isNewRowInserted = insertRes.rows.length > 0;
+    // Public count strictly increments if:
+    // 1. A new row was inserted in the database (not an idempotent duplicate)
+    // 2. shareType is 'external' ('copy_link' is excluded from public count)
+    // 3. account_type is not 'club' (club accounts are excluded from public count)
+    const publicCountIncremented = Boolean(
+        isNewRowInserted &&
+        shareType === "external" &&
+        resolvedAccountType !== "club"
     );
 
     // 3. Retrieve authoritative counts (public share count EXCLUDES 'copy_link' and club accounts)
@@ -806,6 +822,7 @@ export async function recordEventShare(
     return {
         eventId,
         shareCount: publicShareCount,
+        publicCountIncremented,
         shareType,
         platform,
         recipientUserId: null,
