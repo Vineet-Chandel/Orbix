@@ -611,7 +611,7 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
                                                             <ArrowDown className="w-3.5 h-3.5 text-black stroke-[3] shrink-0" />
                                                         )
                                                     ) : (
-                                                        <ArrowUpDown className="w-3.5 h-3.5 text-neutral-800 hover:text-black stroke-[2.5] shrink-0 transition-colors" />
+                                                        <ArrowUpDown className="w-3.5 h-3.5 text-black stroke-[2.5] opacity-90 hover:opacity-100 shrink-0 transition-opacity" />
                                                     )}
                                                 </button>
                                             ) : (
@@ -631,11 +631,11 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
                                                         }}
                                                         className={`p-1 rounded-md border transition-all cursor-pointer ${hasRule
                                                             ? "bg-[#FFE566] text-black border-black shadow-[1px_1px_0px_#000]"
-                                                            : "border-transparent text-neutral-800 hover:text-black hover:border-black/30 hover:bg-black/5"
+                                                            : "border-black/30 text-black bg-black/[0.04] hover:bg-black/10 hover:border-black"
                                                             }`}
                                                         title={`Filter by ${col.label}`}
                                                     >
-                                                        <Filter className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        <Filter className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                                     </button>
 
                                                     {openFilterColumnId === col.id && (

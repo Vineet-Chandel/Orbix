@@ -1,12 +1,12 @@
 import crypto from "crypto";
-import { query } from "../../database/client";
+import { query } from "../../database/client.js";
 import {
     sendTeamCreatedEmail,
     sendTeamInvitationEmail,
     sendTeamMemberJoinedEmail,
     sendTeamMemberLeftOrRemovedEmail,
     sendTeamRegistrationConfirmedEmail,
-} from "../email/eventRegistrationEmailService";
+} from "../email/eventRegistrationEmailService.js";
 
 export interface EventTeamMember {
     id: string;

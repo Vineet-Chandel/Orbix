@@ -152,8 +152,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     } | null>(null);
     const [credibilityInputs, setCredibilityInputs] = useState<{
         reasonCategory?: string;
-        communicatedToAll?: boolean;
-        rescheduleOffered?: boolean;
     }>({});
 
     // Applications & Roster State
@@ -306,7 +304,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         confirmationText,
                         emergencyBypass,
                         reasonCategory: credibilityInputs.reasonCategory,
-                        rescheduleOffered: credibilityInputs.rescheduleOffered,
                     })
                 ).unwrap();
 
@@ -320,6 +317,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         previousEvent: event,
                         password,
                         confirmationText,
+                        reasonCategory: credibilityInputs.reasonCategory,
                     })
                 ).unwrap();
 

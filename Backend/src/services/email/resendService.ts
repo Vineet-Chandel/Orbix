@@ -28,11 +28,12 @@ export interface SendSecurityNotificationEmailOptions {
 
 export interface SendEmailResult {
   success: boolean;
-  simulated?: boolean;
-  messageId?: string;
-  error?: string;
-  provider?: "resend" | "smtp" | "simulation";
-  sandboxRestricted?: boolean;
+  simulated?: boolean | undefined;
+  messageId?: string | undefined;
+  id?: string | undefined;
+  error?: string | undefined;
+  provider?: "resend" | "smtp" | "simulation" | string | undefined;
+  sandboxRestricted?: boolean | undefined;
 }
 
 export interface EmailDispatchDeps {
@@ -191,26 +192,38 @@ async function sendViaSmtp(
   }
 }
 
-interface DispatchEmailPayload {
+export interface DispatchEmailPayload {
   to: string;
   subject: string;
   html: string;
-  text: string;
-  fromName: string;
-  defaultFromEmail: string;
-  logContext: string;
+  text?: string | undefined;
+  from?: string | undefined;
+  customFrom?: string | undefined;
+  fromName?: string | undefined;
+  defaultFromEmail?: string | undefined;
+  replyTo?: string | undefined;
+  logContext?: string | undefined;
+  idempotencyKey?: string | undefined;
+  priority?: "HIGH" | "NORMAL" | "LOW" | undefined;
+  emailType?: string | undefined;
+  userId?: string | undefined;
+  eventId?: string | undefined;
+  campaignId?: string | undefined;
 }
 
 /**
- * Unified Multi-Provider Email Dispatcher.
- * Intelligently chooses between Resend API, SMTP, and non-production simulation.
- * Fails closed in production when no verified provider is configured or when delivery fails.
+ * Raw multi-provider dispatcher (Resend API or SMTP).
+ * Called by worker or directly during high-priority synchronous attempt.
  */
-export async function dispatchEmail(
+export async function executeDirectProviderDispatch(
   payload: DispatchEmailPayload,
   deps?: EmailDispatchDeps
 ): Promise<SendEmailResult> {
-  const { to, subject, html, text, fromName, defaultFromEmail, logContext } = payload;
+  const { to, subject, html } = payload;
+  const text = payload.text || "";
+  const fromName = payload.fromName || "Orbix";
+  const defaultFromEmail = payload.defaultFromEmail || payload.from || payload.customFrom || DEFAULT_SYSTEM_FROM;
+  const logContext = payload.logContext || `Email -> ${to}`;
   const normalizedTo = to.trim().toLowerCase();
   const isProduction = process.env.NODE_ENV === "production";
 
@@ -351,6 +364,144 @@ export async function dispatchEmail(
     simulated: false,
     error: "No usable email transport configured.",
   };
+}
+
+/**
+ * Production-Grade Fault-Tolerant Email Gateway.
+ * Persists all emails into durable PostgreSQL jobs and dispatches them via BullMQ
+ * with isolated recipient execution, exponential backoff, and dead-letter protection.
+ */
+export async function dispatchEmail(
+  payload: DispatchEmailPayload,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
+  const isQueueEnabled = process.env.EMAIL_QUEUE_ENABLED !== "false";
+
+  // If queues are explicitly disabled (e.g. testing with mock deps), run raw provider send
+  if (!isQueueEnabled) {
+    return executeDirectProviderDispatch(payload, deps);
+  }
+
+  const { to, subject, html, text, priority, emailType, userId, eventId, campaignId } = payload;
+  const normalizedTo = to.trim().toLowerCase();
+  const resolvedEmailType = emailType || "transactional";
+
+  // Infer priority: Authentication OTPs, 2FA, password resets, and security alerts are HIGH priority
+  const resolvedPriority: "HIGH" | "NORMAL" | "LOW" =
+    priority ||
+    (subject.toLowerCase().includes("verification") ||
+    subject.toLowerCase().includes("code") ||
+    subject.toLowerCase().includes("password reset") ||
+    subject.toLowerCase().includes("security")
+      ? "HIGH"
+      : "NORMAL");
+
+  const idempotencyKey =
+    payload.idempotencyKey ||
+    `email-${Date.now()}-${Math.random().toString(36).slice(2, 9)}-${normalizedTo}`;
+
+  try {
+    const { EmailDeliveryService } = await import("./emailDeliveryService.js");
+    const { EmailQueueService } = await import("./emailQueueService.js");
+
+    // 1. Create durable job record in PostgreSQL
+    const { job, isNew } = await EmailDeliveryService.createDeliveryJob({
+      campaignId,
+      eventId,
+      userId,
+      recipientEmail: normalizedTo,
+      subject,
+      htmlBody: html,
+      textBody: text,
+      emailType: resolvedEmailType,
+      priority: resolvedPriority,
+      idempotencyKey,
+      metadata: { logContext: payload.logContext },
+    });
+
+    // If job was already sent previously (idempotency replay), return existing success
+    if (job.status === "SENT") {
+      return {
+        success: true,
+        simulated: false,
+        provider: job.provider || "resend",
+        messageId: job.providerMessageId || undefined,
+      };
+    }
+
+    // 2. High-priority interactive requests: attempt immediate inline delivery
+    if (resolvedPriority === "HIGH") {
+      const startedAt = new Date();
+      const sendResult = await executeDirectProviderDispatch(payload, deps);
+      const completedAt = new Date();
+      const durationMs = completedAt.getTime() - startedAt.getTime();
+
+      if (sendResult.success) {
+        const messageId = sendResult.messageId || sendResult.id || null;
+        await EmailDeliveryService.recordAttempt({
+          jobId: job.id,
+          attemptNumber: 1,
+          workerId: "inline-gateway",
+          startedAt,
+          completedAt,
+          durationMs,
+          status: "SUCCESS",
+          provider: sendResult.provider || "resend",
+          providerMessageId: messageId || undefined,
+          providerResponse: sendResult,
+        });
+
+        await EmailDeliveryService.markSuccess(job.id, sendResult.provider || "resend", messageId);
+        return sendResult;
+      }
+
+      // If immediate attempt failed transiently, don't fail user operation:
+      // Schedule background retry with exponential backoff & enqueue to queue!
+      await EmailDeliveryService.recordAttempt({
+        jobId: job.id,
+        attemptNumber: 1,
+        workerId: "inline-gateway",
+        startedAt,
+        completedAt,
+        durationMs,
+        status: "TRANSIENT_FAILURE",
+        errorMessage: sendResult.error,
+      });
+
+      await EmailDeliveryService.markFailure(job.id, new Error(sendResult.error || "Inline dispatch failed"), "inline-gateway", 1);
+      await EmailQueueService.enqueueEmailJob({
+        jobId: job.id,
+        priority: resolvedPriority,
+        emailType: job.emailType,
+        recipientEmail: job.recipientEmail,
+      });
+
+      return {
+        success: true,
+        simulated: false,
+        id: job.id,
+        error: "Dispatched to background queue for resilient delivery",
+      };
+    }
+
+    // 3. Normal / Background priority: enqueue to BullMQ
+    await EmailQueueService.enqueueEmailJob({
+      jobId: job.id,
+      priority: resolvedPriority,
+      emailType: job.emailType,
+      recipientEmail: job.recipientEmail,
+    });
+
+    return {
+      success: true,
+      simulated: false,
+      id: job.id,
+    };
+  } catch (queueErr: any) {
+    console.warn(`[dispatchEmail] Queue error, executing raw fallback dispatch:`, queueErr.message);
+    // In the unlikely event of database failure creating job, fall back to direct dispatch
+    return executeDirectProviderDispatch(payload, deps);
+  }
 }
 
 /**

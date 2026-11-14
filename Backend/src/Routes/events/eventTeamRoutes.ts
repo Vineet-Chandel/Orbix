@@ -1,7 +1,7 @@
 import express from "express";
 import type { Request, Response } from "express";
 import { authenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
-import { ClubEventTeamService } from "../../services/club/clubEventTeamService";
+import { ClubEventTeamService } from "../../services/club/clubEventTeamService.js";
 
 export const eventTeamRouter = express.Router();
 

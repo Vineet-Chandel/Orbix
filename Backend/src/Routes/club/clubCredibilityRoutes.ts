@@ -134,7 +134,7 @@ clubCredibilityRouter.post("/credibility/preview-impact", authenticate, requireC
             return res.status(404).json({ success: false, message: "Verified club profile not found." });
         }
 
-        const { eventId, action, reasonCategory, communicatedToAll, rescheduleOffered } = req.body;
+        const { eventId, action, reasonCategory } = req.body;
 
         if (!eventId || !action) {
             return res.status(400).json({ success: false, message: "eventId and action are required." });
@@ -142,8 +142,8 @@ clubCredibilityRouter.post("/credibility/preview-impact", authenticate, requireC
 
         const preview = await ClubCredibilityService.previewImpact(clubId, eventId, action, {
             reasonCategory,
-            communicatedToAll,
-            rescheduleOffered,
+            communicatedToAll: true,
+            rescheduleOffered: false,
         });
 
         return res.json({

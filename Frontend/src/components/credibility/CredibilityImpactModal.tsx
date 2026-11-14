@@ -9,7 +9,10 @@ import {
     X,
     TrendingDown,
     TrendingUp,
+    Minus,
     Info,
+    Send,
+    Activity,
 } from "lucide-react";
 import {
     previewCredibilityImpact,
@@ -17,12 +20,11 @@ import {
 } from "../../api/clubCredibilityApi";
 import { OrbixLoader } from "../ui/loader";
 import { NeoSelect } from "../NeoSelect";
-import { NeoCheckbox } from "../NeoCheckbox";
 
 export interface CredibilityImpactModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (data: { reasonCategory: string; communicatedToAll: boolean; rescheduleOffered: boolean }) => void;
+    onConfirm: (data: { reasonCategory: string }) => void;
     eventId: string;
     eventTitle: string;
     action: "cancel" | "delete" | "draft" | "complete";
@@ -30,12 +32,36 @@ export interface CredibilityImpactModalProps {
 }
 
 const REASON_OPTIONS = [
-    { value: "emergency_verified", label: "Verified Emergency / Medical Incident", description: "Unexpected urgent emergency handled with responsible communication." },
-    { value: "weather_force_majeure", label: "Severe Weather / Force Majeure", description: "Unforeseen physical condition or natural hazard preventing safe assembly." },
-    { value: "academic_institutional", label: "Academic / College Institutional Clash", description: "Mandatory campus exam, institutional holiday, or faculty directive." },
-    { value: "operational_delay", label: "Operational / Speaker / Venue Delay", description: "Venue unreadiness, speaker unavailability, or technical obstacles." },
-    { value: "low_registration", label: "Low Registration Turnout", description: "Insufficient student turnout to conduct the intended event program." },
-    { value: "unexplained", label: "Unexplained / Short-Notice Discretionary", description: "Discretionary cancellation without documented external constraints." },
+    {
+        value: "academic_clash",
+        label: "Academic / College Institutional Clash",
+        description: "Mandatory campus exam, institutional holiday, or faculty directive.",
+    },
+    {
+        value: "operational_delay",
+        label: "Operational / Speaker / Venue Delay",
+        description: "Venue unreadiness, speaker unavailability, or technical obstacles.",
+    },
+    {
+        value: "low_turnout",
+        label: "Low Registration Turnout",
+        description: "Insufficient student turnout to conduct the intended event program.",
+    },
+    {
+        value: "emergency_verified",
+        label: "Verified Emergency / Medical Incident",
+        description: "Unexpected urgent emergency handled with responsible communication.",
+    },
+    {
+        value: "weather_force_majeure",
+        label: "Severe Weather / Force Majeure",
+        description: "Unforeseen physical condition or natural hazard preventing safe assembly.",
+    },
+    {
+        value: "short_notice",
+        label: "Unexplained / Short-Notice Discretionary",
+        description: "Discretionary cancellation without documented external constraints.",
+    },
 ];
 
 export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
@@ -50,8 +76,6 @@ export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
     const [loading, setLoading] = useState(true);
     const [preview, setPreview] = useState<CredibilityImpactPreview | null>(null);
     const [reasonCategory, setReasonCategory] = useState<string>("operational_delay");
-    const [communicatedToAll, setCommunicatedToAll] = useState(true);
-    const [rescheduleOffered, setRescheduleOffered] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
 
     // Fetch dynamic preview calculation whenever inputs change
@@ -66,8 +90,8 @@ export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
             eventId,
             action,
             reasonCategory,
-            communicatedToAll,
-            rescheduleOffered,
+            communicatedToAll: true,
+            rescheduleOffered: false,
         })
             .then((data) => {
                 if (isMounted) {
@@ -86,7 +110,7 @@ export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
         return () => {
             isMounted = false;
         };
-    }, [isOpen, eventId, action, reasonCategory, communicatedToAll, rescheduleOffered]);
+    }, [isOpen, eventId, action, reasonCategory]);
 
     if (!isOpen || typeof document === "undefined") return null;
 
@@ -138,10 +162,10 @@ export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
         >
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-xl bg-[#FAF6EE] dark:bg-[#141414] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto text-neutral-900 dark:text-neutral-100"
+                className="w-full max-w-xl bg-[#FAF6EE] dark:bg-[#141414] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] max-h-[90vh] flex flex-col overflow-hidden text-neutral-900 dark:text-neutral-100"
             >
-                {/* Header Row */}
-                <div className="flex items-start justify-between gap-3 pb-3 border-b-2 border-black/10 dark:border-white/10">
+                {/* Header Row — Fixed / Pinned */}
+                <div className="shrink-0 p-5 sm:p-6 pb-4 border-b-2 border-black/10 dark:border-white/10 flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <div
                             className={`w-11 h-11 rounded-2xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0 ${
@@ -174,158 +198,162 @@ export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
                     </button>
                 </div>
 
-                {/* Subtitle / Context Note */}
-                <p className="text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                    {action === "cancel" && "Cancelling a published event affects your club's reputation based on advance notice, affected participants, and cancellation validity."}
-                    {action === "delete" && "Deleting a published event removes the listing while preserving audit accountability in your credibility ledger."}
-                    {action === "draft" && "Unpublishing a live event to draft removes it from campus feeds. Registrations received are retained."}
-                    {action === "complete" && "Concluding this live session commits verified attendee records to your club's credibility track record."}
-                </p>
+                {/* Modal Body — Independently Scrollable with generous bottom padding */}
+                <div className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-5 pb-28">
+                    {/* Subtitle / Context Note */}
+                    <p className="text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                        {action === "cancel" && "Cancelling a published event affects your club's reputation based on advance notice, affected participants, and cancellation validity."}
+                        {action === "delete" && "Deleting a published event removes the listing while preserving audit accountability in your credibility ledger."}
+                        {action === "draft" && "Unpublishing a live event to draft removes it from campus feeds. Registrations received are retained."}
+                        {action === "complete" && "Concluding this live session commits verified attendee records to your club's credibility track record."}
+                    </p>
 
-                {/* Live Scoring Impact Card */}
-                {loading ? (
-                    <div className="p-8 rounded-2xl border-2 border-black bg-white dark:bg-[#1c1c1c] shadow-[4px_4px_0px_#000] flex flex-col items-center justify-center gap-3">
-                        <OrbixLoader size="sm" variant="centered" color="#000" />
-                        <span className="text-xs font-black uppercase tracking-wider text-neutral-500">
-                            Calculating dynamic credibility preview...
-                        </span>
-                    </div>
-                ) : fetchError ? (
-                    <div className="p-4 rounded-2xl border-2 border-black bg-rose-50 text-rose-950 shadow-[3px_3px_0px_#000] text-xs font-bold">
-                        {fetchError}
-                    </div>
-                ) : preview ? (
-                    <div className="space-y-4">
-                        {/* 4-Stat Metric Matrix */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                            {/* Current Score */}
-                            <div className="p-3 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] space-y-1">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Current</span>
-                                <div className="text-lg sm:text-xl font-black text-black dark:text-white">
-                                    {Math.round(preview.currentScore)}
-                                    <span className="text-xs text-neutral-400 font-bold">/100</span>
-                                </div>
-                            </div>
-
-                            {/* Estimated Impact */}
-                            <div
-                                className={`p-3 rounded-2xl border-2 border-black shadow-[2.5px_2.5px_0px_#000] space-y-1 ${
-                                    preview.estimatedDelta < 0
-                                        ? "bg-rose-50 dark:bg-rose-950/40 text-rose-950 dark:text-rose-200"
-                                        : preview.estimatedDelta > 0
-                                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200"
-                                        : "bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200"
-                                }`}
-                            >
-                                <span className="text-[10px] font-black uppercase tracking-wider opacity-75">Estimated Impact</span>
-                                <div className="text-lg sm:text-xl font-black flex items-center gap-1">
-                                    {preview.estimatedDelta < 0 ? (
-                                        <TrendingDown className="w-4 h-4 text-rose-600 stroke-[3]" />
-                                    ) : preview.estimatedDelta > 0 ? (
-                                        <TrendingUp className="w-4 h-4 text-emerald-600 stroke-[3]" />
-                                    ) : null}
-                                    <span>{preview.estimatedRange}</span>
-                                </div>
-                            </div>
-
-                            {/* Affected Registrations */}
-                            <div className="p-3 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] space-y-1">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Affected</span>
-                                <div className="text-lg sm:text-xl font-black text-black dark:text-white flex items-center gap-1.5">
-                                    <Users className="w-4 h-4 text-sky-600 stroke-[2.5]" />
-                                    <span>{preview.affectedParticipants}</span>
-                                </div>
-                            </div>
-
-                            {/* Notice Window */}
-                            <div className="p-3 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] space-y-1">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Advance Notice</span>
-                                <div className="text-sm sm:text-base font-black text-black dark:text-white flex items-center gap-1 mt-0.5">
-                                    <Clock className="w-3.5 h-3.5 text-amber-600 stroke-[2.5]" />
-                                    <span>
-                                        {preview.hoursNotice !== undefined
-                                            ? preview.hoursNotice >= 24
-                                                ? `${Math.round(preview.hoursNotice / 24)}d`
-                                                : `${Math.round(preview.hoursNotice)}h`
-                                            : "N/A"}
-                                    </span>
-                                </div>
-                            </div>
+                    {/* Live Scoring Impact Card */}
+                    {loading ? (
+                        <div className="p-8 rounded-2xl border-2 border-black bg-white dark:bg-[#1c1c1c] shadow-[4px_4px_0px_#000] flex flex-col items-center justify-center gap-3">
+                            <OrbixLoader size="sm" variant="centered" color="#000" />
+                            <span className="text-xs font-black uppercase tracking-wider text-neutral-500">
+                                Calculating dynamic credibility preview...
+                            </span>
                         </div>
-
-                        {/* Factors Breakdown */}
-                        {preview.factors && preview.factors.length > 0 && (
-                            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] space-y-2">
-                                <h5 className="text-[11px] font-black uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                                    <Info className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    <span>Factors Influencing Your Standing:</span>
-                                </h5>
-                                <ul className="space-y-1 text-xs font-bold text-neutral-600 dark:text-neutral-400">
-                                    {preview.factors.map((f, idx) => (
-                                        <li key={idx} className="flex items-start gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white mt-1.5 shrink-0" />
-                                            <span>{f}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Reason Category Selector for Cancellations */}
-                        {(action === "cancel" || action === "delete") && (
-                            <div className="space-y-2 pt-1">
-                                <label className="block text-xs font-black uppercase tracking-wider text-black dark:text-white">
-                                    Reason for Cancellation / Removal:
-                                </label>
-                                <NeoSelect
-                                    value={reasonCategory}
-                                    onChange={(val) => setReasonCategory(val)}
-                                    size="sm"
-                                    options={REASON_OPTIONS.map((opt) => ({
-                                        value: opt.value,
-                                        label: opt.label,
-                                        description: opt.description,
-                                    }))}
-                                />
-
-                                {/* Additional Remedies Checkboxes */}
-                                <div className="space-y-2 pt-2">
-                                    <div className="flex items-start gap-2.5">
-                                        <NeoCheckbox
-                                            checked={communicatedToAll}
-                                            onCheckedChange={(checked) => setCommunicatedToAll(checked)}
-                                            size="sm"
-                                            colorScheme="pink"
-                                        />
-                                        <span
-                                            onClick={() => setCommunicatedToAll(!communicatedToAll)}
-                                            className="text-xs font-black text-neutral-800 dark:text-neutral-200 cursor-pointer select-none leading-tight"
-                                        >
-                                            Dispatch urgent notification email to all {preview.affectedParticipants} registered students
+                    ) : fetchError ? (
+                        <div className="p-4 rounded-2xl border-2 border-black bg-rose-50 text-rose-950 shadow-[3px_3px_0px_#000] text-xs font-bold">
+                            {fetchError}
+                        </div>
+                    ) : preview ? (
+                        <div className="space-y-4">
+                            {/* Standardized 4-Stat Metric Matrix with consistent heights & typography */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                {/* Current Score */}
+                                <div className="p-3 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] flex flex-col justify-between min-h-[82px] h-full">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 h-5 flex items-center truncate">
+                                        Current
+                                    </span>
+                                    <div className="text-lg sm:text-xl font-black text-black dark:text-white flex items-center gap-1.5 h-7">
+                                        <Activity className="w-4 h-4 text-emerald-600 stroke-[2.5] shrink-0" />
+                                        <span>
+                                            {Math.round(preview.currentScore)}
+                                            <span className="text-xs text-neutral-400 font-bold">/100</span>
                                         </span>
                                     </div>
-                                    <div className="flex items-start gap-2.5">
-                                        <NeoCheckbox
-                                            checked={rescheduleOffered}
-                                            onCheckedChange={(checked) => setRescheduleOffered(checked)}
-                                            size="sm"
-                                            colorScheme="green"
-                                        />
+                                </div>
+
+                                {/* Estimated Impact */}
+                                <div className="p-3 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] flex flex-col justify-between min-h-[82px] h-full">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 h-5 flex items-center truncate">
+                                        Estimated Impact
+                                    </span>
+                                    <div className="text-lg sm:text-xl font-black flex items-center gap-1.5 h-7">
+                                        {preview.estimatedDelta < 0 ? (
+                                            <TrendingDown className="w-4 h-4 text-rose-600 stroke-[3] shrink-0" />
+                                        ) : preview.estimatedDelta > 0 ? (
+                                            <TrendingUp className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
+                                        ) : (
+                                            <Minus className="w-4 h-4 text-neutral-400 stroke-[3] shrink-0" />
+                                        )}
                                         <span
-                                            onClick={() => setRescheduleOffered(!rescheduleOffered)}
-                                            className="text-xs font-black text-neutral-800 dark:text-neutral-200 cursor-pointer select-none leading-tight"
+                                            className={
+                                                preview.estimatedDelta < 0
+                                                    ? "text-rose-600 dark:text-rose-400"
+                                                    : preview.estimatedDelta > 0
+                                                    ? "text-emerald-600 dark:text-emerald-400"
+                                                    : "text-black dark:text-white"
+                                            }
                                         >
-                                            Offer automatic priority pass rollover when session is rescheduled (+10% remedy credit)
+                                            {preview.estimatedRange}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Affected Registrations */}
+                                <div className="p-3 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] flex flex-col justify-between min-h-[82px] h-full">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 h-5 flex items-center truncate">
+                                        Affected
+                                    </span>
+                                    <div className="text-lg sm:text-xl font-black text-black dark:text-white flex items-center gap-1.5 h-7">
+                                        <Users className="w-4 h-4 text-sky-600 stroke-[2.5] shrink-0" />
+                                        <span>{preview.affectedParticipants}</span>
+                                    </div>
+                                </div>
+
+                                {/* Advance Notice */}
+                                <div className="p-3 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] flex flex-col justify-between min-h-[82px] h-full">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 h-5 flex items-center truncate">
+                                        Advance Notice
+                                    </span>
+                                    <div className="text-lg sm:text-xl font-black text-black dark:text-white flex items-center gap-1.5 h-7">
+                                        <Clock className="w-4 h-4 text-amber-600 stroke-[2.5] shrink-0" />
+                                        <span>
+                                            {preview.hoursNotice !== undefined
+                                                ? preview.hoursNotice >= 24
+                                                    ? `${Math.round(preview.hoursNotice / 24)}d`
+                                                    : `${Math.round(preview.hoursNotice)}h`
+                                                : "N/A"}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                ) : null}
 
-                {/* Footer Buttons */}
-                <div className="pt-2 border-t-2 border-black/10 dark:border-white/10 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
+                            {/* Factors Breakdown */}
+                            {preview.factors && preview.factors.length > 0 && (
+                                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border-2 border-black shadow-[2.5px_2.5px_0px_#000] space-y-2">
+                                    <h5 className="text-[11px] font-black uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                                        <Info className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Factors Influencing Your Standing:</span>
+                                    </h5>
+                                    <ul className="space-y-1 text-xs font-bold text-neutral-600 dark:text-neutral-400">
+                                        {preview.factors.map((f, idx) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white mt-1.5 shrink-0" />
+                                                <span>{f}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Reason Category Selector for Cancellations */}
+                            {(action === "cancel" || action === "delete") && (
+                                <div className="space-y-3 pt-1">
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black dark:text-white mb-1.5">
+                                            Reason for Cancellation / Removal:
+                                        </label>
+                                        <NeoSelect
+                                            value={reasonCategory}
+                                            onChange={(val) => setReasonCategory(val)}
+                                            size="sm"
+                                            placement="auto"
+                                            options={REASON_OPTIONS.map((opt) => ({
+                                                value: opt.value,
+                                                label: opt.label,
+                                                description: opt.description,
+                                            }))}
+                                        />
+                                    </div>
+
+                                    {/* Automatic Dispatch Notification Info Banner */}
+                                    <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-2.5">
+                                        <div className="w-5 h-5 rounded-lg bg-[#FFE566] text-black border border-black flex items-center justify-center shrink-0 mt-0.5 shadow-[1px_1px_0px_#000]">
+                                            <Send className="w-3 h-3 stroke-[2.5]" />
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs font-black text-black dark:text-white">
+                                                Automatic Participant Notification
+                                            </p>
+                                            <p className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 leading-snug">
+                                                Urgent in-app alerts and official cancellation emails will be automatically dispatched to all registered applicants specifying this cancellation reason.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : null}
+                </div>
+
+                {/* Footer Buttons — Fixed / Pinned at bottom, NEVER gets hidden or covered */}
+                <div className="shrink-0 p-4 sm:p-5 border-t-2 border-black/10 dark:border-white/10 bg-[#FAF6EE] dark:bg-[#141414] z-20 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
                     <button
                         type="button"
                         onClick={onClose}
@@ -340,8 +368,6 @@ export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
                         onClick={() =>
                             onConfirm({
                                 reasonCategory,
-                                communicatedToAll,
-                                rescheduleOffered,
                             })
                         }
                         disabled={loading || isSubmitting}

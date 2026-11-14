@@ -220,15 +220,16 @@ export const deleteClubEvent = createAsyncThunk<
         previousEvent: ClubEvent;
         password?: string;
         confirmationText?: string;
+        reasonCategory?: string;
     },
     { rejectValue: { eventId: string; previousEvent: ClubEvent; message: string } }
->("clubEvents/deleteClubEvent", async ({ eventId, previousEvent, password, confirmationText }, { rejectWithValue }) => {
+>("clubEvents/deleteClubEvent", async ({ eventId, previousEvent, password, confirmationText, reasonCategory }, { rejectWithValue }) => {
     try {
         const res = await fetch(`/api/club/events/${eventId}`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ password, confirmationText }),
+            body: JSON.stringify({ password, confirmationText, reasonCategory }),
         });
 
         const data = await res.json().catch(() => null);

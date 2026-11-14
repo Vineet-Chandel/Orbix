@@ -1,4 +1,4 @@
-import { dispatchEmail, DEFAULT_SYSTEM_FROM } from "./resendService";
+import { dispatchEmail, DEFAULT_SYSTEM_FROM } from "./resendService.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
@@ -494,4 +494,102 @@ export async function sendTeamRegistrationConfirmedEmail({
         text,
         logContext: `[TeamConfirmedEmail: ${teamName} -> ${to}]`,
     });
+}
+
+/**
+ * 7. Event Cancellation Notification Email
+ * Sent to all registered participants (accepted, pending, waitlisted, rejected, attended)
+ * when a club cancels an event. Prominently displays the specific cancellation reason provided by the host club.
+ */
+export async function sendEventCancellationEmail({
+    to,
+    recipientName,
+    eventTitle,
+    clubName,
+    startsAt,
+    venue,
+    reasonLabel,
+    reasonDescription,
+}: {
+    to: string;
+    recipientName: string;
+    eventTitle: string;
+    clubName: string;
+    startsAt?: string | Date;
+    venue?: string;
+    reasonLabel: string;
+    reasonDescription?: string;
+}): Promise<boolean> {
+    const formattedDate = startsAt
+        ? new Date(startsAt).toLocaleString("en-IN", {
+              timeZone: "Asia/Kolkata",
+              dateStyle: "medium",
+              timeStyle: "short",
+          })
+        : "Scheduled Session";
+
+    const contentHtml = `
+      <p style="margin: 0 0 16px 0; font-size: 15px; color: #111111;">
+        Hi <strong>${recipientName || "Attendee"}</strong>,
+      </p>
+      <p style="margin: 0 0 16px 0; font-size: 14px; color: #333333; line-height: 1.6;">
+        We are writing to inform you that <strong>${clubName}</strong> has cancelled the upcoming event <strong>&ldquo;${eventTitle}&rdquo;</strong>.
+      </p>
+
+      <div style="background-color: #FFF1F2; border: 2.5px solid #000000; border-radius: 12px; padding: 18px; margin: 20px 0; box-shadow: 4px 4px 0px #000000;">
+        <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #9F1239; margin-bottom: 6px;">
+          Official Cancellation Reason
+        </div>
+        <div style="font-size: 16px; font-weight: 800; color: #000000;">
+          ${reasonLabel}
+        </div>
+        ${
+            reasonDescription
+                ? `<div style="margin-top: 6px; font-size: 13px; color: #4B5563; font-weight: 500; line-height: 1.4;">${reasonDescription}</div>`
+                : ""
+        }
+      </div>
+
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 16px 0 20px 0; background-color: #FAF6EE; border: 2px solid #000000; border-radius: 12px; padding: 14px 16px; box-shadow: 2px 2px 0px #000000;">
+        <tr>
+          <td style="font-size: 12px; font-weight: 700; color: #555555; padding-bottom: 6px;">Host Club</td>
+          <td align="right" style="font-size: 13px; font-weight: 800; color: #000000; padding-bottom: 6px;">${clubName}</td>
+        </tr>
+        <tr>
+          <td style="font-size: 12px; font-weight: 700; color: #555555; padding-bottom: 6px;">Original Schedule</td>
+          <td align="right" style="font-size: 13px; font-weight: 800; color: #000000; padding-bottom: 6px;">${formattedDate} (IST)</td>
+        </tr>
+        ${
+            venue
+                ? `
+        <tr>
+          <td style="font-size: 12px; font-weight: 700; color: #555555;">Location</td>
+          <td align="right" style="font-size: 13px; font-weight: 800; color: #000000;">${venue}</td>
+        </tr>`
+                : ""
+        }
+      </table>
+
+      <p style="margin: 16px 0 0 0; font-size: 13px; color: #4B5563; line-height: 1.5;">
+        Any entry passes or check-in tokens associated with your registration for this session have been deactivated. You can explore other upcoming campus activities and track your applications anytime from your dashboard.
+      </p>
+    `;
+
+    const { html, text } = buildNeoEmailWrapper({
+        headline: `Notice: "${eventTitle}" has been cancelled`,
+        badge: "Cancellation Notice",
+        contentHtml,
+        ctaText: "Explore Campus Events",
+        ctaUrl: `${FRONTEND_URL}/events`,
+    });
+
+    const result = await dispatchEmail({
+        to,
+        subject: `[Cancelled] ${eventTitle} · ${clubName}`,
+        html,
+        text,
+        logContext: `[EventCancellationEmail: ${eventTitle} -> ${to}]`,
+    });
+
+    return result.success;
 }

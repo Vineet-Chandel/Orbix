@@ -35,8 +35,13 @@ import eventEngagementRouter from './Routes/events/eventEngagementRoutes.js';
 import { clubCredibilityRouter } from './Routes/club/clubCredibilityRoutes.js';
 import projectRouter from './Routes/projects/projectRoutes.js';
 import { workspaceRouter } from './Routes/workspace/workspaceRoutes.js';
+import { emailMonitoringRouter } from './Routes/admin/emailMonitoringRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import { startAccountPurgeWorker } from './services/account/accountPurgeService.js';
+import { startEmailWorkers, stopEmailWorkers } from './workers/emailWorker.js';
+import { startCampaignFanoutWorker, stopCampaignFanoutWorker } from './workers/emailCampaignFanoutWorker.js';
+import { startEmailOutboxDispatcher, stopEmailOutboxDispatcher } from './workers/emailOutboxDispatcher.js';
+import { EmailQueueService } from './services/email/emailQueueService.js';
 import redis from './redis/client.js';
 
 const app: Express = express();
@@ -161,6 +166,9 @@ apiRouter.use('/internal/college-verifications', founderCollegeVerificationRoute
 // Support & Help Desk
 apiRouter.use('/help', helpRouter);
 
+// Fault-Tolerant Email Subsystem Admin & DLQ Monitoring
+apiRouter.use('/admin/email', emailMonitoringRouter);
+
 // Platform, About & Editorial Blogs
 apiRouter.use('/platform', platformRouter);
 apiRouter.use('/about', platformRouter);
@@ -220,9 +228,36 @@ const startServer = async () => {
         } catch (workerErr) {
             console.error("Failed to initialize account purge worker:", workerErr);
         }
+
+        // Initialize production fault-tolerant email infrastructure & workers
+        try {
+            startEmailWorkers();
+            startCampaignFanoutWorker();
+            startEmailOutboxDispatcher();
+        } catch (emailWorkerErr: any) {
+            console.warn("⚠️ Failed to initialize email delivery workers:", emailWorkerErr.message);
+        }
     } catch (error) {
         console.error("Server startup failed:", error);
     }
 };
+
+const gracefulShutdown = async (signal: string) => {
+    console.log(`[Orbix Server] Received ${signal}. Performing graceful shutdown...`);
+    try {
+        stopEmailOutboxDispatcher();
+        await Promise.allSettled([
+            stopEmailWorkers(),
+            stopCampaignFanoutWorker(),
+            EmailQueueService.closeAll(),
+        ]);
+    } catch (shutdownErr: any) {
+        console.error("[Orbix Server] Error during shutdown:", shutdownErr.message);
+    }
+    process.exit(0);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 startServer();

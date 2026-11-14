@@ -34,7 +34,7 @@ import clubProfileRouter from "./clubProfileRoutes.js";
 import clubSettingsRouter from "./clubSettingsRoutes.js";
 import clubCertificateRouter from "./clubCertificateRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
-import { notifyClubAndCollegeUsers } from "../../services/club/clubEventNotificationService.js";
+import { notifyClubAndCollegeUsers, notifyEventCancelledToAllApplicants } from "../../services/club/clubEventNotificationService.js";
 import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
 import { sendGuardianConsentEmail, OnboardingEmailService } from "../../services/email/resendService.js";
 import { ClubCredibilityService } from "../../services/club/clubCredibilityService.js";
@@ -2598,44 +2598,54 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                     actorId: userId,
                     idempotencyKey: `complete_${eventId}_${current.status}`,
                 }).catch((err) => console.error("[Credibility] Record event_completed error:", err));
-            } else if (newStatus === "cancelled" && current.status === "published") {
+            } else if (newStatus === "cancelled") {
                 const startsAtMs = new Date(current.starts_at).getTime();
                 const hoursNotice = Math.max(0, (startsAtMs - Date.now()) / (1000 * 60 * 60));
                 const regsCount = refreshedEvent.rows[0]?.registrationsCount || 0;
                 const reasonCat = req.body.reasonCategory || (req.body.emergencyBypass ? "emergency_verified" : "operational_delay");
 
-                const cancelEval = new ClubCredibilityEngine().evaluateCancellationQuality({
-                    hoursNoticeBeforeEvent: hoursNotice,
-                    affectedRegistrationsCount: regsCount,
-                    reasonCategory: reasonCat,
-                    communicatedToAllParticipants: true,
-                    rescheduleOrRemedyOffered: Boolean(req.body.rescheduleOffered),
-                });
-
-                ClubCredibilityService.recordCredibilityEvent({
-                    clubId,
-                    eventId: String(eventId),
-                    sourceAction: "event_cancelled",
-                    reasonCode: `cancellation_${reasonCat}`,
-                    outcomeQuality: cancelEval.qualityScore,
-                    weightInputs: {
-                        baseWeight: 1.5,
-                        scope: current.scope,
-                        verifiedRegistrations: regsCount,
-                        noticeHours: hoursNotice,
-                        isNegativeOutcome: cancelEval.qualityScore < 50,
-                    },
-                    factorBreakdown: {
-                        eventTitle: current.title,
-                        scope: current.scope,
-                        hoursNotice,
-                        affectedRegistrations: regsCount,
+                if (current.status === "published") {
+                    const cancelEval = new ClubCredibilityEngine().evaluateCancellationQuality({
+                        hoursNoticeBeforeEvent: hoursNotice,
+                        affectedRegistrationsCount: regsCount,
                         reasonCategory: reasonCat,
-                        dimensionalBreakdown: cancelEval.dimensionalBreakdown,
-                    },
-                    actorId: userId,
-                    idempotencyKey: `cancel_${eventId}_${Date.now()}`,
-                }).catch((err) => console.error("[Credibility] Record event_cancelled error:", err));
+                        communicatedToAllParticipants: true,
+                        rescheduleOrRemedyOffered: false,
+                    });
+
+                    ClubCredibilityService.recordCredibilityEvent({
+                        clubId,
+                        eventId: String(eventId),
+                        sourceAction: "event_cancelled",
+                        reasonCode: `cancellation_${reasonCat}`,
+                        outcomeQuality: cancelEval.qualityScore,
+                        weightInputs: {
+                            baseWeight: 1.5,
+                            scope: current.scope,
+                            verifiedRegistrations: regsCount,
+                            noticeHours: hoursNotice,
+                            isNegativeOutcome: cancelEval.qualityScore < 50,
+                        },
+                        factorBreakdown: {
+                            eventTitle: current.title,
+                            scope: current.scope,
+                            hoursNotice,
+                            affectedRegistrations: regsCount,
+                            reasonCategory: reasonCat,
+                            dimensionalBreakdown: cancelEval.dimensionalBreakdown,
+                        },
+                        actorId: userId,
+                        idempotencyKey: `cancel_${eventId}_${Date.now()}`,
+                    }).catch((err) => console.error("[Credibility] Record event_cancelled error:", err));
+                }
+
+                // Automatically dispatch email and in-app notifications to ALL registered applicants
+                notifyEventCancelledToAllApplicants({
+                    eventId: String(eventId),
+                    clubId,
+                    reasonCategory: reasonCat,
+                    actorUserId: userId,
+                }).catch((err) => console.error("[Cancellation] Error notifying applicants:", err));
             } else if (newStatus === "draft" && current.status === "published") {
                 // Unpublishing a live published event with active registrations
                 const regsCount = refreshedEvent.rows[0]?.registrationsCount || 0;
@@ -2759,13 +2769,22 @@ clubRouter.delete("/events/:eventId", authenticate, requireClubAccount, async (r
         // Credibility Accountability: If deleting a live published event with student registrations, record evidence
         const ev = existingEvent.rows[0];
         if (ev.status === "published" && (ev.registrationsCount || 0) > 0) {
+            const reasonCategory = req.body.reasonCategory || "operational_delay";
+            // Notify all registered applicants before event records cascade
+            await notifyEventCancelledToAllApplicants({
+                eventId: String(eventId),
+                clubId: clubRes.rows[0].id,
+                reasonCategory,
+                actorUserId: userId,
+            }).catch((err) => console.error("[Credibility] Error notifying applicants on delete:", err));
+
             const startsAtMs = new Date(ev.starts_at).getTime();
             const hoursNotice = Math.max(0, (startsAtMs - Date.now()) / (1000 * 60 * 60));
             const cancelEval = new ClubCredibilityEngine().evaluateCancellationQuality({
                 hoursNoticeBeforeEvent: hoursNotice,
                 affectedRegistrationsCount: ev.registrationsCount,
-                reasonCategory: "operational_delay",
-                communicatedToAllParticipants: false,
+                reasonCategory,
+                communicatedToAllParticipants: true,
                 rescheduleOrRemedyOffered: false,
             });
 
