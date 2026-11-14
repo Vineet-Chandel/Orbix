@@ -70,6 +70,8 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const cameraCaptureInputRef = useRef<HTMLInputElement | null>(null);
+    const isSecureContext = typeof window !== "undefined" ? window.isSecureContext : true;
     const streamRef = useRef<MediaStream | null>(null);
     const animFrameRef = useRef<number | null>(null);
     const lastScannedCodeRef = useRef<string | null>(null);
@@ -610,6 +612,16 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                 onChange={handleImageUpload}
             />
 
+            {/* Hidden input for direct camera capture (works even on insecure HTTP) */}
+            <input
+                ref={cameraCaptureInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleImageUpload}
+            />
+
             {/* Top Terminal Ribbon */}
             <div className="p-5 rounded-3xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -844,47 +856,71 @@ export const ClubEventCheckinTerminal: React.FC<ClubEventCheckinTerminalProps> =
                                 </>
                             ) : (
                                 /* Inactive Camera Screen with Clear Troubleshooting & Options */
-                                <div className="text-center p-6 space-y-3 z-10 max-w-sm mx-auto">
-                                    <div className="w-14 h-14 rounded-2xl bg-neutral-900 border-2 border-neutral-700 flex items-center justify-center mx-auto text-[#a2ff86] shadow-[2px_2px_0px_#000]">
-                                        <QrCode className="w-7 h-7" />
+                                <div className="text-center p-5 space-y-3 z-10 max-w-sm mx-auto">
+                                    <div className="w-12 h-12 rounded-2xl bg-neutral-900 border-2 border-neutral-700 flex items-center justify-center mx-auto text-[#a2ff86] shadow-[2px_2px_0px_#000]">
+                                        <QrCode className="w-6 h-6" />
                                     </div>
                                     <div className="space-y-1">
                                         <h4 className="text-sm font-black text-white">Camera is Inactive</h4>
                                         <p className="text-xs text-neutral-300 leading-relaxed">
                                             {cameraError ||
-                                                "Click 'Enable Camera' to activate live video barcode scanning, or upload a photo of the entry pass."}
+                                                "Click 'Enable Camera' to activate live video barcode scanning, or snap a photo of the entry pass."}
                                         </p>
                                     </div>
 
                                     <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                                        {/* Direct Native Camera Snap (Works on all mobile & desktop browsers even over HTTP) */}
                                         <button
                                             type="button"
-                                            onClick={() => startCamera()}
-                                            disabled={isStartingCamera}
-                                            className="px-4 py-2 rounded-xl border-2 border-black bg-[#a2ff86] text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-[#8cee70] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                            onClick={() => cameraCaptureInputRef.current?.click()}
+                                            className="px-3.5 py-2 rounded-xl border-2 border-black bg-[#a2ff86] text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-[#8cee70] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                            title="Open device camera to snap pass QR"
                                         >
-                                            {isStartingCamera ? (
-                                                <>
-                                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                                    <span>Starting...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Camera className="w-3.5 h-3.5" />
-                                                    <span>Enable Camera</span>
-                                                </>
-                                            )}
+                                            <Camera className="w-3.5 h-3.5" />
+                                            <span>Snap with Camera</span>
                                         </button>
+
+                                        {isSecureContext && (
+                                            <button
+                                                type="button"
+                                                onClick={() => startCamera()}
+                                                disabled={isStartingCamera}
+                                                className="px-3.5 py-2 rounded-xl border-2 border-black bg-white text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-neutral-100 flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                            >
+                                                {isStartingCamera ? (
+                                                    <>
+                                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                                        <span>Starting...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Scan className="w-3.5 h-3.5" />
+                                                        <span>Live Stream</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
 
                                         <button
                                             type="button"
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="px-4 py-2 rounded-xl border-2 border-black bg-white text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-neutral-100 flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                            className="px-3.5 py-2 rounded-xl border-2 border-black bg-white text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-neutral-100 flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                         >
                                             <ImageIcon className="w-3.5 h-3.5" />
                                             <span>Upload QR</span>
                                         </button>
                                     </div>
+
+                                    {!isSecureContext && (
+                                        <div className="p-2.5 rounded-xl bg-amber-950/60 border border-amber-500/40 text-[10px] text-amber-200 text-left space-y-1">
+                                            <p className="font-bold text-amber-300">
+                                                Browser Security Notice (Plain HTTP):
+                                            </p>
+                                            <p>
+                                                Browsers restrict continuous WebRTC video streams to <strong>HTTPS</strong>. Tap <strong>Snap with Camera</strong> above to scan with your camera immediately, or configure SSL/HTTPS on this domain.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
