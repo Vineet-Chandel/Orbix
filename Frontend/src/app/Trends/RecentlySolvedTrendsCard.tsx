@@ -10,7 +10,7 @@ interface RecentlySolvedTrendsCardProps {
 }
 
 export const RecentlySolvedTrendsCard: React.FC<RecentlySolvedTrendsCardProps> = ({
-    connectedPortals,
+    connectedPortals: _connectedPortals,
     username = "",
 }) => {
     const authUser = useAppSelector((state) => state.user.user);
