@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 /**
  * Form Security & Sanitization Engine
  * 
@@ -22,6 +24,174 @@ const WHITELISTED_EXTENSIONS = new Set([
     "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "csv",
     "png", "jpg", "jpeg", "webp", "gif", "zip", "rar", "7z", "tar", "gz"
 ]);
+
+/**
+ * Canonical File Type Format Registry
+ * Maps high-level club configuration choices to concrete extensions, MIME types, and friendly labels.
+ */
+export const FILE_FORMAT_MAP: Record<string, { extensions: string[]; mimeTypes: string[]; label: string }> = {
+    pdf: {
+        extensions: ["pdf"],
+        mimeTypes: ["application/pdf"],
+        label: "PDF Document (.pdf)",
+    },
+    png: {
+        extensions: ["png"],
+        mimeTypes: ["image/png"],
+        label: "PNG Image (.png)",
+    },
+    jpg: {
+        extensions: ["jpg", "jpeg"],
+        mimeTypes: ["image/jpeg"],
+        label: "JPG Image (.jpg, .jpeg)",
+    },
+    jpeg: {
+        extensions: ["jpg", "jpeg"],
+        mimeTypes: ["image/jpeg"],
+        label: "JPG Image (.jpg, .jpeg)",
+    },
+    image: {
+        extensions: ["png", "jpg", "jpeg", "webp"],
+        mimeTypes: ["image/png", "image/jpeg", "image/webp"],
+        label: "Images (PNG, JPG, WebP)",
+    },
+    docs: {
+        extensions: ["doc", "docx"],
+        mimeTypes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        label: "Word / DOCX (.doc, .docx)",
+    },
+    docx: {
+        extensions: ["doc", "docx"],
+        mimeTypes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        label: "Word / DOCX (.doc, .docx)",
+    },
+    doc: {
+        extensions: ["doc", "docx"],
+        mimeTypes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        label: "Word / DOCX (.doc, .docx)",
+    },
+    txt: {
+        extensions: ["txt"],
+        mimeTypes: ["text/plain"],
+        label: "Plain Text (.txt)",
+    },
+    document: {
+        extensions: ["doc", "docx", "txt", "rtf", "odt"],
+        mimeTypes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "application/rtf",
+        ],
+        label: "Documents (Word, Text, RTF)",
+    },
+    excel: {
+        extensions: ["xls", "xlsx", "csv"],
+        mimeTypes: [
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+        ],
+        label: "Excel / Spreadsheet (.xlsx, .csv)",
+    },
+    spreadsheet: {
+        extensions: ["xls", "xlsx", "csv"],
+        mimeTypes: [
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+        ],
+        label: "Excel / Spreadsheet (.xlsx, .csv)",
+    },
+    csv: {
+        extensions: ["csv"],
+        mimeTypes: ["text/csv"],
+        label: "CSV (.csv)",
+    },
+    zip: {
+        extensions: ["zip", "rar", "7z", "tar", "gz"],
+        mimeTypes: [
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed",
+            "application/x-tar",
+            "application/gzip",
+        ],
+        label: "ZIP / Tarball Archive (.zip, .tar, .7z)",
+    },
+    archive: {
+        extensions: ["zip", "rar", "7z", "tar", "gz"],
+        mimeTypes: [
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed",
+            "application/x-tar",
+            "application/gzip",
+        ],
+        label: "ZIP / Tarball Archive (.zip, .tar, .7z)",
+    },
+};
+
+/**
+ * Resolves configured allowedFileTypes into verified concrete file extensions and human-readable labels.
+ */
+export function resolveAllowedExtensions(allowedFileTypes?: string[]): {
+    allowedExtensions: Set<string>;
+    allowedMimeTypes: Set<string>;
+    displayLabels: string[];
+} {
+    if (!allowedFileTypes || allowedFileTypes.length === 0) {
+        return {
+            allowedExtensions: WHITELISTED_EXTENSIONS,
+            allowedMimeTypes: new Set(),
+            displayLabels: ["All supported file formats"],
+        };
+    }
+
+    const exts = new Set<string>();
+    const mimes = new Set<string>();
+    const labels: string[] = [];
+
+    for (const rawType of allowedFileTypes) {
+        const key = rawType.toLowerCase().replace(/^\./, "").trim();
+        const mapping = FILE_FORMAT_MAP[key];
+        if (mapping) {
+            mapping.extensions.forEach((e) => exts.add(e));
+            mapping.mimeTypes.forEach((m) => mimes.add(m));
+            if (!labels.includes(mapping.label)) {
+                labels.push(mapping.label);
+            }
+        } else if (WHITELISTED_EXTENSIONS.has(key)) {
+            exts.add(key);
+            labels.push(`.${key.toUpperCase()}`);
+        }
+    }
+
+    if (exts.size === 0) {
+        return {
+            allowedExtensions: WHITELISTED_EXTENSIONS,
+            allowedMimeTypes: new Set(),
+            displayLabels: ["All supported file formats"],
+        };
+    }
+
+    return {
+        allowedExtensions: exts,
+        allowedMimeTypes: mimes,
+        displayLabels: labels,
+    };
+}
 
 // Characters that trigger formula execution in spreadsheet software (Excel, Google Sheets, LibreOffice)
 const SPREADSHEET_FORMULA_REGEX = /^[=+\-@\t\r|]/;
@@ -71,19 +241,23 @@ export function escapeCsvFormula(value: unknown): string {
 /**
  * Validates a file attachment's metadata, extension, size, and ownership
  */
-export function validateAttachmentSecurity(attachment: {
-    fileName?: string;
-    fileUrl?: string;
-    fileSize?: number;
-    filePublicId?: string;
-    fileType?: string;
-    questionId?: string;
-}, allowedTypes?: string[]): { valid: boolean; error?: string } {
+export function validateAttachmentSecurity(
+    attachment: {
+        fileName?: string;
+        fileUrl?: string;
+        fileSize?: number;
+        filePublicId?: string;
+        fileType?: string;
+        questionId?: string;
+    },
+    allowedTypes?: string[],
+    maxFileSizeMb?: number
+): { valid: boolean; error?: string } {
     if (!attachment || typeof attachment !== "object") {
         return { valid: false, error: "Invalid attachment object." };
     }
 
-    const { fileName, fileUrl, fileSize, filePublicId } = attachment;
+    const { fileName, fileUrl, fileSize } = attachment;
 
     if (!fileName || typeof fileName !== "string" || fileName.trim().length === 0) {
         return { valid: false, error: "Attachment fileName is required." };
@@ -106,11 +280,15 @@ export function validateAttachmentSecurity(attachment: {
         return { valid: false, error: `Unsupported file type ".${ext}". Allowed: PDF, Office docs, images, ZIP.` };
     }
 
-    // Question-specific allowed types check
+    // Question-specific allowed types check using resolved extensions
     if (allowedTypes && allowedTypes.length > 0) {
-        const normalizedAllowed = allowedTypes.map((t) => t.toLowerCase().replace(/^\./, ""));
-        if (!normalizedAllowed.includes(ext)) {
-            return { valid: false, error: `File type ".${ext}" is not permitted for this question. Allowed: ${normalizedAllowed.join(", ")}` };
+        const resolved = resolveAllowedExtensions(allowedTypes);
+        if (!resolved.allowedExtensions.has(ext)) {
+            const allowedList = resolved.displayLabels.join(", ") || allowedTypes.join(", ");
+            return {
+                valid: false,
+                error: `File type ".${ext}" is not permitted for this question. Allowed formats: ${allowedList}.`,
+            };
         }
     }
 
@@ -119,10 +297,12 @@ export function validateAttachmentSecurity(attachment: {
         return { valid: false, error: `Invalid secure attachment URL for "${fileName}".` };
     }
 
-    // Size limit: 25MB max
-    const maxBytes = 25 * 1024 * 1024;
+    // Size limit check
+    const limitMb = maxFileSizeMb && maxFileSizeMb > 0 ? maxFileSizeMb : 25;
+    const maxBytes = limitMb * 1024 * 1024;
     if (fileSize !== undefined && (typeof fileSize !== "number" || fileSize <= 0 || fileSize > maxBytes)) {
-        return { valid: false, error: `File "${fileName}" exceeds the 25MB maximum upload limit.` };
+        const actualMb = typeof fileSize === "number" ? (fileSize / (1024 * 1024)).toFixed(1) : "?";
+        return { valid: false, error: `File "${fileName}" (${actualMb} MB) exceeds the ${limitMb} MB maximum limit.` };
     }
 
     return { valid: true };
@@ -332,4 +512,146 @@ export function sanitizeStudentAnswers(answers: Record<string, any>): Record<str
     }
 
     return sanitized;
+}
+
+/**
+ * Recursively sorts keys of an object to ensure deterministic stringification
+ */
+function sortKeys(val: any): any {
+    if (val === null || val === undefined) return null;
+    if (Array.isArray(val)) {
+        return val.map(sortKeys);
+    }
+    if (typeof val === "object" && !(val instanceof Date)) {
+        const sorted: Record<string, any> = {};
+        const keys = Object.keys(val).sort();
+        for (const k of keys) {
+            const v = val[k];
+            // Omit purely transient UI properties
+            if (k === "_uiTemp" || k === "isDragging" || k === "isEditing") continue;
+            sorted[k] = sortKeys(v);
+        }
+        return sorted;
+    }
+    return val;
+}
+
+/**
+ * Normalizes form payload into a clean semantic canonical structure for comparison and hashing.
+ * Ignores transient database IDs, timestamps, and counters.
+ */
+export function canonicalizeFormContent(raw: any): Record<string, any> {
+    if (!raw || typeof raw !== "object") return {};
+
+    const structure = typeof raw.structure === "string" ? (() => { try { return JSON.parse(raw.structure); } catch { return {}; } })() : (raw.structure || {});
+    const settings = typeof raw.settings === "string" ? (() => { try { return JSON.parse(raw.settings); } catch { return {}; } })() : (raw.settings || {});
+    const themeSettings = typeof raw.themeSettings === "string" ? (() => { try { return JSON.parse(raw.themeSettings); } catch { return {}; } })() : (raw.themeSettings || raw.theme_settings || {});
+
+    const sections = Array.isArray(structure.sections) ? structure.sections : [];
+
+    const normalizedSections = sections.map((sec: any) => ({
+        id: typeof sec.id === "string" ? sec.id.trim() : "",
+        title: typeof sec.title === "string" ? sec.title.trim() : "",
+        description: typeof sec.description === "string" ? sec.description.trim() : "",
+        questions: (Array.isArray(sec.questions) ? sec.questions : []).map((q: any) => ({
+            id: typeof q.id === "string" ? q.id.trim() : "",
+            type: q.type || "short_answer",
+            title: typeof q.title === "string" ? q.title.trim() : "",
+            description: typeof q.description === "string" ? q.description.trim() : "",
+            isRequired: Boolean(q.isRequired),
+            options: Array.isArray(q.options)
+                ? q.options.map((opt: any) =>
+                      typeof opt === "string"
+                          ? opt.trim()
+                          : {
+                                label: typeof opt.label === "string" ? opt.label.trim() : "",
+                                value: typeof opt.value === "string" ? opt.value.trim() : (typeof opt.label === "string" ? opt.label.trim() : ""),
+                                targetSectionId: opt.targetSectionId || null,
+                            }
+                  )
+                : [],
+            validationRules: q.validationRules
+                ? {
+                      minLength: q.validationRules.minLength != null ? Number(q.validationRules.minLength) : null,
+                      maxLength: q.validationRules.maxLength != null ? Number(q.validationRules.maxLength) : null,
+                      minValue: q.validationRules.minValue != null ? Number(q.validationRules.minValue) : null,
+                      maxValue: q.validationRules.maxValue != null ? Number(q.validationRules.maxValue) : null,
+                      minSelect: q.validationRules.minSelect != null ? Number(q.validationRules.minSelect) : null,
+                      maxSelect: q.validationRules.maxSelect != null ? Number(q.validationRules.maxSelect) : null,
+                      regexPattern: q.validationRules.regexPattern || null,
+                      allowedFileTypes: Array.isArray(q.validationRules.allowedFileTypes)
+                          ? [...q.validationRules.allowedFileTypes].map(String).sort()
+                          : null,
+                      maxFileSizeMb: q.validationRules.maxFileSizeMb != null ? Number(q.validationRules.maxFileSizeMb) : null,
+                      maxFiles: q.validationRules.maxFiles != null ? Number(q.validationRules.maxFiles) : null,
+                  }
+                : null,
+            quizOptions: q.quizOptions
+                ? {
+                      points: q.quizOptions.points != null ? Number(q.quizOptions.points) : 0,
+                      correctAnswers: Array.isArray(q.quizOptions.correctAnswers)
+                          ? [...q.quizOptions.correctAnswers].map(String).sort()
+                          : [],
+                      answerExplanation: typeof q.quizOptions.answerExplanation === "string" ? q.quizOptions.answerExplanation.trim() : "",
+                      partialCredit: Boolean(q.quizOptions.partialCredit),
+                  }
+                : null,
+            visibilityRule: q.visibilityRule
+                ? {
+                      dependsOnQuestionId: q.visibilityRule.dependsOnQuestionId || null,
+                      operator: q.visibilityRule.operator || "equals",
+                      value: q.visibilityRule.value != null ? q.visibilityRule.value : null,
+                  }
+                : null,
+            gridRows: Array.isArray(q.gridRows) ? q.gridRows.map((r: any) => (typeof r === "string" ? r.trim() : (r?.label || "").trim())) : null,
+            gridColumns: Array.isArray(q.gridColumns) ? q.gridColumns.map((c: any) => (typeof c === "string" ? c.trim() : (c?.label || "").trim())) : null,
+            scaleMin: q.scaleMin != null ? Number(q.scaleMin) : null,
+            scaleMax: q.scaleMax != null ? Number(q.scaleMax) : null,
+            scaleMinLabel: typeof q.scaleMinLabel === "string" ? q.scaleMinLabel.trim() : null,
+            scaleMaxLabel: typeof q.scaleMaxLabel === "string" ? q.scaleMaxLabel.trim() : null,
+        })),
+    }));
+
+    const normalizedSettings = {
+        isOpen: settings.isOpen !== undefined ? Boolean(settings.isOpen) : true,
+        closedMessage: typeof settings.closedMessage === "string" ? settings.closedMessage.trim() : "",
+        maxResponses: settings.maxResponses != null ? Number(settings.maxResponses) : null,
+        limitOneResponse: settings.limitOneResponse !== undefined ? Boolean(settings.limitOneResponse) : true,
+        allowEditResponse: settings.allowEditResponse !== undefined ? Boolean(settings.allowEditResponse) : false,
+        requireLogin: settings.requireLogin !== undefined ? Boolean(settings.requireLogin) : true,
+        showProgressBar: settings.showProgressBar !== undefined ? Boolean(settings.showProgressBar) : true,
+        confirmationMessage: typeof settings.confirmationMessage === "string" ? settings.confirmationMessage.trim() : "",
+        notifyOnRegistration: settings.notifyOnRegistration !== undefined ? Boolean(settings.notifyOnRegistration) : true,
+        quiz: settings.quiz ? {
+            isQuiz: Boolean(settings.quiz.isQuiz),
+            releaseGradesImmediately: Boolean(settings.quiz.releaseGradesImmediately),
+            showCorrectAnswersToStudents: Boolean(settings.quiz.showCorrectAnswersToStudents),
+            defaultPointsPerQuestion: settings.quiz.defaultPointsPerQuestion != null ? Number(settings.quiz.defaultPointsPerQuestion) : 1,
+        } : null,
+    };
+
+    const normalizedTheme = {
+        accentColor: themeSettings.accentColor || "#38BDF8",
+        fontFamily: themeSettings.fontFamily || "sans",
+        headerPosition: themeSettings.headerPosition || "center",
+    };
+
+    return {
+        title: typeof raw.title === "string" ? raw.title.trim() : "",
+        description: typeof raw.description === "string" ? raw.description.trim() : "",
+        headerImageUrl: raw.headerImageUrl || raw.header_image_url || null,
+        sections: normalizedSections,
+        settings: normalizedSettings,
+        theme: normalizedTheme,
+    };
+}
+
+/**
+ * Computes a deterministic SHA-256 hash of form content to detect semantic card or setting changes.
+ */
+export function computeFormContentHash(formContent: any): string {
+    const canonical = canonicalizeFormContent(formContent);
+    const sorted = sortKeys(canonical);
+    const jsonString = JSON.stringify(sorted);
+    return crypto.createHash("sha256").update(jsonString).digest("hex");
 }

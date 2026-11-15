@@ -37,7 +37,7 @@ export interface FormValidationRules {
     minSelected?: number;
     maxSelected?: number;
     exactSelected?: number;
-    allowedFileTypes?: ("image" | "pdf" | "document" | "spreadsheet" | "zip")[];
+    allowedFileTypes?: string[];
     maxFileSizeMb?: number;
     maxFiles?: number;
     requireResponseEachRow?: boolean;
@@ -318,6 +318,8 @@ export interface ClubEventFormResponse {
     isClosed: boolean;
     closedReason?: string;
     registeredCount: number;
+    publishedVersion?: FormVersionRecord | null;
+    totalVersions?: number;
 }
 
 export interface PublicFormResponse {
@@ -552,6 +554,263 @@ export function uploadFileToCloudinary(
 }
 
 /**
+ * Upload student attachment directly to backend fallback endpoint (Multi-part stream)
+ */
+export function uploadAttachmentDirectToServer(
+    eventId: string,
+    questionId: string,
+    file: File,
+    onProgress?: (percent: number) => void
+): Promise<{ secureUrl: string; publicId: string; fileName: string; fileSize: number; mimeType: string }> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable && onProgress) {
+                const percent = Math.round((event.loaded / event.total) * 100);
+                onProgress(percent);
+            }
+        });
+
+        xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success && data.attachment) {
+                        resolve({
+                            secureUrl: data.attachment.fileUrl,
+                            publicId: data.attachment.filePublicId,
+                            fileName: data.attachment.fileName,
+                            fileSize: data.attachment.fileSize,
+                            mimeType: data.attachment.mimeType,
+                        });
+                    } else {
+                        reject(new Error(data.message || "Server upload failed."));
+                    }
+                } catch {
+                    reject(new Error("Failed to parse server upload response."));
+                }
+            } else {
+                try {
+                    const err = JSON.parse(xhr.responseText);
+                    reject(new Error(err.message || `Upload failed with HTTP ${xhr.status}`));
+                } catch {
+                    reject(new Error(`Upload failed with HTTP ${xhr.status}`));
+                }
+            }
+        });
+
+        xhr.addEventListener("error", () => {
+            reject(new Error("Network connection error during file upload."));
+        });
+
+        xhr.addEventListener("abort", () => {
+            reject(new Error("File upload was cancelled."));
+        });
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("questionId", questionId);
+
+        xhr.open("POST", `/api/events/${encodeURIComponent(eventId)}/form/upload`);
+        xhr.withCredentials = true;
+        xhr.send(formData);
+    });
+}
+
+/**
+ * Resilient student file upload: tries Cloudinary direct upload first,
+ * and automatically falls back to server-side multipart stream if needed.
+ */
+export async function uploadStudentAttachment(
+    eventId: string,
+    questionId: string,
+    file: File,
+    onProgress?: (percent: number) => void
+): Promise<{ secureUrl: string; publicId: string; fileName: string; fileSize: number; mimeType: string }> {
+    try {
+        const config = await requestAttachmentUploadSignature(eventId, questionId, file.type);
+        return await uploadFileToCloudinary(config, file, onProgress);
+    } catch (directErr: any) {
+        console.warn("Direct Cloudinary upload failed or was blocked, falling back to server upload:", directErr);
+        return await uploadAttachmentDirectToServer(eventId, questionId, file, onProgress);
+    }
+}
+
+/**
+ * Format Definitions Registry for UI & Validation
+ */
+export const FILE_FORMAT_DEFINITIONS: Record<string, { extensions: string[]; mimeTypes: string[]; label: string; badge: string }> = {
+    pdf: {
+        extensions: ["pdf"],
+        mimeTypes: ["application/pdf"],
+        label: "PDF Document (.pdf)",
+        badge: "PDF",
+    },
+    png: {
+        extensions: ["png"],
+        mimeTypes: ["image/png"],
+        label: "PNG Image (.png)",
+        badge: "PNG",
+    },
+    jpg: {
+        extensions: ["jpg", "jpeg"],
+        mimeTypes: ["image/jpeg"],
+        label: "Image (JPG / JPEG)",
+        badge: "JPG",
+    },
+    image: {
+        extensions: ["jpg", "jpeg", "png", "webp"],
+        mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+        label: "Images (JPG, PNG)",
+        badge: "Image",
+    },
+    docx: {
+        extensions: ["doc", "docx"],
+        mimeTypes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        label: "Word / DOCX (.doc, .docx)",
+        badge: "DOCX",
+    },
+    docs: {
+        extensions: ["doc", "docx"],
+        mimeTypes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        label: "Word / DOCX (.doc, .docx)",
+        badge: "DOCS",
+    },
+    txt: {
+        extensions: ["txt"],
+        mimeTypes: ["text/plain"],
+        label: "Plain Text (.txt)",
+        badge: "TXT",
+    },
+    document: {
+        extensions: ["doc", "docx", "txt", "rtf"],
+        mimeTypes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+        ],
+        label: "Word / DOCX / TXT",
+        badge: "Docs",
+    },
+    excel: {
+        extensions: ["xls", "xlsx", "csv"],
+        mimeTypes: [
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+        ],
+        label: "Excel / Spreadsheet (.xlsx, .csv)",
+        badge: "Excel",
+    },
+    spreadsheet: {
+        extensions: ["xls", "xlsx", "csv"],
+        mimeTypes: [
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+        ],
+        label: "Excel / Spreadsheet (.xlsx, .csv)",
+        badge: "Excel",
+    },
+    zip: {
+        extensions: ["zip", "rar", "7z", "tar", "gz"],
+        mimeTypes: [
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed",
+            "application/x-tar",
+            "application/gzip",
+        ],
+        label: "ZIP / Tarball Archive (.zip, .tar, .7z)",
+        badge: "ZIP",
+    },
+};
+
+export function getAcceptStringForAllowedTypes(allowedTypes?: string[]): string {
+    if (!allowedTypes || allowedTypes.length === 0) {
+        return ".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip";
+    }
+    const parts: string[] = [];
+    for (const t of allowedTypes) {
+        const key = t.toLowerCase().replace(/^\./, "").trim();
+        const def = FILE_FORMAT_DEFINITIONS[key];
+        if (def) {
+            def.extensions.forEach((e) => parts.push(`.${e}`));
+            def.mimeTypes.forEach((m) => parts.push(m));
+        } else {
+            parts.push(`.${key}`);
+        }
+    }
+    return Array.from(new Set(parts)).join(",");
+}
+
+export function getAllowedTypeBadges(allowedTypes?: string[]): { id: string; label: string; badge: string }[] {
+    if (!allowedTypes || allowedTypes.length === 0) {
+        return [{ id: "any", label: "All Supported Formats", badge: "ANY" }];
+    }
+    const badges: { id: string; label: string; badge: string }[] = [];
+    const seen = new Set<string>();
+    for (const t of allowedTypes) {
+        const key = t.toLowerCase().replace(/^\./, "").trim();
+        const def = FILE_FORMAT_DEFINITIONS[key];
+        if (def && !seen.has(def.badge)) {
+            seen.add(def.badge);
+            badges.push({ id: key, label: def.label, badge: def.badge });
+        } else if (!seen.has(key.toUpperCase())) {
+            seen.add(key.toUpperCase());
+            badges.push({ id: key, label: `.${key.toUpperCase()}`, badge: key.toUpperCase() });
+        }
+    }
+    return badges;
+}
+
+export function validateLocalFile(
+    file: File,
+    validation?: { allowedFileTypes?: string[]; maxFileSizeMb?: number }
+): { valid: boolean; error?: string } {
+    if (!file) return { valid: false, error: "No file provided." };
+
+    const extMatch = file.name.toLowerCase().match(/\.([a-z0-9]+)$/);
+    const ext = extMatch ? extMatch[1] : "";
+
+    const maxMb = validation?.maxFileSizeMb ?? 10;
+    if (file.size > maxMb * 1024 * 1024) {
+        const actualMb = (file.size / (1024 * 1024)).toFixed(1);
+        return { valid: false, error: `File "${file.name}" (${actualMb} MB) exceeds maximum allowed size of ${maxMb} MB.` };
+    }
+
+    if (validation?.allowedFileTypes && validation.allowedFileTypes.length > 0) {
+        const validExts = new Set<string>();
+        for (const t of validation.allowedFileTypes) {
+            const key = t.toLowerCase().replace(/^\./, "").trim();
+            const def = FILE_FORMAT_DEFINITIONS[key];
+            if (def) {
+                def.extensions.forEach((e) => validExts.add(e));
+            } else {
+                validExts.add(key);
+            }
+        }
+
+        if (!validExts.has(ext)) {
+            const badges = getAllowedTypeBadges(validation.allowedFileTypes).map((b) => b.badge).join(", ");
+            return {
+                valid: false,
+                error: `File type ".${ext}" is not allowed. Organizers only accept: ${badges}.`,
+            };
+        }
+    }
+
+    return { valid: true };
+}
+
+/**
  * Submit student form response
  */
 export async function submitEventFormResponse(
@@ -584,7 +843,7 @@ export async function submitEventFormResponse(
 export async function publishClubEventForm(
     eventId: string,
     changeSummary?: string
-): Promise<{ success: boolean; message: string; version: FormVersionRecord; form: ClubEventFormRecord }> {
+): Promise<{ success: boolean; isUnchanged?: boolean; message: string; version: FormVersionRecord; form: ClubEventFormRecord }> {
     const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1036,4 +1295,149 @@ export async function fetchClubCrossEventAnalytics(clubId: string): Promise<{
         throw new Error(data?.message || "Failed to load cross-event analytics.");
     }
     return data;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * FORM CONTENT EQUALITY & SEMANTIC CANONICALIZER
+ * ---------------------------------------------------------------------------
+ * Deep deterministic comparison between working draft and published version.
+ * Accurately tracks whether cards, questions, validation rules, settings, or
+ * themes have changed without false positives from UI transient state.
+ */
+
+function sortKeysDeterministic(val: any): any {
+    if (val === null || val === undefined) return null;
+    if (Array.isArray(val)) {
+        return val.map(sortKeysDeterministic);
+    }
+    if (typeof val === "object" && !(val instanceof Date)) {
+        const sorted: Record<string, any> = {};
+        const keys = Object.keys(val).sort();
+        for (const k of keys) {
+            const v = val[k];
+            if (k === "_uiTemp" || k === "isDragging" || k === "isEditing" || k === "tempId") continue;
+            sorted[k] = sortKeysDeterministic(v);
+        }
+        return sorted;
+    }
+    return val;
+}
+
+export function canonicalizeFormContent(raw: any): Record<string, any> {
+    if (!raw || typeof raw !== "object") return {};
+
+    const structure = typeof raw.structure === "string" ? (() => { try { return JSON.parse(raw.structure); } catch { return {}; } })() : (raw.structure || {});
+    const settings = typeof raw.settings === "string" ? (() => { try { return JSON.parse(raw.settings); } catch { return {}; } })() : (raw.settings || {});
+    const themeSettings = typeof raw.themeSettings === "string" ? (() => { try { return JSON.parse(raw.themeSettings); } catch { return {}; } })() : (raw.themeSettings || raw.theme_settings || {});
+
+    const sections = Array.isArray(structure.sections) ? structure.sections : [];
+
+    const normalizedSections = sections.map((sec: any) => ({
+        id: typeof sec.id === "string" ? sec.id.trim() : "",
+        title: typeof sec.title === "string" ? sec.title.trim() : "",
+        description: typeof sec.description === "string" ? sec.description.trim() : "",
+        questions: (Array.isArray(sec.questions) ? sec.questions : []).map((q: any) => ({
+            id: typeof q.id === "string" ? q.id.trim() : "",
+            type: q.type || "short_answer",
+            title: typeof q.title === "string" ? q.title.trim() : "",
+            description: typeof q.description === "string" ? q.description.trim() : "",
+            isRequired: Boolean(q.isRequired),
+            options: Array.isArray(q.options)
+                ? q.options.map((opt: any) =>
+                      typeof opt === "string"
+                          ? opt.trim()
+                          : {
+                                label: typeof opt.label === "string" ? opt.label.trim() : "",
+                                value: typeof opt.value === "string" ? opt.value.trim() : (typeof opt.label === "string" ? opt.label.trim() : ""),
+                                targetSectionId: opt.targetSectionId || null,
+                            }
+                  )
+                : [],
+            validationRules: q.validationRules
+                ? {
+                      minLength: q.validationRules.minLength != null ? Number(q.validationRules.minLength) : null,
+                      maxLength: q.validationRules.maxLength != null ? Number(q.validationRules.maxLength) : null,
+                      minValue: q.validationRules.minValue != null ? Number(q.validationRules.minValue) : null,
+                      maxValue: q.validationRules.maxValue != null ? Number(q.validationRules.maxValue) : null,
+                      minSelect: q.validationRules.minSelect != null ? Number(q.validationRules.minSelect) : null,
+                      maxSelect: q.validationRules.maxSelect != null ? Number(q.validationRules.maxSelect) : null,
+                      regexPattern: q.validationRules.regexPattern || null,
+                      allowedFileTypes: Array.isArray(q.validationRules.allowedFileTypes)
+                          ? [...q.validationRules.allowedFileTypes].map(String).sort()
+                          : null,
+                      maxFileSizeMb: q.validationRules.maxFileSizeMb != null ? Number(q.validationRules.maxFileSizeMb) : null,
+                      maxFiles: q.validationRules.maxFiles != null ? Number(q.validationRules.maxFiles) : null,
+                  }
+                : null,
+            quizOptions: q.quizOptions
+                ? {
+                      points: q.quizOptions.points != null ? Number(q.quizOptions.points) : 0,
+                      correctAnswers: Array.isArray(q.quizOptions.correctAnswers)
+                          ? [...q.quizOptions.correctAnswers].map(String).sort()
+                          : [],
+                      answerExplanation: typeof q.quizOptions.answerExplanation === "string" ? q.quizOptions.answerExplanation.trim() : "",
+                      partialCredit: Boolean(q.quizOptions.partialCredit),
+                  }
+                : null,
+            visibilityRule: q.visibilityRule
+                ? {
+                      dependsOnQuestionId: q.visibilityRule.dependsOnQuestionId || null,
+                      operator: q.visibilityRule.operator || "equals",
+                      value: q.visibilityRule.value != null ? q.visibilityRule.value : null,
+                  }
+                : null,
+            gridRows: Array.isArray(q.gridRows) ? q.gridRows.map((r: any) => (typeof r === "string" ? r.trim() : (r?.label || "").trim())) : null,
+            gridColumns: Array.isArray(q.gridColumns) ? q.gridColumns.map((c: any) => (typeof c === "string" ? c.trim() : (c?.label || "").trim())) : null,
+            scaleMin: q.scaleMin != null ? Number(q.scaleMin) : null,
+            scaleMax: q.scaleMax != null ? Number(q.scaleMax) : null,
+            scaleMinLabel: typeof q.scaleMinLabel === "string" ? q.scaleMinLabel.trim() : null,
+            scaleMaxLabel: typeof q.scaleMaxLabel === "string" ? q.scaleMaxLabel.trim() : null,
+        })),
+    }));
+
+    const normalizedSettings = {
+        isOpen: settings.isOpen !== undefined ? Boolean(settings.isOpen) : true,
+        closedMessage: typeof settings.closedMessage === "string" ? settings.closedMessage.trim() : "",
+        maxResponses: settings.maxResponses != null ? Number(settings.maxResponses) : null,
+        limitOneResponse: settings.limitOneResponse !== undefined ? Boolean(settings.limitOneResponse) : true,
+        allowEditResponse: settings.allowEditResponse !== undefined ? Boolean(settings.allowEditResponse) : false,
+        requireLogin: settings.requireLogin !== undefined ? Boolean(settings.requireLogin) : true,
+        showProgressBar: settings.showProgressBar !== undefined ? Boolean(settings.showProgressBar) : true,
+        confirmationMessage: typeof settings.confirmationMessage === "string" ? settings.confirmationMessage.trim() : "",
+        notifyOnRegistration: settings.notifyOnRegistration !== undefined ? Boolean(settings.notifyOnRegistration) : true,
+        quiz: settings.quiz ? {
+            isQuiz: Boolean(settings.quiz.isQuiz),
+            releaseGradesImmediately: Boolean(settings.quiz.releaseGradesImmediately),
+            showCorrectAnswersToStudents: Boolean(settings.quiz.showCorrectAnswersToStudents),
+            defaultPointsPerQuestion: settings.quiz.defaultPointsPerQuestion != null ? Number(settings.quiz.defaultPointsPerQuestion) : 1,
+        } : null,
+    };
+
+    const normalizedTheme = {
+        accentColor: themeSettings.accentColor || "#38BDF8",
+        fontFamily: themeSettings.fontFamily || "sans",
+        headerPosition: themeSettings.headerPosition || "center",
+    };
+
+    return {
+        title: typeof raw.title === "string" ? raw.title.trim() : "",
+        description: typeof raw.description === "string" ? raw.description.trim() : "",
+        headerImageUrl: raw.headerImageUrl || raw.header_image_url || null,
+        sections: normalizedSections,
+        settings: normalizedSettings,
+        theme: normalizedTheme,
+    };
+}
+
+export function getCanonicalFormString(form: any): string {
+    const canonical = canonicalizeFormContent(form);
+    const sorted = sortKeysDeterministic(canonical);
+    return JSON.stringify(sorted);
+}
+
+export function isFormContentEqual(a: any, b: any): boolean {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    return getCanonicalFormString(a) === getCanonicalFormString(b);
 }

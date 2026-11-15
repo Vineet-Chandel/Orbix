@@ -32,6 +32,7 @@ import {
     ChevronUp,
     ArrowRight,
     Lightbulb,
+    Check,
 } from "lucide-react";
 import {
     type ClubEventFormRecord,
@@ -39,11 +40,13 @@ import {
     type FormSection,
     type FormStructure,
     type FormSettings as FormSettingsType,
+    type FormVersionRecord,
     fetchClubEventForm,
     saveClubEventForm,
     publishClubEventForm,
     fetchClubQuestionLibrary,
     requestAiQuestionSuggestions,
+    isFormContentEqual,
 } from "../../../api/clubEventFormApi";
 import {
     ORBIX_FORM_TEMPLATES,
@@ -260,13 +263,14 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const [isPublishing, setIsPublishing] = useState(false);
     const [activeTab, setActiveTab] = useState<MainTab>("questions");
     const [form, setForm] = useState<ClubEventFormRecord | null>(null);
+    const [publishedVersion, setPublishedVersion] = useState<FormVersionRecord | null>(null);
     const [event, setEvent] = useState<any>(null);
     const [registeredCount, setRegisteredCount] = useState(0);
 
     // 2. Save Status Indicator State
     const [saveStatus, setSaveStatus] = useState<SaveBadgeStatus>("saved");
     const isInitialLoad = useRef(true);
-    const autosaveTimer = useRef<NodeJS.Timeout | null>(null);
+    const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 3. Selection & Undo/Redo States
     const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
@@ -307,7 +311,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         section: FormSection;
         index: number;
     } | null>(null);
-    const deleteNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const deleteNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleDeleteSection = (sIdx: number) => {
         if (!form?.structure?.sections) return;
@@ -372,6 +376,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
             const res = await fetchClubEventForm(eventId);
             setForm(res.form);
+            setPublishedVersion(res.publishedVersion || null);
             setEvent(res.event);
             setRegisteredCount(res.registeredCount);
 
@@ -565,11 +570,18 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             });
 
             const res = await publishClubEventForm(eventId, "Published via Form Studio");
+            setPublishedVersion(res.version);
             setForm(res.form);
             setSaveStatus("saved");
-            toast.success(`Form Version ${res.version.versionNumber} is now live for students!`, {
-                title: "Snapshot Published Live",
-            });
+            if (res.isUnchanged) {
+                toast.info(`Form is already up to date with Version ${res.version.versionNumber}. No changes to publish.`, {
+                    title: "Already Up to Date",
+                });
+            } else {
+                toast.success(`Form Version ${res.version.versionNumber} is now live for students!`, {
+                    title: "Snapshot Published Live",
+                });
+            }
         } catch (err: any) {
             setSaveStatus("error");
             toast.error(err.message || "Failed to publish form.");
@@ -577,6 +589,15 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             setIsPublishing(false);
         }
     };
+
+    // Track whether there are unpublished changes between working draft and active published snapshot
+    const hasUnpublishedChanges = useMemo(() => {
+        if (!form) return false;
+        if (isWizardMode) return true;
+        // If not published or no published version snapshot exists, it has unpublished changes
+        if (!form.publishedVersionId || !publishedVersion || !form.isPublished) return true;
+        return !isFormContentEqual(form, publishedVersion);
+    }, [form, publishedVersion, isWizardMode]);
 
     // -------------------------------------------------------------------------
     // FORM MANIPULATION HELPERS
@@ -1096,6 +1117,36 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 </button>
                             )}
                         </div>
+
+                        {/* Published Status Badge */}
+                        {!isWizardMode && (
+                            <div className="flex items-center shrink-0">
+                                {form?.isPublished && publishedVersion && !hasUnpublishedChanges ? (
+                                    <span
+                                        className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white dark:bg-[#1e1e1e] text-neutral-800 dark:text-neutral-200 border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-xs font-black inline-flex items-center gap-1.5"
+                                        title={`Form Version ${publishedVersion.versionNumber} is published and live for students. No pending changes.`}
+                                    >
+                                        <Check className="w-3 h-3 text-emerald-500 stroke-[3]" />
+                                        <span>v{publishedVersion.versionNumber} Published</span>
+                                    </span>
+                                ) : form?.isPublished && publishedVersion && hasUnpublishedChanges ? (
+                                    <span
+                                        className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-xs font-black inline-flex items-center gap-1.5"
+                                        title={`You have modified form cards that are not published yet. Current live version is v${publishedVersion.versionNumber}.`}
+                                    >
+                                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                        <span>v{publishedVersion.versionNumber} (Draft edits)</span>
+                                    </span>
+                                ) : (
+                                    <span
+                                        className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-xs font-bold inline-flex items-center gap-1.5"
+                                        title="This form has not been published to students yet."
+                                    >
+                                        <span>Not Published</span>
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1614,17 +1665,33 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <button
                                 type="button"
                                 onClick={handlePublishForm}
-                                disabled={saving || isPublishing}
-                                className="h-8 sm:h-8.5 px-2.5 sm:px-3 md:px-3.5 rounded-xl font-black text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 disabled:opacity-50 shrink-0 whitespace-nowrap bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 border-0 shadow-none"
-                                title="Publish"
+                                disabled={saving || isPublishing || !hasUnpublishedChanges}
+                                className={`h-8 sm:h-8.5 px-2.5 sm:px-3 md:px-3.5 rounded-xl font-black text-[11px] sm:text-xs transition-all flex items-center justify-center gap-1 sm:gap-1.5 shrink-0 whitespace-nowrap border-0 ${
+                                    !hasUnpublishedChanges
+                                        ? "bg-neutral-100 text-neutral-400 dark:bg-neutral-800/70 dark:text-neutral-500 cursor-not-allowed opacity-90 shadow-none"
+                                        : "bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 cursor-pointer shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5"
+                                }`}
+                                title={
+                                    !hasUnpublishedChanges
+                                        ? `Form is up to date with published Version ${publishedVersion?.versionNumber || 1}. Modify any card or setting to publish changes.`
+                                        : "Publish form changes live for students"
+                                }
                             >
                                 {isPublishing ? (
                                     <>
                                         <span className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
                                         <span>Publishing...</span>
                                     </>
+                                ) : !hasUnpublishedChanges ? (
+                                    <>
+                                        <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500 stroke-[3]" />
+                                        <span>Published</span>
+                                    </>
                                 ) : (
-                                    <span>Publish</span>
+                                    <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span>Publish</span>
+                                    </>
                                 )}
                             </button>
                         )}

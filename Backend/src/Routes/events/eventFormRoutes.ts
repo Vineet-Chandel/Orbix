@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from "express";
+import multer from "multer";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
 import {
@@ -9,6 +10,13 @@ import {
 } from "../../middlewares/formSecurity.middleware.js";
 
 export const eventFormRouter = express.Router();
+
+const formUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB max ceiling
+    },
+});
 
 /**
  * ---------------------------------------------------------------------------
@@ -149,7 +157,8 @@ eventFormRouter.post("/club/events/:eventId/form/publish", ...clubPublishAuth, a
 
         return res.status(200).json({
             success: true,
-            message: `Form version ${result.version.versionNumber} published successfully!`,
+            isUnchanged: Boolean(result.isUnchanged),
+            message: result.message || `Form version ${result.version.versionNumber} published successfully!`,
             version: result.version,
             form: result.form,
         });
@@ -935,6 +944,50 @@ eventFormRouter.post("/events/:eventId/form/upload-signature", authenticate, asy
         });
     }
 });
+
+/**
+ * POST /api/events/:eventId/form/upload
+ * Direct server-side upload stream for student attachments (Fallback & zero-CORS resilience)
+ */
+eventFormRouter.post(
+    "/events/:eventId/form/upload",
+    authenticate,
+    formUpload.single("file"),
+    async (req: Request, res: Response) => {
+        try {
+            const eventId = String(req.params.eventId);
+            const userId = req.user!.id;
+            const questionId = String(req.body.questionId || "");
+
+            if (!questionId) {
+                return res.status(400).json({ success: false, message: "questionId is required." });
+            }
+
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: "No file was uploaded." });
+            }
+
+            const attachment = await ClubEventFormService.uploadAttachmentDirect(
+                eventId,
+                userId,
+                questionId,
+                req.file
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: "File uploaded successfully.",
+                attachment,
+            });
+        } catch (err: any) {
+            console.error("POST /api/events/:eventId/form/upload error:", err);
+            return res.status(err.statusCode || 500).json({
+                success: false,
+                message: err.message || "Failed to upload file.",
+            });
+        }
+    }
+);
 
 /**
  * POST /api/events/:eventId/form/submit
