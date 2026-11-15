@@ -16,6 +16,7 @@ import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
 import { getBlockState } from "../../services/relationship/blockService.js";
 import { resolveRelationshipState, resolveRelationshipStatesBatch } from "../../services/relationship/relationshipService.js";
 import { enrichUserWithClubData } from "../../services/club/clubEnrichmentService.js";
+import { isDemoProfileHandle } from "../../validators/usernamePolicy.js";
 
 const profileRouter = express.Router();
 
@@ -887,7 +888,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
 
         // Immediate mock handler for the public demo profile
         const cleanUser = username.trim().toLowerCase();
-        if (cleanUser === "vineet-chandel" || cleanUser === "demo" || cleanUser === "demo-profile") {
+        if (isDemoProfileHandle(cleanUser)) {
             const demoProfile: PublicProfilePayload = {
                 id: "demo-vineet-chandel",
                 username: "Vineet-Chandel",

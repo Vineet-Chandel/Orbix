@@ -17,11 +17,14 @@ import {
     RotateCcw,
     Check,
     RefreshCw,
-    } from "lucide-react";
+} from "lucide-react";
 import { OrbixButton } from "../OrbixButton";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { useToast } from "../../context/ToastContext";
 import { ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT } from "../../utils/collegeVerificationModalEvents";
+import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
+import { updateProfile, type InstitutionItem } from "../../utils/profileApi";
+import { CollegeAutocomplete } from "../CollegeAutocomplete";
 
 function phoneMatchesCanonical(input: string, canonical: string | null): boolean {
     if (!input || !canonical) return false;
@@ -63,6 +66,9 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
     onVerificationSubmitted,
 }) => {
     const toast = useToast();
+    const dispatch = useAppDispatch();
+    const { user } = useAppSelector((state) => state.user);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const backFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +77,11 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
     const [isLoadingStatus, setIsLoadingStatus] = useState(true);
     const [isScanningOcr, setIsScanningOcr] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Dynamic College Selection state (when no college is set in profile)
+    const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(null);
+    const [isSavingCollege, setIsSavingCollege] = useState(false);
+    const [isChangingCollege, setIsChangingCollege] = useState(false);
 
     // Existing active/latest application
     const [activeApp, setActiveApp] = useState<CollegeVerificationRecord | null>(null);
@@ -103,8 +114,8 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
     const [academicYear, setAcademicYear] = useState("");
     const [collegeNameInput, setCollegeNameInput] = useState("");
 
-    const effectiveCollegeId = currentCollegeId || serverCollege?.id || activeApp?.college_id || null;
-    const effectiveCollegeName = currentCollegeName || serverCollege?.officialName || collegeNameInput || "";
+    const effectiveCollegeId = selectedCollege?.id || currentCollegeId || serverCollege?.id || user?.collegeId || activeApp?.college_id || null;
+    const effectiveCollegeName = selectedCollege?.officialName || currentCollegeName || serverCollege?.officialName || user?.college?.officialName || collegeNameInput || "";
 
     // Contact verification channels
     const [institutionEmail, setInstitutionEmail] = useState("");
@@ -205,6 +216,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                 if (!collegeNameInput) {
                     setCollegeNameInput(data.currentCollege.officialName);
                 }
+                setSelectedCollege((prev) => prev || (data.currentCollege as any));
             }
 
             if (data.verifiedChannels?.email && data.verifiedChannels?.emailVerifiedAt) {
@@ -246,8 +258,46 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
             if (currentCollegeName) {
                 setCollegeNameInput(currentCollegeName);
             }
+            if (user?.college) {
+                setSelectedCollege(user.college);
+            }
+        } else {
+            setIsChangingCollege(false);
+            setIsSavingCollege(false);
         }
-    }, [isOpen, currentCollegeName]);
+    }, [isOpen, currentCollegeName, user?.college]);
+
+    // Authoritative Handler: Selects college and immediately persists it to backend database
+    const handleCollegeSelectAndSave = async (inst: InstitutionItem | null) => {
+        if (!inst) {
+            setSelectedCollege(null);
+            return;
+        }
+
+        setSelectedCollege(inst);
+        setIsSavingCollege(true);
+
+        try {
+            // Save to backend database via PUT /api/profile
+            const updated = await updateProfile({ collegeId: inst.id });
+            dispatch(updateUserProfile(updated));
+            setServerCollege({ id: inst.id, officialName: inst.officialName });
+            setCollegeNameInput(inst.officialName);
+            setIsChangingCollege(false);
+            window.dispatchEvent(new Event("orbix_profile_updated"));
+
+            toast.success(`College affiliation set to "${inst.officialName}".`, {
+                title: "College Affiliated",
+            });
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to save college affiliation. Please try again.", {
+                title: "Save Failed",
+            });
+            setSelectedCollege(null);
+        } finally {
+            setIsSavingCollege(false);
+        }
+    };
 
     // Synchronize verified email/phone state across tabs (e.g. clicking email link in another tab)
     useEffect(() => {
@@ -325,6 +375,13 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
 
     // Run OCR Scanning
     const handleRunOcr = async () => {
+        if (!effectiveCollegeId) {
+            toast.error("Please search and select your college or university above first.", {
+                title: "College Affiliation Required",
+            });
+            return;
+        }
+
         if (!frontFile) {
             toast.error("Please choose a document image first.", { title: "Document Missing" });
             return;
@@ -604,7 +661,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                         </div>
                                     </div>
                                     <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
-                                        Your enrollment at <strong className="text-black font-black">{currentCollegeName}</strong> has been officially verified by Orbix founders. The <span className="font-black">College Verified badge</span> is active on your public profile and seasonal leaderboards.
+                                        Your enrollment at <strong className="text-black font-black">{effectiveCollegeName || currentCollegeName}</strong> has been officially verified by Orbix founders. The <span className="font-black">College Verified badge</span> is active on your public profile and seasonal leaderboards.
                                     </p>
                                     {activeApp?.reviewed_at && (
                                         <p className="text-[11px] text-neutral-500 font-bold">
@@ -629,7 +686,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                     </div>
 
                                     <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
-                                        Your student document and enrollment details for <strong className="text-black font-black">{currentCollegeName}</strong> have been securely submitted. Orbix founders manually review every college verification application to preserve platform integrity.
+                                        Your student document and enrollment details for <strong className="text-black font-black">{effectiveCollegeName || currentCollegeName}</strong> have been securely submitted. Orbix founders manually review every college verification application to preserve platform integrity.
                                     </p>
 
                                     {/* Timeline progress indicator */}
@@ -726,20 +783,84 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                         /* STEP 1: DOCUMENT UPLOAD */
                         /* ========================================================================= */
                         <div className="space-y-4">
-                            {/* Current College Banner */}
-                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
-                                        Verifying Affiliation For
-                                    </span>
-                                    <h4 className="text-xs sm:text-sm font-black text-black truncate">
-                                        {currentCollegeName || "No college chosen in profile"}
-                                    </h4>
+                            {/* Current College Banner or In-Modal College Search Selector */}
+                            {!effectiveCollegeId || isChangingCollege ? (
+                                <div className="p-4 rounded-xl bg-amber-50/70 border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                                <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-950 block">
+                                                    College Affiliation Required
+                                                </span>
+                                                <h4 className="text-xs sm:text-sm font-black text-black">
+                                                    Choose Your College or University
+                                                </h4>
+                                            </div>
+                                        </div>
+                                        {isChangingCollege && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsChangingCollege(false)}
+                                                className="text-xs font-bold text-neutral-600 hover:text-black underline cursor-pointer"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
+                                        No college is currently chosen in your profile. Please search and select your institution to verify authentic enrollment:
+                                    </p>
+
+                                    <div className="space-y-1.5">
+                                        <CollegeAutocomplete
+                                            value={selectedCollege?.id}
+                                            selectedCollege={selectedCollege}
+                                            onChange={handleCollegeSelectAndSave}
+                                            canChangeCollege={user?.canChangeCollege}
+                                            collegeUpdatedAt={user?.collegeUpdatedAt}
+                                            collegeLockRemainingMs={user?.collegeLockRemainingMs}
+                                            nextAllowedCollegeChangeAt={user?.nextAllowedCollegeChangeAt}
+                                            placeholder="Search verified Indian colleges, IITs, NITs, universities..."
+                                            disabled={isSavingCollege}
+                                        />
+                                        {isSavingCollege && (
+                                            <div className="flex items-center gap-2 text-xs font-bold text-neutral-600 pt-1">
+                                                <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                                                <span>Saving college affiliation to your profile...</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <span className="px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000] shrink-0">
-                                    Unverified
-                                </span>
-                            </div>
+                            ) : (
+                                <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
+                                            Verifying Affiliation For
+                                        </span>
+                                        <h4 className="text-xs sm:text-sm font-black text-black truncate">
+                                            {effectiveCollegeName}
+                                        </h4>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {user?.canChangeCollege !== false && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsChangingCollege(true)}
+                                                className="text-[11px] font-black text-neutral-700 hover:text-black underline cursor-pointer px-1 py-0.5"
+                                            >
+                                                Change
+                                            </button>
+                                        )}
+                                        <span className="px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000] shrink-0">
+                                            Unverified
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Document Type Selector */}
                             <div className="space-y-1.5">
@@ -893,19 +1014,24 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                             <div className="pt-2">
                                 <OrbixButton
                                     onClick={handleRunOcr}
-                                    disabled={!frontFile || isScanningOcr}
+                                    disabled={!effectiveCollegeId || !frontFile || isScanningOcr || isSavingCollege}
                                     className="w-full bg-[#FFE566] text-black font-black uppercase text-xs"
                                 >
                                     {isScanningOcr ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2" />
-                                            Extracting Information via OCR...
-                                        </>
+                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                                            <span>Extracting Information via OCR...</span>
+                                        </span>
+                                    ) : !effectiveCollegeId ? (
+                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                            <GraduationCap className="w-4 h-4 shrink-0" />
+                                            <span>Select College Above to Continue</span>
+                                        </span>
                                     ) : (
-                                        <>
-                                            <Sparkles className="w-4 h-4 mr-2" />
-                                            Scan & Extract Document Details
-                                        </>
+                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                            <Sparkles className="w-4 h-4 shrink-0" />
+                                            <span>Scan & Extract Document Details</span>
+                                        </span>
                                     )}
                                 </OrbixButton>
                             </div>
@@ -1003,8 +1129,10 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                     onClick={() => setStep("CONTACT_INFO")}
                                     className="bg-[#FFE566] text-black font-black uppercase text-xs"
                                 >
-                                    Continue to Contact Verification
-                                    <ArrowRight className="w-3.5 h-3.5 ml-1.5 inline" />
+                                    <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                        <span>Continue to Contact Verification</span>
+                                        <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                                    </span>
                                 </OrbixButton>
                             </div>
                         </div>
@@ -1233,8 +1361,10 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                     disabled={!isEmailVerified || !isPhoneVerified}
                                     className="bg-[#FFE566] text-black font-black uppercase text-xs disabled:opacity-50"
                                 >
-                                    Review Application Summary
-                                    <ArrowRight className="w-3.5 h-3.5 ml-1.5 inline" />
+                                    <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                        <span>Review Application Summary</span>
+                                        <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                                    </span>
                                 </OrbixButton>
                             </div>
                         </div>
@@ -1314,15 +1444,15 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                                     className="bg-[#FFE566] text-black font-black uppercase text-xs"
                                 >
                                     {isSubmitting ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2" />
-                                            Submitting Application...
-                                        </>
+                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                                            <span>Submitting Application...</span>
+                                        </span>
                                     ) : (
-                                        <>
-                                            <CheckCircle2 className="w-4 h-4 mr-2" />
-                                            Submit for Founder Review
-                                        </>
+                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                            <span>Submit for Founder Review</span>
+                                        </span>
                                     )}
                                 </OrbixButton>
                             </div>

@@ -17,6 +17,8 @@ import { useAppDispatch, setUser } from "../../../store";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { buildApiUrl } from "../../../api/apiClient";
+import { isDemoProfileUsername } from "../../../data/demoProfileData";
+import { isDemoClubSlug } from "../../../data/demoClubProfileData";
 
 export default function SignupForm() {
     const navigate = useNavigate();
@@ -85,6 +87,10 @@ export default function SignupForm() {
             newErrors.username = "Username is required";
         } else if (!/^[a-z0-9._-]{3,20}$/.test(normalizedUsername)) {
             newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
+        } else if (isDemoProfileUsername(normalizedUsername)) {
+            newErrors.username = "This username is reserved for the Orbix demo profile";
+        } else if (isDemoClubSlug(normalizedUsername)) {
+            newErrors.username = "This handle is reserved for the official demo club showcase";
         }
 
         if (!formData.firstName.trim()) {

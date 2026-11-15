@@ -10,6 +10,8 @@ import {
     isFirebaseConfigured,
 } from "../../../services/phoneAuthService";
 import { buildApiUrl } from "../../../api/apiClient";
+import { isDemoProfileUsername } from "../../../data/demoProfileData";
+import { isDemoClubSlug } from "../../../data/demoClubProfileData";
 import {
     Building2,
     UserCheck,
@@ -413,6 +415,10 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             newErrors.username = "Username is required";
         } else if (!/^[a-z0-9._-]{3,20}$/.test(normalizedUsername)) {
             newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
+        } else if (isDemoProfileUsername(normalizedUsername)) {
+            newErrors.username = "Clubs cannot use the username of the demo profile";
+        } else if (isDemoClubSlug(normalizedUsername)) {
+            newErrors.username = "This username is reserved for the official demo club showcase";
         }
 
         // Password validation (always required: every club receives an isolated Club Portal account)

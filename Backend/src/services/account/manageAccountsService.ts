@@ -7,6 +7,7 @@ import redis from "../../redis/client.js";
 import { deleteUserDetailsCache, userDetailsCache } from "../../redis/cache/cache-auth.js";
 import { sendSecurityNotificationEmail } from "../email/resendService.js";
 import { EmailVerificationService } from "../email/emailVerificationService.js";
+import { checkHandleAvailabilityAcrossPlatform } from "../../validators/usernamePolicy.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "orbix_jwt_secret_fallback_2026";
 const OTP_TTL_SECONDS = 600; // 10 minutes
@@ -1263,46 +1264,20 @@ export class ManageAccountsService {
 
         const normalized = username.trim().toLowerCase();
 
-        if (normalized.length < 3 || normalized.length > 20) {
-            return { available: false, reason: "Username must be between 3 and 20 characters." };
-        }
-
-        if (!/^[a-z0-9._-]+$/.test(normalized)) {
-            return { available: false, reason: "Username can only contain lowercase letters, numbers, dot (.), underscore (_), or hyphen (-)." };
-        }
-
-        if (RESERVED_USERNAMES.has(normalized)) {
-            return { available: false, reason: "This username is reserved by the system." };
-        }
-
         // Check if user already owns this username
         const currentCheck = await query(`SELECT id, username FROM users WHERE id = $1;`, [currentUserId]);
         if (currentCheck.rows[0]?.username?.toLowerCase() === normalized) {
             return { available: false, isCurrent: true, reason: "This is already your current username." };
         }
 
-        // Check if taken in database
-        const conflictRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2 LIMIT 1;`, [normalized, currentUserId]);
-        if (conflictRes.rows[0]) {
-            return { available: false, reason: "This username is already taken." };
-        }
+        // Run authoritative platform-wide check (format, demo profile, demo club, reserved names, users, clubs, hold)
+        const availability = await checkHandleAvailabilityAcrossPlatform(normalized, {
+            entityType: "user",
+            currentUserId,
+        });
 
-        // Check if taken in verified_clubs by another organization
-        const clubConflictRes = await query(`SELECT id FROM verified_clubs WHERE LOWER(slug) = LOWER($1) AND auth_user_id != $2 LIMIT 1;`, [normalized, currentUserId]);
-        if (clubConflictRes.rows[0]) {
-            return { available: false, reason: "This username is already taken." };
-        }
-
-        // Anti-impersonation: check if released within last 7 days by another user
-        const historyCheck = await query(
-            `SELECT id FROM account_change_history
-             WHERE change_type = 'username' AND LOWER(old_value) = LOWER($1) AND user_id != $2
-             AND created_at >= NOW() - INTERVAL '7 days'
-             LIMIT 1;`,
-            [normalized, currentUserId]
-        );
-        if (historyCheck.rows[0]) {
-            return { available: false, reason: "This username was recently released and is temporarily on anti-impersonation hold." };
+        if (!availability.available) {
+            return { available: false, reason: availability.reason || "This username is not available." };
         }
 
         return { available: true };

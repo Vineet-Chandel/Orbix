@@ -9,13 +9,20 @@ export const DEMO_CLUB_SLUG = "acm-psit";
 export function isDemoClubSlug(slug?: string | null): boolean {
     if (!slug) return false;
     const clean = slug.trim().toLowerCase();
-    return (
+    if (
         clean === "acm-psit" ||
         clean === "demo" ||
         clean === "demo-club" ||
         clean === "demo/club" ||
         clean === "acm" ||
         clean === "acm-student-chapter"
+    ) return true;
+    const collapsed = clean.replace(/[-_.\s]/g, "");
+    return (
+        collapsed === "acmpsit" ||
+        collapsed === "democlub" ||
+        collapsed === "acmstudentchapter" ||
+        collapsed === "psitacm"
     );
 }
 

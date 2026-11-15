@@ -24,6 +24,48 @@ export const ScrollToTop: React.FC = () => {
         }
     }, []);
 
+    // Sync document title on route change, guaranteeing "Orbix" with capital 'O' across all pages
+    useEffect(() => {
+        if (typeof document === "undefined") return;
+
+        const path = location.pathname;
+        // Don't overwrite dynamic entity profiles that manage their own titles
+        if (path.startsWith("/profile/u/") || path.startsWith("/clubs/")) {
+            return;
+        }
+
+        const ROUTE_TITLE_MAP: Record<string, string> = {
+            "/": "Orbix — The Engineering Credibility Network",
+            "/dashboard": "Orbix",
+            "/explore": "Explore — Orbix",
+            "/trends": "Trends & Reports — Orbix",
+            "/leaderboard": "Leaderboard — Orbix",
+            "/events": "Events — Orbix",
+            "/card": "Digital Card — Orbix",
+            "/resume": "Resume — Orbix",
+            "/projects": "Projects — Orbix",
+            "/settings": "Settings — Orbix",
+            "/clubs": "Collegiate Clubs — Orbix",
+            "/club": "Club Dashboard — Orbix",
+            "/club/dashboard": "Club Dashboard — Orbix",
+            "/club/status": "Club Status — Orbix",
+            "/customers": "Customers — Orbix",
+            "/pricing": "Pricing — Orbix",
+            "/support": "Support — Orbix",
+            "/platform": "Platform — Orbix",
+            "/platforms": "Platform Integrations — Orbix",
+            "/blogs": "Blogs — Orbix",
+            "/blog": "Blogs — Orbix",
+            "/docs": "Documentation — Orbix",
+            "/privacy": "Privacy Policy — Orbix",
+            "/terms": "Terms & Conditions — Orbix",
+            "/auth/signin": "Sign In — Orbix",
+            "/auth/signup": "Sign Up — Orbix",
+        };
+
+        document.title = ROUTE_TITLE_MAP[path] || "Orbix";
+    }, [location.pathname]);
+
     // Scroll to top or target anchor on route change
     useLayoutEffect(() => {
         // If an anchor hash is provided in the URL (e.g., #section-id), scroll to that element

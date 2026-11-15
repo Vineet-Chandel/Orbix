@@ -828,11 +828,11 @@ export default function ProfileManager() {
                                                                 <XCircle className="w-3 h-3 text-rose-800" />
                                                                 Rejected
                                                             </span>
-                                                        ) : (
+                                                        ) : (selectedCollege?.id || user?.college?.id) ? (
                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-100 border border-black text-[10px] font-bold text-neutral-700 uppercase shrink-0">
                                                                 Unverified
                                                             </span>
-                                                        )}
+                                                        ) : null}
                                                     </div>
 
                                                     <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">

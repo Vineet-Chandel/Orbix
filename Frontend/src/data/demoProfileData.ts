@@ -25,10 +25,14 @@ export const DEMO_USERNAME = "Vineet-Chandel";
 export function isDemoProfileUsername(username?: string | null): boolean {
     if (!username) return false;
     const clean = username.trim().toLowerCase();
+    if (clean === "vineet-chandel" || clean === "demo" || clean === "demo-profile") return true;
+    const collapsed = clean.replace(/[-_.\s]/g, "");
     return (
-        clean === "vineet-chandel" ||
-        clean === "demo" ||
-        clean === "demo-profile"
+        collapsed === "vineetchandel" ||
+        collapsed === "demoprofile" ||
+        collapsed === "demouser" ||
+        collapsed === "demoaccount" ||
+        collapsed === "demo"
     );
 }
 

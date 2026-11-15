@@ -7,6 +7,7 @@ import redis from "../../redis/client.js";
 import { userDetailsCache } from "../../redis/cache/cache-auth.js";
 import { createSession } from "../session/sessionService.js";
 import { OnboardingEmailService } from "../email/onboardingEmailService.js";
+import { checkHandleAvailabilityAcrossPlatform } from "../../validators/usernamePolicy.js";
 
 const DEFAULT_AVATAR_URL = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
 const ACCESS_TOKEN_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -614,12 +615,8 @@ export class OAuthService {
         let attempt = 0;
 
         while (attempt < 50) {
-            const checkRes = await query(
-                `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
-                [candidate]
-            );
-
-            if (checkRes.rows.length === 0) {
+            const availability = await checkHandleAvailabilityAcrossPlatform(candidate, { entityType: "user" });
+            if (availability.available) {
                 return candidate;
             }
 

@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import validator from "../../utils/validation.js";
 import SignupValidator, { ValidationError } from '../../validators/SignupValidator.js';
+import { checkHandleAvailabilityAcrossPlatform } from '../../validators/usernamePolicy.js';
 import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
 import { failsOccursSignin, failsOccursSignup, resetSigninFailures, getFailures } from '../../redis/rate-limiters/rate-limiters-auth.js';
@@ -84,25 +85,15 @@ authRouter.post('/signup/send-email-otp', async (req: Request, res: Response) =>
             });
         }
 
-        // 2. Pre-check: If username provided, is it taken?
+        // 2. Pre-check: If username provided, is it taken or reserved?
         const rawUsername = req.body?.username;
         if (rawUsername && typeof rawUsername === "string") {
             const normalizedUsername = rawUsername.trim().toLowerCase();
-            if (!validator.matches(normalizedUsername, /^[a-z0-9._-]{3,20}$/)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -."
-                });
-            }
-
-            const existingUsernameResult = await query(
-                `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
-                [normalizedUsername]
-            );
-            if (existingUsernameResult.rows.length > 0) {
+            const handleCheck = await checkHandleAvailabilityAcrossPlatform(normalizedUsername, { entityType: "user" });
+            if (!handleCheck.available) {
                 return res.status(409).json({
                     success: false,
-                    message: "This username is already taken. Please choose a different username."
+                    message: handleCheck.reason || "This username is not available. Please choose a different username."
                 });
             }
         }
@@ -240,6 +231,15 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             return res.status(400).json({
                 success: false,
                 message: "Email verification could not be confirmed. Please request a new code."
+            });
+        }
+
+        // Authoritative handle check: enforce immunity for demo profile/club & check collisions
+        const handleAvailability = await checkHandleAvailabilityAcrossPlatform(validatedData.username, { entityType: "user" });
+        if (!handleAvailability.available) {
+            return res.status(409).json({
+                success: false,
+                message: handleAvailability.reason || "This username is not available. Please choose a different username."
             });
         }
 

@@ -282,9 +282,9 @@ export const LeaderboardPage: React.FC = () => {
                 }
             }
         } catch (err: any) {
-            const errorMsg = err.message || "Failed to fetch leaderboard data";
+            const errorMsg = err.message || "Leaderboard standings are syncing. Please refresh in a moment.";
             toast.error(errorMsg, {
-                title: activeTab === "college" ? "College League Unavailable" : "Leaderboard Unavailable",
+                title: activeTab === "college" ? "Campus Standings" : "Leaderboard Notice",
             });
         } finally {
             setIsLoading(false);

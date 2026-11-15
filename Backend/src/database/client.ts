@@ -482,6 +482,22 @@ export const testDatabaseConnection = async () => {
             CREATE INDEX IF NOT EXISTS idx_leaderboard_global_rank ON leaderboard_entries(global_rank);
             CREATE INDEX IF NOT EXISTS idx_leaderboard_is_public ON leaderboard_entries(is_public);
 
+            -- Ensure all projection columns exist on leaderboard_entries (for existing or newly provisioned databases)
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS display_name VARCHAR(150);
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS college VARCHAR(255);
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS college_id UUID;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS score INT NOT NULL DEFAULT 0;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS score_breakdown JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS total_solved INT NOT NULL DEFAULT 0;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS total_contests INT NOT NULL DEFAULT 0;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS platform_ratings JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS streak INT NOT NULL DEFAULT 0;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS global_rank INT DEFAULT NULL;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
             -- Ensure photo_upload_intents table exists for signed upload tracking and replay protection
             CREATE TABLE IF NOT EXISTS photo_upload_intents (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

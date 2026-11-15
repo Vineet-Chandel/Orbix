@@ -41,12 +41,12 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 <h3 className="text-base font-black text-black uppercase tracking-wide">
                     {scope === "college"
                         ? `No Coders from ${selectedCollegeName || "this College"} Yet`
-                        : "No Coders Found"}
+                        : "No Coders on the Leaderboard Yet"}
                 </h3>
                 <p className="text-xs font-medium text-neutral-600 max-w-sm mx-auto leading-relaxed">
                     {scope === "college"
                         ? "Be the first student to link your coding handles and represent this campus on the leaderboard!"
-                        : "No coders match the active filter or search criteria."}
+                        : "Be the first coder to link your coding profiles and take the #1 spot on Orbix!"}
                 </p>
             </div>
         );

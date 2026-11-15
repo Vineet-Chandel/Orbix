@@ -521,6 +521,7 @@ const weakPatterns = [
 ];
 
 import validator from "../utils/validation.js";
+import { checkStaticHandleAvailability } from "./usernamePolicy.js";
 
 export class ValidationError extends Error {
     constructor(message: string) {
@@ -584,8 +585,9 @@ const SignupValidator = (data: any) => {
         throw new ValidationError("Email is not valid.");
     }
 
-    if (!validator.matches(normalizedUsername, /^[a-z0-9._-]{3,20}$/)) {
-        throw new ValidationError("Username must be 3-20 characters, containing only lowercase letters, numbers, dots, underscores, or hyphens.");
+    const usernamePolicyCheck = checkStaticHandleAvailability(normalizedUsername, "user");
+    if (!usernamePolicyCheck.available) {
+        throw new ValidationError(usernamePolicyCheck.reason || "Username is not available.");
     }
 
     if (!validator.isStrongPassword(password)) {

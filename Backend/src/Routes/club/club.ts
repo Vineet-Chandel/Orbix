@@ -12,6 +12,7 @@ import ClubRegistrationValidator, {
     type ValidatedClubRegistrationData,
 } from "../../validators/ClubRegistrationValidator.js";
 import { ValidationError } from "../../validators/SignupValidator.js";
+import { checkHandleAvailabilityAcrossPlatform, isDemoProfileHandle, isDemoClubHandle, isSystemReservedHandle } from "../../validators/usernamePolicy.js";
 import { EmailVerificationService } from "../../services/email/emailVerificationService.js";
 import { PhoneVerificationService } from "../../services/sms/phoneVerificationService.js";
 import { normalizePhoneNumber } from "../../services/sms/smsGatewayService.js";
@@ -357,21 +358,13 @@ clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request,
         }
 
         if (username) {
-            if (!/^[a-z0-9._-]{3,20}$/.test(username)) {
+            const availability = await checkHandleAvailabilityAcrossPlatform(username, { entityType: "club" });
+            if (!availability.available) {
                 return res.json({
                     success: true,
                     available: false,
                     field: "username",
-                    message: "Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -."
-                });
-            }
-            const userRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`, [username]);
-            if (userRes.rows[0]) {
-                return res.json({
-                    success: true,
-                    available: false,
-                    field: "username",
-                    message: "This club username is already taken. Please choose another."
+                    message: availability.reason || "This club username is not available. Please choose another."
                 });
             }
             return res.json({
@@ -754,15 +747,12 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
         const authoritativeCollegeCountry = "India";
         const authoritativeCollegeWebsite = verifiedInst.website || validated.collegeWebsiteUrl || null;
 
-        // 2. Enforce username availability across the platform
-        const userByUsername = await query(
-            `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
-            [validated.username]
-        );
-        if (userByUsername.rows[0]) {
+        // 2. Enforce username & slug availability across the platform (demo profiles, demo clubs, reserved namespaces, and collisions)
+        const handleAvailability = await checkHandleAvailabilityAcrossPlatform(validated.username, { entityType: "club" });
+        if (!handleAvailability.available) {
             return res.status(409).json({
                 success: false,
-                message: "This club username is already taken. Please choose another username.",
+                message: handleAvailability.reason || "This club username is already taken. Please choose another username.",
             });
         }
 
@@ -1707,8 +1697,19 @@ const handlePromoteClub = async (req: Request, res: Response) => {
         let candidateSlug = baseSlug;
         let counter = 1;
         while (true) {
+            // Guard against demo profiles, demo clubs, and system reserved route collision
+            if (
+                isDemoProfileHandle(candidateSlug) ||
+                isDemoClubHandle(candidateSlug) ||
+                isSystemReservedHandle(candidateSlug)
+            ) {
+                counter++;
+                candidateSlug = `${baseSlug}-${counter}`;
+                continue;
+            }
+
             const slugCheck = await client.query(
-                `SELECT id FROM verified_clubs WHERE slug = $1 LIMIT 1;`,
+                `SELECT id FROM verified_clubs WHERE LOWER(slug) = LOWER($1) LIMIT 1;`,
                 [candidateSlug]
             );
             if (!slugCheck.rows[0]) break;
