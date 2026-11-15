@@ -1224,8 +1224,7 @@ clubRouter.get("/application-status", authenticate, requireClubAccount, async (r
                 college_id,
                 is_email_verified,
                 is_phone_verified,
-                phone_verified_at,
-                applicant_user_id
+                phone_verified_at
             FROM club_verification_requests
             WHERE auth_user_id = $1
             ORDER BY submitted_at DESC
