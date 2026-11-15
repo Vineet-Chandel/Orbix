@@ -745,7 +745,7 @@ const DEFAULT_FALLBACK_FAQS = [
 helpRouter.get("/faqs", async (req: Request, res: Response) => {
     try {
         const { category, q } = req.query;
-        let sql = `SELECT id, category, question, answer, helpful_count, unhelpful_count, sort_order
+        let sql = `SELECT id, slug, category, question, answer, helpful_count, not_helpful_count AS unhelpful_count, order_index AS sort_order
                    FROM help_faqs
                    WHERE is_published = true`;
         const params: any[] = [];
@@ -760,13 +760,14 @@ helpRouter.get("/faqs", async (req: Request, res: Response) => {
             sql += ` AND (question ILIKE $${params.length} OR answer ILIKE $${params.length})`;
         }
 
-        sql += ` ORDER BY sort_order ASC, created_at ASC;`;
+        sql += ` ORDER BY order_index ASC, created_at ASC;`;
 
         const dbRes = await query(sql, params);
 
         if (dbRes.rows && dbRes.rows.length > 0) {
             const faqs = dbRes.rows.map((row) => ({
                 id: row.id,
+                slug: row.slug,
                 category: row.category,
                 question: row.question,
                 answer: row.answer,
@@ -811,13 +812,23 @@ helpRouter.post("/faqs/:id/feedback", async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: "isHelpful must be a boolean." });
         }
 
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
         if (isHelpful) {
-            await query(`UPDATE help_faqs SET helpful_count = helpful_count + 1 WHERE id = $1;`, [id]);
+            if (isUuid) {
+                await query(`UPDATE help_faqs SET helpful_count = helpful_count + 1 WHERE id = $1;`, [id]);
+            } else {
+                await query(`UPDATE help_faqs SET helpful_count = helpful_count + 1 WHERE slug = $1;`, [id]);
+            }
         } else {
-            await query(`UPDATE help_faqs SET unhelpful_count = unhelpful_count + 1 WHERE id = $1;`, [id]);
+            if (isUuid) {
+                await query(`UPDATE help_faqs SET not_helpful_count = not_helpful_count + 1 WHERE id = $1;`, [id]);
+            } else {
+                await query(`UPDATE help_faqs SET not_helpful_count = not_helpful_count + 1 WHERE slug = $1;`, [id]);
+            }
         }
 
-        if (userId) {
+        if (userId && isUuid) {
             try {
                 await query(
                     `INSERT INTO help_faq_feedback (faq_id, user_id, is_helpful, user_ip)
