@@ -36,6 +36,10 @@ import {
     Users,
 } from "lucide-react";
 import { clubEventTeamApi } from "../../../api/clubEventTeamApi";
+import {
+    TeamRosterConfigurator,
+    type StagedTeammate,
+} from "../../../components/events/TeamRosterConfigurator";
 import type {
     ClubEventFormRecord,
     FormQuestion,
@@ -159,6 +163,14 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const [teamCode, setTeamCode] = useState<string>(() => {
         return (userResponse?.answers || {})["__teamCode"] || "";
     });
+    const [stagedTeammates, setStagedTeammates] = useState<StagedTeammate[]>(() => {
+        try {
+            const raw = (userResponse?.answers || {})["__stagedTeammates"];
+            return Array.isArray(raw) ? raw : [];
+        } catch {
+            return [];
+        }
+    });
 
     // Autosave states
     const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "offline">("saved");
@@ -260,6 +272,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 if (draftResponse.answers["__teamAction"]) setTeamAction(draftResponse.answers["__teamAction"]);
                 if (draftResponse.answers["__teamName"]) setTeamName(draftResponse.answers["__teamName"]);
                 if (draftResponse.answers["__teamCode"]) setTeamCode(draftResponse.answers["__teamCode"]);
+                if (Array.isArray(draftResponse.answers["__stagedTeammates"])) {
+                    setStagedTeammates(draftResponse.answers["__stagedTeammates"]);
+                }
                 if (draftResponse.fileAttachments && Array.isArray(draftResponse.fileAttachments)) {
                     setFileAttachments(draftResponse.fileAttachments);
                 }
@@ -285,6 +300,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             if (parsed.answers["__teamAction"]) setTeamAction(parsed.answers["__teamAction"]);
                             if (parsed.answers["__teamName"]) setTeamName(parsed.answers["__teamName"]);
                             if (parsed.answers["__teamCode"]) setTeamCode(parsed.answers["__teamCode"]);
+                            if (Array.isArray(parsed.answers["__stagedTeammates"])) {
+                                setStagedTeammates(parsed.answers["__stagedTeammates"]);
+                            }
                             if (parsed.fileAttachments && Array.isArray(parsed.fileAttachments)) {
                                 setFileAttachments(parsed.fileAttachments);
                             }
@@ -715,6 +733,12 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     toast.error("Please provide a team name (at least 2 characters).");
                     return;
                 }
+                const minReq = event.minTeamSize || 2;
+                const totalSquad = 1 + stagedTeammates.length;
+                if (totalSquad < minReq) {
+                    toast.error(`Team requires at least ${minReq} members. Please add ${minReq - totalSquad} more teammate(s) before submitting.`);
+                    return;
+                }
             } else {
                 if (!teamCode.trim() || teamCode.trim().length < 4) {
                     toast.error("Please enter the team join code provided by your leader.");
@@ -765,6 +789,17 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     if (teamAction === "create") {
                         const teamRes = await clubEventTeamApi.createTeam(form.eventId, teamName.trim());
                         teamCreatedOrJoined = teamRes.team;
+
+                        // Auto-dispatch official team invitations to all staged teammates
+                        if (stagedTeammates.length > 0 && teamRes.team?.id) {
+                            for (const member of stagedTeammates) {
+                                try {
+                                    await clubEventTeamApi.inviteMember(form.eventId, teamRes.team.id, member.username);
+                                } catch (invErr: any) {
+                                    console.warn(`Failed to auto-invite @${member.username}:`, invErr);
+                                }
+                            }
+                        }
                     } else {
                         const teamRes = await clubEventTeamApi.joinTeamByCode(form.eventId, teamCode.trim().toUpperCase());
                         teamCreatedOrJoined = teamRes.team;
@@ -1687,24 +1722,43 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     </div>
 
                     {teamAction === "create" ? (
-                        <div className="space-y-1.5 pt-1">
-                            <label className="text-xs font-black text-black block">
-                                Team / Squad Name <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={teamName}
-                                onChange={(e) => {
-                                    setTeamName(e.target.value);
-                                    setAnswer("__teamName", e.target.value);
+                        <div className="space-y-3 pt-1">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black text-black block">
+                                    Team / Squad Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={teamName}
+                                    onChange={(e) => {
+                                        setTeamName(e.target.value);
+                                        setAnswer("__teamName", e.target.value);
+                                    }}
+                                    placeholder="e.g. Algorithm Aces, Byte Warriors..."
+                                    maxLength={80}
+                                    className="w-full p-2.5 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                                />
+                            </div>
+
+                            {/* Live Team Roster & Teammate Search & Invite */}
+                            <TeamRosterConfigurator
+                                eventId={form.eventId}
+                                teamId="new"
+                                minTeamSize={event?.minTeamSize || 2}
+                                maxTeamSize={event?.maxTeamSize || 5}
+                                currentUser={{
+                                    id: user?.id || "current_user",
+                                    username: user?.username || "leader",
+                                    fullName: effectiveProfile.fullName || user?.username,
+                                    avatarUrl: user?.avatarUrl,
+                                    collegeName: effectiveProfile.college,
                                 }}
-                                placeholder="e.g. Algorithm Aces, Byte Warriors..."
-                                maxLength={80}
-                                className="w-full p-2.5 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                                stagedMembers={stagedTeammates}
+                                onStagedMembersChange={(members) => {
+                                    setStagedTeammates(members);
+                                    setAnswer("__stagedTeammates", members);
+                                }}
                             />
-                            <p className="text-[10px] font-bold text-neutral-500">
-                                As Team Leader, you can invite peers via @username or share your 6-char team code after creating the team.
-                            </p>
                         </div>
                     ) : (
                         <div className="space-y-1.5 pt-1">

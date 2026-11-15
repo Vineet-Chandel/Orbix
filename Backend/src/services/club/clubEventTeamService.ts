@@ -103,20 +103,13 @@ export class ClubEventTeamService {
     }
 
     /**
-     * Asserts that registration round is actively open and event has not started.
+     * Asserts that registration round is actively open and event has not concluded.
      * Enforces timeline and round pipeline locking on both backend and frontend.
      */
-    private static async assertRegistrationOpen(eventId: string, startsAt: string) {
-        // 1. Check if event itself has started
-        const startTime = new Date(startsAt).getTime();
+    private static async assertRegistrationOpen(eventId: string, startsAt?: string | null, endsAt?: string | null) {
         const now = Date.now();
-        if (now >= startTime) {
-            const err: any = new Error("Team modifications (joining, leaving, roster changes) are permanently locked because the event has already started.");
-            err.statusCode = 403;
-            throw err;
-        }
 
-        // 2. Check if the registration round / stage deadline has ended
+        // 1. Check registration stage deadline / status first (authoritative round pipeline)
         const stageRes = await query(
             `SELECT id, name, type, action_type, status, ends_at AS "endsAt"
              FROM club_event_stages
@@ -138,6 +131,15 @@ export class ClubEventTeamService {
                 err.statusCode = 403;
                 throw err;
             }
+            // Registration stage is active!
+            return;
+        }
+
+        // 2. If no specific registration stage is configured, check if event has concluded
+        if (endsAt && now >= new Date(endsAt).getTime()) {
+            const err: any = new Error("This event has concluded. Team modifications and roster edits are permanently locked.");
+            err.statusCode = 403;
+            throw err;
         }
     }
 
@@ -212,11 +214,11 @@ export class ClubEventTeamService {
 
         // Fetch leader info for email and registration
         const userRes = await query(
-            `SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`,
+            `SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`,
             [leaderUserId]
         );
         const leaderUser = userRes.rows[0];
-        const leaderName = leaderUser?.first_name ? `${leaderUser.first_name} ${leaderUser.last_name || ""}`.trim() : leaderUser?.username || "Developer";
+        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Developer";
 
         // Update leader's registration record if it exists, or create a pending registration record
         const regCheck = await query(
@@ -334,15 +336,15 @@ export class ClubEventTeamService {
 
         // Resolve user & leader for notifications and registration record
         const [memberUserRes, leaderUserRes] = await Promise.all([
-            query(`SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [userId]),
-            query(`SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [team.leaderId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [team.leaderId]),
         ]);
 
         const memberUser = memberUserRes.rows[0];
         const leaderUser = leaderUserRes.rows[0];
 
-        const memberName = memberUser?.first_name ? `${memberUser.first_name} ${memberUser.last_name || ""}`.trim() : memberUser?.username || "Developer";
-        const leaderName = leaderUser?.first_name ? `${leaderUser.first_name} ${leaderUser.last_name || ""}`.trim() : leaderUser?.username || "Team Leader";
+        const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
+        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
 
         // Link registration record, or create a pending registration record
         const regCheck = await query(
@@ -416,9 +418,14 @@ export class ClubEventTeamService {
         const clean = (searchQuery || "").trim().replace(/^@/, "");
         if (!clean || clean.length < 2) return [];
 
+        const safeTeamId = (teamId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teamId))
+            ? teamId
+            : '00000000-0000-0000-0000-000000000000';
+
         const res = await query(
-            `SELECT u.id, u.username, u.first_name AS "firstName", u.last_name AS "lastName",
+            `SELECT u.id, u.username, u.firstname AS "firstName", u.lastname AS "lastName",
                     COALESCE(u.avatar_url, '') AS "avatarUrl", u.email,
+                    COALESCE(inst.official_name, '') AS "collegeName",
                     EXISTS (
                         SELECT 1 FROM club_event_team_members tm 
                         WHERE tm.event_id = $1 AND tm.user_id = u.id
@@ -428,12 +435,13 @@ export class ClubEventTeamService {
                         WHERE ti.team_id = $2 AND ti.invitee_user_id = u.id AND ti.status = 'pending'
                     ) AS "hasPendingInvite"
              FROM users u
+             LEFT JOIN institutions inst ON inst.id = u.college_id
              WHERE u.id != $3 
                AND u.account_type != 'club'
                AND (
                  LOWER(u.username) LIKE LOWER($4) 
-                 OR LOWER(u.first_name) LIKE LOWER($4) 
-                 OR LOWER(u.last_name) LIKE LOWER($4)
+                 OR LOWER(u.firstname) LIKE LOWER($4) 
+                 OR LOWER(u.lastname) LIKE LOWER($4)
                )
              ORDER BY 
                CASE WHEN LOWER(u.username) = LOWER($5) THEN 0
@@ -441,8 +449,8 @@ export class ClubEventTeamService {
                     ELSE 2 
                END,
                u.username ASC
-             LIMIT 10;`,
-            [eventId, teamId, currentUserId, `%${clean}%`, clean, `${clean}%`]
+             LIMIT 15;`,
+            [eventId, safeTeamId, currentUserId, `%${clean}%`, clean, `${clean}%`]
         );
 
         return res.rows.map((row) => ({
@@ -451,6 +459,7 @@ export class ClubEventTeamService {
             name: `${row.firstName || ""} ${row.lastName || ""}`.trim() || row.username,
             avatarUrl: row.avatarUrl || null,
             email: row.email,
+            collegeName: row.collegeName || null,
             isAlreadyInTeam: Boolean(row.isAlreadyInTeam),
             hasPendingInvite: Boolean(row.hasPendingInvite),
             publicProfileUrl: `/profile/${row.username}`,
@@ -499,7 +508,7 @@ export class ClubEventTeamService {
         // Find target user
         const cleanUsername = targetUsername.trim().replace(/^@/, "");
         const targetRes = await query(
-            `SELECT id, username, first_name, last_name, email FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+            `SELECT id, username, firstname, lastname, email FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
             [cleanUsername]
         );
 
@@ -554,10 +563,10 @@ export class ClubEventTeamService {
         );
 
         // Fetch leader info for email
-        const leaderRes = await query(`SELECT username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [leaderUserId]);
+        const leaderRes = await query(`SELECT username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [leaderUserId]);
         const leader = leaderRes.rows[0];
-        const leaderName = leader?.first_name ? `${leader.first_name} ${leader.last_name || ""}`.trim() : leader?.username || "Team Leader";
-        const targetName = targetUser?.first_name ? `${targetUser.first_name} ${targetUser.last_name || ""}`.trim() : targetUser?.username || "Developer";
+        const leaderName = leader?.firstname ? `${leader.firstname} ${leader.lastname || ""}`.trim() : leader?.username || "Team Leader";
+        const targetName = targetUser?.firstname ? `${targetUser.firstname} ${targetUser.lastname || ""}`.trim() : targetUser?.username || "Developer";
 
         // Dispatch invitation email
         if (targetUser.email) {
@@ -680,14 +689,14 @@ export class ClubEventTeamService {
 
         // Resolve user & leader for notifications
         const [memberUserRes, leaderUserRes] = await Promise.all([
-            query(`SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [userId]),
-            query(`SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [inv.leaderId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [inv.leaderId]),
         ]);
 
         const memberUser = memberUserRes.rows[0];
         const leaderUser = leaderUserRes.rows[0];
-        const memberName = memberUser?.first_name ? `${memberUser.first_name} ${memberUser.last_name || ""}`.trim() : memberUser?.username || "Developer";
-        const leaderName = leaderUser?.first_name ? `${leaderUser.first_name} ${leaderUser.last_name || ""}`.trim() : leaderUser?.username || "Team Leader";
+        const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
+        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
 
         // Dispatch background emails
         if (memberUser?.email) {
@@ -802,9 +811,9 @@ export class ClubEventTeamService {
         }
 
         // Target user info for email
-        const targetRes = await query(`SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [targetUserId]);
+        const targetRes = await query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [targetUserId]);
         const targetUser = targetRes.rows[0];
-        const targetName = targetUser?.first_name ? `${targetUser.first_name} ${targetUser.last_name || ""}`.trim() : targetUser?.username || "Developer";
+        const targetName = targetUser?.firstname ? `${targetUser.firstname} ${targetUser.lastname || ""}`.trim() : targetUser?.username || "Developer";
 
         if (targetUser?.email) {
             sendTeamMemberLeftOrRemovedEmail({
@@ -926,14 +935,14 @@ export class ClubEventTeamService {
 
         // Resolve user & leader for email
         const [leavingUserRes, leaderUserRes] = await Promise.all([
-            query(`SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [userId]),
-            query(`SELECT email, username, first_name, last_name FROM users WHERE id = $1 LIMIT 1;`, [team.leaderId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [team.leaderId]),
         ]);
 
         const leavingUser = leavingUserRes.rows[0];
         const leaderUser = leaderUserRes.rows[0];
-        const leavingName = leavingUser?.first_name ? `${leavingUser.first_name} ${leavingUser.last_name || ""}`.trim() : leavingUser?.username || "A teammate";
-        const leaderName = leaderUser?.first_name ? `${leaderUser.first_name} ${leaderUser.last_name || ""}`.trim() : leaderUser?.username || "Team Leader";
+        const leavingName = leavingUser?.firstname ? `${leavingUser.firstname} ${leavingUser.lastname || ""}`.trim() : leavingUser?.username || "A teammate";
+        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
 
         if (leaderUser?.email) {
             sendTeamMemberLeftOrRemovedEmail({
@@ -1011,8 +1020,8 @@ export class ClubEventTeamService {
                     COALESCE(e.min_team_size, 2) AS "minTeamSize",
                     COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                     u.username AS "leaderUsername",
-                    u.first_name AS "leaderFirstName",
-                    u.last_name AS "leaderLastName"
+                    u.firstname AS "leaderFirstName",
+                    u.lastname AS "leaderLastName"
              FROM club_event_teams t
              JOIN club_events e ON e.id = t.event_id
              JOIN users u ON u.id = t.leader_id
@@ -1038,8 +1047,8 @@ export class ClubEventTeamService {
             [t.eventId]
         );
 
-        let isLocked = Date.now() >= new Date(t.startsAt).getTime();
-        let lockReason: string | null = isLocked ? "The event has already started." : null;
+        let isLocked = false;
+        let lockReason: string | null = null;
         let registrationDeadline: string | null = null;
 
         if (stageRes.rows[0]) {
@@ -1057,7 +1066,7 @@ export class ClubEventTeamService {
         // Fetch all members with user profiles & contact emails
         const membersRes = await query(
             `SELECT m.id, m.user_id AS "userId", m.role, m.joined_at AS "joinedAt",
-                    u.username, u.first_name AS "firstName", u.last_name AS "lastName",
+                    u.username, u.firstname AS "firstName", u.lastname AS "lastName",
                     COALESCE(u.avatar_url, '') AS "avatarUrl", u.email
              FROM club_event_team_members m
              JOIN users u ON u.id = m.user_id
@@ -1086,8 +1095,8 @@ export class ClubEventTeamService {
                     i.invitee_user_id AS "inviteeUserId", i.status, i.created_at AS "createdAt",
                     inviter.username AS "inviterUsername",
                     invitee.username AS "inviteeUsername",
-                    invitee.first_name AS "inviteeFirstName",
-                    invitee.last_name AS "inviteeLastName",
+                    invitee.firstname AS "inviteeFirstName",
+                    invitee.lastname AS "inviteeLastName",
                     COALESCE(invitee.avatar_url, '') AS "inviteeAvatarUrl"
              FROM club_event_team_invitations i
              JOIN users inviter ON inviter.id = i.inviter_user_id
@@ -1156,8 +1165,8 @@ export class ClubEventTeamService {
             `SELECT i.id, i.team_id AS "teamId", i.created_at AS "createdAt",
                     t.name AS "teamName", t.code AS "teamCode",
                     u.username AS "leaderUsername",
-                    u.first_name AS "leaderFirstName",
-                    u.last_name AS "leaderLastName",
+                    u.firstname AS "leaderFirstName",
+                    u.lastname AS "leaderLastName",
                     (SELECT COUNT(*)::int FROM club_event_team_members WHERE team_id = t.id) AS "membersCount",
                     COALESCE(e.max_team_size, 4) AS "maxTeamSize"
              FROM club_event_team_invitations i
@@ -1196,8 +1205,8 @@ export class ClubEventTeamService {
                     t.name AS "teamName", t.code AS "teamCode",
                     e.title AS "eventTitle", e.starts_at AS "startsAt",
                     u.username AS "leaderUsername",
-                    u.first_name AS "leaderFirstName",
-                    u.last_name AS "leaderLastName",
+                    u.firstname AS "leaderFirstName",
+                    u.lastname AS "leaderLastName",
                     COALESCE(u.avatar_url, '') AS "leaderAvatarUrl",
                     (SELECT COUNT(*)::int FROM club_event_team_members WHERE team_id = t.id) AS "membersCount",
                     COALESCE(e.max_team_size, 4) AS "maxTeamSize"
@@ -1234,7 +1243,7 @@ export class ClubEventTeamService {
         const teamsRes = await query(
             `SELECT t.id, t.name, t.code, t.status, t.created_at AS "createdAt",
                     u.id AS "leaderId", u.username AS "leaderUsername",
-                    u.first_name AS "leaderFirstName", u.last_name AS "leaderLastName",
+                    u.firstname AS "leaderFirstName", u.lastname AS "leaderLastName",
                     u.email AS "leaderEmail"
              FROM club_event_teams t
              JOIN users u ON u.id = t.leader_id
@@ -1247,7 +1256,7 @@ export class ClubEventTeamService {
             teamsRes.rows.map(async (t) => {
                 const membersRes = await query(
                     `SELECT m.id, m.user_id AS "userId", m.role, m.joined_at AS "joinedAt",
-                            u.username, u.first_name AS "firstName", u.last_name AS "lastName",
+                            u.username, u.firstname AS "firstName", u.lastname AS "lastName",
                             COALESCE(u.avatar_url, '') AS "avatarUrl", u.email,
                             r.status AS "registrationStatus", r.ticket_code AS "ticketCode"
                      FROM club_event_team_members m

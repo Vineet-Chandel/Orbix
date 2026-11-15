@@ -25,6 +25,8 @@ export interface NeoDateTimePickerProps {
     className?: string;
     minDate?: string;
     maxDate?: string;
+    placement?: "bottom" | "top" | "auto";
+    align?: "left" | "right" | "auto";
 }
 
 const MONTH_NAMES = [
@@ -76,9 +78,61 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
     className = "",
     minDate,
     maxDate,
+    placement = "auto",
+    align = "auto",
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isOpen, setIsOpen] = useState(false);
+    const [autoPlacement, setAutoPlacement] = useState<"top" | "bottom">("bottom");
+    const [autoAlign, setAutoAlign] = useState<"left" | "right">("left");
+
+    // Dynamic placement and alignment computation
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const computePlacement = () => {
+            if (!containerRef.current) return;
+            const rect = containerRef.current.getBoundingClientRect();
+
+            // 1. Vertical placement: auto flip if insufficient space below
+            if (placement === "auto") {
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                const pickerHeight = mode === "datetime" ? 440 : 340;
+
+                // If not enough room below and more space above, open upwards
+                if (spaceBelow < pickerHeight && spaceAbove > 280) {
+                    setAutoPlacement("top");
+                } else {
+                    setAutoPlacement("bottom");
+                }
+            }
+
+            // 2. Horizontal alignment: align to right edge if close to right viewport boundary
+            if (align === "auto") {
+                const spaceRight = window.innerWidth - rect.left;
+                if (spaceRight < 340 && rect.right >= 320) {
+                    setAutoAlign("right");
+                } else {
+                    setAutoAlign("left");
+                }
+            }
+        };
+
+        computePlacement();
+        window.addEventListener("scroll", computePlacement, true);
+        window.addEventListener("resize", computePlacement);
+        return () => {
+            window.removeEventListener("scroll", computePlacement, true);
+            window.removeEventListener("resize", computePlacement);
+        };
+    }, [isOpen, placement, align, mode]);
+
+    const effectivePlacement =
+        placement === "top" ? "top" : placement === "bottom" ? "bottom" : autoPlacement;
+
+    const effectiveAlign =
+        align === "right" ? "right" : align === "left" ? "left" : autoAlign;
 
     // Parse the incoming value into Date parts
     const parsedDate = useMemo(() => {
@@ -398,7 +452,7 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
     };
 
     return (
-        <div ref={containerRef} className={`relative w-full ${className}`}>
+        <div ref={containerRef} className={`relative w-full ${isOpen ? "z-[9999]" : "z-10"} ${className}`}>
             {label && (
                 <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
                     {label} {required && <span className="text-rose-500">*</span>}
@@ -465,7 +519,11 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
                 <div
                     role="dialog"
                     aria-label="Date and time picker"
-                    className="absolute left-0 top-[calc(100%+6px)] z-50 w-full sm:w-[330px] bg-white border-3 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-4 space-y-3.5 animate-in fade-in zoom-in-95 duration-150 select-none"
+                    className={`absolute ${effectiveAlign === "right" ? "right-0" : "left-0"} ${
+                        effectivePlacement === "top"
+                            ? "bottom-[calc(100%+8px)] shadow-[6px_6px_0px_#000]"
+                            : "top-[calc(100%+8px)] shadow-[6px_6px_0px_#000]"
+                    } z-[9999] w-full sm:w-[330px] bg-white border-3 border-black rounded-2xl p-4 space-y-3.5 animate-in fade-in zoom-in-95 duration-150 select-none`}
                 >
                     {/* Month / Year Navigation with Custom NeoSelect Dropdowns & Fast Chevrons */}
                     <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/10 gap-1.5">

@@ -20,6 +20,7 @@ import {
     XCircle,
     FileText,
     Lock,
+    Sparkles,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -33,6 +34,11 @@ import {
 } from "../../api/clubCertificatesApi";
 import { clubEventTeamApi } from "../../api/clubEventTeamApi";
 import { EventTeamManagementModal } from "./EventTeamManagementModal";
+import {
+    TeamRosterConfigurator,
+    type StagedTeammate,
+} from "../../components/events/TeamRosterConfigurator";
+import { useAppSelector } from "../../store";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { OrbixLoader } from "../../components/ui/loader";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -77,6 +83,15 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     const [managingTeamApp, setManagingTeamApp] = useState<StudentApplicationItem | null>(null);
     const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
     const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null);
+
+    // Team formation modal state (for unlinked team events)
+    const { user } = useAppSelector((state) => state.user);
+    const [configuringTeamApp, setConfiguringTeamApp] = useState<StudentApplicationItem | null>(null);
+    const [createTeamName, setCreateTeamName] = useState("");
+    const [joinTeamCode, setJoinTeamCode] = useState("");
+    const [teamTab, setTeamTab] = useState<"create" | "join">("create");
+    const [stagedTeammates, setStagedTeammates] = useState<StagedTeammate[]>([]);
+    const [isConfiguringTeam, setIsConfiguringTeam] = useState(false);
 
     const { handleBackdropClick: handlePassBackdropClick } = useModalDismiss({
         isOpen: Boolean(activePassApp),
@@ -665,7 +680,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                             {/* Action Controls */}
                                             <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-black/10 mt-auto">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    {app.teamId && (
+                                                    {app.teamId ? (
                                                         <button
                                                             type="button"
                                                             onClick={() => setManagingTeamApp(app)}
@@ -674,7 +689,22 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                             <Users className="w-3.5 h-3.5" />
                                                             <span>Manage Team Roster</span>
                                                         </button>
-                                                    )}
+                                                    ) : app.isTeamEvent ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setConfiguringTeamApp(app);
+                                                                setCreateTeamName("");
+                                                                setJoinTeamCode("");
+                                                                setStagedTeammates([]);
+                                                                setTeamTab("create");
+                                                            }}
+                                                            className="px-3 py-1.5 rounded-lg border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                        >
+                                                            <Users className="w-3.5 h-3.5" />
+                                                            <span>Create / Join Team</span>
+                                                        </button>
+                                                    ) : null}
                                                     {app.status === "registered" || app.status === "attended" ? (
                                                         <button
                                                             onClick={() => setActivePassApp(app)}
@@ -1214,6 +1244,207 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                     onTeamUpdated={loadApplications}
                     onTeamLeft={loadApplications}
                 />
+            )}
+
+            {/* Create or Join Team Modal for unlinked team events */}
+            {configuringTeamApp && (
+                <div
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setConfiguringTeamApp(null);
+                    }}
+                    className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto"
+                >
+                    <div className="w-full max-w-lg rounded-2xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-5 sm:p-6 space-y-4 relative">
+                        <button
+                            type="button"
+                            onClick={() => setConfiguringTeamApp(null)}
+                            className="absolute top-4 right-4 p-1.5 rounded-lg border-2 border-black bg-[#FAF6EE] hover:bg-neutral-200 cursor-pointer"
+                        >
+                            <X className="w-4 h-4 text-black" />
+                        </button>
+
+                        <div className="space-y-1 pr-6">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-black inline-block">
+                                Team Configuration Required
+                            </span>
+                            <h3 className="text-lg font-black text-black">
+                                Configure Squad for {configuringTeamApp.eventTitle}
+                            </h3>
+                            <p className="text-xs text-neutral-600 font-medium">
+                                This event requires a team of {configuringTeamApp.minTeamSize || 2} to {configuringTeamApp.maxTeamSize || 5} members.
+                            </p>
+                        </div>
+
+                        {/* Action Toggle */}
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-[#FAF6EE] rounded-2xl border-2 border-black">
+                            <button
+                                type="button"
+                                onClick={() => setTeamTab("create")}
+                                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                    teamTab === "create"
+                                        ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                        : "text-neutral-700 hover:text-black"
+                                }`}
+                            >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>Create New Team</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTeamTab("join")}
+                                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                    teamTab === "join"
+                                        ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                        : "text-neutral-700 hover:text-black"
+                                }`}
+                            >
+                                <Users className="w-3.5 h-3.5" />
+                                <span>Join with Code</span>
+                            </button>
+                        </div>
+
+                        {teamTab === "create" ? (
+                            <div className="space-y-3 pt-1">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-black block">
+                                        Team / Squad Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={createTeamName}
+                                        onChange={(e) => setCreateTeamName(e.target.value)}
+                                        placeholder="e.g. Algorithm Aces, Byte Warriors..."
+                                        maxLength={80}
+                                        className="w-full p-2.5 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                                    />
+                                </div>
+
+                                <TeamRosterConfigurator
+                                    eventId={configuringTeamApp.eventId}
+                                    teamId="new"
+                                    minTeamSize={configuringTeamApp.minTeamSize || 2}
+                                    maxTeamSize={configuringTeamApp.maxTeamSize || 5}
+                                    currentUser={{
+                                        id: user?.id || "current_user",
+                                        username: user?.username || "leader",
+                                        fullName: user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : user?.username,
+                                        avatarUrl: user?.avatarUrl,
+                                        collegeName: user?.college?.officialName,
+                                    }}
+                                    stagedMembers={stagedTeammates}
+                                    onStagedMembersChange={setStagedTeammates}
+                                />
+
+                                <button
+                                    type="button"
+                                    disabled={isConfiguringTeam}
+                                    onClick={async () => {
+                                        if (!createTeamName.trim() || createTeamName.trim().length < 2) {
+                                            toast.error("Please provide a team name (at least 2 characters).");
+                                            return;
+                                        }
+                                        const minReq = configuringTeamApp.minTeamSize || 2;
+                                        const squadSize = 1 + stagedTeammates.length;
+                                        if (squadSize < minReq) {
+                                            toast.error(`Team requires at least ${minReq} members. Please add ${minReq - squadSize} more teammate(s).`);
+                                            return;
+                                        }
+
+                                        try {
+                                            setIsConfiguringTeam(true);
+                                            const teamRes = await clubEventTeamApi.createTeam(configuringTeamApp.eventId, createTeamName.trim());
+                                            
+                                            // Send invites to staged teammates
+                                            for (const m of stagedTeammates) {
+                                                try {
+                                                    await clubEventTeamApi.inviteMember(configuringTeamApp.eventId, teamRes.team.id, m.username);
+                                                } catch (e: any) {
+                                                    console.warn(`Failed to invite ${m.username}:`, e);
+                                                }
+                                            }
+
+                                            toast.success(`Team "${createTeamName}" created and invites sent!`, { title: "Team Formed" });
+                                            setConfiguringTeamApp(null);
+                                            loadApplications();
+                                        } catch (err: any) {
+                                            toast.error(err.message || "Failed to create team.");
+                                        } finally {
+                                            setIsConfiguringTeam(false);
+                                        }
+                                    }}
+                                    className="w-full py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8def6e] text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    {isConfiguringTeam ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                            <span>Creating Team & Sending Invites...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-4 h-4" />
+                                            <span>Create Squad & Dispatch Invitations</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 pt-1">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-black block">
+                                        Team Join Code <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={joinTeamCode}
+                                        onChange={(e) => setJoinTeamCode(e.target.value.toUpperCase())}
+                                        placeholder="e.g. ALGO-A1B2C3"
+                                        maxLength={20}
+                                        className="w-full p-2.5 text-xs font-mono font-black uppercase bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                                    />
+                                    <p className="text-[10px] font-bold text-neutral-500">
+                                        Enter the 6-character code provided by your squad leader.
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    disabled={isConfiguringTeam}
+                                    onClick={async () => {
+                                        if (!joinTeamCode.trim() || joinTeamCode.trim().length < 4) {
+                                            toast.error("Please enter a valid team join code.");
+                                            return;
+                                        }
+
+                                        try {
+                                            setIsConfiguringTeam(true);
+                                            await clubEventTeamApi.joinTeamByCode(configuringTeamApp.eventId, joinTeamCode.trim());
+                                            toast.success("Successfully joined the squad!", { title: "Team Joined" });
+                                            setConfiguringTeamApp(null);
+                                            loadApplications();
+                                        } catch (err: any) {
+                                            toast.error(err.message || "Failed to join team.");
+                                        } finally {
+                                            setIsConfiguringTeam(false);
+                                        }
+                                    }}
+                                    className="w-full py-2.5 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    {isConfiguringTeam ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-[#a2ff86] border-t-transparent rounded-full animate-spin" />
+                                            <span>Joining Team...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Users className="w-4 h-4" />
+                                            <span>Join Squad</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
         </section>
     );

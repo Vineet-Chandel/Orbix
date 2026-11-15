@@ -808,7 +808,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 1: EVENT INFORMATION & SCHEDULE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 1 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
@@ -1367,7 +1367,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 2: TIMELINE & ROUND ARCHITECTURE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 2 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
@@ -1476,7 +1476,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 4: BANNER SELECTION STUDIO */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 4 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
@@ -1673,7 +1673,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 6: REVIEW & PUBLISH PRE-FLIGHT CHECKLIST */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 6 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">

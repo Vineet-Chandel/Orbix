@@ -127,8 +127,11 @@ export const clubEventTeamApi = {
     /**
      * Search users by username to invite to the team
      */
-    async searchUsers(eventId: string, teamId: string, query: string): Promise<{ success: boolean; users: SearchUserResult[] }> {
-        const res = await fetch(buildApiUrl(`/events/${eventId}/teams/${teamId}/search-users?q=${encodeURIComponent(query)}`), {
+    async searchUsers(eventId: string, teamId: string = "new", query: string): Promise<{ success: boolean; users: SearchUserResult[] }> {
+        const url = teamId && teamId !== "new"
+            ? buildApiUrl(`/events/${eventId}/teams/${teamId}/search-users?q=${encodeURIComponent(query)}`)
+            : buildApiUrl(`/events/${eventId}/search-users?q=${encodeURIComponent(query)}`);
+        const res = await fetch(url, {
             headers: getAuthHeaders(),
         });
         const data = await res.json();

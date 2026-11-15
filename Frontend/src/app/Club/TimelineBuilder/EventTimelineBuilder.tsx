@@ -582,7 +582,7 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                             </div>
 
                             {/* Schedule & Timing Configuration */}
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border border-black/30 space-y-3">
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border border-black/30 space-y-3 relative z-20">
                                 <div className="flex items-center justify-between flex-wrap gap-1">
                                     <span className="text-[11px] font-black uppercase text-black flex items-center gap-1.5">
                                         <Calendar className="w-3.5 h-3.5" />

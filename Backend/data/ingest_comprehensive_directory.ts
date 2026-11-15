@@ -2,10 +2,20 @@ import fs from "fs";
 import path from "path";
 import readline from "readline";
 import { fileURLToPath } from "url";
-import { query } from "../src/database/client.js";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Robustly load .env from Backend directory or CWD before executing database queries
+const backendEnvPath = path.resolve(__dirname, "../.env");
+if (fs.existsSync(backendEnvPath)) {
+    dotenv.config({ path: backendEnvPath });
+} else {
+    dotenv.config();
+}
+
+import { query } from "../src/database/client.js";
 
 interface RawInstitutionRecord {
     aisheCode: string;
@@ -157,6 +167,62 @@ export async function runComprehensiveIngestion() {
     console.log("🏛️  COMPREHENSIVE INDIAN HIGHER-EDUCATION DIRECTORY INGESTION PIPELINE");
     console.log("================================================================================");
     const startTime = Date.now();
+
+    // -------------------------------------------------------------------------
+    // STEP 0: Ensure Required Schema & Tables Exist
+    // -------------------------------------------------------------------------
+    console.log("🔧 Step 0: Ensuring database tables and schema exist...");
+    await query(`
+        CREATE TABLE IF NOT EXISTS institutions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            official_name VARCHAR(500) NOT NULL,
+            normalized_name VARCHAR(500) NOT NULL,
+            aliases TEXT[] DEFAULT '{}',
+            aishe_code VARCHAR(50) UNIQUE,
+            state VARCHAR(100),
+            district VARCHAR(150),
+            city VARCHAR(150),
+            institution_type VARCHAR(100),
+            parent_university VARCHAR(500),
+            website VARCHAR(500),
+            verification_status VARCHAR(30) NOT NULL DEFAULT 'verified',
+            verification_basis TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            last_verified_at TIMESTAMPTZ,
+            source_year VARCHAR(20),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        ALTER TABLE institutions ADD COLUMN IF NOT EXISTS parent_university VARCHAR(500);
+
+        CREATE INDEX IF NOT EXISTS idx_institutions_normalized_name ON institutions (normalized_name varchar_pattern_ops);
+        CREATE INDEX IF NOT EXISTS idx_institutions_status_active ON institutions (verification_status, is_active) WHERE verification_status = 'verified' AND is_active = true;
+
+        CREATE TABLE IF NOT EXISTS institution_sources (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+            source_name VARCHAR(200) NOT NULL,
+            source_url TEXT,
+            source_record_id VARCHAR(100),
+            source_publication_year VARCHAR(20),
+            retrieval_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            verification_result VARCHAR(50) NOT NULL DEFAULT 'confirmed',
+            notes TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS institution_aliases (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+            alias VARCHAR(255) NOT NULL,
+            alias_type VARCHAR(50) DEFAULT 'popular',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT unique_inst_alias UNIQUE (institution_id, alias)
+        );
+        CREATE INDEX IF NOT EXISTS idx_inst_aliases_alias ON institution_aliases (LOWER(alias) varchar_pattern_ops);
+    `);
+    console.log("✅ Step 0 Finished: Tables verified.");
 
     // -------------------------------------------------------------------------
     // STEP 1: Ingest Curated Universities & Institutes of National Importance

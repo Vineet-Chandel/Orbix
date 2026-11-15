@@ -3924,15 +3924,19 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
                 COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                 (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration' OR s.stage_order = 1) ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
                 COALESCE(
-                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at THEN true ELSE false END
+                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR (s.ends_at IS NOT NULL AND NOW() > s.ends_at) THEN true ELSE false END
                      FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration' OR s.stage_order = 1) ORDER BY s.stage_order ASC LIMIT 1),
-                    CASE WHEN (e.ends_at IS NOT NULL AND NOW() > e.ends_at) OR e.status = 'completed' THEN true ELSE false END
+                    CASE WHEN e.status IN ('completed', 'cancelled') OR (e.ends_at IS NOT NULL AND NOW() > e.ends_at) THEN true ELSE false END
                 ) AS "isRegistrationClosed",
-                r.team_id AS "teamId",
-                r.team_role AS "teamRole",
-                t.name AS "teamName",
-                t.code AS "teamCode",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_team_members tm WHERE tm.team_id = r.team_id), 0) AS "teamMembersCount",
+                COALESCE(r.team_id, (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1)) AS "teamId",
+                COALESCE(r.team_role, (SELECT tm.role FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1), 'leader') AS "teamRole",
+                COALESCE(t.name, (SELECT t2.name FROM club_event_teams t2 WHERE t2.id = (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1))) AS "teamName",
+                COALESCE(t.code, (SELECT t2.code FROM club_event_teams t2 WHERE t2.id = (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1))) AS "teamCode",
+                COALESCE(
+                    (SELECT COUNT(*)::int FROM club_event_team_members tm 
+                     WHERE tm.team_id = COALESCE(r.team_id, (SELECT tm2.team_id FROM club_event_team_members tm2 WHERE tm2.event_id = r.event_id AND tm2.user_id = r.user_id LIMIT 1))),
+                    0
+                ) AS "teamMembersCount",
                 vc.name AS "clubName",
                 vc.slug AS "clubSlug",
                 COALESCE(vc.logo_url, '') AS "clubLogoUrl",

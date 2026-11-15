@@ -1,4 +1,20 @@
 
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+
+const __clientFilename = fileURLToPath(import.meta.url);
+const __clientDirname = path.dirname(__clientFilename);
+
+// Robustly load Backend/.env regardless of CWD or execution context
+const backendEnvPath = path.resolve(__clientDirname, "../../.env");
+if (fs.existsSync(backendEnvPath)) {
+    dotenv.config({ path: backendEnvPath });
+} else {
+    dotenv.config();
+}
+
 if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
   try {
     process.loadEnvFile();
