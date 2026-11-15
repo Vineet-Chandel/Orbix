@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
     Save,
-    ChevronDown,
     Check,
     ArrowLeft,
     ArrowRight,
+    Plus,
+    Sparkles,
 } from "lucide-react";
 import type { ClubProfileData, ClubLink, ClubVisibilityTier } from "../../../utils/clubProfileApi";
 import { useAppDispatch, useAppSelector, fetchClubProfile, saveClubProfile } from "../../../store";
@@ -72,68 +73,135 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
     const [validationMissingItems, setValidationMissingItems] = useState<string[]>([]);
-    const [showCompletionDetails, setShowCompletionDetails] = useState(false);
-    const completionRef = useRef<HTMLDivElement>(null);
 
-    // Dismiss completion popover on outside click or Escape
-    useEffect(() => {
-        if (!showCompletionDetails) return;
-        const handleClickOutside = (e: MouseEvent) => {
-            if (completionRef.current && !completionRef.current.contains(e.target as Node)) {
-                setShowCompletionDetails(false);
-            }
-        };
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                setShowCompletionDetails(false);
-            }
-        };
-        window.addEventListener("mousedown", handleClickOutside);
-        window.addEventListener("keydown", handleKeyDown);
-        return () => {
-            window.removeEventListener("mousedown", handleClickOutside);
-            window.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [showCompletionDetails]);
+    // Profile sections breakdown for completeness scoring and direct step-navigation
+    const profileSections = useMemo(() => [
+        {
+            id: "name",
+            label: "Club Identity & Name",
+            description: "Official chapter title (min 2 characters)",
+            stepId: 1,
+            isRequired: true,
+            isCompleted: Boolean(name.trim().length >= 2),
+        },
+        {
+            id: "category",
+            label: "Primary Category",
+            description: "Specialized domain (Coding, Robotics, etc.)",
+            stepId: 1,
+            isRequired: true,
+            isCompleted: Boolean(category.trim()),
+        },
+        {
+            id: "college",
+            label: "College Affiliation",
+            description: "Verified institutional directory link",
+            stepId: 1,
+            isRequired: true,
+            isCompleted: Boolean(club?.collegeName || club?.collegeId),
+        },
+        {
+            id: "status",
+            label: "Operating Status & Era",
+            description: "Active chapter status & founded year",
+            stepId: 1,
+            isRequired: false,
+            isCompleted: Boolean(operatingStatus && foundedYear),
+        },
+        {
+            id: "about",
+            label: "Chapter Story & About",
+            description: "Comprehensive narrative (20+ characters)",
+            stepId: 2,
+            isRequired: true,
+            isCompleted: Boolean(about.trim().length >= 20),
+        },
+        {
+            id: "branding",
+            label: "Logo & Showcase Banner",
+            description: "High-resolution avatar & cover assets",
+            stepId: 2,
+            isRequired: false,
+            isCompleted: Boolean(logoUrl || coverImageUrl),
+        },
+        {
+            id: "coordinators",
+            label: "Student Leads & Roster",
+            description: "Appointed student coordinators & leads",
+            stepId: 3,
+            isRequired: false,
+            isCompleted: Boolean(coordinators && coordinators.length > 0),
+        },
+        {
+            id: "contact",
+            label: "Contact & Social Channels",
+            description: "Public contact email & verified handles",
+            stepId: 4,
+            isRequired: false,
+            isCompleted: Boolean(publicEmail || (links && links.length > 0)),
+        },
+        {
+            id: "publishing",
+            label: "Recruitment & Publishing",
+            description: "Auditions drive & public showcase tier",
+            stepId: 5,
+            isRequired: false,
+            isCompleted: Boolean(recruitmentStatus && (visibility === "public" || visibility === "unlisted")),
+        },
+    ], [
+        name,
+        category,
+        club?.collegeName,
+        club?.collegeId,
+        operatingStatus,
+        foundedYear,
+        about,
+        logoUrl,
+        coverImageUrl,
+        coordinators,
+        publicEmail,
+        links,
+        recruitmentStatus,
+        visibility,
+    ]);
 
-    // Dynamic completion tier theme with interactive border and vibrant neo-brutalist styling
-    const completionTheme = useMemo(() => {
-        const pct = completion.percentage || 0;
-        if (pct >= 100) {
+    const completedCount = useMemo(() => {
+        return profileSections.filter((s) => s.isCompleted).length;
+    }, [profileSections]);
+
+    const displayPercentage = useMemo(() => {
+        const calculated = Math.round((completedCount / profileSections.length) * 100);
+        return Math.max(completion?.percentage || 0, calculated);
+    }, [completedCount, profileSections.length, completion?.percentage]);
+
+    const completionBadge = useMemo(() => {
+        if (displayPercentage >= 100) {
             return {
-                borderClass: "border-emerald-500 hover:border-black",
-                shadowClass: "shadow-[3px_3px_0px_#10b981] hover:shadow-[4px_4px_0px_#059669]",
-                badgeBg: "bg-[#a2ff86] text-black border-2 border-black",
-                accentText: "text-emerald-700",
-                label: "Complete",
+                label: "Fully Complete",
+                bg: "bg-[#a2ff86]",
+                text: "text-black",
             };
         }
-        if (pct >= 70) {
+        if (displayPercentage >= 70) {
             return {
-                borderClass: "border-sky-500 hover:border-black",
-                shadowClass: "shadow-[3px_3px_0px_#0284c7] hover:shadow-[4px_4px_0px_#0369a1]",
-                badgeBg: "bg-sky-100 text-sky-950 border-2 border-sky-400",
-                accentText: "text-sky-700",
-                label: "Almost Done",
+                label: "Almost Ready",
+                bg: "bg-[#FFE566]",
+                text: "text-black",
             };
         }
-        if (pct >= 40) {
+        if (displayPercentage >= 40) {
             return {
-                borderClass: "border-amber-500 hover:border-black",
-                shadowClass: "shadow-[3px_3px_0px_#f59e0b] hover:shadow-[4px_4px_0px_#d97706]",
-                badgeBg: "bg-amber-100 text-amber-950 border-2 border-amber-400",
-                accentText: "text-amber-700",
                 label: "In Progress",
+                bg: "bg-[#FFE566]",
+                text: "text-black",
             };
         }
         return {
-            borderClass: "border-rose-500 hover:border-black",
-            shadowClass: "shadow-[3px_3px_0px_#f43f5e] hover:shadow-[4px_4px_0px_#e11d48]",
-            badgeBg: "bg-rose-100 text-rose-950 border-2 border-rose-400",
-            accentText: "text-rose-700",
             label: "Getting Started",
+            bg: "bg-neutral-100",
+            text: "text-neutral-700",
         };
-    }, [completion.percentage]);
+    }, [displayPercentage]);
 
     // Snapshot for dirty-state tracking
     const initialSnapshotRef = useRef<string>("");
