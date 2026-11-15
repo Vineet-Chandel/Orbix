@@ -1018,8 +1018,8 @@ flowchart TD
 | `PORT` | HTTP port for backend server (default: 3000) | `Backend/src/index.ts` | No |
 | `NODE_ENV` | Runtime environment (`development` \| `production` \| `test`) | Backend & Frontend | Yes |
 | `JWT_SECRET` | Cryptographic secret for signing user JWTs | `Backend/src/Routes/auth/` | **Yes (Production)** |
-| `DATABASE_URL` | PostgreSQL connection string (Supabase / Neon / AWS) | `Backend/src/database/client.ts` | **Yes** |
-| `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Individual database connection parameters | `Backend/src/database/client.ts` | Optional (if URL unset) |
+| `SUPABASE_DB_URL` | PostgreSQL connection string for Supabase (transaction pooler / direct) | `Backend/src/database/client.ts` | **Yes (Primary)** |
+| `DATABASE_URL` | Fallback PostgreSQL connection string (if `SUPABASE_DB_URL` unset) | `Backend/src/database/client.ts` | Optional |
 | `REDIS_HOST`, `REDIS_PORT` | Redis host and port (default: 6379) | `Backend/src/redis/client.ts` | **Yes** |
 | `REDIS_PASSWORD`, `REDIS_USERNAME` | Redis authentication credentials | `Backend/src/redis/client.ts` | Optional |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Cloudinary storage API credentials | `Backend/src/config/cloudinary.ts` | **Yes (Production)** |

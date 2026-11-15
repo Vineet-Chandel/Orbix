@@ -2085,23 +2085,30 @@ Organizer Request: ${userPrompt}`;
     /**
      * Register a media asset in the database
      */
-    static async registerMediaAsset(data: {
-        formId?: string | null;
-        eventId?: string | null;
-        uploaderUserId?: string | null;
-        publicId: string;
-        secureUrl: string;
-        resourceType?: string;
-        format?: string | null;
-        bytes?: number | null;
-        width?: number | null;
-        height?: number | null;
-        assetPurpose: "form_header" | "question_image" | "option_image" | "student_attachment";
-        questionId?: string | null;
-        responseId?: string | null;
-        metadata?: Record<string, any>;
-    }): Promise<MediaAssetRecord> {
-        const res = await query(
+    static async registerMediaAsset(
+        data: {
+            formId?: string | null;
+            eventId?: string | null;
+            uploaderUserId?: string | null;
+            publicId: string;
+            secureUrl: string;
+            resourceType?: string;
+            format?: string | null;
+            bytes?: number | null;
+            width?: number | null;
+            height?: number | null;
+            assetPurpose: "form_header" | "question_image" | "option_image" | "student_attachment";
+            questionId?: string | null;
+            responseId?: string | null;
+            metadata?: Record<string, any>;
+        },
+        dbClient?: any
+    ): Promise<MediaAssetRecord> {
+        const queryFn = dbClient
+            ? (sql: string, params?: any[]) => dbClient.query(sql, params)
+            : query;
+
+        const res = await queryFn(
             `INSERT INTO club_form_media_assets (
                 form_id, event_id, uploader_user_id, public_id, secure_url, resource_type,
                 format, bytes, width, height, asset_purpose, question_id, response_id, metadata
@@ -2406,7 +2413,7 @@ Organizer Request: ${userPrompt}`;
                         v.id AS "activeVersionId"
                  FROM club_event_forms f
                  LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
-                 WHERE f.event_id = $1 FOR UPDATE OF f;`,
+                 WHERE f.event_id = $1;`,
                 [eventId]
             );
 
@@ -2984,17 +2991,20 @@ Organizer Request: ${userPrompt}`;
                         // Track media assets
                         for (const att of fileAttachments) {
                             if (att.filePublicId) {
-                                await this.registerMediaAsset({
-                                    formId,
-                                    eventId,
-                                    uploaderUserId: userId,
-                                    publicId: att.filePublicId,
-                                    secureUrl: att.fileUrl,
-                                    assetPurpose: "student_attachment",
-                                    questionId: att.questionId,
-                                    responseId: updateRes.rows[0].id,
-                                    bytes: att.fileSize,
-                                });
+                                await this.registerMediaAsset(
+                                    {
+                                        formId,
+                                        eventId,
+                                        uploaderUserId: userId,
+                                        publicId: att.filePublicId,
+                                        secureUrl: att.fileUrl,
+                                        assetPurpose: "student_attachment",
+                                        questionId: att.questionId,
+                                        responseId: updateRes.rows[0].id,
+                                        bytes: att.fileSize,
+                                    },
+                                    client
+                                );
                             }
                         }
 
@@ -3203,17 +3213,20 @@ Organizer Request: ${userPrompt}`;
             // Track uploaded attachments in media assets table
             for (const att of fileAttachments) {
                 if (att.filePublicId) {
-                    await this.registerMediaAsset({
-                        formId,
-                        eventId,
-                        uploaderUserId: userId || null,
-                        publicId: att.filePublicId,
-                        secureUrl: att.fileUrl,
-                        assetPurpose: "student_attachment",
-                        questionId: att.questionId,
-                        responseId: newReg.id,
-                        bytes: att.fileSize ?? null,
-                    });
+                    await this.registerMediaAsset(
+                        {
+                            formId,
+                            eventId,
+                            uploaderUserId: userId || null,
+                            publicId: att.filePublicId,
+                            secureUrl: att.fileUrl,
+                            assetPurpose: "student_attachment",
+                            questionId: att.questionId,
+                            responseId: newReg.id,
+                            bytes: att.fileSize ?? null,
+                        },
+                        client
+                    );
                 }
             }
 
