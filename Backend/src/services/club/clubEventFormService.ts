@@ -3732,7 +3732,11 @@ Organizer Request: ${userPrompt}`;
         status: string,
         reviewNotes?: string
     ) {
-        const evCheck = await query(`SELECT club_id AS "clubId", title FROM club_events WHERE id = $1;`, [eventId]);
+        const evCheck = await query(
+            `SELECT club_id AS "clubId", title, COALESCE(is_team_event, false) AS "isTeamEvent", COALESCE(min_team_size, 2) AS "minTeamSize" 
+             FROM club_events WHERE id = $1;`,
+            [eventId]
+        );
         if (!evCheck.rows[0]) {
             const error: any = new Error("Event not found.");
             error.statusCode = 404;
@@ -3745,6 +3749,34 @@ Organizer Request: ${userPrompt}`;
             const error: any = new Error(`Invalid status: ${status}. Must be one of ${validStatuses.join(", ")}`);
             error.statusCode = 400;
             throw error;
+        }
+
+        // Strict validation: In team events, registrations cannot be accepted/approved unless team meets minimum size requirement
+        if ((status === "registered" || status === "attended") && evCheck.rows[0].isTeamEvent) {
+            const teamCheck = await query(
+                `SELECT t.id, t.name,
+                        (SELECT COUNT(*)::int FROM club_event_team_members WHERE team_id = t.id) AS "membersCount"
+                 FROM club_event_registrations r
+                 JOIN club_event_teams t ON t.id = r.team_id
+                 WHERE r.id = $1 AND r.event_id = $2;`,
+                [registrationId, eventId]
+            );
+
+            if (!teamCheck.rows[0]) {
+                const error: any = new Error("Cannot approve registration: Applicant has not created or joined a team for this team event.");
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const team = teamCheck.rows[0];
+            const minSize = evCheck.rows[0].minTeamSize || 2;
+            if (team.membersCount < minSize) {
+                const error: any = new Error(
+                    `Cannot accept registration: Team "${team.name}" has only ${team.membersCount} member(s). A minimum of ${minSize} members is strictly required before this application can be accepted.`
+                );
+                error.statusCode = 400;
+                throw error;
+            }
         }
 
         const isAttended = status === "attended";

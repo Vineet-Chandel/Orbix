@@ -22,6 +22,7 @@ import {
     Sparkles,
     AlertCircle,
     Menu,
+    FileText,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
@@ -33,6 +34,7 @@ import { ClubMarkdownRenderer } from "../Club/Profile/ClubMarkdownRenderer";
 import { EventPublicTimelineView } from "./EventPublicTimelineView";
 import { EventActionRow } from "../../components/events/EventActionRow";
 import { DynamicEventRegistrationModal } from "./DynamicEventRegistrationModal";
+import { EventTeamManagementModal } from "./EventTeamManagementModal";
 import { CollegeRestrictionModal } from "../../components/CollegeRestrictionModal";
 import { OrbixLoader } from "../../components/ui/loader";
 
@@ -63,6 +65,7 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
 
     const [copiedCode, setCopiedCode] = useState(false);
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+    const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
     const [restrictedEvent, setRestrictedEvent] = useState<CollegeEventItem | null>(null);
 
     // Fetch event if not provided initially or if targetEventId changes
@@ -362,29 +365,64 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
 
                 {/* Title & Interactive Action Row */}
                 <div className="space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-black tracking-tight leading-tight flex-1">
-                            {event.title}
-                        </h1>
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="space-y-2 flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-3">
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-black tracking-tight leading-tight flex-1">
+                                    {event.title}
+                                </h1>
+                                <div className="flex items-center shrink-0 pt-0.5 lg:hidden">
+                                    <EventActionRow
+                                        eventId={event.id}
+                                        eventTitle={event.title}
+                                        eventSummary={event.summary || undefined}
+                                        initialLikeCount={event.likesCount}
+                                        initialLiked={event.hasLiked}
+                                        initialShareCount={(event as any).sharesCount}
+                                        size="md"
+                                    />
+                                </div>
+                            </div>
 
-                        <div className="flex items-center shrink-0 pt-0.5">
-                            <EventActionRow
-                                eventId={event.id}
-                                eventTitle={event.title}
-                                eventSummary={event.summary || undefined}
-                                initialLikeCount={event.likesCount}
-                                initialLiked={event.hasLiked}
-                                initialShareCount={(event as any).sharesCount}
-                                size="md"
-                            />
+                            {event.summary && (
+                                <p className="text-sm sm:text-base font-semibold text-neutral-700 leading-relaxed max-w-4xl">
+                                    {event.summary}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Right: Actions and Team Size Widget */}
+                        <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end gap-3 shrink-0">
+                            <div className="hidden lg:flex items-center">
+                                <EventActionRow
+                                    eventId={event.id}
+                                    eventTitle={event.title}
+                                    eventSummary={event.summary || undefined}
+                                    initialLikeCount={event.likesCount}
+                                    initialLiked={event.hasLiked}
+                                    initialShareCount={(event as any).sharesCount}
+                                    size="md"
+                                />
+                            </div>
+
+                            {/* Team Size Widget */}
+                            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border-2 sm:border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3 self-start lg:self-auto">
+                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl border-2 border-black bg-[#FAF6EE] flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                    <Users className="w-5 h-5 text-black stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0 pr-1 text-left">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                        Team Size
+                                    </span>
+                                    <span className="text-xs sm:text-sm font-black text-black block truncate">
+                                        {event.isTeamEvent
+                                            ? `${event.minTeamSize || 2} - ${event.maxTeamSize || 4} Members`
+                                            : "Individual Participation"}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    {event.summary && (
-                        <p className="text-sm sm:text-base font-semibold text-neutral-700 leading-relaxed max-w-4xl">
-                            {event.summary}
-                        </p>
-                    )}
                 </div>
             </div>
 
@@ -492,7 +530,35 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                         </div>
                     </div>
 
-                    {/* 3. Registration Status & Pass Card */}
+                    {/* 3. Team Size & Registered Statistics (Unstop / Hackathon Style) */}
+                    <div className="p-4 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-2xl border-2 border-black bg-[#FAF6EE] flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                <Users className="w-5 h-5 text-black" />
+                            </div>
+                            <div className="min-w-0">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                    Team Size
+                                </span>
+                                <span className="text-sm font-black text-black block truncate">
+                                    {event.isTeamEvent
+                                        ? `${event.minTeamSize || 2} - ${event.maxTeamSize || 4} Members`
+                                        : "Individual Participation"}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="text-right shrink-0 pl-3 border-l-2 border-black/10">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                Registered
+                            </span>
+                            <span className="text-sm font-black text-emerald-700">
+                                {event.registrationsCount || 0}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* 4. Registration Status & Pass Card */}
                     <div className="p-4 sm:p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
                         <div className="flex items-center justify-between pb-2 border-b-2 border-black/10">
                             <div className="text-[11px] font-black uppercase tracking-wider text-black">
@@ -505,14 +571,26 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                         </div>
 
                         {event.isTeamEvent && (
-                            <div className="p-3 rounded-xl bg-[#a2ff86]/25 border-l-4 border-emerald-600 space-y-1">
+                            <div className="p-3 rounded-xl bg-[#a2ff86]/25 border-l-4 border-emerald-600 space-y-1.5">
                                 <div className="flex items-center gap-1.5 font-black text-black text-xs">
                                     <Users className="w-4 h-4 text-emerald-800 shrink-0" />
-                                    <span>Team Registration Event ({event.minTeamSize || 1} to {event.maxTeamSize || 4} Members)</span>
+                                    <span>Team Registration Event ({event.minTeamSize || 2} to {event.maxTeamSize || 4} Members)</span>
                                 </div>
                                 <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
-                                    Register as a Team Leader to invite members via @username, or join an existing squad with their 6-character team code before the event starts.
+                                    Form or join a team before registration closes. A minimum of {event.minTeamSize || 2} members is required for team acceptance.
                                 </p>
+                                {event.teamId && (
+                                    <div className="pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsTeamModalOpen(true)}
+                                            className="w-full py-2 px-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                        >
+                                            <Users className="w-3.5 h-3.5" />
+                                            <span>Manage Team Roster & Invites</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -566,14 +644,23 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                                 )}
                             </div>
                         ) : event.registrationStatus === "pending" || event.isPending ? (
-                            <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-600 space-y-1 text-center">
+                            <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-600 space-y-2.5 text-center">
                                 <div className="flex items-center justify-center gap-2 text-amber-950 font-black text-xs">
                                     <Clock className="w-4 h-4 text-amber-700" />
-                                    <span>Application Submitted · Pending Review</span>
+                                    <span>Application Pass · Under Review</span>
                                 </div>
                                 <p className="text-[11px] font-bold text-amber-800 leading-relaxed">
-                                    The {event.clubName} team is reviewing your profile. Once approved, your session ticket pass will be activated automatically.
+                                    Your application has been received and is currently in the review stage with {event.clubName}. This proves you have registered; official entry tickets activate once approved.
                                 </p>
+                                <div className="pt-1">
+                                    <Link
+                                        to="/student/activity?tab=applications"
+                                        className="w-full py-2 px-3 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-950 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                    >
+                                        <FileText className="w-3.5 h-3.5 text-amber-950" />
+                                        <span>View Application Pass in Activity</span>
+                                    </Link>
+                                </div>
                             </div>
                         ) : event.registrationStatus === "rejected" ? (
                             <div className="p-3.5 rounded-xl bg-rose-50 border-2 border-rose-600 space-y-2 text-center">
@@ -780,9 +867,35 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                 onSuccess={(updatedEvent) => {
                     setEvent(updatedEvent);
                     setIsRegisterModalOpen(false);
-                    toast.success("Registration confirmed! Your pass is now active.", { title: "Pass Activated" });
+                    toast.success("Application submitted! Your application pass is ready for review.", { title: "Application Submitted" });
                 }}
             />
+
+            {/* Team Roster & Invites Management Modal */}
+            {event.isTeamEvent && event.teamId && (
+                <EventTeamManagementModal
+                    isOpen={isTeamModalOpen}
+                    onClose={() => setIsTeamModalOpen(false)}
+                    eventId={event.id}
+                    teamId={event.teamId}
+                    eventTitle={event.title}
+                    eventStartsAt={event.startsAt}
+                    onTeamUpdated={() => {
+                        fetchPublicEventById(targetEventId)
+                            .then((res) => {
+                                if (res) setEvent(res);
+                            })
+                            .catch(() => {});
+                    }}
+                    onTeamLeft={() => {
+                        fetchPublicEventById(targetEventId)
+                            .then((res) => {
+                                if (res) setEvent(res);
+                            })
+                            .catch(() => {});
+                    }}
+                />
+            )}
 
             {/* Cross-Campus Eligibility Restriction Modal */}
             <CollegeRestrictionModal

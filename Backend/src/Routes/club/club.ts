@@ -3922,6 +3922,12 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
                 COALESCE(e.is_team_event, false) AS "isTeamEvent",
                 COALESCE(e.min_team_size, 1) AS "minTeamSize",
                 COALESCE(e.max_team_size, 4) AS "maxTeamSize",
+                (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration' OR s.stage_order = 1) ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
+                COALESCE(
+                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration' OR s.stage_order = 1) ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN (e.ends_at IS NOT NULL AND NOW() > e.ends_at) OR e.status = 'completed' THEN true ELSE false END
+                ) AS "isRegistrationClosed",
                 r.team_id AS "teamId",
                 r.team_role AS "teamRole",
                 t.name AS "teamName",

@@ -348,16 +348,16 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
             )}
 
             {/* Main Profile Canvas */}
-            <main className={`max-w-6xl mx-auto px-4 sm:px-6 ${isEmbedded ? "py-4 sm:py-6" : "py-6 sm:py-8"} space-y-6`}>
+            <main className={`${isEmbedded ? "w-full max-w-none px-2.5 xs:px-3 sm:px-5 lg:px-6 py-3.5 sm:py-5" : "max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8"} space-y-6`}>
                 {/* Header Banner & Hero Card */}
                 <div className="rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] overflow-hidden">
-                    {/* Header Banner Image (100% full view, never cropped) */}
-                    <div className="w-full aspect-[2.4/1] sm:aspect-[2.8/1] max-h-80 bg-neutral-950 border-b-2 border-black relative overflow-hidden flex items-center justify-center">
+                    {/* Header Banner Image (Full-width showcase) */}
+                    <div className="w-full aspect-[2.4/1] sm:aspect-[3.2/1] lg:aspect-[3.8/1] max-h-80 bg-neutral-950 border-b-2 border-black relative overflow-hidden flex items-center justify-center">
                         {club.coverImageUrl ? (
                             <img
                                 src={club.coverImageUrl}
                                 alt={club.name}
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-cover object-center"
                             />
                         ) : (
                             <div className="w-full h-full bg-[#FFE566] bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:16px_16px] flex items-center justify-center">

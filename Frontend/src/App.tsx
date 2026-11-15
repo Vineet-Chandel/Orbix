@@ -117,8 +117,8 @@ const App = () => {
               <Route path="/demo" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
               <Route path="/demo/profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
               <Route path="/demo-profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
-              <Route path="/demo/club" element={<Navigate to="/clubs/acm-psit" replace />} />
-              <Route path="/demo-club" element={<Navigate to="/clubs/acm-psit" replace />} />
+              <Route path="/demo/club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
+              <Route path="/demo-club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/events" element={<EventTrackerPage />} />
               <Route path="/events/:eventId/register" element={<PublicEventRegistrationPage />} />

@@ -116,6 +116,12 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
 
     const effectiveCollegeId = selectedCollege?.id || currentCollegeId || serverCollege?.id || user?.collegeId || activeApp?.college_id || null;
     const effectiveCollegeName = selectedCollege?.officialName || currentCollegeName || serverCollege?.officialName || user?.college?.officialName || collegeNameInput || "";
+    const hasValidAffiliatedCollege = Boolean(
+        effectiveCollegeId &&
+        effectiveCollegeName &&
+        effectiveCollegeName.trim().length > 0 &&
+        !effectiveCollegeName.toLowerCase().includes("no college")
+    );
 
     // Contact verification channels
     const [institutionEmail, setInstitutionEmail] = useState("");
@@ -784,7 +790,7 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                         /* ========================================================================= */
                         <div className="space-y-4">
                             {/* Current College Banner or In-Modal College Search Selector */}
-                            {!effectiveCollegeId || isChangingCollege ? (
+                            {!hasValidAffiliatedCollege || isChangingCollege ? (
                                 <div className="p-4 rounded-xl bg-amber-50/70 border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-2.5">
@@ -1014,25 +1020,24 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                             <div className="pt-2">
                                 <OrbixButton
                                     onClick={handleRunOcr}
-                                    disabled={!effectiveCollegeId || !frontFile || isScanningOcr || isSavingCollege}
-                                    className="w-full bg-[#FFE566] text-black font-black uppercase text-xs"
-                                >
-                                    {isScanningOcr ? (
-                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
-                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
-                                            <span>Extracting Information via OCR...</span>
-                                        </span>
-                                    ) : !effectiveCollegeId ? (
-                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                    disabled={!hasValidAffiliatedCollege || !frontFile || isScanningOcr || isSavingCollege}
+                                    loading={isScanningOcr}
+                                    loadingLabel="Extracting Information via OCR..."
+                                    icon={
+                                        !hasValidAffiliatedCollege ? (
                                             <GraduationCap className="w-4 h-4 shrink-0" />
-                                            <span>Select College Above to Continue</span>
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                        ) : (
                                             <Sparkles className="w-4 h-4 shrink-0" />
-                                            <span>Scan & Extract Document Details</span>
-                                        </span>
-                                    )}
+                                        )
+                                    }
+                                    fullWidth
+                                    variant="yellow"
+                                    size="md"
+                                    className="text-xs uppercase font-black"
+                                >
+                                    {!hasValidAffiliatedCollege
+                                        ? "Select College Above to Continue"
+                                        : "Scan & Extract Document Details"}
                                 </OrbixButton>
                             </div>
                         </div>

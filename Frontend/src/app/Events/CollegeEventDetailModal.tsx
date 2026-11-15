@@ -304,6 +304,34 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                 </div>
                             </div>
 
+                            {/* Team Size & Registration Statistics (Unstop Style) */}
+                            <div className="p-4 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-11 h-11 rounded-2xl border-2 border-black bg-[#FAF6EE] flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <Users className="w-5 h-5 text-black" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                            Team Size
+                                        </span>
+                                        <span className="text-sm font-black text-black block truncate">
+                                            {event.isTeamEvent
+                                                ? `${event.minTeamSize || 2} - ${event.maxTeamSize || 4} Members`
+                                                : "Individual Participation"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="text-right shrink-0 pl-3 border-l-2 border-black/10">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                        Registered
+                                    </span>
+                                    <span className="text-sm font-black text-emerald-700">
+                                        {event.registrationsCount || 0}
+                                    </span>
+                                </div>
+                            </div>
+
                             {/* 3. Registration & Action Card */}
                             <div className="p-4 sm:p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
                                 <div className="flex items-center justify-between pb-2 border-b-2 border-black/10">
@@ -320,7 +348,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                     <div className="p-3 rounded-xl bg-[#a2ff86]/25 border-l-4 border-emerald-600 space-y-1">
                                         <div className="flex items-center gap-1.5 font-black text-black text-xs">
                                             <Users className="w-4 h-4 text-emerald-800 shrink-0" />
-                                            <span>Team Registration Event ({event.minTeamSize || 1} to {event.maxTeamSize || 4} Members)</span>
+                                            <span>Team Registration Event ({event.minTeamSize || 2} to {event.maxTeamSize || 4} Members)</span>
                                         </div>
                                         <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
                                             Register as a Team Leader to invite members via @username, or join an existing squad with their 6-character team code before the event starts.

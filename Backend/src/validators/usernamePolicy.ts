@@ -48,6 +48,20 @@ export const DEMO_PROFILE_EXACT = new Set([
 ]);
 
 export const DEMO_CLUB_EXACT = new Set([
+    "aws-swg-psit",
+    "aws_swg_psit",
+    "awsswgpsit",
+    "aws.swg.psit",
+    "aws-psit",
+    "aws_psit",
+    "awspsit",
+    "aws-swg",
+    "aws_swg",
+    "awsswg",
+    "psit-aws",
+    "psitaws",
+    "aws-student-work-group",
+    "awsstudentworkgroup",
     "acm-psit",
     "acm_psit",
     "acmpsit",
@@ -71,6 +85,10 @@ export const DEMO_PROFILE_COLLAPSED_ROOTS = [
 ];
 
 export const DEMO_CLUB_COLLAPSED_ROOTS = [
+    "awsswgpsit",
+    "awspsit",
+    "awsswg",
+    "psitaws",
     "acmpsit",
     "democlub",
     "acmstudentchapter",

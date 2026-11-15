@@ -18,6 +18,8 @@ import {
     Users,
     CheckCircle2,
     XCircle,
+    FileText,
+    Lock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -562,16 +564,30 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                         </span>
                                                     </div>
                                                     {app.isTeamEvent && (
-                                                        <div className="flex items-center gap-1.5 pt-1">
+                                                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
                                                             {app.teamName ? (
-                                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 ${
+                                                                    (app.teamMembersCount || 0) < (app.minTeamSize || 2)
+                                                                        ? "bg-amber-100 text-amber-950 border-amber-600"
+                                                                        : "bg-[#a2ff86] text-black border-black"
+                                                                }`}>
                                                                     <Users className="w-3 h-3 text-black" />
-                                                                    <span>Team: {app.teamName} ({app.teamRole === "leader" ? "Leader" : "Member"}) · {app.teamMembersCount} Members</span>
+                                                                    <span>
+                                                                        Team: {app.teamName} ({app.teamRole === "leader" ? "Leader" : "Member"}) · {app.teamMembersCount || 1} Members
+                                                                        {(app.teamMembersCount || 0) < (app.minTeamSize || 2) && ` (Needs min ${app.minTeamSize || 2})`}
+                                                                    </span>
                                                                 </span>
                                                             ) : (
                                                                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FAF6EE] text-neutral-700 border border-black/40 inline-flex items-center gap-1">
                                                                     <Users className="w-3 h-3 text-neutral-500" />
-                                                                    <span>Team Event ({app.minTeamSize || 1}-{app.maxTeamSize || 4} Members)</span>
+                                                                    <span>Team Event ({app.minTeamSize || 2}-{app.maxTeamSize || 4} Members)</span>
+                                                                </span>
+                                                            )}
+
+                                                            {(app.isRegistrationClosed || (app.startsAt && Date.now() >= new Date(app.startsAt).getTime())) && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-neutral-200 text-neutral-700 border border-neutral-400 inline-flex items-center gap-1">
+                                                                    <Lock className="w-2.5 h-2.5" />
+                                                                    Roster Locked
                                                                 </span>
                                                             )}
                                                         </div>
@@ -622,7 +638,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                     ) : app.status === "pending" ? (
                                                         <span className="text-amber-900 font-bold flex items-center gap-1 text-xs">
                                                             <Clock className="w-3.5 h-3.5 text-amber-700" />
-                                                            Pending Review
+                                                            Application Under Review
                                                         </span>
                                                     ) : app.status === "rejected" ? (
                                                         <span className="text-rose-900 font-bold flex items-center gap-1 text-xs">
@@ -665,13 +681,17 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                             className="px-3 py-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                                                         >
                                                             <QrCode className="w-3.5 h-3.5" />
-                                                            View Pass & QR
+                                                            View Official Pass & QR
                                                         </button>
                                                     ) : app.status === "pending" ? (
-                                                        <span className="px-3 py-1.5 rounded-lg border border-amber-400 bg-amber-50 text-amber-950 text-xs font-bold flex items-center gap-1.5 select-none">
-                                                            <Clock className="w-3.5 h-3.5 text-amber-700" />
-                                                            Pass will activate once club approves
-                                                        </span>
+                                                        <button
+                                                            onClick={() => setActivePassApp(app)}
+                                                            className="px-3 py-1.5 rounded-lg border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                            title="View your official application submission pass"
+                                                        >
+                                                            <FileText className="w-3.5 h-3.5 text-black" />
+                                                            View Application Pass
+                                                        </button>
                                                     ) : app.status === "rejected" ? (
                                                         <span className="px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 text-rose-800 text-xs font-bold flex items-center gap-1.5 select-none">
                                                             <Ban className="w-3.5 h-3.5 text-rose-600" />
@@ -937,10 +957,17 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
                         {/* Pass Header */}
                         <div className="space-y-1">
-                            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-[#a2ff86]">
-                                <span className="w-2 h-2 rounded-full bg-[#a2ff86] animate-pulse inline-block" />
-                                Official Entry Pass
-                            </div>
+                            {activePassApp.status === "pending" ? (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                    <Clock className="w-3 h-3 text-black animate-spin" />
+                                    <span>Application Pass · Under Review</span>
+                                </div>
+                            ) : (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-[#a2ff86]">
+                                    <span className="w-2 h-2 rounded-full bg-[#a2ff86] animate-pulse inline-block" />
+                                    <span>Official Entry Pass</span>
+                                </div>
+                            )}
                             <h3 className="font-black text-lg text-black mt-1 leading-tight">
                                 {activePassApp.eventTitle}
                             </h3>
@@ -962,41 +989,91 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         </div>
 
-                        {/* Real Scannable High-DPI QR Code Card */}
-                        <div className="flex flex-col items-center justify-center py-1">
-                            <div className="p-3.5 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] inline-block">
-                                <OrbixCardQR
-                                    value={activePassApp.ticketCode || ""}
-                                    size={180}
-                                    showLogo={true}
-                                    noShadow={true}
-                                />
-                            </div>
-                            <span className="text-[10px] font-mono font-bold text-neutral-500 mt-2 flex items-center gap-1.5">
-                                <QrCode className="w-3.5 h-3.5 text-black" />
-                                Scan at registration desk for admission check-in
-                            </span>
-                        </div>
+                        {/* Middle Section: Scannable QR for Approved Passes OR Application Proof for Pending Review */}
+                        {activePassApp.status === "pending" ? (
+                            <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] text-center space-y-3">
+                                <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                    <FileText className="w-6 h-6 text-black stroke-[2.5]" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="text-sm font-black text-black">Official Application Receipt</h4>
+                                    <p className="text-[11px] font-medium text-neutral-600 max-w-xs mx-auto leading-relaxed">
+                                        Your application is in the coordinator review stage. This pass is your verified proof of registration submission.
+                                    </p>
+                                </div>
 
-                        {/* Ticket Code Box */}
-                        <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black space-y-1">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                Your Pass Code
-                            </span>
-                            <div className="flex items-center justify-center gap-2">
-                                <span className="font-mono text-xl sm:text-2xl font-black text-black tracking-widest">
-                                    {activePassApp.ticketCode}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopyTicket(activePassApp.ticketCode)}
-                                    className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                    title="Copy Pass Code"
-                                >
-                                    <Copy className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="p-2.5 rounded-xl bg-white border-2 border-black flex items-center justify-between font-mono text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
+                                    <span className="text-[10px] uppercase font-bold text-neutral-500 font-sans">Application ID</span>
+                                    <div className="flex items-center gap-1.5 text-black">
+                                        <span>APP-{activePassApp.id ? activePassApp.id.slice(0, 8).toUpperCase() : "VERIFIED"}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCopyTicket(`APP-${activePassApp.id ? activePassApp.id.slice(0, 8).toUpperCase() : "VERIFIED"}`)}
+                                            className="p-1 hover:bg-neutral-100 rounded cursor-pointer"
+                                            title="Copy Application ID"
+                                        >
+                                            <Copy className="w-3 h-3 text-neutral-600" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {activePassApp.isTeamEvent && (
+                                    <div className="p-2.5 rounded-xl bg-white border border-black/30 text-left text-xs space-y-1">
+                                        <div className="flex items-center justify-between font-black text-black">
+                                            <span>Team: {activePassApp.teamName || "Squad"}</span>
+                                            <span className="capitalize text-[10px] px-1.5 py-0.5 rounded bg-amber-100 border border-amber-400 font-bold">
+                                                {activePassApp.teamRole === "leader" ? "Team Leader" : "Member"}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[11px] font-bold text-neutral-600">
+                                            <span>Roster:</span>
+                                            <span className={activePassApp.teamMembersCount && activePassApp.teamMembersCount >= (activePassApp.minTeamSize || 2) ? "text-emerald-700 font-black" : "text-amber-800 font-black"}>
+                                                {activePassApp.teamMembersCount || 1} / {activePassApp.maxTeamSize || 4} Members
+                                                {activePassApp.teamMembersCount && activePassApp.teamMembersCount < (activePassApp.minTeamSize || 2) && ` (Needs min ${activePassApp.minTeamSize || 2})`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                        ) : (
+                            <>
+                                {/* Real Scannable High-DPI QR Code Card */}
+                                <div className="flex flex-col items-center justify-center py-1">
+                                    <div className="p-3.5 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] inline-block">
+                                        <OrbixCardQR
+                                            value={activePassApp.ticketCode || ""}
+                                            size={180}
+                                            showLogo={true}
+                                            noShadow={true}
+                                        />
+                                    </div>
+                                    <span className="text-[10px] font-mono font-bold text-neutral-500 mt-2 flex items-center gap-1.5">
+                                        <QrCode className="w-3.5 h-3.5 text-black" />
+                                        Scan at registration desk for admission check-in
+                                    </span>
+                                </div>
+
+                                {/* Ticket Code Box */}
+                                <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                        Your Pass Code
+                                    </span>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <span className="font-mono text-xl sm:text-2xl font-black text-black tracking-widest">
+                                            {activePassApp.ticketCode}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCopyTicket(activePassApp.ticketCode)}
+                                            className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                            title="Copy Pass Code"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         {/* Attendee Info Grid: Name, College, Applied Time, Student ID/Dept */}
                         <div className="p-3 sm:p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-left grid grid-cols-2 gap-2.5 shadow-[1.5px_1.5px_0px_#000]">
@@ -1056,11 +1133,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                         <div className="grid grid-cols-2 gap-2 pt-1 print:hidden" data-no-print="true">
                             <button
                                 type="button"
-                                onClick={() => handleCopyTicket(activePassApp.ticketCode)}
+                                onClick={() => handleCopyTicket(activePassApp.ticketCode || `APP-${activePassApp.id ? activePassApp.id.slice(0, 8).toUpperCase() : "VERIFIED"}`)}
                                 className="py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
                             >
                                 <Copy className="w-3.5 h-3.5" />
-                                Copy Code
+                                {activePassApp.status === "pending" ? "Copy App ID" : "Copy Code"}
                             </button>
                             <button
                                 type="button"

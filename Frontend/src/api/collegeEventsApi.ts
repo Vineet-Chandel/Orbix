@@ -115,6 +115,8 @@ export interface StudentApplicationItem {
     isTeamEvent?: boolean;
     minTeamSize?: number;
     maxTeamSize?: number;
+    registrationDeadline?: string | null;
+    isRegistrationClosed?: boolean;
     teamId?: string | null;
     teamRole?: "leader" | "member" | null;
     teamName?: string | null;

@@ -144,6 +144,25 @@ export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelec
                         )}
                     </div>
 
+                    {/* Team Size Widget */}
+                    <div className="mt-3 flex items-center gap-2">
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <div className="w-6 h-6 rounded-lg border border-black bg-[#FAF6EE] flex items-center justify-center shrink-0">
+                                <Users className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                    Team Size:
+                                </span>
+                                <span className="font-black text-black">
+                                    {ev.isTeamEvent
+                                        ? `${ev.minTeamSize || 2} - ${ev.maxTeamSize || 4} Members`
+                                        : "Individual Participation"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Event-wise Key Analytics Metrics */}
                     <div className="mt-3 flex items-center gap-2 text-xs font-bold flex-wrap">
                         <span className="inline-flex items-center gap-1 text-sky-950 bg-sky-50 px-2 py-0.5 rounded-md border border-black/20">

@@ -86,6 +86,8 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                                 isPending: reg.status === "pending",
                                 registrationStatus: reg.status,
                                 ticketCode: reg.ticketCode,
+                                teamId: reg.teamId || event.teamId,
+                                teamRole: reg.teamRole || event.teamRole,
                                 totalApplicationsCount: (event.totalApplicationsCount || 0) + 1,
                             });
                         }}
@@ -140,6 +142,8 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                                 isPending: reg.status === "pending",
                                 registrationStatus: reg.status,
                                 ticketCode: reg.ticketCode,
+                                teamId: reg.teamId || event.teamId,
+                                teamRole: reg.teamRole || event.teamRole,
                                 totalApplicationsCount: (event.totalApplicationsCount || 0) + 1,
                             });
                         }}

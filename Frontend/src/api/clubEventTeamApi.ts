@@ -47,6 +47,9 @@ export interface EventTeamDetails {
     eventTitle: string;
     isEventStarted: boolean;
     isLeader: boolean;
+    isLocked?: boolean;
+    lockReason?: string | null;
+    registrationDeadline?: string | null;
     members: EventTeamMember[];
 }
 

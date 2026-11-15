@@ -33,7 +33,9 @@ import {
     ChevronUp,
     Lightbulb,
     ClipboardList,
+    Users,
 } from "lucide-react";
+import { clubEventTeamApi } from "../../../api/clubEventTeamApi";
 import type {
     ClubEventFormRecord,
     FormQuestion,
@@ -147,6 +149,17 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const [showAnswersSummary, setShowAnswersSummary] = useState(true);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
+    // Team registration state (when event is team-based)
+    const [teamAction, setTeamAction] = useState<"create" | "join">(() => {
+        return (userResponse?.answers || {})["__teamAction"] || "create";
+    });
+    const [teamName, setTeamName] = useState<string>(() => {
+        return (userResponse?.answers || {})["__teamName"] || "";
+    });
+    const [teamCode, setTeamCode] = useState<string>(() => {
+        return (userResponse?.answers || {})["__teamCode"] || "";
+    });
+
     // Autosave states
     const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "offline">("saved");
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -244,6 +257,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             // 1. Try server draft first
             if (draftResponse && draftResponse.answers && Object.keys(draftResponse.answers).length > 0) {
                 setAnswers((prev) => ({ ...prev, ...draftResponse.answers }));
+                if (draftResponse.answers["__teamAction"]) setTeamAction(draftResponse.answers["__teamAction"]);
+                if (draftResponse.answers["__teamName"]) setTeamName(draftResponse.answers["__teamName"]);
+                if (draftResponse.answers["__teamCode"]) setTeamCode(draftResponse.answers["__teamCode"]);
                 if (draftResponse.fileAttachments && Array.isArray(draftResponse.fileAttachments)) {
                     setFileAttachments(draftResponse.fileAttachments);
                 }
@@ -266,6 +282,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         const parsed = JSON.parse(localRaw);
                         if (parsed && typeof parsed === "object" && parsed.answers && Object.keys(parsed.answers).length > 0) {
                             setAnswers((prev) => ({ ...prev, ...parsed.answers }));
+                            if (parsed.answers["__teamAction"]) setTeamAction(parsed.answers["__teamAction"]);
+                            if (parsed.answers["__teamName"]) setTeamName(parsed.answers["__teamName"]);
+                            if (parsed.answers["__teamCode"]) setTeamCode(parsed.answers["__teamCode"]);
                             if (parsed.fileAttachments && Array.isArray(parsed.fileAttachments)) {
                                 setFileAttachments(parsed.fileAttachments);
                             }
@@ -690,6 +709,20 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         const studentName = answers["q_student_name"] || effectiveProfile.fullName || "Student";
         const studentEmail = answers["q_student_email"] || effectiveProfile.email || "";
 
+        if (event?.isTeamEvent) {
+            if (teamAction === "create") {
+                if (!teamName.trim() || teamName.trim().length < 2) {
+                    toast.error("Please provide a team name (at least 2 characters).");
+                    return;
+                }
+            } else {
+                if (!teamCode.trim() || teamCode.trim().length < 4) {
+                    toast.error("Please enter the team join code provided by your leader.");
+                    return;
+                }
+            }
+        }
+
         if (isPreview) {
             toast.success("Preview response simulated successfully! (Preview Mode)", {
                 title: "Form Submission Simulation",
@@ -725,12 +758,34 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 institutionName: effectiveProfile.college || undefined,
             });
 
+            // Process team creation or joining if this is a team event
+            let teamCreatedOrJoined: any = null;
+            if (event?.isTeamEvent) {
+                try {
+                    if (teamAction === "create") {
+                        const teamRes = await clubEventTeamApi.createTeam(form.eventId, teamName.trim());
+                        teamCreatedOrJoined = teamRes.team;
+                    } else {
+                        const teamRes = await clubEventTeamApi.joinTeamByCode(form.eventId, teamCode.trim().toUpperCase());
+                        teamCreatedOrJoined = teamRes.team;
+                    }
+                } catch (teamErr: any) {
+                    console.warn("Team creation/joining notice:", teamErr);
+                    toast.warning(teamErr.message || "Team squad was not linked. You can manage your team in the activity view.");
+                }
+            }
+
             const regRecord = {
                 ...res.registration,
                 applicantName: studentName,
                 applicantEmail: studentEmail,
                 answers: res.registration?.answers || answers,
                 fileAttachments: res.registration?.fileAttachments || fileAttachments,
+                teamId: teamCreatedOrJoined?.id || res.registration?.teamId,
+                teamRole: teamAction === "create" ? "leader" : "member",
+                teamName: teamCreatedOrJoined?.name,
+                teamCode: teamCreatedOrJoined?.code,
+                teamMembersCount: teamCreatedOrJoined?.membersCount || 1,
             };
 
             setSubmittedRegistration(regRecord);
@@ -743,7 +798,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 }
             } catch {}
 
-            toast.success(res.message || "Registration submitted successfully!");
+            toast.success(
+                event?.isTeamEvent && teamCreatedOrJoined
+                    ? `Registered in team "${teamCreatedOrJoined.name}" for ${event?.title || form.title}!`
+                    : res.message || "Registration submitted successfully!"
+            );
             if (onSuccess) {
                 onSuccess(regRecord);
             }
@@ -1567,6 +1626,110 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Team Registration Configuration (when event is team-based) */}
+            {event?.isTeamEvent && !submittedRegistration && !userResponse && (
+                <div
+                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] space-y-3.5"
+                    style={{ backgroundColor: cardSurfaceColor || undefined }}
+                >
+                    <div className="flex items-center justify-between pb-2 border-b-2 border-black/10">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
+                                <Users className="w-4 h-4 text-black" />
+                            </div>
+                            <div>
+                                <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-black">
+                                    Team Registration ({event.minTeamSize || 2} - {event.maxTeamSize || 4} Members)
+                                </h4>
+                                <span className="text-[11px] font-bold text-neutral-500">
+                                    Squad configuration required before registration can be finalized
+                                </span>
+                            </div>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] text-black">
+                            Required
+                        </span>
+                    </div>
+
+                    {/* Team Action Tabs */}
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-[#FAF6EE] rounded-2xl border-2 border-black">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTeamAction("create");
+                                setAnswer("__teamAction", "create");
+                            }}
+                            className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                teamAction === "create"
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black"
+                            }`}
+                        >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Create New Team</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTeamAction("join");
+                                setAnswer("__teamAction", "join");
+                            }}
+                            className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                teamAction === "join"
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black"
+                            }`}
+                        >
+                            <Users className="w-3.5 h-3.5" />
+                            <span>Join with Code</span>
+                        </button>
+                    </div>
+
+                    {teamAction === "create" ? (
+                        <div className="space-y-1.5 pt-1">
+                            <label className="text-xs font-black text-black block">
+                                Team / Squad Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={teamName}
+                                onChange={(e) => {
+                                    setTeamName(e.target.value);
+                                    setAnswer("__teamName", e.target.value);
+                                }}
+                                placeholder="e.g. Algorithm Aces, Byte Warriors..."
+                                maxLength={80}
+                                className="w-full p-2.5 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                            />
+                            <p className="text-[10px] font-bold text-neutral-500">
+                                As Team Leader, you can invite peers via @username or share your 6-char team code after creating the team.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-1.5 pt-1">
+                            <label className="text-xs font-black text-black block">
+                                Team Join Code <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={teamCode}
+                                onChange={(e) => {
+                                    const val = e.target.value.toUpperCase();
+                                    setTeamCode(val);
+                                    setAnswer("__teamCode", val);
+                                }}
+                                placeholder="e.g. ALGO-A1B2C3"
+                                maxLength={20}
+                                className="w-full p-2.5 text-xs font-mono font-black uppercase bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                            />
+                            <p className="text-[10px] font-bold text-neutral-500">
+                                Enter the unique code provided by your team leader to join their squad for this event.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Multi-Section Progress Bar (4.2 Multi-Section Forms) */}
             {totalSections > 1 && form.settings?.showProgressBar && (

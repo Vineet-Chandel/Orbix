@@ -20,7 +20,7 @@ import {
 import { AdaptiveImageCropper } from "./AdaptiveImageCropper";
 import { AdaptiveImageAdjustmentPanel } from "./AdaptiveImageAdjustmentPanel";
 import { AdaptiveImagePreview } from "./AdaptiveImagePreview";
-import { OrbixLoader } from "../ui/loader";
+import { OrbixLoader, OrbixLoaderIcon } from "../ui/loader";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 export interface AdaptiveImageEditorModalProps {
@@ -345,12 +345,12 @@ export const AdaptiveImageEditorModal: React.FC<AdaptiveImageEditorModalProps> =
                 </div>
 
                 {/* 3. Bottom Action Bar */}
-                <div className="p-4 sm:px-6 bg-[#0E0E0E] border-t border-neutral-800 flex items-center justify-between shrink-0">
+                <div className="h-16 px-4 sm:px-6 bg-[#0E0E0E] border-t border-neutral-800 flex items-center justify-between shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={isExporting}
-                        className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-bold border border-neutral-700 transition-colors cursor-pointer"
+                        className="h-10 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-bold border border-neutral-700 transition-colors cursor-pointer flex items-center justify-center shrink-0 disabled:opacity-50"
                     >
                         Cancel
                     </button>
@@ -364,16 +364,16 @@ export const AdaptiveImageEditorModal: React.FC<AdaptiveImageEditorModalProps> =
                             type="button"
                             onClick={handleConfirmExport}
                             disabled={!loadedImage || isExporting}
-                            className="px-5 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#86efac] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
+                            className="h-10 px-5 rounded-xl bg-[#a2ff86] hover:bg-[#86efac] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50 shrink-0"
                         >
                             {isExporting ? (
                                 <>
-                                    <OrbixLoader size="sm" />
+                                    <OrbixLoaderIcon size="xs" color="#000" className="shrink-0" />
                                     <span>Processing & Exporting...</span>
                                 </>
                             ) : (
                                 <>
-                                    <Check className="w-4 h-4 stroke-[3]" />
+                                    <Check className="w-4 h-4 stroke-[3] shrink-0" />
                                     <span>Confirm & Apply</span>
                                 </>
                             )}

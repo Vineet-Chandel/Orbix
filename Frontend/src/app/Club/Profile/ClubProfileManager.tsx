@@ -5,7 +5,6 @@ import {
     ArrowLeft,
     ArrowRight,
     Plus,
-    Sparkles,
 } from "lucide-react";
 import type { ClubProfileData, ClubLink, ClubVisibilityTier } from "../../../utils/clubProfileApi";
 import { useAppDispatch, useAppSelector, fetchClubProfile, saveClubProfile } from "../../../store";

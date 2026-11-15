@@ -208,7 +208,12 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
     if (!isOpen) return null;
 
     const startsAtDate = team?.eventStartsAt || eventStartsAt;
-    const isLocked = Boolean(team?.isEventStarted || (startsAtDate && Date.now() >= new Date(startsAtDate).getTime()));
+    const isLocked = Boolean(
+        team?.isLocked ||
+        team?.isEventStarted ||
+        (startsAtDate && Date.now() >= new Date(startsAtDate).getTime()) ||
+        (team?.registrationDeadline && Date.now() >= new Date(team.registrationDeadline).getTime())
+    );
     const capacityRatio = team ? Math.min(100, Math.round((team.membersCount / team.maxTeamSize) * 100)) : 0;
     const isFull = team ? team.membersCount >= team.maxTeamSize : false;
 
@@ -296,12 +301,12 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                     </div>
                 </div>
 
-                {/* Lock Alert Banner if event started */}
+                {/* Lock Alert Banner if event started or registration ended */}
                 {isLocked && (
                     <div className="bg-amber-100 border-b-2 border-black px-4 py-3 flex items-center gap-2.5 text-xs font-black text-amber-950">
                         <Lock className="w-4 h-4 text-amber-800 shrink-0" />
                         <span>
-                            Event has started. Team roster is permanently locked. No modifications, member additions, or departures are permitted.
+                            {team?.lockReason || "The registration round has ended and the timeline has advanced. Team roster is permanently locked. No modifications, member additions, or departures are permitted."}
                         </span>
                     </div>
                 )}
@@ -315,6 +320,18 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                         </div>
                     ) : team ? (
                         <>
+                            {/* Incomplete Team Warning (if below minTeamSize) */}
+                            {team.membersCount < team.minTeamSize && (
+                                <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-500 flex items-start gap-3 shadow-[2px_2px_0px_#000]">
+                                    <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                                    <div className="text-xs">
+                                        <span className="font-black text-amber-950 block">Incomplete Team Warning</span>
+                                        <span className="font-medium text-amber-900 leading-relaxed block mt-0.5">
+                                            This event strictly requires at least <strong className="font-black text-black">{team.minTeamSize} members</strong>. Your squad currently has {team.membersCount} member(s). Share your team code or invite teammates before registration closes, otherwise your application cannot be accepted!
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                             {/* Team Code & Capacity Bar Card */}
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/10">
