@@ -93,42 +93,32 @@ export function usePlatformSync(): UsePlatformSyncReturn {
                 }
             })();
 
-            const primarySync = buildApiUrl("/api/portals/resync");
-            const endpoints = import.meta.env.DEV
-                ? [primarySync, "http://localhost:3000/api/portals/resync"]
-                : [primarySync];
-
+            const syncUrl = buildApiUrl("/api/portals/resync");
             let resData: any = null;
 
-            for (const url of endpoints) {
-                try {
-                    const headers: Record<string, string> = {
-                        "Content-Type": "application/json",
-                    };
-                    if (token) {
-                        headers["Authorization"] = `Bearer ${token}`;
-                    }
-
-                    const res = await fetch(url, {
-                        method: "POST",
-                        headers,
-                        credentials: "include",
-                        body: JSON.stringify({
-                            username: userIdentifier,
-                            portals: portalsPayload,
-                        }),
-                    });
-
-                    if (res.ok) {
-                        resData = await res.json();
-                        if (resData && resData.success) {
-                            break;
-                        }
-                    }
-                } catch {
-                    // Try next endpoint fallback
-                    continue;
+            try {
+                const headers: Record<string, string> = {
+                    "Content-Type": "application/json",
+                };
+                if (token) {
+                    headers["Authorization"] = `Bearer ${token}`;
                 }
+
+                const res = await fetch(syncUrl, {
+                    method: "POST",
+                    headers,
+                    credentials: "include",
+                    body: JSON.stringify({
+                        username: userIdentifier,
+                        portals: portalsPayload,
+                    }),
+                });
+
+                if (res.ok) {
+                    resData = await res.json();
+                }
+            } catch {
+                // Network error or server offline
             }
 
             if (!resData || !Array.isArray(resData.results)) {

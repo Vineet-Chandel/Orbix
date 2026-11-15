@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { RotateCcw } from "lucide-react";
-import { LinkedInCard } from "../../../app/Profile/CardStudio/LinkedInCard";
-import { InstagramStoryCard } from "../../../app/Profile/CardStudio/InstagramStoryCard";
-import type { CardThemeConfig } from "../../../app/Profile/CardStudio/types";
+import { LinkedInCard } from "../../../../app/Profile/CardStudio/LinkedInCard";
+import { InstagramStoryCard } from "../../../../app/Profile/CardStudio/InstagramStoryCard";
+import type { CardThemeConfig } from "../../../../app/Profile/CardStudio/types";
 import {
     mockUser,
     mockStats,
@@ -112,9 +112,8 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
             aria-label="Tap card to flip"
         >
             <RotateCcw
-                className={`w-4 h-4 text-black stroke-[2.5] transition-transform duration-500 ${
-                    isAnyFlipped ? "rotate-180" : ""
-                }`}
+                className={`w-4 h-4 text-black stroke-[2.5] transition-transform duration-500 ${isAnyFlipped ? "rotate-180" : ""
+                    }`}
             />
             <span>Tap Card to Flip</span>
         </button>

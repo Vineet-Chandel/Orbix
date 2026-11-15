@@ -189,25 +189,19 @@ export default function ClubStatusPage() {
         setError(null);
 
         try {
-            const primaryEndpoint = "/api/club/application-status";
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/club/application-status"]
-                : [primaryEndpoint];
+            const endpoint = "/api/club/application-status";
             let res: Response | null = null;
             let data: any = null;
 
-            for (const endpoint of endpoints) {
-                try {
-                    const r = await fetch(endpoint, {
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                    });
-                    res = r;
-                    data = await r.json().catch(() => null);
-                    break;
-                } catch {
-                    continue;
-                }
+            try {
+                const r = await fetch(endpoint, {
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                });
+                res = r;
+                data = await r.json().catch(() => null);
+            } catch {
+                // network error
             }
 
             if (!res || !res.ok) {

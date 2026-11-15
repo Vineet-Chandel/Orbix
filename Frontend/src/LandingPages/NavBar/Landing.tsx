@@ -32,6 +32,30 @@ export interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
     {
+        id: 'developers',
+        title: 'Developers',
+        dropdown: false,
+        icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+            </svg>
+        ),
+    },
+    {
+        id: 'clubs',
+        title: 'Clubs',
+        dropdown: false,
+        icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+        ),
+    },
+    {
         id: 'docs',
         title: 'Docs',
         dropdown: false,
@@ -82,7 +106,11 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
     const location = useLocation();
     // Auto-detect route if activeTab is not explicitly specified
     let detectedTab: string | null = null;
-    if (location.pathname.startsWith('/docs')) {
+    if (location.pathname === '/clubs' || location.pathname.startsWith('/clubs')) {
+        detectedTab = 'clubs';
+    } else if (location.pathname === '/' || location.pathname === '') {
+        detectedTab = 'developers';
+    } else if (location.pathname.startsWith('/docs')) {
         detectedTab = 'docs';
     } else if (location.pathname.startsWith('/blog') || location.pathname.startsWith('/blogs')) {
         detectedTab = 'blogs';
@@ -207,19 +235,27 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
         setInternalActiveTab(tabId);
         onTabChange?.(tabId);
 
+        setIsClickOpen(false);
+        setOpenDropdown(null);
+
+        if (tabId === 'developers') {
+            navigate('/');
+            return;
+        }
+
+        if (tabId === 'clubs') {
+            navigate('/clubs');
+            return;
+        }
+
         if (tabId === 'blogs') {
-            setIsClickOpen(false);
-            setOpenDropdown(null);
             navigate('/blogs');
             return;
         }
 
-        // Close dropdown and navigate to dedicated pages
-        setIsClickOpen(false);
-        setOpenDropdown(null);
-
         if (tabId === 'docs') {
             navigate('/docs');
+            return;
         }
     };
 
@@ -413,14 +449,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
 
                 {/* Right Action Buttons */}
                 <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto shrink-0">
-                    {/* Demo Profile Link (Desktop Only) */}
-                    <Link
-                        to="/profile/u/Vineet-Chandel"
-                        className="hidden md:flex h-[36px] sm:h-[40px] px-3 sm:px-4 items-center justify-center text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-950 transition-colors rounded-full hover:bg-neutral-100 focus:outline-none whitespace-nowrap"
-                        title="View live demo showcase profile (@Vineet-Chandel)"
-                    >
-                        Demo Profile
-                    </Link>
+
 
                     {/* Authenticated User Notification Bell (Desktop Only) */}
                     {isLoggedIn && (
@@ -435,11 +464,10 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         onClick={toggleMobileMenu}
                         aria-label="Toggle navigation menu"
                         aria-expanded={isMobileMenuOpen}
-                        className={`md:hidden relative flex items-center justify-center w-[36px] h-[36px] rounded-full border-2 border-black transition-all cursor-pointer shrink-0 ${
-                            isMobileMenuOpen
-                                ? "bg-[#FFE566] text-black shadow-[2px_2px_0px_#000]"
-                                : "bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-                        }`}
+                        className={`md:hidden relative flex items-center justify-center w-[36px] h-[36px] rounded-full border-2 border-black transition-all cursor-pointer shrink-0 ${isMobileMenuOpen
+                            ? "bg-[#FFE566] text-black shadow-[2px_2px_0px_#000]"
+                            : "bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                            }`}
                         title="Open menu (Docs, Blogs, Notifications)"
                     >
                         <MoreVertical className="w-4 h-4 stroke-[2.5]" />
@@ -457,9 +485,8 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         onClick={handleWorkspaceClick}
                         disabled={loading}
                         title={isLoggedIn ? `${displayName} - Open Workspace` : "Sign in to Orbix"}
-                        className={`group relative inline-flex items-center h-[36px] sm:h-[40px] gap-1 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden mr-0.5 sm:mr-1 shrink-0 ${
-                            isLoggedIn ? "pl-1 sm:pl-1.5 pr-2.5 sm:pr-3.5" : "pl-3 sm:pl-4 pr-2.5 sm:pr-3.5"
-                        }`}
+                        className={`group relative inline-flex items-center h-[36px] sm:h-[40px] gap-1 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden mr-0.5 sm:mr-1 shrink-0 ${isLoggedIn ? "pl-1 sm:pl-1.5 pr-2.5 sm:pr-3.5" : "pl-3 sm:pl-4 pr-2.5 sm:pr-3.5"
+                            }`}
                     >
                         {isLoggedIn && (
                             <img
@@ -538,15 +565,79 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                     </button>
                                 </div>
 
+                                {/* Item 0A: Developers */}
+                                <Link
+                                    to="/"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${location.pathname === '/'
+                                        ? 'bg-[#FFE566] shadow-[2.5px_2.5px_0px_#000]'
+                                        : 'bg-[#FAF6EE] hover:bg-[#FFE566]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                            <User className="w-4 h-4 text-black stroke-[2.5]" />
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-xs font-black text-black flex items-center gap-1.5">
+                                                <span>Developers & Showcase</span>
+                                                {location.pathname === '/' && (
+                                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-black text-[#FFE566] font-mono font-bold">
+                                                        ACTIVE
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[10px] text-neutral-600 font-medium">
+                                                Personal developer profile, portfolio & ratings
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-black stroke-[2.5] shrink-0" />
+                                </Link>
+
+                                {/* Item 0B: Clubs */}
+                                <Link
+                                    to="/clubs"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${location.pathname === '/clubs' || location.pathname.startsWith('/clubs')
+                                        ? 'bg-[#a2ff86] shadow-[2.5px_2.5px_0px_#000]'
+                                        : 'bg-[#FAF6EE] hover:bg-[#a2ff86]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                            <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                                <circle cx="9" cy="7" r="4" />
+                                                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                            </svg>
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-xs font-black text-black flex items-center gap-1.5">
+                                                <span>Clubs & Campus Hub</span>
+                                                {(location.pathname === '/clubs' || location.pathname.startsWith('/clubs')) && (
+                                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-black text-[#a2ff86] font-mono font-bold">
+                                                        ACTIVE
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[10px] text-neutral-600 font-medium">
+                                                Campus chapters, event creation & leader tools
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-black stroke-[2.5] shrink-0" />
+                                </Link>
+
                                 {/* Item 1: Docs */}
                                 <Link
                                     to="/docs"
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${
-                                        location.pathname.startsWith('/docs')
-                                            ? 'bg-[#FFE566] shadow-[2.5px_2.5px_0px_#000]'
-                                            : 'bg-[#FAF6EE] hover:bg-[#FFE566]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
-                                    }`}
+                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${location.pathname.startsWith('/docs')
+                                        ? 'bg-[#FFE566] shadow-[2.5px_2.5px_0px_#000]'
+                                        : 'bg-[#FAF6EE] hover:bg-[#FFE566]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
+                                        }`}
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
@@ -573,11 +664,10 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                 <Link
                                     to="/blogs"
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${
-                                        location.pathname.startsWith('/blog') || location.pathname.startsWith('/blogs')
-                                            ? 'bg-[#a2ff86] shadow-[2.5px_2.5px_0px_#000]'
-                                            : 'bg-[#FAF6EE] hover:bg-[#a2ff86]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
-                                    }`}
+                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${location.pathname.startsWith('/blog') || location.pathname.startsWith('/blogs')
+                                        ? 'bg-[#a2ff86] shadow-[2.5px_2.5px_0px_#000]'
+                                        : 'bg-[#FAF6EE] hover:bg-[#a2ff86]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
+                                        }`}
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">

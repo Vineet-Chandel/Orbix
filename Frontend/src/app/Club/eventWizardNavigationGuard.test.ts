@@ -10,11 +10,12 @@ import {
     type WizardNavigationState,
     type FormValidationState,
 } from "./eventWizardNavigationGuard.ts";
+import type { ConfiguredStage } from "./TimelineBuilder/types";
 
 const createValidForm = (): FormValidationState => ({
     title: "Orbix Hackathon 2026",
-    startsAt: "2026-12-01T10:00:00.000Z",
-    endsAt: "2026-12-02T18:00:00.000Z",
+    startsAt: "2026-12-01T10:00",
+    endsAt: "2026-12-02T18:00",
     registrationUrl: "https://orbix.dev/register",
     locationType: "in_person",
     venueOrLocation: "Main Auditorium, Campus",
@@ -25,9 +26,32 @@ const createValidForm = (): FormValidationState => ({
     coverImageUrl: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
 });
 
+const createValidStage = (order = 1): ConfiguredStage => ({
+    id: `stg_${order}`,
+    name: `Round ${order}`,
+    type: "registration",
+    description: "Initial round",
+    instructions: "Follow instructions",
+    stageOrder: order,
+    startsAt: "2026-12-01T10:00",
+    endsAt: "2026-12-02T10:00",
+    timezone: "Asia/Kolkata",
+    eligibilityType: "all_registered",
+    actionType: "registration",
+    requirements: {
+        allowResubmission: false,
+        maxSubmissions: 1,
+        teamSubmissionOnly: false,
+        leaderOnlySubmit: false,
+        allMembersCanView: true,
+        lateSubmissionPolicy: "disallow",
+        requireApprovalToAdvance: false,
+    },
+});
+
 const createValidState = (): WizardNavigationState => ({
     form: createValidForm(),
-    stages: [{ id: "stg_1", name: "Round 1" }],
+    stages: [createValidStage(1)],
     totalQuestions: 3,
     isUploadingBanner: false,
 });
@@ -137,7 +161,7 @@ test("Existing entered data preserved after blocked navigation attempts", () => 
     state.form.title = ""; // Incomplete Step 1
     const originalSummary = "Detailed event description";
     state.form.venueOrLocation = originalSummary;
-    state.stages = [{ id: "stg_custom", name: "Semi Finals" }];
+    state.stages = [{ ...createValidStage(1), name: "Semi Finals" }];
 
     // Attempt blocked navigation
     const result = evaluateStepNavigation(1, 4, state);
@@ -146,14 +170,27 @@ test("Existing entered data preserved after blocked navigation attempts", () => 
     // Verify all entered data is untouched and preserved
     assert.equal(state.form.venueOrLocation, originalSummary);
     assert.equal(state.stages.length, 1);
-    assert.equal((state.stages[0] as { name: string }).name, "Semi Finals");
+    assert.equal(state.stages[0].name, "Semi Finals");
     assert.equal(state.totalQuestions, 3);
 });
 
 test("Direct unit tests for step validators (validateStep2, validateStep3, validateStep4)", () => {
     // Step 2
     assert.equal(validateStep2([]).isValid, false);
-    assert.equal(validateStep2([{ id: "s1" }]).isValid, true);
+    assert.equal(validateStep2([createValidStage(1)], "2026-12-01T10:00", "2026-12-02T18:00").isValid, true);
+
+    // Timeline boundary checks for Step 2
+    const outOfBoundsStage = createValidStage(1);
+    outOfBoundsStage.startsAt = "2026-11-11T10:00"; // Starts before event start (2026-12-01)
+    const outOfBoundsRes = validateStep2([outOfBoundsStage], "2026-12-01T10:00", "2026-12-02T18:00");
+    assert.equal(outOfBoundsRes.isValid, false);
+    assert.match(outOfBoundsRes.errorMessage || "", /cannot start before event starts/);
+
+    const afterEndStage = createValidStage(1);
+    afterEndStage.endsAt = "2026-12-05T10:00"; // Ends after event end (2026-12-02)
+    const afterEndRes = validateStep2([afterEndStage], "2026-12-01T10:00", "2026-12-02T18:00");
+    assert.equal(afterEndRes.isValid, false);
+    assert.match(afterEndRes.errorMessage || "", /cannot be after event ends/);
 
     // Step 3
     assert.equal(validateStep3(0).isValid, false);
@@ -213,7 +250,7 @@ test("Validation rejects invalid team sizes when isTeamEvent is true", () => {
 
 test("getMaxPermittedStep correctly identifies the furthest unlocked step", () => {
     const state = createValidState();
-    assert.equal(getMaxPermittedStep(state), 5);
+    assert.equal(getMaxPermittedStep(state), 6);
 
     state.form.coverImageUrl = "";
     assert.equal(getMaxPermittedStep(state), 4);

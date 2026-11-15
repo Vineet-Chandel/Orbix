@@ -452,13 +452,13 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     return (
         <section
-            className="w-full rounded-2xl bg-white border-2 border-black text-neutral-900 p-6 sm:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans"
+            className="w-full rounded-2xl bg-white border-2 border-black text-neutral-900 p-4 sm:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans"
             aria-label="Contest Performance Module"
         >
             {/* ========================================================================= */}
             {/* TOP ROW — Contest Rating Graph (Left) & Total Contests Summary (Right)    */}
             {/* ========================================================================= */}
-            <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch relative z-10">
+            <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch relative z-10">
                 {/* Primary Column: Rating & Progression Graph (8 of 12 cols on desktop) */}
                 <div className="lg:col-span-8 flex flex-col justify-between">
                     {/* Section Header & Platform Selector */}
@@ -486,6 +486,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             <div
                                 role="tablist"
                                 aria-label="Connected Contest Platforms"
+                                style={{ WebkitOverflowScrolling: "touch" }}
                                 className="flex items-center gap-1.5 p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-x-auto no-scrollbar self-start sm:self-auto max-w-full shrink-0"
                             >
                                 {platformsList.map((platform) => {

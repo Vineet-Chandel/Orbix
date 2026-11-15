@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
 import { Award, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUnifiedBadges, type UnifiedBadgeRecord } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
@@ -195,11 +196,14 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
                             </p>
                         </div>
                     ) : (
-                        /* Responsive Multi-Column Badge Grid */
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-x-3 gap-y-6 sm:gap-x-4 sm:gap-y-7">
+                        /* Responsive Multi-Column Badge Grid (Supports narrow screens down to 280px) */
+                        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-x-2.5 xs:gap-x-3 gap-y-5 sm:gap-x-4 sm:gap-y-7">
                             {displayedBadges.map((badge) => (
-                                <div
+                                <motion.div
                                     key={badge.id}
+                                    whileHover={{ scale: 1.08 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 20 }}
                                     onMouseEnter={() => setHoveredBadge(badge)}
                                     onMouseLeave={() => setHoveredBadge(null)}
                                     className="group relative flex flex-col items-center text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-black rounded-xl p-1.5"
@@ -207,18 +211,18 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
                                     aria-label={`${badge.displayName || badge.name} from ${badge.platformName}`}
                                 >
                                     {/* Badge Artwork Container */}
-                                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center p-1 transition-transform duration-200 group-hover:scale-110">
+                                    <div className="w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center p-1 transition-transform duration-200">
                                         <BadgeIconWithFallback badge={badge} />
                                     </div>
 
                                     {/* Badge Title beneath artwork */}
-                                    <span className="text-xs sm:text-sm font-black text-black group-hover:underline transition-colors text-center line-clamp-2 leading-tight max-w-[105px] mt-2">
+                                    <span className="text-[11px] sm:text-xs md:text-sm font-black text-black group-hover:underline transition-colors text-center line-clamp-2 leading-tight max-w-[105px] mt-1.5 sm:mt-2">
                                         {badge.name}
                                     </span>
 
                                     {/* Accessible Hover / Focus Tooltip */}
                                     {hoveredBadge?.id === badge.id && (
-                                        <div className="absolute bottom-full mb-3 z-50 pointer-events-none w-56 sm:w-64 p-3.5 rounded-2xl bg-black border-2 border-black text-white shadow-[4px_4px_0px_#a2ff86] text-left animate-fadeIn">
+                                        <div className="absolute bottom-full mb-3 z-50 pointer-events-none w-52 sm:w-64 p-3.5 rounded-2xl bg-black border-2 border-black text-white shadow-[4px_4px_0px_#a2ff86] text-left animate-fadeIn">
                                             <div className="flex items-center gap-2 mb-1.5">
                                                 <span className="w-4 h-4 flex items-center justify-center">
                                                     {getPortalIcon(badge.platform, "w-full h-full object-contain")}
@@ -243,7 +247,7 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
                                             )}
                                         </div>
                                     )}
-                                </div>
+                                </motion.div>
                             ))}
                         </div>
                     )}

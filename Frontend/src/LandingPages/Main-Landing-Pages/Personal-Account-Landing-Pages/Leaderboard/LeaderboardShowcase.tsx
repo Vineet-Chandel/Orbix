@@ -11,7 +11,7 @@ import {
     BookOpen,
     Users,
 } from "lucide-react";
-import { getPortalIcon } from "../../../utils/portalIcons";
+import { getPortalIcon } from "../../../../utils/portalIcons";
 
 export interface MockLeaderboardItem {
     rank: number;
@@ -313,22 +313,20 @@ export const LeaderboardShowcase: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setViewMode("podium")}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                    viewMode === "podium"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "text-neutral-700 hover:text-black font-bold"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === "podium"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black font-bold"
+                                    }`}
                             >
                                 Podium View
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setViewMode("table")}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                    viewMode === "table"
-                                        ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                        : "text-neutral-700 hover:text-black font-bold"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === "table"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black font-bold"
+                                    }`}
                             >
                                 Table View
                             </button>
@@ -353,17 +351,15 @@ export const LeaderboardShowcase: React.FC = () => {
                                     key={c.id}
                                     type="button"
                                     onClick={() => setSelectedCollege(c.id)}
-                                    className={`px-3.5 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 border-black flex items-center gap-2 cursor-pointer ${
-                                        isSelected
-                                            ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000] -translate-y-0.5"
-                                            : "bg-white text-neutral-700 hover:text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-50"
-                                    }`}
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 border-black flex items-center gap-2 cursor-pointer ${isSelected
+                                        ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000] -translate-y-0.5"
+                                        : "bg-white text-neutral-700 hover:text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-50"
+                                        }`}
                                 >
                                     <span>{c.name}</span>
                                     <span
-                                        className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                                            isSelected ? "bg-black text-[#FFE566]" : "bg-neutral-100 text-neutral-600"
-                                        }`}
+                                        className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${isSelected ? "bg-black text-[#FFE566]" : "bg-neutral-100 text-neutral-600"
+                                            }`}
                                     >
                                         {c.count}
                                     </span>
@@ -566,15 +562,14 @@ export const LeaderboardShowcase: React.FC = () => {
                                         >
                                             <td className="py-3.5 px-4 sm:px-6 text-center">
                                                 <span
-                                                    className={`inline-flex items-center justify-center w-7 h-7 rounded-lg font-black text-xs border-2 border-black shadow-[1px_1px_0px_#000] ${
-                                                        entry.rank === 1
-                                                            ? "bg-[#FFE566] text-black"
-                                                            : entry.rank === 2
+                                                    className={`inline-flex items-center justify-center w-7 h-7 rounded-lg font-black text-xs border-2 border-black shadow-[1px_1px_0px_#000] ${entry.rank === 1
+                                                        ? "bg-[#FFE566] text-black"
+                                                        : entry.rank === 2
                                                             ? "bg-slate-200 text-black"
                                                             : entry.rank === 3
-                                                            ? "bg-amber-100 text-black"
-                                                            : "bg-white text-neutral-800"
-                                                    }`}
+                                                                ? "bg-amber-100 text-black"
+                                                                : "bg-white text-neutral-800"
+                                                        }`}
                                                 >
                                                     {entry.rank}
                                                 </span>

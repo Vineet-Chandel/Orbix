@@ -7,6 +7,7 @@ import {
     X,
     Check,
     Sparkles,
+    AlertCircle,
 } from "lucide-react";
 import { NeoSelect, type NeoSelectOption } from "./NeoSelect";
 
@@ -19,6 +20,7 @@ export interface NeoDateTimePickerProps {
     placeholder?: string;
     disabled?: boolean;
     error?: string;
+    hideErrorText?: boolean;
     required?: boolean;
     className?: string;
     minDate?: string;
@@ -69,8 +71,11 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
     placeholder = mode === "datetime" ? "Select date and time..." : "Select date...",
     disabled = false,
     error,
+    hideErrorText = false,
     required = false,
     className = "",
+    minDate,
+    maxDate,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isOpen, setIsOpen] = useState(false);
@@ -82,6 +87,18 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
         if (isNaN(d.getTime())) return null;
         return d;
     }, [value]);
+
+    const parsedMinDate = useMemo(() => {
+        if (!minDate) return null;
+        const d = new Date(minDate);
+        return isNaN(d.getTime()) ? null : d;
+    }, [minDate]);
+
+    const parsedMaxDate = useMemo(() => {
+        if (!maxDate) return null;
+        const d = new Date(maxDate);
+        return isNaN(d.getTime()) ? null : d;
+    }, [maxDate]);
 
     // Active calendar viewing month/year
     const [viewYear, setViewYear] = useState<number>(() => {
@@ -192,6 +209,14 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
         const daysInCurrentMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
         const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
 
+        const isDayDisabled = (y: number, m: number, d: number) => {
+            const endOfDay = new Date(y, m, d, 23, 59, 59, 999).getTime();
+            const startOfDay = new Date(y, m, d, 0, 0, 0, 0).getTime();
+            const isBeforeMin = parsedMinDate ? endOfDay < parsedMinDate.getTime() : false;
+            const isAfterMax = parsedMaxDate ? startOfDay > parsedMaxDate.getTime() : false;
+            return isBeforeMin || isAfterMax;
+        };
+
         const cells: Array<{
             day: number;
             month: number;
@@ -199,6 +224,7 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
             isCurrentMonth: boolean;
             isToday: boolean;
             isSelected: boolean;
+            isDisabled: boolean;
         }> = [];
 
         const today = new Date();
@@ -222,6 +248,7 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
                     selectedDay === dayNum &&
                     selectedMonth === prevMonthIndex &&
                     selectedYear === prevYear,
+                isDisabled: isDayDisabled(prevYear, prevMonthIndex, dayNum),
             });
         }
 
@@ -242,6 +269,7 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
                 isCurrentMonth: true,
                 isToday,
                 isSelected,
+                isDisabled: isDayDisabled(viewYear, viewMonth, dayNum),
             });
         }
 
@@ -261,11 +289,12 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
                     selectedDay === dayNum &&
                     selectedMonth === nextMonthIndex &&
                     selectedYear === nextYear,
+                isDisabled: isDayDisabled(nextYear, nextMonthIndex, dayNum),
             });
         }
 
         return cells;
-    }, [viewYear, viewMonth, selectedYear, selectedMonth, selectedDay, parsedDate]);
+    }, [viewYear, viewMonth, selectedYear, selectedMonth, selectedDay, parsedDate, parsedMinDate, parsedMaxDate]);
 
     const handlePrevMonth = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -304,6 +333,8 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
     };
 
     const handleSelectDay = (cell: (typeof calendarDays)[0]) => {
+        if (cell.isDisabled) return;
+
         setSelectedYear(cell.year);
         setSelectedMonth(cell.month);
         setSelectedDay(cell.day);
@@ -331,12 +362,19 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
     };
 
     const handleQuickNow = () => {
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = now.getMonth();
-        const d = now.getDate();
-        const h24 = now.getHours();
-        const mins = now.getMinutes();
+        let target = new Date();
+        if (parsedMinDate && target < parsedMinDate) {
+            target = new Date(parsedMinDate);
+        }
+        if (parsedMaxDate && target > parsedMaxDate) {
+            target = new Date(parsedMaxDate);
+        }
+
+        const y = target.getFullYear();
+        const m = target.getMonth();
+        const d = target.getDate();
+        const h24 = target.getHours();
+        const mins = target.getMinutes();
         const period: "AM" | "PM" = h24 >= 12 ? "PM" : "AM";
         const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
 
@@ -386,7 +424,7 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
                     isOpen
                         ? "bg-white border-black ring-2 ring-black shadow-[3px_3px_0px_#000]"
                         : "bg-[#FAF6EE] hover:bg-white border-black shadow-[2px_2px_0px_#000]"
-                } ${error ? "border-rose-500 bg-rose-50/60" : ""} ${
+                } ${error ? "border-rose-500 bg-rose-50/70 ring-1 ring-rose-400" : ""} ${
                     disabled ? "opacity-60 cursor-not-allowed" : ""
                 }`}
             >
@@ -413,6 +451,14 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
                     </span>
                 </div>
             </div>
+
+            {/* In-field Real-Time Error Message */}
+            {error && !hideErrorText && (
+                <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                    <span>{error}</span>
+                </p>
+            )}
 
             {/* Neo-Brutalist Popover Calendar - Crisp pure white with bold black border & brutalist shadow */}
             {isOpen && (
@@ -484,26 +530,30 @@ export const NeoDateTimePicker: React.FC<NeoDateTimePickerProps> = ({
                         {calendarDays.map((cell, idx) => {
                             const isSelected = cell.isSelected;
                             const isToday = cell.isToday;
+                            const isDisabled = cell.isDisabled;
 
                             return (
                                 <button
                                     key={idx}
                                     type="button"
+                                    disabled={isDisabled}
                                     onClick={() => handleSelectDay(cell)}
-                                    className={`h-8 w-full rounded-lg text-xs font-bold transition-all flex items-center justify-center relative cursor-pointer ${
-                                        isSelected
-                                            ? "bg-[#a2ff86] text-black font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] z-10 scale-105"
+                                    className={`h-8 w-full rounded-lg text-xs font-bold transition-all flex items-center justify-center relative ${
+                                        isDisabled
+                                            ? "text-neutral-300 opacity-20 cursor-not-allowed select-none pointer-events-none line-through"
+                                            : isSelected
+                                            ? "bg-[#a2ff86] text-black font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] z-10 scale-105 cursor-pointer"
                                             : cell.isCurrentMonth
-                                            ? "text-black hover:bg-[#FFE566] hover:border hover:border-black"
-                                            : "text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100"
+                                            ? "text-black hover:bg-[#FFE566] hover:border hover:border-black cursor-pointer"
+                                            : "text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100 cursor-pointer"
                                     } ${
-                                        isToday && !isSelected
+                                        isToday && !isSelected && !isDisabled
                                             ? "font-black underline decoration-black decoration-2"
                                             : ""
                                     }`}
                                 >
                                     <span>{cell.day}</span>
-                                    {isToday && !isSelected && (
+                                    {isToday && !isSelected && !isDisabled && (
                                         <span className="w-1.5 h-1.5 rounded-full bg-black absolute bottom-1" />
                                     )}
                                 </button>

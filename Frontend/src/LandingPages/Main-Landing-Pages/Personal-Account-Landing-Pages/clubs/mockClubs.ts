@@ -1,6 +1,6 @@
-import type { CollegeClubItem } from "../../../utils/clubProfileApi";
-import type { CollegeEventItem } from "../../../api/collegeEventsApi";
-import { PRESET_EVENT_BANNERS } from "../../../components/EventBanners/presetEventBanners";
+import type { CollegeClubItem } from "../../../../utils/clubProfileApi";
+import type { CollegeEventItem } from "../../../../api/collegeEventsApi";
+import { PRESET_EVENT_BANNERS } from "../../../../components/EventBanners/presetEventBanners";
 
 // Helper: Mandala SVG banner matching the authentic mandala artwork from user image 2
 const MANDALA_BANNER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">

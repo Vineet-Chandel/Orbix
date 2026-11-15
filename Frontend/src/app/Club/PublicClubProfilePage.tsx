@@ -28,6 +28,7 @@ import MessageClubModal from "./MessageClubModal";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
+import { isDemoClubSlug, getDemoClubProfileBundle } from "../../data/demoClubProfileData";
 
 interface PublicCoordinator {
     id: string;
@@ -126,8 +127,14 @@ interface PublicEvent {
     publishedAt: string | null;
 }
 
-export default function PublicClubProfilePage() {
-    const { slug } = useParams<{ slug: string }>();
+export interface PublicClubProfilePageProps {
+    overrideSlug?: string;
+    isEmbedded?: boolean;
+}
+
+export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false }: PublicClubProfilePageProps = {}) {
+    const params = useParams<{ slug: string }>();
+    const slug = overrideSlug || params.slug;
 
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
@@ -149,6 +156,24 @@ export default function PublicClubProfilePage() {
 
     useEffect(() => {
         if (!slug) return;
+
+        if (isDemoClubSlug(slug)) {
+            const bundle = getDemoClubProfileBundle(slug);
+            setClub(bundle.club);
+            setCoordinators(bundle.coordinators);
+            setAchievements(bundle.achievements);
+            setTeams(bundle.teams);
+            setUpcomingEvents(bundle.upcomingEvents);
+            setPastEvents(bundle.pastEvents);
+            setIsManagerOrMember(false);
+            setLoading(false);
+            setNotFound(false);
+            setIsBlockedByClub(false);
+            if (!isEmbedded) {
+                document.title = `${bundle.club.name} | Verified Collegiate Club on Orbix`;
+            }
+            return;
+        }
 
         const fetchClub = async () => {
             try {
@@ -175,7 +200,9 @@ export default function PublicClubProfilePage() {
                     setIsManagerOrMember(Boolean(data.isManagerOrMember));
 
                     // Dynamic Document Title & SEO meta
-                    document.title = `${data.club.name} | Verified Collegiate Club on Orbix`;
+                    if (!isEmbedded) {
+                        document.title = `${data.club.name} | Verified Collegiate Club on Orbix`;
+                    }
                 } else {
                     setNotFound(true);
                 }
@@ -188,7 +215,7 @@ export default function PublicClubProfilePage() {
         };
 
         fetchClub();
-    }, [slug]);
+    }, [slug, isEmbedded]);
 
     const handleRegisterEvent = async (eventId: string) => {
         if (!user) {
@@ -284,42 +311,44 @@ export default function PublicClubProfilePage() {
     const social = club.socialLinks || {};
 
     return (
-        <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black">
+        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen bg-[#FAF6EE]"} bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black`}>
             {/* Top Navigation Bar */}
-            <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                    <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
-                        <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
-                        <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
-                        <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                            Clubs Directory
-                        </span>
-                    </Link>
+            {!isEmbedded && (
+                <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black">
+                    <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+                        <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
+                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                            <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
+                            <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                Clubs Directory
+                            </span>
+                        </Link>
 
-                    <div className="flex items-center gap-2.5">
-                        <button
-                            type="button"
-                            onClick={() => setIsMessageModalOpen(true)}
-                            className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
-                        >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>Message Chapter</span>
-                        </button>
-
-                        {isManagerOrMember && (
-                            <Link
-                                to="/club/profile"
-                                className="px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => setIsMessageModalOpen(true)}
+                                className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
                             >
-                                Edit Profile
-                            </Link>
-                        )}
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>Message Chapter</span>
+                            </button>
+
+                            {isManagerOrMember && (
+                                <Link
+                                    to="/club/profile"
+                                    className="px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    Edit Profile
+                                </Link>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            )}
 
             {/* Main Profile Canvas */}
-            <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+            <main className={`max-w-6xl mx-auto px-4 sm:px-6 ${isEmbedded ? "py-4 sm:py-6" : "py-6 sm:py-8"} space-y-6`}>
                 {/* Header Banner & Hero Card */}
                 <div className="rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] overflow-hidden">
                     {/* Header Banner Image (100% full view, never cropped) */}

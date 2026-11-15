@@ -18,6 +18,11 @@ import { STAGE_TEMPLATES, type StageTemplateDefinition } from "./StageTemplates"
 import { NeoSelect, type NeoSelectOption } from "../../../components/NeoSelect";
 import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import {
+    validateStageTiming,
+    formatDateTimeDisplay,
+    formatDateToInput,
+} from "../eventWizardNavigationGuard";
 
 const STAGE_CATEGORY_OPTIONS: NeoSelectOption[] = [
     { value: "registration", label: "Registration" },
@@ -63,7 +68,7 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
     stages,
     onChange,
     eventStartsAt,
-    eventEndsAt: _eventEndsAt,
+    eventEndsAt,
     isTeamEvent,
 }) => {
     const [selectedStageId, setSelectedStageId] = useState<string | null>(stages[0]?.id || null);
@@ -71,21 +76,68 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
 
     const activeStage = stages.find((s) => s.id === selectedStageId) || stages[0];
 
-    // Helper to calculate smart default dates for a newly added stage
+    // Helper to calculate smart default dates for a newly added stage strictly inside boundaries
     const computeNextStageDates = (durationHours = 24) => {
-        let baseStart = new Date();
+        const now = new Date();
+        let baseStart: Date;
         if (stages.length > 0) {
             const lastStage = stages[stages.length - 1];
-            baseStart = new Date(lastStage.endsAt);
+            const lastEnd = lastStage.endsAt ? new Date(lastStage.endsAt) : null;
+            baseStart = lastEnd && !isNaN(lastEnd.getTime()) ? lastEnd : (eventStartsAt ? new Date(eventStartsAt) : now);
         } else if (eventStartsAt) {
             baseStart = new Date(eventStartsAt);
+        } else {
+            baseStart = now;
         }
 
-        const baseEnd = new Date(baseStart.getTime() + durationHours * 3600 * 1000);
+        // Never start before eventStartsAt
+        if (eventStartsAt) {
+            const eStart = new Date(eventStartsAt);
+            if (!isNaN(eStart.getTime()) && baseStart < eStart) {
+                baseStart = eStart;
+            }
+        }
+
+        let baseEnd = new Date(baseStart.getTime() + durationHours * 3600 * 1000);
+
+        // Never exceed eventEndsAt if eventEndsAt is specified
+        if (eventEndsAt) {
+            const eEnd = new Date(eventEndsAt);
+            if (!isNaN(eEnd.getTime())) {
+                if (baseStart >= eEnd) {
+                    baseStart = new Date(Math.max(eEnd.getTime() - Math.min(durationHours * 3600 * 1000, 3600 * 1000), eventStartsAt ? new Date(eventStartsAt).getTime() : 0));
+                }
+                if (baseEnd > eEnd) {
+                    baseEnd = eEnd;
+                }
+            }
+        }
+
         return {
-            startsAt: baseStart.toISOString().slice(0, 16),
-            endsAt: baseEnd.toISOString().slice(0, 16),
+            startsAt: formatDateToInput(baseStart),
+            endsAt: formatDateToInput(baseEnd),
         };
+    };
+
+    // Auto-fit all stages proportionally into event timeline if out-of-bounds
+    const handleAutoFitStages = () => {
+        if (!eventStartsAt || stages.length === 0) return;
+        const sDate = new Date(eventStartsAt);
+        const hasEnd = Boolean(eventEndsAt && !isNaN(new Date(eventEndsAt).getTime()) && new Date(eventEndsAt).getTime() > sDate.getTime());
+        const eDate = hasEnd ? new Date(eventEndsAt!) : new Date(sDate.getTime() + stages.length * 86400000);
+        const totalMs = Math.max(eDate.getTime() - sDate.getTime(), stages.length * 3600 * 1000);
+
+        const segmentMs = Math.floor(totalMs / stages.length);
+        const updated = stages.map((st, idx) => {
+            const stStart = new Date(sDate.getTime() + idx * segmentMs);
+            const stEnd = idx === stages.length - 1 ? eDate : new Date(sDate.getTime() + (idx + 1) * segmentMs);
+            return {
+                ...st,
+                startsAt: formatDateToInput(stStart),
+                endsAt: formatDateToInput(stEnd),
+            };
+        });
+        onChange(updated);
     };
 
     // Add stage from a template
@@ -214,12 +266,11 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
         onChange(reordered);
     };
 
-    // Validate stage dates
-    const isStageDatesValid = (s: ConfiguredStage) => {
-        const start = new Date(s.startsAt).getTime();
-        const end = new Date(s.endsAt).getTime();
-        return !isNaN(start) && !isNaN(end) && end >= start;
-    };
+    const hasAnyStageErrors = stages.some((s) => validateStageTiming(s, eventStartsAt, eventEndsAt).hasError);
+    const hasAnyOutOfBounds = stages.some((s) => validateStageTiming(s, eventStartsAt, eventEndsAt).isOutOfBounds);
+    const activeValidation = activeStage
+        ? validateStageTiming(activeStage, eventStartsAt, eventEndsAt)
+        : { hasError: false, isOutOfBounds: false, startsAtError: undefined, endsAtError: undefined, summaryError: undefined };
 
     return (
         <div className="space-y-6">
@@ -254,6 +305,55 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Event Timeline Boundaries Ribbon Banner */}
+            {eventStartsAt && (
+                <div
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border-2 transition-all ${
+                        hasAnyOutOfBounds
+                            ? "bg-rose-50 border-rose-600 shadow-[3px_3px_0px_#e11d48]"
+                            : "bg-[#FAF6EE] border-black shadow-[2px_2px_0px_#000]"
+                    }`}
+                >
+                    <div className="flex items-center gap-2.5 text-xs font-bold text-black min-w-0">
+                        <Calendar className="w-4 h-4 text-black shrink-0" />
+                        <span className="text-neutral-700 shrink-0">Main Event Timeline:</span>
+                        <span className="font-black text-black truncate">
+                            {formatDateTimeDisplay(eventStartsAt)}
+                            {eventEndsAt ? ` → ${formatDateTimeDisplay(eventEndsAt)}` : " onwards (No end date set)"}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        {hasAnyOutOfBounds ? (
+                            <>
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-600 text-white flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Boundary Violation
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={handleAutoFitStages}
+                                    className="px-2.5 py-1 rounded-lg border-2 border-black bg-[#FFE566] hover:bg-[#fedd33] font-black text-[11px] shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1 transition-all active:translate-x-[0.5px] active:translate-y-[0.5px]"
+                                    title="Automatically adjust round dates to fit inside the event timeline"
+                                >
+                                    <Sparkles className="w-3 h-3" />
+                                    <span>Auto-Fit Rounds</span>
+                                </button>
+                            </>
+                        ) : hasAnyStageErrors ? (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-300 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                Review Stages
+                            </span>
+                        ) : (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-black text-[#a2ff86]">
+                                Timeline Enforced
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Template Selector Drawer */}
             {showTemplatePicker && (
@@ -309,21 +409,32 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                     <div className="space-y-2.5">
                         {stages.map((stage, index) => {
                             const isSelected = stage.id === selectedStageId;
-                            const datesValid = isStageDatesValid(stage);
+                            const stageVal = validateStageTiming(stage, eventStartsAt, eventEndsAt);
+                            const datesValid = !stageVal.hasError;
 
                             return (
                                 <div
                                     key={stage.id}
                                     onClick={() => setSelectedStageId(stage.id)}
                                     className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer relative ${
-                                        isSelected
+                                        !datesValid
+                                            ? isSelected
+                                                ? "bg-rose-50/70 border-rose-600 ring-2 ring-rose-500 shadow-[4px_4px_0px_#e11d48] translate-x-1"
+                                                : "bg-white border-rose-400 hover:border-rose-600 shadow-[2px_2px_0px_#e11d48]"
+                                            : isSelected
                                             ? "bg-[#FAF6EE] border-black shadow-[4px_4px_0px_#000] translate-x-1"
                                             : "bg-white border-black/30 hover:border-black shadow-[2px_2px_0px_#000]"
                                     }`}
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="w-5 h-5 rounded-lg bg-black text-[#a2ff86] font-black text-xs flex items-center justify-center shrink-0">
+                                            <span
+                                                className={`w-5 h-5 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${
+                                                    !datesValid
+                                                        ? "bg-rose-600 text-white"
+                                                        : "bg-black text-[#a2ff86]"
+                                                }`}
+                                            >
                                                 {stage.stageOrder}
                                             </span>
                                             <div className="min-w-0">
@@ -370,10 +481,14 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                                             </span>
                                         </div>
 
-                                        {!datesValid && (
-                                            <span className="text-[10px] font-black text-rose-600 flex items-center gap-0.5">
-                                                <AlertCircle className="w-3 h-3" />
-                                                Invalid Dates
+                                        {!datesValid ? (
+                                            <span className="text-[10px] font-black text-rose-700 bg-rose-100 border border-rose-300 px-1.5 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                                                <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                                                <span>{stageVal.isOutOfBounds ? "Outside Schedule" : "Invalid Dates"}</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md shrink-0">
+                                                Valid
                                             </span>
                                         )}
                                     </div>
@@ -468,10 +583,32 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
 
                             {/* Schedule & Timing Configuration */}
                             <div className="p-4 rounded-xl bg-[#FAF6EE] border border-black/30 space-y-3">
-                                <span className="text-[11px] font-black uppercase text-black flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    <span>Schedule & Deadlines (IST - Asia/Kolkata)</span>
-                                </span>
+                                <div className="flex items-center justify-between flex-wrap gap-1">
+                                    <span className="text-[11px] font-black uppercase text-black flex items-center gap-1.5">
+                                        <Calendar className="w-3.5 h-3.5" />
+                                        <span>Schedule & Deadlines (IST - Asia/Kolkata)</span>
+                                    </span>
+                                    {eventStartsAt && (
+                                        <span className="text-[10px] font-bold text-neutral-600 bg-white/70 px-2 py-0.5 rounded-md border border-black/10">
+                                            Limit: {new Date(eventStartsAt).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
+                                            {eventEndsAt ? ` – ${new Date(eventEndsAt).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}` : ""}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {activeValidation.hasError && (
+                                    <div className="p-3 rounded-xl bg-rose-50 border-2 border-rose-500 shadow-[2px_2px_0px_#e11d48] flex items-start gap-2.5 text-rose-950 animate-in fade-in">
+                                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                        <div className="text-xs font-bold leading-tight">
+                                            <span className="font-black block text-rose-800">
+                                                {activeValidation.isOutOfBounds ? "Timeline Boundary Violation" : "Invalid Round Schedule"}
+                                            </span>
+                                            <span className="text-rose-700 text-[11px]">
+                                                {activeValidation.summaryError || "Please adjust round start and deadline dates to stay within the event schedule."}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
@@ -480,6 +617,9 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                                             required
                                             value={activeStage.startsAt}
                                             onChange={(val) => handleUpdateActiveStage("startsAt", val)}
+                                            error={activeValidation.startsAtError}
+                                            minDate={eventStartsAt}
+                                            maxDate={eventEndsAt}
                                             placeholder="Pick round start date & time"
                                             mode="datetime"
                                         />
@@ -491,6 +631,9 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                                             required
                                             value={activeStage.endsAt}
                                             onChange={(val) => handleUpdateActiveStage("endsAt", val)}
+                                            error={activeValidation.endsAtError}
+                                            minDate={activeStage.startsAt || eventStartsAt}
+                                            maxDate={eventEndsAt}
                                             placeholder="Pick submission deadline"
                                             mode="datetime"
                                         />

@@ -129,9 +129,6 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
 
         const isRefreshing = force || hasPortalMismatch;
         const primaryUrl = `/api/portals/submissions/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`;
-        const endpoints = import.meta.env.DEV
-            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-            : [primaryUrl];
 
         let authToken = "";
         try {
@@ -143,42 +140,38 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-        let lastError = "Failed to fetch unified submissions";
-
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    headers,
-                    credentials: "include",
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && (data.success !== false) && (data.dailyMerged || data.platformBreakdown || data.totalSubmissions !== undefined)) {
-                        return {
-                            username: effectiveUser,
-                            totalSubmissions: data.totalSubmissions || 0,
-                            activeDays: data.activeDays || 0,
-                            dayStreak: data.dayStreak || 0,
-                            maxStreak: data.maxStreak || 0,
-                            platformBreakdown: data.platformBreakdown || {},
-                            dailyMerged: data.dailyMerged || {},
-                            connectedPlatformsCount:
-                                data.connectedPlatformsCount ||
-                                Object.keys(data.platformBreakdown || {}).length,
-                            timestamp: data.timestamp || new Date().toISOString(),
-                            cooldownRemaining: data.cooldownRemaining,
-                            isCooldownActive: data.isCooldownActive,
-                            cooldownExpiresAt: data.cooldownExpiresAt,
-                            message: data.message,
-                        };
-                    }
+        try {
+            const res = await fetch(primaryUrl, {
+                headers,
+                credentials: "include",
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && (data.success !== false) && (data.dailyMerged || data.platformBreakdown || data.totalSubmissions !== undefined)) {
+                    return {
+                        username: effectiveUser,
+                        totalSubmissions: data.totalSubmissions || 0,
+                        activeDays: data.activeDays || 0,
+                        dayStreak: data.dayStreak || 0,
+                        maxStreak: data.maxStreak || 0,
+                        platformBreakdown: data.platformBreakdown || {},
+                        dailyMerged: data.dailyMerged || {},
+                        connectedPlatformsCount:
+                            data.connectedPlatformsCount ||
+                            Object.keys(data.platformBreakdown || {}).length,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        cooldownRemaining: data.cooldownRemaining,
+                        isCooldownActive: data.isCooldownActive,
+                        cooldownExpiresAt: data.cooldownExpiresAt,
+                        message: data.message,
+                    };
                 }
-            } catch (err: any) {
-                lastError = err?.message || lastError;
             }
+            const errData = await res.json().catch(() => null);
+            return rejectWithValue(errData?.message || `Failed to fetch unified submissions (${res.status})`);
+        } catch (err: any) {
+            return rejectWithValue(err?.message || "Failed to fetch unified submissions");
         }
-
-        return rejectWithValue(lastError);
     },
     {
         // Allow fetch if force or portal mismatch detected; prevent infinite duplicate requests

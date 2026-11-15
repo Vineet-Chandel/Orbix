@@ -419,30 +419,30 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     }
 
     return (
-        <div className="w-full rounded-2xl bg-white text-neutral-900 p-6 sm:p-7 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
+        <div className="w-full rounded-2xl bg-white text-neutral-900 p-4 sm:p-7 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
             {/* Top Header Row */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
-                <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5 relative z-10">
+                <div className="flex items-center gap-3 sm:gap-3.5">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] shrink-0">
                         <Code2 className="w-5 h-5 text-black" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
+                        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                            <h3 className="text-lg sm:text-2xl font-black text-black tracking-tight leading-tight">
                                 Practice Activity
                             </h3>
-                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] border-2 border-black text-[10px] sm:text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
                                 <Sparkles className="w-3 h-3 text-black" />
                                 <span>Multi-Platform Practice</span>
                             </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-neutral-600 font-bold mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-600 font-bold mt-0.5 sm:mt-1">
                             Merged problem solving and practice submissions from all connected platforms (excluding GitHub)
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0 flex-wrap justify-end">
+                <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full lg:w-auto flex-wrap">
                     {/* Sync / Refetch Platforms Button with 1-Hour Cooldown */}
                     <button
                         type="button"
@@ -472,20 +472,23 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     </button>
 
                     {/* Total Submissions Metric */}
-                    <div className="text-left md:text-right">
-                        <span className="text-3xl sm:text-4xl font-mono font-black text-black block leading-none">
+                    <div className="text-right">
+                        <span className="text-2xl sm:text-4xl font-mono font-black text-black block leading-none">
                             {totalSubmissions.toLocaleString()}
                         </span>
-                        <div className="inline-flex items-center md:justify-end gap-1.5 text-xs font-black uppercase tracking-wider text-black mt-1.5 bg-[#FAF6EE] border-2 border-black px-2.5 py-0.5 rounded-lg shadow-[1px_1px_0px_#000]">
-                            <GitCommit className="w-3.5 h-3.5 text-black" />
+                        <div className="inline-flex items-center justify-end gap-1.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-black mt-1 bg-[#FAF6EE] border-2 border-black px-2 sm:px-2.5 py-0.5 rounded-lg shadow-[1px_1px_0px_#000]">
+                            <GitCommit className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-black" />
                             <span>Submissions Done</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Platform Filter Chips Row */}
-            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y-2 border-black/15 relative z-10 scrollbar-none">
+            {/* Platform Filter Chips Row with Smooth Touch Scrolling */}
+            <div
+                style={{ WebkitOverflowScrolling: "touch" }}
+                className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y-2 border-black/15 relative z-10 scrollbar-none"
+            >
                 <button
                     type="button"
                     onClick={() => setSelectedPortal("all")}
@@ -531,7 +534,10 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             </div>
 
             {/* Heatmap Area: Uncovered, Circular Curvy Monochrome Dots with Spaces */}
-            <div className="py-4 relative z-10 overflow-x-auto scrollbar-none">
+            <div
+                style={{ WebkitOverflowScrolling: "touch" }}
+                className="py-4 relative z-10 overflow-x-auto scrollbar-none"
+            >
                 <div className="min-w-[700px] flex flex-col space-y-2">
                     {/* Month Labels Row aligned across columns */}
                     <div

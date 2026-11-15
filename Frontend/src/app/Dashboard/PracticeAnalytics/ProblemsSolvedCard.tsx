@@ -92,7 +92,7 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
                             <div className="w-36 h-36 rounded-full border-4 border-neutral-200" />
                         </div>
                     ) : (
-                        <div className="flex items-center justify-around sm:justify-start sm:gap-14">
+                        <div className="flex flex-col xs:flex-row items-center justify-center sm:justify-start gap-6 sm:gap-14">
                             {/* Circular Donut */}
                             <div className="relative w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 flex items-center justify-center">
                                 <svg
@@ -201,13 +201,13 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
                 </div>
 
                 {/* Bottom Platform Breakdown: Vertical Bar Chart */}
-                <div className="pt-6 mt-3 border-t-2 border-black/15 relative z-10">
+                <div className="pt-6 mt-3 border-t-2 border-black/15 relative z-10 overflow-x-auto no-scrollbar">
                     {platforms.length === 0 ? (
                         <div className="py-8 text-center text-xs text-neutral-500 font-bold">
                             No platform problem data available
                         </div>
                     ) : (
-                        <div className="flex items-end justify-around gap-2 sm:gap-4 h-48 sm:h-52 pt-6 pb-2">
+                        <div className="flex items-end justify-around gap-2 sm:gap-4 h-48 sm:h-52 pt-6 pb-2 min-w-[280px]">
                             {platforms.map((p) => {
                                 const heightPct =
                                     p.count === 0

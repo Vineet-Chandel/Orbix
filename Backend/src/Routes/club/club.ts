@@ -2180,6 +2180,49 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
             return res.status(400).json({ success: false, message: "endsAt cannot be earlier than startsAt." });
         }
 
+        const { initialStages } = req.body;
+        if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
+            const eventStartMs = new Date(startsAt).getTime();
+            const eventEndMs = endsAt ? new Date(endsAt).getTime() : NaN;
+
+            for (const stage of initialStages) {
+                const sStartMs = stage.startsAt ? new Date(stage.startsAt).getTime() : NaN;
+                const sEndMs = stage.endsAt ? new Date(stage.endsAt).getTime() : NaN;
+                const stageName = stage.name || stage.stageName || "Round";
+
+                if (!isNaN(sStartMs) && !isNaN(eventStartMs) && sStartMs < eventStartMs) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Round "${stageName}" cannot start before event start time.`,
+                    });
+                }
+                if (!isNaN(sStartMs) && !isNaN(eventEndMs) && sStartMs > eventEndMs) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Round "${stageName}" cannot start after event end time.`,
+                    });
+                }
+                if (!isNaN(sStartMs) && !isNaN(sEndMs) && sEndMs < sStartMs) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Round "${stageName}" submission deadline must be on or after round start time.`,
+                    });
+                }
+                if (!isNaN(sEndMs) && !isNaN(eventEndMs) && sEndMs > eventEndMs) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Round "${stageName}" submission deadline cannot be after event end time.`,
+                    });
+                }
+                if (!isNaN(sEndMs) && !isNaN(eventStartMs) && sEndMs < eventStartMs) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Round "${stageName}" submission deadline cannot be before event start time.`,
+                    });
+                }
+            }
+        }
+
         let baseSlug = generateSlug(title);
         if (!baseSlug) baseSlug = "event";
         let candidateSlug = baseSlug;
@@ -2292,7 +2335,6 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
         }
 
         // Save initial timeline stages configured during 5-step event creation wizard
-        const { initialStages } = req.body;
         if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
             try {
                 await EventStageService.syncEventStages(newEvent.id, clubId, initialStages);
@@ -2701,8 +2743,9 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
         if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
             try {
                 await EventStageService.syncEventStages(String(eventId), clubId, initialStages);
-            } catch (stageErr) {
+            } catch (stageErr: any) {
                 console.error("[PATCH /events/:eventId] Error syncing stages:", stageErr);
+                return res.status(400).json({ success: false, message: stageErr?.message || "Invalid stage timing." });
             }
         }
 
@@ -3178,7 +3221,22 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
                 CASE WHEN $1::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
                 CASE WHEN $1::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
-                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount"
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount",
+                (SELECT s.starts_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationStartsAt",
+                (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
+                COALESCE(
+                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN (e.ends_at IS NOT NULL AND NOW() > e.ends_at) OR e.status = 'completed' THEN true ELSE false END
+                ) AS "isRegistrationClosed",
+                COALESCE(
+                    (SELECT CASE WHEN NOW() < s.starts_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN NOW() < e.starts_at THEN true ELSE false END
+                ) AS "isRegistrationUpcoming",
+                (SELECT s.name FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageName",
+                (SELECT s.stage_order FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageOrder",
+                (SELECT COUNT(*)::int FROM club_event_stages s WHERE s.event_id = e.id) AS "stagesCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
             WHERE e.status IN ('published', 'completed') AND vc.is_active = true
@@ -3205,6 +3263,24 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
             sql += ` AND (COALESCE(e.ends_at, e.starts_at) < NOW() OR e.status = 'completed')`;
         } else if (timeFilter === "today") {
             sql += ` AND (DATE(e.starts_at) = CURRENT_DATE OR (e.starts_at <= NOW() AND COALESCE(e.ends_at, e.starts_at) >= NOW()))`;
+        } else if (timeFilter === "closed") {
+            sql += ` AND (
+                e.status != 'completed' AND (
+                    EXISTS (
+                        SELECT 1 FROM club_event_stages s 
+                        WHERE s.event_id = e.id 
+                          AND (s.type = 'registration' OR s.action_type = 'registration') 
+                          AND (s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at)
+                    )
+                    OR (
+                        NOT EXISTS (
+                            SELECT 1 FROM club_event_stages s 
+                            WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration')
+                        )
+                        AND e.ends_at IS NOT NULL AND NOW() > e.ends_at
+                    )
+                )
+            )`;
         }
 
         if (search) {
@@ -3281,7 +3357,22 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_id FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamId",
                 CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_role FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamRole",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
-                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount"
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount",
+                (SELECT s.starts_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationStartsAt",
+                (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
+                COALESCE(
+                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN (e.ends_at IS NOT NULL AND NOW() > e.ends_at) OR e.status = 'completed' THEN true ELSE false END
+                ) AS "isRegistrationClosed",
+                COALESCE(
+                    (SELECT CASE WHEN NOW() < s.starts_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN NOW() < e.starts_at THEN true ELSE false END
+                ) AS "isRegistrationUpcoming",
+                (SELECT s.name FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageName",
+                (SELECT s.stage_order FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageOrder",
+                (SELECT COUNT(*)::int FROM club_event_stages s WHERE s.event_id = e.id) AS "stagesCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
             WHERE e.id = $1 AND e.status IN ('published', 'completed')
@@ -3368,6 +3459,18 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 
         if (event.status !== "published") {
             return res.status(400).json({ success: false, message: "Registration is not open for this event." });
+        }
+
+        // Enforce Timeline Registration Window
+        const regWindow = await EventStageService.validateRegistrationWindow(eventId);
+        if (!regWindow.isOpen) {
+            return res.status(403).json({
+                success: false,
+                code: regWindow.code || "REGISTRATION_CLOSED",
+                message: regWindow.message || "Registration is closed for this event.",
+                deadline: regWindow.deadline,
+                startsAt: regWindow.startsAt,
+            });
         }
 
         // 1. Enforce Block Check

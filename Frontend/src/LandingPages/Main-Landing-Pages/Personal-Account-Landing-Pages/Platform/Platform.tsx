@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, RefreshCw, Layers, ShieldCheck, Sparkles, X } from "lucide-react";
-import { OrbixLogo } from "../../../components/OrbixLogo";
+import { OrbixLogo } from "../../../../components/OrbixLogo";
 
 export interface PlatformItem {
     id: string;
@@ -1022,11 +1022,10 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     >
                                         <button
                                             type="button"
-                                            className={`relative bg-white flex items-center justify-center cursor-pointer transition-all duration-200 border-2 border-black ${
-                                                isActive
-                                                    ? "shadow-[4px_4px_0px_#000] scale-110 z-30"
-                                                    : "shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:scale-95"
-                                            }`}
+                                            className={`relative bg-white flex items-center justify-center cursor-pointer transition-all duration-200 border-2 border-black ${isActive
+                                                ? "shadow-[4px_4px_0px_#000] scale-110 z-30"
+                                                : "shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:scale-95"
+                                                }`}
                                             style={{
                                                 width: canvasConfig.outerBadgeSize,
                                                 height: canvasConfig.outerBadgeSize,
@@ -1116,11 +1115,10 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     >
                                         <button
                                             type="button"
-                                            className={`relative bg-white flex items-center justify-center cursor-pointer transition-all duration-200 border-2 border-black ${
-                                                isActive
-                                                    ? "shadow-[4px_4px_0px_#000] scale-110 z-30"
-                                                    : "shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:scale-95"
-                                            }`}
+                                            className={`relative bg-white flex items-center justify-center cursor-pointer transition-all duration-200 border-2 border-black ${isActive
+                                                ? "shadow-[4px_4px_0px_#000] scale-110 z-30"
+                                                : "shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:scale-95"
+                                                }`}
                                             style={{
                                                 width: canvasConfig.innerBadgeSize,
                                                 height: canvasConfig.innerBadgeSize,
@@ -1152,11 +1150,10 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                         title="Orbix Autonomous Integration Core"
                     >
                         <div
-                            className={`relative rounded-full bg-[#0c101d] border-2 border-black flex items-center justify-center transition-all duration-300 ${
-                                isCenterHovered
-                                    ? "shadow-[6px_6px_0px_#000] -translate-y-1 scale-105"
-                                    : "shadow-[4px_4px_0px_#000]"
-                            }`}
+                            className={`relative rounded-full bg-[#0c101d] border-2 border-black flex items-center justify-center transition-all duration-300 ${isCenterHovered
+                                ? "shadow-[6px_6px_0px_#000] -translate-y-1 scale-105"
+                                : "shadow-[4px_4px_0px_#000]"
+                                }`}
                             style={{
                                 width: canvasConfig.centerSize,
                                 height: canvasConfig.centerSize,

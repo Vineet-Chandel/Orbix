@@ -61,6 +61,11 @@ export const EventPublicTimelineView: React.FC<EventPublicTimelineViewProps> = (
             .finally(() => setLoading(false));
     }, [eventId]);
 
+    const registrationStage = stages.find((s) => s.type === "registration" || s.actionType === "registration");
+    const isRegistrationConcluded = registrationStage
+        ? (registrationStage.status === "completed" || registrationStage.status === "cancelled" || new Date(registrationStage.endsAt).getTime() < Date.now())
+        : false;
+
     // Handle opening submission dialog for a stage
     const handleOpenSubmission = async (stage: ConfiguredStage) => {
         setSubmittingStage(stage);
@@ -276,6 +281,10 @@ export const EventPublicTimelineView: React.FC<EventPublicTimelineViewProps> = (
                                                     <UploadCloud className="w-3.5 h-3.5 stroke-[2.5]" />
                                                     <span>Submit Deliverables</span>
                                                 </button>
+                                            ) : isRegistrationConcluded ? (
+                                                <span className="text-[11px] font-bold text-neutral-500 italic">
+                                                    Registration concluded · Restricted to registered participants
+                                                </span>
                                             ) : (
                                                 <span className="text-[11px] font-bold text-neutral-500 italic">
                                                     Apply above to submit deliverables

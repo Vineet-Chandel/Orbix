@@ -16,6 +16,7 @@ export interface CreateStageInput {
     actionType?: string;
     requirements?: Record<string, any>;
     bannerUrl?: string;
+    formConfig?: any;
 }
 
 export class EventStageService {
@@ -42,15 +43,137 @@ export class EventStageService {
     }
 
     /**
+     * Retrieves the designated Registration stage for an event if configured
+     */
+    static async getEventRegistrationStage(eventId: string): Promise<any | null> {
+        const res = await query(
+            `SELECT * FROM club_event_stages 
+             WHERE event_id = $1 AND (type = 'registration' OR action_type = 'registration')
+             ORDER BY stage_order ASC LIMIT 1;`,
+            [eventId]
+        );
+        return res.rows[0] || null;
+    }
+
+    /**
+     * Algorithmic check: Is registration currently open for this event?
+     * Returns { isOpen: boolean, reason?: string, deadline?: Date, startsAt?: Date }
+     */
+    static async validateRegistrationWindow(eventId: string): Promise<{
+        isOpen: boolean;
+        code?: "REGISTRATION_NOT_STARTED" | "REGISTRATION_DEADLINE_PASSED" | "EVENT_NOT_OPEN";
+        message?: string;
+        deadline?: Date;
+        startsAt?: Date;
+    }> {
+        // 1. Fetch event status and timings
+        const evRes = await query(
+            `SELECT id, status, starts_at, ends_at FROM club_events WHERE id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        if (!evRes.rows[0]) {
+            return { isOpen: false, code: "EVENT_NOT_OPEN", message: "Event not found." };
+        }
+        const ev = evRes.rows[0];
+
+        if (ev.status === "completed" || ev.status === "cancelled") {
+            return { isOpen: false, code: "EVENT_NOT_OPEN", message: `Event is already ${ev.status}.` };
+        }
+
+        // 2. Check explicit registration stage in timeline
+        const regStage = await this.getEventRegistrationStage(eventId);
+        const now = new Date();
+
+        if (regStage) {
+            const rStart = new Date(regStage.starts_at);
+            const rEnd = new Date(regStage.ends_at);
+
+            if (regStage.status === "completed" || regStage.status === "cancelled" || now > rEnd) {
+                const formatted = rEnd.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+                return {
+                    isOpen: false,
+                    code: "REGISTRATION_DEADLINE_PASSED",
+                    message: `Registration for this event concluded on ${formatted} IST. Applications are no longer accepted.`,
+                    deadline: rEnd,
+                    startsAt: rStart,
+                };
+            }
+
+            if (now < rStart) {
+                const formatted = rStart.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+                return {
+                    isOpen: false,
+                    code: "REGISTRATION_NOT_STARTED",
+                    message: `Registration for this event opens on ${formatted} IST.`,
+                    deadline: rEnd,
+                    startsAt: rStart,
+                };
+            }
+
+            return { isOpen: true, deadline: rEnd, startsAt: rStart };
+        }
+
+        // 3. Fallback: If no explicit registration stage exists, check overall event schedule
+        if (ev.ends_at && now > new Date(ev.ends_at)) {
+            return {
+                isOpen: false,
+                code: "REGISTRATION_DEADLINE_PASSED",
+                message: "Event schedule has already concluded.",
+                deadline: new Date(ev.ends_at),
+                startsAt: new Date(ev.starts_at),
+            };
+        }
+
+        return {
+            isOpen: true,
+            deadline: ev.ends_at ? new Date(ev.ends_at) : undefined,
+            startsAt: new Date(ev.starts_at),
+        };
+    }
+
+    /**
      * Create multiple stages for an event in batch (used by Wizard Step 2 & API)
      */
     static async createStagesBatch(eventId: string, clubId: string, stages: CreateStageInput[]): Promise<any[]> {
         const createdStages: any[] = [];
+        const now = new Date();
+
+        // Validate stages against event timeline boundaries
+        const eventRes = await query(`SELECT starts_at, ends_at FROM club_events WHERE id = $1;`, [eventId]);
+        const ev = eventRes.rows[0];
+        const eventStartMs = ev?.starts_at ? new Date(ev.starts_at).getTime() : NaN;
+        const eventEndMs = ev?.ends_at ? new Date(ev.ends_at).getTime() : NaN;
+
+        for (const s of stages) {
+            const sStartMs = s.startsAt ? new Date(s.startsAt).getTime() : NaN;
+            const sEndMs = s.endsAt ? new Date(s.endsAt).getTime() : NaN;
+            const stageName = s.name || "Round";
+
+            if (!isNaN(sStartMs) && !isNaN(eventStartMs) && sStartMs < eventStartMs) {
+                throw new Error(`Round "${stageName}" cannot start before event start time.`);
+            }
+            if (!isNaN(sStartMs) && !isNaN(eventEndMs) && sStartMs > eventEndMs) {
+                throw new Error(`Round "${stageName}" cannot start after event end time.`);
+            }
+            if (!isNaN(sStartMs) && !isNaN(sEndMs) && sEndMs < sStartMs) {
+                throw new Error(`Round "${stageName}" submission deadline must be on or after round start time.`);
+            }
+            if (!isNaN(sEndMs) && !isNaN(eventEndMs) && sEndMs > eventEndMs) {
+                throw new Error(`Round "${stageName}" submission deadline cannot be after event end time.`);
+            }
+            if (!isNaN(sEndMs) && !isNaN(eventStartMs) && sEndMs < eventStartMs) {
+                throw new Error(`Round "${stageName}" submission deadline cannot be before event start time.`);
+            }
+        }
 
         let i = 0;
         for (const s of stages) {
             i++;
             const order = s.stageOrder ?? i;
+            const sStart = new Date(s.startsAt);
+            const sEnd = new Date(s.endsAt);
+            const initialStatus = sEnd < now ? "completed" : sStart <= now ? "active" : "scheduled";
+
             const res = await query(
                 `INSERT INTO club_event_stages (
                     event_id, club_id, name, type, description, instructions, stage_order,
@@ -66,8 +189,8 @@ export class EventStageService {
                     s.description || null,
                     s.instructions || null,
                     order,
-                    new Date(s.startsAt),
-                    new Date(s.endsAt),
+                    sStart,
+                    sEnd,
                     s.timezone || "Asia/Kolkata",
                     s.eligibilityType || "all_registered",
                     JSON.stringify(s.eligibleTeamIds || []),
@@ -81,13 +204,46 @@ export class EventStageService {
                         allMembersCanView: true,
                         lateSubmissionPolicy: "disallow",
                         requireApprovalToAdvance: false,
+                        isElimination: false,
+                        requiresSubmission: false,
                     }),
                     s.bannerUrl || null,
-                    new Date(s.startsAt) <= new Date() && new Date() < new Date(s.endsAt) ? "active" : "scheduled"
+                    initialStatus
                 ]
             );
 
-            createdStages.push(res.rows[0]);
+            const createdStage = res.rows[0];
+            createdStages.push(createdStage);
+
+            // If a custom stage submission form was supplied in formConfig, save to club_event_stage_forms
+            if (s.formConfig && createdStage.id) {
+                try {
+                    await query(
+                        `INSERT INTO club_event_stage_forms (stage_id, event_id, title, description, fields, allowed_file_types, max_file_size_bytes, max_files)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                         ON CONFLICT (stage_id) DO UPDATE SET
+                            title = EXCLUDED.title,
+                            description = EXCLUDED.description,
+                            fields = EXCLUDED.fields,
+                            allowed_file_types = EXCLUDED.allowed_file_types,
+                            max_file_size_bytes = EXCLUDED.max_file_size_bytes,
+                            max_files = EXCLUDED.max_files,
+                            updated_at = NOW();`,
+                        [
+                            createdStage.id,
+                            eventId,
+                            s.formConfig.title || s.name,
+                            s.formConfig.description || null,
+                            JSON.stringify(s.formConfig.fields || []),
+                            JSON.stringify(s.formConfig.allowedFileTypes || ["pdf", "zip", "png", "jpg"]),
+                            s.formConfig.maxFileSizeBytes || 26214400,
+                            s.formConfig.maxFiles || 5,
+                        ]
+                    );
+                } catch (formSaveErr) {
+                    console.error("[EventStageService] Error saving stage form config:", formSaveErr);
+                }
+            }
         }
 
         return createdStages;
@@ -118,18 +274,27 @@ export class EventStageService {
             type: s.stageType || s.type || "custom",
             description: s.description || null,
             instructions: s.instructions || null,
-            stageOrder: typeof s.orderIndex === "number" ? s.orderIndex : (typeof s.stageOrder === "number" ? s.stageOrder : idx),
+            stageOrder: typeof s.orderIndex === "number" ? s.orderIndex : (typeof s.stageOrder === "number" ? s.stageOrder : idx + 1),
             startsAt: s.startsAt,
             endsAt: s.endsAt,
             timezone: s.timezone || "Asia/Kolkata",
             eligibilityType: s.eligibilityType || "all_registered",
-            actionType: s.participantActionType || s.actionType || (s.requiresSubmission ? "file_submission" : "none"),
+            eligibleTeamIds: s.eligibleTeamIds || [],
+            eligibleUserIds: s.eligibleUserIds || [],
+            actionType: s.participantActionType || s.actionType || (s.requiresSubmission ? "submit_project" : "none"),
             requirements: {
-                ...(s.submissionRequirements || {}),
-                isElimination: Boolean(s.isElimination),
-                requiresSubmission: Boolean(s.requiresSubmission),
+                allowResubmission: s.requirements?.allowResubmission ?? s.submissionRequirements?.allowResubmission ?? true,
+                maxSubmissions: s.requirements?.maxSubmissions ?? s.submissionRequirements?.maxSubmissions ?? 1,
+                teamSubmissionOnly: Boolean(s.requirements?.teamSubmissionOnly ?? s.submissionRequirements?.teamSubmissionOnly),
+                leaderOnlySubmit: Boolean(s.requirements?.leaderOnlySubmit ?? s.submissionRequirements?.leaderOnlySubmit ?? true),
+                allMembersCanView: s.requirements?.allMembersCanView ?? s.submissionRequirements?.allMembersCanView ?? true,
+                lateSubmissionPolicy: s.requirements?.lateSubmissionPolicy || s.submissionRequirements?.lateSubmissionPolicy || "disallow",
+                requireApprovalToAdvance: Boolean(s.requirements?.requireApprovalToAdvance ?? s.submissionRequirements?.requireApprovalToAdvance),
+                isElimination: Boolean(s.requirements?.isElimination ?? s.isElimination),
+                requiresSubmission: Boolean(s.requirements?.requiresSubmission ?? s.requiresSubmission),
             },
             bannerUrl: s.bannerUrl || null,
+            formConfig: s.formConfig || undefined,
         }));
 
         return await this.createStagesBatch(eventId, clubId, inputList);
@@ -145,6 +310,34 @@ export class EventStageService {
             throw new Error("Stage not found");
         }
         const oldState = currentRes.rows[0];
+
+        // If timing is being updated, validate against main event boundaries
+        if (updates.startsAt || updates.endsAt) {
+            const eventRes = await query(`SELECT starts_at, ends_at FROM club_events WHERE id = $1;`, [eventId]);
+            const ev = eventRes.rows[0];
+            const eventStartMs = ev?.starts_at ? new Date(ev.starts_at).getTime() : NaN;
+            const eventEndMs = ev?.ends_at ? new Date(ev.ends_at).getTime() : NaN;
+
+            const effectiveStart = updates.startsAt ? new Date(updates.startsAt).getTime() : new Date(oldState.starts_at).getTime();
+            const effectiveEnd = updates.endsAt ? new Date(updates.endsAt).getTime() : new Date(oldState.ends_at).getTime();
+            const stageName = updates.name || oldState.name;
+
+            if (!isNaN(effectiveStart) && !isNaN(eventStartMs) && effectiveStart < eventStartMs) {
+                throw new Error(`Round "${stageName}" cannot start before event start time.`);
+            }
+            if (!isNaN(effectiveStart) && !isNaN(eventEndMs) && effectiveStart > eventEndMs) {
+                throw new Error(`Round "${stageName}" cannot start after event end time.`);
+            }
+            if (!isNaN(effectiveStart) && !isNaN(effectiveEnd) && effectiveEnd < effectiveStart) {
+                throw new Error(`Round "${stageName}" submission deadline must be on or after its start time.`);
+            }
+            if (!isNaN(effectiveEnd) && !isNaN(eventEndMs) && effectiveEnd > eventEndMs) {
+                throw new Error(`Round "${stageName}" submission deadline cannot be after event end time.`);
+            }
+            if (!isNaN(effectiveEnd) && !isNaN(eventStartMs) && effectiveEnd < eventStartMs) {
+                throw new Error(`Round "${stageName}" submission deadline cannot be before event start time.`);
+            }
+        }
 
         const setClauses: string[] = [];
         const params: any[] = [stageId, eventId];

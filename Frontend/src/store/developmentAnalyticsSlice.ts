@@ -129,39 +129,32 @@ export const fetchDevelopmentAnalytics = createAsyncThunk<
         }
 
         const primaryUrl = `/api/portals/development/analytics?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsParam}`;
-        const endpoints = import.meta.env.DEV
-            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-            : [primaryUrl];
 
-        let lastError = "Failed to fetch development analytics";
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    headers: reqHeaders,
-                    signal: AbortSignal.timeout(10000),
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.success || data.contributions !== undefined) {
-                        return {
-                            username: effectiveUser,
-                            githubHandle: data.githubHandle || ghHandle || "",
-                            contributions: data.contributions ?? 0,
-                            repos: data.repos ?? 0,
-                            stars: data.stars ?? 0,
-                            followers: data.followers ?? 0,
-                            languages: data.languages || [],
-                            topRepositories: data.topRepositories || [],
-                            mostStarred: data.mostStarred ?? null,
-                            latestWork: data.latestWork ?? null,
-                            timestamp: data.timestamp || new Date().toISOString(),
-                        };
-                    }
-                    lastError = data.message || lastError;
+        try {
+            const res = await fetch(primaryUrl, {
+                headers: reqHeaders,
+                signal: AbortSignal.timeout(10000),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success || data.contributions !== undefined) {
+                    return {
+                        username: effectiveUser,
+                        githubHandle: data.githubHandle || ghHandle || "",
+                        contributions: data.contributions ?? 0,
+                        repos: data.repos ?? 0,
+                        stars: data.stars ?? 0,
+                        followers: data.followers ?? 0,
+                        languages: data.languages || [],
+                        topRepositories: data.topRepositories || [],
+                        mostStarred: data.mostStarred ?? null,
+                        latestWork: data.latestWork ?? null,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                    };
                 }
-            } catch (err: any) {
-                lastError = err.message || lastError;
             }
+        } catch {
+            // fallback to cached or default
         }
 
         // Return existing cached data if available

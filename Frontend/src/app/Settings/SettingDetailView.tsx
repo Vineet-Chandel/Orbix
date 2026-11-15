@@ -158,25 +158,19 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             setSetupCooldownSeconds(60);
             try {
                 const primarySetup = buildApiUrl("/api/auth/2fa/setup/send-otp");
-                const endpoints = import.meta.env.DEV
-                    ? [primarySetup, "http://localhost:3000/api/auth/2fa/setup/send-otp"]
-                    : [primarySetup];
                 let response: Response | null = null;
                 let resultData: any = null;
 
-                for (const url of endpoints) {
-                    try {
-                        const res = await fetch(url, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                        });
-                        response = res;
-                        resultData = await res.json().catch(() => null);
-                        break;
-                    } catch {
-                        continue;
-                    }
+                try {
+                    const res = await fetch(primarySetup, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                    });
+                    response = res;
+                    resultData = await res.json().catch(() => null);
+                } catch {
+                    // Network error
                 }
 
                 if (!response || !response.ok) {
@@ -210,25 +204,19 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
         setIsSendingSetupOtp(true);
         try {
             const primaryResend = buildApiUrl("/api/auth/2fa/setup/send-otp");
-            const endpoints = import.meta.env.DEV
-                ? [primaryResend, "http://localhost:3000/api/auth/2fa/setup/send-otp"]
-                : [primaryResend];
             let response: Response | null = null;
             let resultData: any = null;
 
-            for (const url of endpoints) {
-                try {
-                    const res = await fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                    });
-                    response = res;
-                    resultData = await res.json().catch(() => null);
-                    break;
-                } catch {
-                    continue;
-                }
+            try {
+                const res = await fetch(primaryResend, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                });
+                response = res;
+                resultData = await res.json().catch(() => null);
+            } catch {
+                // Network error
             }
 
             if (!response || !response.ok) {
@@ -296,26 +284,20 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
         setIsVerifyingSetupOtp(true);
         try {
             const primaryVerify = buildApiUrl("/api/auth/2fa/setup/verify-otp");
-            const endpoints = import.meta.env.DEV
-                ? [primaryVerify, "http://localhost:3000/api/auth/2fa/setup/verify-otp"]
-                : [primaryVerify];
             let response: Response | null = null;
             let resultData: any = null;
 
-            for (const url of endpoints) {
-                try {
-                    const res = await fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                        body: JSON.stringify({ otp: code }),
-                    });
-                    response = res;
-                    resultData = await res.json().catch(() => null);
-                    break;
-                } catch {
-                    continue;
-                }
+            try {
+                const res = await fetch(primaryVerify, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ otp: code }),
+                });
+                response = res;
+                resultData = await res.json().catch(() => null);
+            } catch {
+                // Network error
             }
 
             if (!response || !response.ok) {
@@ -347,24 +329,18 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
         setIsDisabling2FA(true);
         try {
             const primaryDisable = buildApiUrl("/api/auth/2fa/disable");
-            const endpoints = import.meta.env.DEV
-                ? [primaryDisable, "http://localhost:3000/api/auth/2fa/disable"]
-                : [primaryDisable];
             let response: Response | null = null;
 
-            for (const url of endpoints) {
-                try {
-                    const res = await fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                        body: JSON.stringify({ password: disablePassword }),
-                    });
-                    response = res;
-                    break;
-                } catch {
-                    continue;
-                }
+            try {
+                const res = await fetch(primaryDisable, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ password: disablePassword }),
+                });
+                response = res;
+            } catch {
+                // Network error
             }
 
             if (!response || !response.ok) {
@@ -1568,28 +1544,30 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            {/* Header */}
-            <div className="flex items-center gap-3 pb-4 border-b-2 border-black/15">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="p-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer shrink-0"
-                    aria-label={["verify-account", "password-security", "manage-account"].includes(viewKey) ? "Back to Account Center" : "Back to Settings Hub"}
-                    title={["verify-account", "password-security", "manage-account"].includes(viewKey) ? "Back to Account Center" : "Back to Settings"}
-                >
-                    <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-                </button>
-                <div className="space-y-0.5">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500">
-                        {["verify-account", "password-security", "manage-account"].includes(viewKey)
-                            ? "Settings • Account Center"
-                            : "Settings"}
-                    </span>
-                    <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                        {getViewTitle()}
-                    </h2>
+            {/* Header (Suppressed when viewKey === "help" since HelpCenterView renders its own unified full-width header) */}
+            {viewKey !== "help" && (
+                <div className="flex items-center gap-3 pb-4 border-b-2 border-black/15">
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        className="p-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer shrink-0"
+                        aria-label={["verify-account", "password-security", "manage-account"].includes(viewKey) ? "Back to Account Center" : "Back to Settings Hub"}
+                        title={["verify-account", "password-security", "manage-account"].includes(viewKey) ? "Back to Account Center" : "Back to Settings"}
+                    >
+                        <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                    <div className="space-y-0.5">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                            {["verify-account", "password-security", "manage-account"].includes(viewKey)
+                                ? "Settings • Account Center"
+                                : "Settings"}
+                        </span>
+                        <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                            {getViewTitle()}
+                        </h2>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {renderContent()}
 

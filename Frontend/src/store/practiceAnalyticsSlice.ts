@@ -176,41 +176,34 @@ export const fetchPracticeAnalytics = createAsyncThunk<
         }
 
         const primaryUrl = `/api/portals/practice/analytics?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsParam}`;
-        const endpoints = import.meta.env.DEV
-            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-            : [primaryUrl];
 
-        let lastError = "Failed to fetch practice analytics";
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    headers: reqHeaders,
-                    signal: AbortSignal.timeout(10000),
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.success || data.totalSolved !== undefined) {
-                        return {
-                            username: effectiveUser,
-                            totalSolved: data.totalSolved || 0,
-                            donutTotal: data.donutTotal || 0,
-                            difficulty: data.difficulty || { easy: 0, medium: 0, hard: 0, total: 0 },
-                            platformBreakdown: data.platformBreakdown || [],
-                            recentlySolved: data.recentlySolved || [],
-                            dsaTopics: data.dsaTopics || [],
-                            topicStrength: data.topicStrength || [],
-                            trends: data.trends,
-                            timestamp: data.timestamp || new Date().toISOString(),
-                        };
-                    }
-                    lastError = data.message || lastError;
+        try {
+            const res = await fetch(primaryUrl, {
+                headers: reqHeaders,
+                signal: AbortSignal.timeout(10000),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success || data.totalSolved !== undefined) {
+                    return {
+                        username: effectiveUser,
+                        totalSolved: data.totalSolved || 0,
+                        donutTotal: data.donutTotal || 0,
+                        difficulty: data.difficulty || { easy: 0, medium: 0, hard: 0, total: 0 },
+                        platformBreakdown: data.platformBreakdown || [],
+                        recentlySolved: data.recentlySolved || [],
+                        dsaTopics: data.dsaTopics || [],
+                        topicStrength: data.topicStrength || [],
+                        trends: data.trends,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                    };
                 }
-            } catch (err: any) {
-                lastError = err.message || lastError;
             }
+            const errData = await res.json().catch(() => null);
+            return rejectWithValue(errData?.message || `Failed to fetch practice analytics (${res.status})`);
+        } catch (err: any) {
+            return rejectWithValue(err.message || "Failed to fetch practice analytics");
         }
-
-        return rejectWithValue(lastError);
     },
     {
         condition: ({ username, force = false }, { getState }) => {

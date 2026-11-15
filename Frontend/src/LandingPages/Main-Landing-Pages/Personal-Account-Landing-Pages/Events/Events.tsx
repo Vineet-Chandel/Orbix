@@ -16,7 +16,7 @@ import {
     Eye,
     EyeOff,
 } from "lucide-react";
-import { getPortalIcon } from "../../../utils/portalIcons";
+import { getPortalIcon } from "../../../../utils/portalIcons";
 import {
     getInitialLandingEvents,
     fetchLandingEventsApi,
@@ -24,8 +24,8 @@ import {
     saveLandingEventsProfile,
     generateDynamicMockEvents,
 } from "./mockEvents";
-import type { EventItem } from "../../../store";
-import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import type { EventItem } from "../../../../store";
+import { useModalDismiss } from "../../../../hooks/useModalDismiss";
 
 export const ALL_FILTER_PLATFORMS = [
     { id: "leetcode", name: "LeetCode", color: "#FFA116" },

@@ -74,6 +74,33 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
         new Date(event.startsAt).getTime() <= Date.now() &&
         (event.endsAt ? new Date(event.endsAt).getTime() >= Date.now() : true);
 
+    const checkIsRegistrationClosed = (): boolean => {
+        if (isCompleted || event.status === "cancelled") return true;
+        if (typeof event.isRegistrationClosed === "boolean") return event.isRegistrationClosed;
+        if (event.registrationDeadline) {
+            const deadlineMs = new Date(event.registrationDeadline).getTime();
+            if (!isNaN(deadlineMs)) return deadlineMs < Date.now();
+        }
+        if (event.endsAt) {
+            const endsMs = new Date(event.endsAt).getTime();
+            if (!isNaN(endsMs)) return endsMs < Date.now();
+        }
+        return false;
+    };
+
+    const checkIsRegistrationUpcoming = (): boolean => {
+        if (isCompleted || event.status === "cancelled") return false;
+        if (typeof event.isRegistrationUpcoming === "boolean") return event.isRegistrationUpcoming;
+        if (event.registrationStartsAt) {
+            const startsMs = new Date(event.registrationStartsAt).getTime();
+            if (!isNaN(startsMs)) return startsMs > Date.now();
+        }
+        return false;
+    };
+
+    const isRegClosed = checkIsRegistrationClosed();
+    const isRegUpcoming = checkIsRegistrationUpcoming();
+
     const handleCopyTicket = () => {
         if (!event.ticketCode) return;
         navigator.clipboard.writeText(event.ticketCode);
@@ -383,6 +410,30 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                 ) : isCompleted ? (
                                     <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-300 text-center text-xs font-bold text-neutral-600">
                                         This event session has concluded.
+                                    </div>
+                                ) : isRegClosed ? (
+                                    <div className="p-3.5 rounded-xl bg-neutral-100 border-2 border-neutral-400 space-y-1.5 text-center">
+                                        <div className="flex items-center justify-center gap-1.5 text-neutral-900 font-black text-xs uppercase tracking-wider">
+                                            <Lock className="w-3.5 h-3.5 text-neutral-600" />
+                                            <span>Registration Concluded</span>
+                                        </div>
+                                        <p className="text-[11px] font-bold text-neutral-600 leading-relaxed">
+                                            {event.registrationDeadline 
+                                                ? `The registration window for this event closed on ${new Date(event.registrationDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}. Applications are no longer accepted.`
+                                                : "The registration window for this event has closed. Applications are no longer accepted."}
+                                        </p>
+                                    </div>
+                                ) : isRegUpcoming ? (
+                                    <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-1.5 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-amber-950 font-black text-xs uppercase tracking-wider">
+                                            <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                            <span>Registration Opens Soon</span>
+                                        </div>
+                                        <p className="text-[11px] font-bold text-amber-800 leading-relaxed">
+                                            {event.registrationStartsAt
+                                                ? `Registration opens on ${new Date(event.registrationStartsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}.`
+                                                : "Registration for this event has not started yet."}
+                                        </p>
                                     </div>
                                 ) : (
                                     <button

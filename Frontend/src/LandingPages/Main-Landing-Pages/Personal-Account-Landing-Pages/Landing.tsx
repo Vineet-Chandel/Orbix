@@ -1,12 +1,12 @@
 import React from 'react';
-import NavBar from '../NavBar/Landing';
-import Hero from './Hero/Landing';
+import NavBar from '../../NavBar/Landing';
+import Hero from '../Hero/Landing';
 import { Card } from './Card';
 import { Platform } from './Platform';
 import { Events } from './Events';
 import { LeaderboardShowcase as Leaderboard } from './Leaderboard';
 import { ClubsShowcase as Clubs } from './clubs';
-import { Footer } from './Footer';
+import { Footer } from '../Footer';
 
 /**
  * Optimized Showcase Section:
@@ -34,7 +34,7 @@ export default function MainLanding() {
 
       <NavBar />
 
-      <Hero />
+      <Hero mode="developer" />
 
       <ShowcaseSection fallbackHeight={520}>
         <section className="w-full">

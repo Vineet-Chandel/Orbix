@@ -298,3 +298,122 @@ export async function submitFAQFeedback(
 
     return data;
 }
+
+export interface HelpUploadConfig {
+    cloudName: string;
+    apiKey: string;
+    timestamp: number;
+    signature: string;
+    publicId: string;
+    folder: string;
+    uploadUrl: string;
+    maxBytes: number;
+    allowedFormats: string[];
+}
+
+/**
+ * Step A: Request signed upload configuration for Help Center screenshot attachments
+ */
+export async function requestHelpUploadSignature(): Promise<HelpUploadConfig> {
+    const res = await fetch(`${API_BASE}/help/upload-signature`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.uploadConfig) {
+        throw new Error(data.message || "Failed to generate Cloudinary upload signature.");
+    }
+
+    return data.uploadConfig;
+}
+
+/**
+ * Fallback: Upload screenshot directly via backend proxy
+ */
+export async function uploadHelpScreenshotDirect(file: File): Promise<{
+    secureUrl: string;
+    url: string;
+    publicId: string;
+}> {
+    const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+
+    const res = await fetch(`${API_BASE}/help/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ image: base64Data }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.secureUrl) {
+        throw new Error(data.message || "Failed to upload screenshot to Cloudinary.");
+    }
+
+    return data;
+}
+
+/**
+ * Upload image file directly to Cloudinary using signed upload, with automatic backend fallback
+ */
+export async function uploadHelpScreenshot(
+    file: File,
+    onProgress?: (percent: number) => void
+): Promise<{ secureUrl: string; publicId: string }> {
+    try {
+        const config = await requestHelpUploadSignature();
+
+        return await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener("progress", (event) => {
+                if (event.lengthComputable && onProgress) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    onProgress(percent);
+                }
+            });
+
+            xhr.addEventListener("load", () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        resolve({
+                            publicId: response.public_id || config.publicId,
+                            secureUrl: response.secure_url,
+                        });
+                    } catch {
+                        reject(new Error("Failed to parse Cloudinary response."));
+                    }
+                } else {
+                    reject(new Error(`Cloudinary upload returned status ${xhr.status}`));
+                }
+            });
+
+            xhr.addEventListener("error", () => {
+                reject(new Error("Network connection lost during upload."));
+            });
+
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("api_key", config.apiKey);
+            formData.append("timestamp", String(config.timestamp));
+            formData.append("signature", config.signature);
+            formData.append("public_id", config.publicId);
+
+            xhr.open("POST", config.uploadUrl, true);
+            xhr.send(formData);
+        });
+    } catch (directErr) {
+        console.warn("[Help Cloudinary] Direct upload failed, falling back to backend upload:", directErr);
+        if (onProgress) onProgress(50);
+        const result = await uploadHelpScreenshotDirect(file);
+        if (onProgress) onProgress(100);
+        return { secureUrl: result.secureUrl, publicId: result.publicId };
+    }
+}

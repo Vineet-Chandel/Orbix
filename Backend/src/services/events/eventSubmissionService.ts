@@ -142,15 +142,34 @@ export class EventSubmissionService {
 
         // 2. Deadline & Status validation
         const now = new Date();
-        if (stage.status !== "active") {
-            if (stage.status === "paused") {
-                throw new Error("This round is temporarily paused by the organizers.");
-            }
-            if (now > new Date(stage.ends_at)) {
+        const stageStart = new Date(stage.starts_at);
+        const stageEnd = new Date(stage.ends_at);
+
+        if (stage.status === "paused") {
+            throw new Error("This round is temporarily paused by the organizers.");
+        }
+        if (stage.status === "cancelled") {
+            throw new Error("This round has been cancelled.");
+        }
+        if (now < stageStart) {
+            throw new Error(`This round has not yet started. Opens on ${stageStart.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`);
+        }
+
+        const isPastDeadline = now > stageEnd;
+        let isLateSubmission = false;
+
+        if (isPastDeadline) {
+            const latePolicy = stage.requirements?.lateSubmissionPolicy || "disallow";
+            if (latePolicy === "disallow") {
                 throw new Error("The submission deadline for this round has closed.");
-            }
-            if (now < new Date(stage.starts_at)) {
-                throw new Error("This round has not yet started.");
+            } else if (latePolicy === "allow_grace_period") {
+                const gracePeriodMs = 2 * 60 * 60 * 1000; // 2 hour grace period
+                if (now.getTime() - stageEnd.getTime() > gracePeriodMs) {
+                    throw new Error("The grace period deadline for this round has expired.");
+                }
+                isLateSubmission = true;
+            } else if (latePolicy === "allow_with_flag") {
+                isLateSubmission = true;
             }
         }
 
@@ -170,19 +189,68 @@ export class EventSubmissionService {
             throw new Error(`Your event application status (${registration.status}) does not permit stage submission.`);
         }
 
-        // 4. Shortlisting check
+        // 4. Detailed Eligibility Types Check
         if (stage.eligibility_type === "shortlisted_only") {
             const advRes = await query(
                 `SELECT id FROM club_event_stage_advancements 
-                 WHERE to_stage_id = $1 AND registration_id = $2 AND status IN ('shortlisted', 'advanced');`,
+                 WHERE to_stage_id = $1 AND registration_id = $2 AND status IN ('shortlisted', 'advanced', 'approved');`,
                 [stage.id, registration.id]
             );
             if (advRes.rows.length === 0) {
                 throw new Error("You have not been shortlisted for this advanced round.");
             }
+        } else if (stage.eligibility_type === "selected_teams_only") {
+            const allowedTeams: string[] = Array.isArray(stage.eligible_team_ids) ? stage.eligible_team_ids : [];
+            if (!registration.team_id || !allowedTeams.includes(registration.team_id)) {
+                throw new Error("Your team is not among the selected teams eligible for this round.");
+            }
+        } else if (stage.eligibility_type === "custom") {
+            const allowedUsers: string[] = Array.isArray(stage.eligible_user_ids) ? stage.eligible_user_ids : [];
+            if (!allowedUsers.includes(input.userId)) {
+                throw new Error("You are not on the custom selected participant roster for this round.");
+            }
         }
 
-        // 5. Team leadership submission check
+        // 5. Require Approval To Advance Check from preceding stages
+        const precedingStageRes = await query(
+            `SELECT id, name, requirements FROM club_event_stages 
+             WHERE event_id = $1 AND stage_order < $2 
+             ORDER BY stage_order DESC LIMIT 1;`,
+            [input.eventId, stage.stage_order]
+        );
+        if (precedingStageRes.rows.length > 0) {
+            const prevStage = precedingStageRes.rows[0];
+            const prevRequirements = typeof prevStage.requirements === "string" ? JSON.parse(prevStage.requirements) : (prevStage.requirements || {});
+            if (prevRequirements.requireApprovalToAdvance) {
+                const advCheck = await query(
+                    `SELECT id FROM club_event_stage_advancements
+                     WHERE from_stage_id = $1 AND to_stage_id = $2 AND registration_id = $3 AND status IN ('advanced', 'shortlisted', 'approved');`,
+                    [prevStage.id, stage.id, registration.id]
+                );
+                if (advCheck.rows.length === 0) {
+                    throw new Error(`Advancement approval from "${prevStage.name}" is required to submit deliverables for this stage.`);
+                }
+            }
+        }
+
+        // 6. Resubmission & Max Submissions policy
+        const prevSubRes = await query(
+            `SELECT id, version FROM club_event_stage_submissions WHERE stage_id = $1 AND registration_id = $2;`,
+            [input.stageId, input.registrationId]
+        );
+
+        if (prevSubRes.rows.length > 0) {
+            const prevSub = prevSubRes.rows[0];
+            if (stage.requirements?.allowResubmission === false) {
+                throw new Error("Resubmissions are not permitted for this round. Your previous deliverable has already been recorded.");
+            }
+            const maxSubs = Number(stage.requirements?.maxSubmissions) || 1;
+            if (maxSubs > 0 && prevSub.version >= maxSubs) {
+                throw new Error(`Maximum submission limit (${maxSubs}) reached for this round.`);
+            }
+        }
+
+        // 7. Team leadership submission check
         if (stage.requirements?.teamSubmissionOnly && stage.requirements?.leaderOnlySubmit && registration.team_id) {
             const teamRes = await query(
                 `SELECT leader_id FROM club_event_teams WHERE id = $1;`,
@@ -193,7 +261,7 @@ export class EventSubmissionService {
             }
         }
 
-        const status = input.status || "submitted";
+        const status = isLateSubmission ? "late_submitted" : (input.status || "submitted");
 
         // 6. Upsert submission
         const subRes = await query(

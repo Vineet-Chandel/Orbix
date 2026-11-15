@@ -263,20 +263,13 @@ export const Sidebar = ({
 
     const handleSignOut = async () => {
         try {
-            const primarySignout = buildApiUrl("/api/auth/logout");
-            const endpoints = import.meta.env.DEV
-                ? [primarySignout, "/api/auth/signout", "http://localhost:3000/api/auth/logout", "/api/signout"]
-                : [primarySignout, "/api/auth/signout", "/api/signout"];
-            await Promise.allSettled(
-                endpoints.map((url) =>
-                    fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                        body: JSON.stringify({ gmail: user?.gmail || "" }),
-                    })
-                )
-            );
+            const logoutUrl = buildApiUrl("/api/auth/logout");
+            await fetch(logoutUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ gmail: user?.gmail || "" }),
+            });
         } catch {
             // ignore
         }

@@ -39,6 +39,8 @@ import type { ConfiguredStage } from "./TimelineBuilder/types";
 import {
     evaluateStepNavigation,
     validateStep1,
+    validateStageTiming,
+    formatDateToInput,
     type FormErrors,
 } from "./eventWizardNavigationGuard";
 import { fetchEventStages } from "../../api/eventLifecycleApi";
@@ -163,8 +165,27 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     };
 
     const buildDefaultStages = (startsAtStr?: string, endsAtStr?: string): ConfiguredStage[] => {
-        const sDate = startsAtStr ? new Date(startsAtStr) : new Date();
-        const eDate = endsAtStr ? new Date(endsAtStr) : new Date(Date.now() + 7 * 86400000);
+        const now = new Date();
+        const sDate = startsAtStr && !isNaN(new Date(startsAtStr).getTime()) ? new Date(startsAtStr) : now;
+        const hasValidEndDate = Boolean(endsAtStr && !isNaN(new Date(endsAtStr).getTime()) && new Date(endsAtStr).getTime() > sDate.getTime());
+        const eDate = hasValidEndDate ? new Date(endsAtStr!) : new Date(sDate.getTime() + 7 * 86400000);
+
+        const totalMs = Math.max(eDate.getTime() - sDate.getTime(), 3 * 3600 * 1000);
+
+        let stage1EndMs: number;
+        let stage2EndMs: number;
+
+        if (totalMs >= 7 * 86400000) {
+            stage1EndMs = sDate.getTime() + Math.min(4 * 86400000, Math.floor(totalMs * 0.35));
+            stage2EndMs = stage1EndMs + Math.min(7 * 86400000, Math.floor((totalMs - (stage1EndMs - sDate.getTime())) * 0.7));
+        } else {
+            stage1EndMs = sDate.getTime() + Math.floor(totalMs * 0.4);
+            stage2EndMs = sDate.getTime() + Math.floor(totalMs * 0.8);
+        }
+
+        const stage1End = new Date(stage1EndMs);
+        const stage2End = new Date(stage2EndMs);
+        const stage3End = eDate;
 
         return [
             {
@@ -174,8 +195,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 description: "Initial participant signup, profile matching, and admission screening.",
                 instructions: "Complete all required questionnaire fields to secure your admission pass.",
                 stageOrder: 1,
-                startsAt: sDate.toISOString().slice(0, 16),
-                endsAt: new Date(sDate.getTime() + 4 * 86400000).toISOString().slice(0, 16),
+                startsAt: formatDateToInput(sDate),
+                endsAt: formatDateToInput(stage1End),
                 timezone: "Asia/Kolkata",
                 status: "active",
                 eligibilityType: "all_registered",
@@ -197,8 +218,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 description: "Build, commit, and submit project source repository, live demo, and presentation pitch.",
                 instructions: "Submit your GitHub repository, live URL, and architecture deck before the deadline.",
                 stageOrder: 2,
-                startsAt: new Date(sDate.getTime() + 4 * 86400000).toISOString().slice(0, 16),
-                endsAt: new Date(sDate.getTime() + 6 * 86400000).toISOString().slice(0, 16),
+                startsAt: formatDateToInput(stage1End),
+                endsAt: formatDateToInput(stage2End),
                 timezone: "Asia/Kolkata",
                 status: "scheduled",
                 eligibilityType: "accepted_only",
@@ -254,8 +275,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 description: "Final evaluation, jury score compilation, and credential issuance.",
                 instructions: "Scores will be revealed live. Verified certificates are dispatched to the student portfolio.",
                 stageOrder: 3,
-                startsAt: new Date(sDate.getTime() + 6 * 86400000).toISOString().slice(0, 16),
-                endsAt: eDate.toISOString().slice(0, 16),
+                startsAt: formatDateToInput(stage2End),
+                endsAt: formatDateToInput(stage3End),
                 timezone: "Asia/Kolkata",
                 status: "scheduled",
                 eligibilityType: "all_registered",
@@ -274,6 +295,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     };
 
     const [stages, setStages] = useState<ConfiguredStage[]>(() => buildDefaultStages());
+    const [hasCustomizedStages, setHasCustomizedStages] = useState(false);
+
+    const handleStagesChange = (updatedStages: ConfiguredStage[]) => {
+        setHasCustomizedStages(true);
+        setStages(updatedStages);
+    };
 
     const [form, setForm] = useState<FormState>({
         title: "",
@@ -328,6 +355,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     useEffect(() => {
         if (isOpen) {
             setCurrentStep(1);
+            setHasCustomizedStages(false);
             if (editingEvent) {
                 setForm({
                     title: editingEvent.title || "",
@@ -703,17 +731,27 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <span>Event Info</span>
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={() => handleNavigateToStep(2)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 2
-                                ? "bg-[#C084FC] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
-                                : "text-neutral-700 hover:text-black hover:bg-white/60"
-                                }`}
-                        >
-                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">2</span>
-                            <span>Timeline ({stages.length})</span>
-                        </button>
+                        {(() => {
+                            const hasStageErrors = stages.some((s) => validateStageTiming(s, form.startsAt, form.endsAt).hasError);
+                            return (
+                                <button
+                                    type="button"
+                                    onClick={() => handleNavigateToStep(2)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 2
+                                        ? "bg-[#C084FC] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                        : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                        }`}
+                                >
+                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${hasStageErrors ? "bg-rose-600 text-white" : "bg-black text-white"}`}>
+                                        2
+                                    </span>
+                                    <span>Timeline ({stages.length})</span>
+                                    {hasStageErrors && (
+                                        <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" title="Timeline boundary violation" />
+                                    )}
+                                </button>
+                            );
+                        })()}
 
                         <button
                             type="button"
@@ -898,9 +936,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             required
                                             value={form.startsAt}
                                             onChange={(val) => {
-                                                setForm({ ...form, startsAt: val });
+                                                setForm((prev) => ({ ...prev, startsAt: val }));
                                                 if (errors.startsAt) {
-                                                    setErrors({ ...errors, startsAt: undefined });
+                                                    setErrors((prev) => ({ ...prev, startsAt: undefined }));
+                                                }
+                                                if (!editingEvent && !hasCustomizedStages && val) {
+                                                    setStages(buildDefaultStages(val, form.endsAt));
                                                 }
                                             }}
                                             onBlur={() => handleBlur("startsAt")}
@@ -908,12 +949,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             placeholder="Pick event start date & time"
                                             mode="datetime"
                                         />
-                                        {touched.startsAt && errors.startsAt && (
-                                            <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                                                <AlertCircle className="w-3 h-3 shrink-0" />
-                                                <span>{errors.startsAt}</span>
-                                            </p>
-                                        )}
                                     </div>
 
                                     <div>
@@ -921,9 +956,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             label="Ends At (Optional)"
                                             value={form.endsAt}
                                             onChange={(val) => {
-                                                setForm({ ...form, endsAt: val });
+                                                setForm((prev) => ({ ...prev, endsAt: val }));
                                                 if (errors.endsAt) {
-                                                    setErrors({ ...errors, endsAt: undefined });
+                                                    setErrors((prev) => ({ ...prev, endsAt: undefined }));
+                                                }
+                                                if (!editingEvent && !hasCustomizedStages && form.startsAt) {
+                                                    setStages(buildDefaultStages(form.startsAt, val));
                                                 }
                                             }}
                                             onBlur={() => handleBlur("endsAt")}
@@ -931,12 +969,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             placeholder="Pick event end date & time"
                                             mode="datetime"
                                         />
-                                        {touched.endsAt && errors.endsAt && (
-                                            <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                                                <AlertCircle className="w-3 h-3 shrink-0" />
-                                                <span>{errors.endsAt}</span>
-                                            </p>
-                                        )}
                                     </div>
                                 </div>
 
@@ -1355,7 +1387,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                     <EventTimelineBuilder
                         stages={stages}
-                        onChange={setStages}
+                        onChange={handleStagesChange}
                         eventStartsAt={form.startsAt}
                         eventEndsAt={form.endsAt}
                         isTeamEvent={form.isTeamEvent}

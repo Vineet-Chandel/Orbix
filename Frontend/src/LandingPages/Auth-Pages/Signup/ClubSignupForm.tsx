@@ -850,10 +850,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         };
 
         try {
-            const primaryEndpoint = buildApiUrl("/api/club/register");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/club/register"]
-                : [primaryEndpoint];
+            const endpoints = [buildApiUrl("/api/club/register")];
             let response: Response | null = null;
             let resultData: any = null;
 

@@ -1,5 +1,5 @@
-import type { CardThemeConfig } from "../../../app/Profile/CardStudio/types";
-import { CARD_THEMES } from "../../../app/Profile/CardStudio/types";
+import type { CardThemeConfig } from "../../../../app/Profile/CardStudio/types";
+import { CARD_THEMES } from "../../../../app/Profile/CardStudio/types";
 import type {
     AggregatedCodingStats,
     CoderTypeBadge,
@@ -7,13 +7,13 @@ import type {
     RankedPlatform,
     ConnectedPlatformBadge,
     RankedContestPlatform,
-} from "../../../utils/cardStatsAggregator";
+} from "../../../../utils/cardStatsAggregator";
 import {
     demoConnectedPortals,
     demoTopContests,
-} from "../../../data/demoProfileData";
+} from "../../../../data/demoProfileData";
 
-import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
+import { DEFAULT_AVATAR_URL } from "../../../../utils/avatarConstants";
 
 export const mockUser = {
     firstName: "Vineet",

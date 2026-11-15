@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
     Clock,
     MapPin,
@@ -21,17 +21,16 @@ import {
     Flame,
     Zap,
     Bell,
+    Lock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import {
     fetchCollegeEvents,
-    fetchPublicEventById,
-    toggleEventLike,
     type CollegeEventItem,
 } from "../../api/collegeEventsApi";
 import { DynamicEventRegistrationModal } from "./DynamicEventRegistrationModal";
-import { CollegeEventDetailModal } from "./CollegeEventDetailModal";
+import { CollegeEventDetailView } from "./CollegeEventDetailView";
 import { EventActionRow } from "../../components/events/EventActionRow";
 import { primeEventEngagementCache } from "../../hooks/useEventEngagement";
 import { CollegeRestrictionModal } from "../../components/CollegeRestrictionModal";
@@ -61,12 +60,11 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
     );
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [timeFilter, setTimeFilter] = useState<"live" | "today" | "completed" | "passes" | "all">("live");
+    const [timeFilter, setTimeFilter] = useState<"live" | "today" | "closed" | "completed" | "passes" | "all">("live");
     const [selectedClubId, setSelectedClubId] = useState<string>("all");
 
     // Modal state for registration & restriction
     const [selectedEventForModal, setSelectedEventForModal] = useState<CollegeEventItem | null>(null);
-    const [selectedEventForDetail, setSelectedEventForDetail] = useState<CollegeEventItem | null>(null);
     const [restrictedEvent, setRestrictedEvent] = useState<CollegeEventItem | null>(null);
 
     // Invite leaders modal state
@@ -77,44 +75,19 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const params = useParams<{ eventId?: string; slug?: string }>();
 
-    const eventIdParam = searchParams.get("eventId") || searchParams.get("event");
+    const activeEventId = params.eventId || searchParams.get("eventId") || searchParams.get("event") || null;
 
-    // Automatically check QR/deep-link eventId param and open exact event details
+    // Normalize legacy query param ?eventId=... to canonical route /college-events/:eventId
     useEffect(() => {
-        if (!eventIdParam || loading) return;
-
-        const checkAndOpenEvent = async () => {
-            let targetEvent = events.find((e) => e.id === eventIdParam || e.slug === eventIdParam);
-            if (!targetEvent) {
-                targetEvent = (await fetchPublicEventById(eventIdParam)) || undefined;
-            }
-            if (!targetEvent) return;
-
-            const shouldRegister = searchParams.get("action") === "register" || searchParams.get("register") === "true";
-
-            if (shouldRegister) {
-                const userCollegeId = user?.collegeId || user?.college?.id;
-                const userCollegeName = user?.college?.officialName || (typeof user?.college === "string" ? user.college : "");
-
-                const isSameCollege =
-                    (targetEvent.collegeId && userCollegeId && String(targetEvent.collegeId).trim().toLowerCase() === String(userCollegeId).trim().toLowerCase()) ||
-                    (targetEvent.collegeName && userCollegeName && targetEvent.collegeName.trim().toLowerCase() === userCollegeName.trim().toLowerCase());
-
-                const isEligible = targetEvent.scope === "PAN_INDIA" || isSameCollege;
-
-                if (!isEligible) {
-                    setRestrictedEvent(targetEvent);
-                } else {
-                    setSelectedEventForModal(targetEvent);
-                }
-            } else {
-                setSelectedEventForDetail(targetEvent);
-            }
-        };
-
-        checkAndOpenEvent();
-    }, [eventIdParam, loading, events, user, searchParams]);
+        const queryEventId = searchParams.get("eventId") || searchParams.get("event");
+        if (queryEventId && !params.eventId) {
+            const action = searchParams.get("action");
+            const extra = action ? `?action=${action}` : "";
+            navigate(`/college-events/${queryEventId}${extra}`, { replace: true });
+        }
+    }, [searchParams, params.eventId, navigate]);
 
     const handleInitiateRegistration = (ev: CollegeEventItem) => {
         if (!user) {
@@ -134,6 +107,11 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
 
         if (!isEligible) {
             setRestrictedEvent(ev);
+            return;
+        }
+
+        if (checkIsRegistrationClosed(ev)) {
+            toast.error("Registration deadline has passed for this event. Applications are no longer accepted.");
             return;
         }
 
@@ -173,71 +151,6 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
         return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
     }, [events]);
 
-    // Optimistic Heart / Appreciation Toggle
-    const handleToggleHeart = async (event: CollegeEventItem) => {
-        if (!user) {
-            const redirectUrl = `/college-events?eventId=${event.id}`;
-            navigate(`/auth/signin?redirect=${encodeURIComponent(redirectUrl)}`);
-            return;
-        }
-
-        const previousLiked = event.hasLiked;
-        const previousCount = event.likesCount || 0;
-
-        // 1. Optimistic update
-        const updatedLiked = !previousLiked;
-        const updatedCount = updatedLiked ? previousCount + 1 : Math.max(0, previousCount - 1);
-
-        setEvents((prev) =>
-            prev.map((e) =>
-                e.id === event.id
-                    ? { ...e, hasLiked: updatedLiked, likesCount: updatedCount }
-                    : e
-            )
-        );
-
-        setSelectedEventForDetail((prev) =>
-            prev && prev.id === event.id
-                ? { ...prev, hasLiked: updatedLiked, likesCount: updatedCount }
-                : prev
-        );
-
-        if (updatedLiked) {
-            toast.success("Added your appreciation!", { title: "Appreciated" });
-        }
-
-        // 2. Background API call
-        try {
-            const res = await toggleEventLike(event.id);
-            setEvents((prev) =>
-                prev.map((e) =>
-                    e.id === event.id
-                        ? { ...e, hasLiked: res.liked, likesCount: res.likesCount }
-                        : e
-                )
-            );
-            setSelectedEventForDetail((prev) =>
-                prev && prev.id === event.id
-                    ? { ...prev, hasLiked: res.liked, likesCount: res.likesCount }
-                    : prev
-            );
-        } catch {
-            // Rollback
-            setEvents((prev) =>
-                prev.map((e) =>
-                    e.id === event.id
-                        ? { ...e, hasLiked: previousLiked, likesCount: previousCount }
-                        : e
-                )
-            );
-            setSelectedEventForDetail((prev) =>
-                prev && prev.id === event.id
-                    ? { ...prev, hasLiked: previousLiked, likesCount: previousCount }
-                    : prev
-            );
-            toast.error("Failed to update appreciation.");
-        }
-    };
 
     // Helper: is an event truly completed?
     const checkIsCompleted = (ev: CollegeEventItem): boolean => {
@@ -279,9 +192,39 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
         return startsDate.toDateString() === new Date().toDateString();
     };
 
+    // Helper: has the registration deadline passed for this event?
+    const checkIsRegistrationClosed = (ev: CollegeEventItem): boolean => {
+        if (checkIsCompleted(ev)) return true;
+        if (typeof ev.isRegistrationClosed === "boolean") return ev.isRegistrationClosed;
+        if (ev.registrationDeadline) {
+            const deadlineMs = new Date(ev.registrationDeadline).getTime();
+            if (!isNaN(deadlineMs)) return deadlineMs < Date.now();
+        }
+        if (ev.endsAt) {
+            const endsMs = new Date(ev.endsAt).getTime();
+            if (!isNaN(endsMs)) return endsMs < Date.now();
+        }
+        return false;
+    };
+
+    // Helper: is registration scheduled for the future (not started yet)?
+    const checkIsRegistrationUpcoming = (ev: CollegeEventItem): boolean => {
+        if (checkIsCompleted(ev)) return false;
+        if (typeof ev.isRegistrationUpcoming === "boolean") return ev.isRegistrationUpcoming;
+        if (ev.registrationStartsAt) {
+            const startsMs = new Date(ev.registrationStartsAt).getTime();
+            if (!isNaN(startsMs)) return startsMs > Date.now();
+        }
+        return false;
+    };
+
     // Subsets
+    const registrationClosedEvents = useMemo(() => {
+        return events.filter((e) => !checkIsCompleted(e) && checkIsRegistrationClosed(e));
+    }, [events]);
+
     const activeEvents = useMemo(() => {
-        return events.filter((e) => !checkIsCompleted(e));
+        return events.filter((e) => !checkIsCompleted(e) && !checkIsRegistrationClosed(e));
     }, [events]);
 
     const completedEvents = useMemo(() => {
@@ -313,10 +256,12 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
             list = completedEvents;
         } else if (timeFilter === "today") {
             list = todayEvents;
+        } else if (timeFilter === "closed") {
+            list = registrationClosedEvents;
         } else if (timeFilter === "passes") {
             list = myRegisteredEvents;
         } else {
-            list = activeEvents.length > 0 ? activeEvents : completedEvents;
+            list = activeEvents.length > 0 ? activeEvents : (registrationClosedEvents.length > 0 ? registrationClosedEvents : completedEvents);
         }
 
         if (selectedClubId !== "all") {
@@ -335,7 +280,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
         }
 
         return list;
-    }, [events, timeFilter, activeEvents, completedEvents, todayEvents, myRegisteredEvents, selectedClubId, searchQuery]);
+    }, [events, timeFilter, activeEvents, registrationClosedEvents, completedEvents, todayEvents, myRegisteredEvents, selectedClubId, searchQuery]);
 
     const filteredPanIndiaEvents = useMemo(() => {
         return filteredEvents.filter((e) => e.scope === "PAN_INDIA");
@@ -375,13 +320,15 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
         const isCompleted = checkIsCompleted(ev);
         const isLiveNow = checkIsLiveNow(ev);
         const isToday = checkIsToday(ev);
+        const isRegClosed = checkIsRegistrationClosed(ev);
+        const isRegUpcoming = checkIsRegistrationUpcoming(ev);
         const isRegistered = ev.registrationStatus === "registered" || ev.registrationStatus === "attended" || (ev.isRegistered && ev.registrationStatus !== "pending");
         const isPending = ev.registrationStatus === "pending" || ev.isPending;
 
         return (
             <div
                 key={ev.id}
-                onClick={() => setSelectedEventForDetail(ev)}
+                onClick={() => navigate(`/college-events/${ev.id}${ev.slug ? `/${ev.slug}` : ""}`)}
                 className={`relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group ${
                     isPanIndia ? "hover:border-[#FF9933]" : "hover:border-black"
                 }`}
@@ -434,6 +381,8 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 ${
                                     isCompleted
                                         ? "bg-neutral-200 text-neutral-800"
+                                        : isRegClosed
+                                        ? "bg-neutral-200 text-neutral-800"
                                         : isLiveNow
                                         ? "bg-emerald-300 text-black animate-pulse"
                                         : isToday
@@ -443,6 +392,11 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                             >
                                 {isCompleted ? (
                                     "Completed"
+                                ) : isRegClosed ? (
+                                    <>
+                                        <Lock className="w-2.5 h-2.5" />
+                                        Reg Closed
+                                    </>
                                 ) : isLiveNow ? (
                                     <>
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-ping inline-block" />
@@ -622,6 +576,16 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                         ) : isCompleted ? (
                             <span className="px-3 py-1.5 rounded-xl bg-neutral-100 text-neutral-500 border border-black/30 text-xs font-bold select-none">
                                 Completed
+                            </span>
+                        ) : isRegClosed ? (
+                            <span className="px-3 py-1.5 rounded-xl bg-neutral-200 text-neutral-700 border-2 border-neutral-400 text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                <Lock className="w-3 h-3 text-neutral-600" />
+                                <span>Registration Closed</span>
+                            </span>
+                        ) : isRegUpcoming ? (
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border-2 border-amber-300 text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                <Clock className="w-3 h-3 text-amber-700" />
+                                <span>Opens Soon</span>
                             </span>
                         ) : isPanIndia ? (
                             <button
@@ -889,6 +853,23 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
         );
     };
 
+    if (activeEventId) {
+        const foundEvent = events.find((e) => e.id === activeEventId || e.slug === activeEventId) || null;
+        return (
+            <section
+                aria-label="College Event Details"
+                className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none p-4 sm:p-6 lg:p-8"
+            >
+                <CollegeEventDetailView
+                    eventId={activeEventId}
+                    initialEvent={foundEvent}
+                    onBack={() => navigate("/college-events")}
+                    onOpenMobileSidebar={onOpenMobileSidebar}
+                />
+            </section>
+        );
+    }
+
     return (
         <section
             aria-label="College Events Hub"
@@ -1008,6 +989,17 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                             </button>
                             <button
                                 type="button"
+                                onClick={() => setTimeFilter("closed")}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                    timeFilter === "closed"
+                                        ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                }`}
+                            >
+                                Registration Closed ({registrationClosedEvents.length})
+                            </button>
+                            <button
+                                type="button"
                                 onClick={() => setTimeFilter("completed")}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                     timeFilter === "completed"
@@ -1100,27 +1092,6 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                     </div>
                 )}
             </div>
-
-            {/* Full Event Details Preview Modal */}
-            <CollegeEventDetailModal
-                isOpen={Boolean(selectedEventForDetail)}
-                onClose={() => {
-                    setSelectedEventForDetail(null);
-                    if (searchParams.has("eventId") || searchParams.has("event")) {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete("eventId");
-                        newParams.delete("event");
-                        const searchStr = newParams.toString();
-                        navigate(
-                            { pathname: location.pathname, search: searchStr ? `?${searchStr}` : "" },
-                            { replace: true }
-                        );
-                    }
-                }}
-                event={selectedEventForDetail}
-                onApply={(ev) => handleInitiateRegistration(ev)}
-                onToggleHeart={(ev) => handleToggleHeart(ev)}
-            />
 
             {/* Dynamic Registration Modal */}
             <DynamicEventRegistrationModal

@@ -465,16 +465,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                 headers,
                 credentials: "include",
                 body: JSON.stringify(savePayload),
-            }).catch(() => {
-                if (import.meta.env.DEV) {
-                    fetch("http://localhost:3000/api/portals/save", {
-                        method: "POST",
-                        headers,
-                        credentials: "include",
-                        body: JSON.stringify(savePayload),
-                    }).catch(() => {});
-                }
-            });
+            }).catch(() => {});
         } catch (e) {
             console.error("Failed to persist connected portals:", e);
         }
@@ -547,31 +538,23 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         setConnectError(null);
 
         const timer = setTimeout(async () => {
-            const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`);
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
-                : [primaryEndpoint];
-
+            const endpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`);
             let data: PortalProfileData | null = null;
             let errorMessage: string | null = null;
 
-            for (const url of endpoints) {
-                try {
-                    const res = await fetch(url, { signal: controller.signal });
-                    if (res.ok) {
-                        const json = await res.json();
-                        if (json && json.success) {
-                            data = json;
-                            break;
-                        }
-                    } else if (res.status === 404) {
-                        const errJson = await res.json().catch(() => ({}));
-                        errorMessage = errJson.message || `Account '@${username}' not found on ${config.name}.`;
-                        break;
+            try {
+                const res = await fetch(endpoint, { signal: controller.signal });
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json && json.success) {
+                        data = json;
                     }
-                } catch {
-                    // Try next
+                } else if (res.status === 404) {
+                    const errJson = await res.json().catch(() => ({}));
+                    errorMessage = errJson.message || `Account '@${username}' not found on ${config.name}.`;
                 }
+            } catch {
+                // Network error or timeout
             }
 
             if (!isMounted) return;
@@ -658,30 +641,23 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         if (!profile || !config) return;
 
         setIsSingleVerifying(true);
-        const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`);
-        const endpoints = import.meta.env.DEV
-            ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
-            : [primaryEndpoint];
+        const endpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`);
 
         let fetched: PortalProfileData | null = null;
         let is404 = false;
 
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json && json.success) {
-                        fetched = json;
-                        break;
-                    }
-                } else if (res.status === 404) {
-                    is404 = true;
-                    break;
+        try {
+            const res = await fetch(endpoint);
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.success) {
+                    fetched = json;
                 }
-            } catch {
-                // ignore
+            } else if (res.status === 404) {
+                is404 = true;
             }
+        } catch {
+            // ignore
         }
 
         const now = new Date().toISOString();

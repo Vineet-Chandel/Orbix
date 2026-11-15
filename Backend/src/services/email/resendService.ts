@@ -1156,6 +1156,260 @@ export async function sendCollegeVerificationEmail(
   }, deps);
 }
 
+export interface SendHelpTicketCreatedEmailOptions {
+  to: string;
+  name?: string;
+  ticketNumber: string;
+  category: "bug_report" | "sync_issue" | "college_verification" | "feature_request" | "general_inquiry" | string;
+  subject: string;
+  description: string;
+  priority?: string;
+  attachmentUrl?: string | null;
+  createdAt?: string | Date;
+}
+
+/**
+ * Builds the empathetic and caring HTML confirmation email template for Help Center tickets.
+ */
+function buildHelpTicketCreatedEmailTemplate(options: SendHelpTicketCreatedEmailOptions) {
+  const {
+    name = "Developer",
+    ticketNumber,
+    category,
+    subject,
+    description,
+    priority = "normal",
+    attachmentUrl,
+    createdAt = new Date(),
+  } = options;
+
+  const safeName = String(name || "Developer").replace(/[<>&"]/g, "");
+  const safeSubject = String(subject || "").replace(/[<>&"]/g, "");
+  const safeTicket = String(ticketNumber || "").replace(/[<>&"]/g, "");
+  const safeDesc = String(description || "").replace(/[<>&"]/g, "");
+  const formattedDate = new Date(createdAt).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  let categoryLabel = "General Support";
+  let badgeColor = "#FFE566";
+  let badgeText = "SUPPORT TICKET";
+  let headline = "We've Received Your Support Request";
+  let empathyMessage = `Hello <strong>${safeName}</strong>,<br/><br/>Thank you for reaching out to Orbix Support. We're here to ensure you have the smoothest experience possible.<br/><br/>Our engineering and support team has logged your inquiry and is reviewing the details you shared.`;
+
+  if (category === "bug_report") {
+    categoryLabel = "Bug Report";
+    badgeColor = "#FFE566";
+    badgeText = "BUG REPORT ACKNOWLEDGED";
+    headline = "We're On It — Thank You for Catching This!";
+    empathyMessage = `Hello <strong>${safeName}</strong>,<br/><br/>First and foremost, <strong>thank you so much</strong> for taking the time to report this issue. Software engineering is a continuous craft of refinement, and thoughtful bug reports like yours help make Orbix faster, smoother, and more reliable for every developer in our community.<br/><br/>Please rest assured: our engineering team has received your report along with auto-attached system diagnostics. We are actively investigating the root cause to put a fix into production. You're in good hands, and we truly appreciate your patience and help!`;
+  } else if (category === "sync_issue") {
+    categoryLabel = "Platform Sync & Stats";
+    badgeColor = "#a2ff86";
+    badgeText = "SYNC DIAGNOSTICS QUEUED";
+    headline = "We're Inspecting Your Coding Stats & Ratings";
+    empathyMessage = `Hello <strong>${safeName}</strong>,<br/><br/>We understand how much hard work and dedication goes into your competitive programming streaks, contest ratings, and practice problem milestones. We treat data integrity as our top priority.<br/><br/>Our sync monitoring workers are checking the platform feeds for your account, and we will make sure your stats, rating graphs, and badges are properly reconciled.`;
+  } else if (category === "college_verification") {
+    categoryLabel = "College & Club Chapter";
+    badgeColor = "#93c5fd";
+    badgeText = "COLLEGE REVIEW";
+    headline = "Your College & Chapter Inquiry Is Being Reviewed";
+    empathyMessage = `Hello <strong>${safeName}</strong>,<br/><br/>Thank you for reaching out regarding university chapter or collegiate verification. We love supporting student developer communities!<br/><br/>Our academic review team is checking your details and credentials to help you get your campus community connected.`;
+  } else if (category === "feature_request") {
+    categoryLabel = "Feature Suggestion";
+    badgeColor = "#fbcfe8";
+    badgeText = "PRODUCT PROPOSAL";
+    headline = "Love This Idea! It's Reached Our Product Team";
+    empathyMessage = `Hello <strong>${safeName}</strong>,<br/><br/>The most impactful features on Orbix come directly from engineers like you who use the platform every day.<br/><br/>We have forwarded your suggestion straight to our core product roadmap board. Thank you for helping shape the future of Orbix!`;
+  }
+
+  const emailSubject = `[Ticket #${safeTicket}] ${headline} — Orbix Support`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${emailSubject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #FAF6EE; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #000000;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #FAF6EE; padding: 36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 580px; background-color: #FFFFFF; border: 2.5px solid #000000; border-radius: 16px; box-shadow: 5px 5px 0px #000000; overflow: hidden; border-collapse: separate;" cellspacing="0" cellpadding="0">
+          <!-- Header Bar -->
+          <tr>
+            <td style="background-color: #000000; padding: 20px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="left">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="vertical-align: middle; padding-right: 10px; line-height: 0;">
+                          <img src="https://res.cloudinary.com/bh1mhiwb/image/upload/c_fit,h_120,w_120/v1793205819/orbix/brand/orbix_logo_green.png" 
+                               alt="Orbix Logo" 
+                               width="26" 
+                               height="26" 
+                               style="display: block; width: 26px; height: 26px; border: 0;" />
+                        </td>
+                        <td style="vertical-align: middle;">
+                          <span style="font-size: 19px; font-weight: 900; letter-spacing: 1.5px; color: #a2ff86; text-transform: uppercase;">
+                            ORBIX SUPPORT
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td align="right">
+                    <span style="display: inline-block; background-color: ${badgeColor}; color: #000000; font-size: 10px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; border: 1.5px solid #000000;">
+                      ${badgeText}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding: 32px 28px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 900; line-height: 1.3; color: #000000; letter-spacing: -0.5px;">
+                ${headline}
+              </h1>
+
+              <div style="font-size: 14px; line-height: 1.65; color: #222222; margin-bottom: 24px;">
+                ${empathyMessage}
+              </div>
+
+              <!-- Ticket Summary Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #FAF6EE; border: 2px solid #000000; border-radius: 12px; box-shadow: 3px 3px 0px #000000; margin-bottom: 24px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 16px 20px; border-bottom: 1.5px solid rgba(0,0,0,0.15); background-color: #F2ECE0;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td>
+                          <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #666666;">
+                            Ticket Reference
+                          </span>
+                          <div style="font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 16px; font-weight: 900; color: #000000;">
+                            #${safeTicket}
+                          </div>
+                        </td>
+                        <td align="right">
+                          <span style="display: inline-block; font-size: 11px; font-weight: 900; padding: 3px 8px; border-radius: 6px; border: 1px solid #000000; background-color: #FFFFFF; text-transform: uppercase;">
+                            ${priority} Priority
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px; font-size: 13px; line-height: 1.6; color: #111111;">
+                    <div style="margin-bottom: 8px;">
+                      <strong>Subject:</strong> ${safeSubject}
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <strong>Category:</strong> ${categoryLabel}
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <strong>Logged At:</strong> ${formattedDate}
+                    </div>
+                    ${attachmentUrl ? `
+                    <div style="margin-top: 10px; padding: 8px 12px; background-color: #FFFFFF; border: 1.5px solid #000000; border-radius: 8px; font-size: 12px;">
+                      📎 <strong>Attachment:</strong> <a href="${attachmentUrl}" target="_blank" style="color: #0284c7; font-weight: bold; text-decoration: underline;">View Uploaded Screenshot</a>
+                    </div>` : ""}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- 5-Stage Live Resolution Journey -->
+              <div style="margin-bottom: 24px;">
+                <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; color: #555555; margin-bottom: 10px;">
+                  Resolution Journey
+                </div>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border: 2px solid #000000; border-radius: 12px; background-color: #FFFFFF; padding: 14px 18px; box-shadow: 2px 2px 0px #000000;">
+                  <tr>
+                    <td style="font-size: 12px; line-height: 1.8; color: #222222;">
+                      <div style="font-weight: 900; color: #15803d;">
+                        ✅ Stage 1: Received & Logged (Completed)
+                      </div>
+                      <div style="font-weight: 800; color: #0284c7;">
+                        🔄 Stage 2: Triaging & Root Cause Analysis (Current)
+                      </div>
+                      <div style="color: #666666;">
+                        ⏳ Stage 3: Engineering Fix in Development
+                      </div>
+                      <div style="color: #666666;">
+                        🧪 Stage 4: Verification & Regression Testing
+                      </div>
+                      <div style="color: #666666;">
+                        🎉 Stage 5: Fix Deployed & Ticket Closed
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Reassuring Note & Dashboard Call to Action -->
+              <div style="padding: 16px; background-color: #FAF6EE; border-left: 4px solid #000000; border-radius: 6px; font-size: 12.5px; line-height: 1.6; color: #333333; margin-bottom: 24px;">
+                <strong>What happens next?</strong> You don't need to do anything right now. As our team works through the ticket, any status updates, questions, or fixes will be sent to your email and updated live in your <strong>Settings &gt; Help Center &gt; My Tickets</strong> dashboard.
+              </div>
+
+              <div style="font-size: 13px; line-height: 1.6; color: #444444;">
+                With care and dedication,<br/>
+                <strong style="color: #000000;">The Orbix Engineering & Support Team</strong>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 16px 28px; background-color: #F0EDE6; border-top: 2px solid #000000; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #777777; font-weight: 700;">
+                Orbix Support • Zero Password Sync • 24/7 Developer Reliability
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const text = `Hello ${safeName},\n\n${headline}\n\n${category === "bug_report" ? "Thank you for reporting this issue! Software engineering is a continuous craft of refinement, and your report helps make Orbix better for everyone." : "We have received your support request and our team is actively reviewing it."}\n\nTicket Reference: #${safeTicket}\nSubject: ${safeSubject}\nCategory: ${categoryLabel}\nPriority: ${priority}\nLogged At: ${formattedDate}\n${attachmentUrl ? `Attachment: ${attachmentUrl}\n` : ""}\nResolution Journey:\n1. [DONE] Stage 1: Received & Logged\n2. [ACTIVE] Stage 2: Triaging & Root Cause Analysis\n3. Stage 3: Engineering Fix in Development\n4. Stage 4: Verification & Testing\n5. Stage 5: Fix Deployed & Closed\n\nYou can track live progress anytime in your Orbix dashboard under Settings > Help Center > My Tickets.\n\nWith care,\nThe Orbix Engineering Team`;
+
+  return { subject: emailSubject, headline, html, text };
+}
+
+/**
+ * Sends a warm, empathetic Help Center ticket confirmation email to the user.
+ */
+export async function sendHelpTicketCreatedEmail(
+  options: SendHelpTicketCreatedEmailOptions,
+  deps?: EmailDispatchDeps
+): Promise<SendEmailResult> {
+  const { to } = options;
+  const template = buildHelpTicketCreatedEmailTemplate(options);
+
+  return dispatchEmail(
+    {
+      to,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+      fromName: "Orbix Support Team",
+      defaultFromEmail: "onboarding@resend.dev",
+      logContext: `Help Center ticket created #${options.ticketNumber}`,
+    },
+    deps
+  );
+}
+
 export { OnboardingEmailService } from "./onboardingEmailService.js";
 export type {
   SendPersonalWelcomeEmailOptions,

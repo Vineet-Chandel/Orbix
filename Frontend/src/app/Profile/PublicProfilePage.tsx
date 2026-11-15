@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     Repeat,
     Code2,
@@ -249,7 +249,7 @@ export function diagnoseProfileError(err: any, rawUsername?: string): ProfileDia
                         text: "text-amber-900",
                     },
                     statusCode: 0,
-                    details: err.details || err.message || "Failed to fetch from /api/profile/public and localhost:3000",
+                    details: err.details || err.message || "Failed to fetch from /api/profile/public",
                     suggestedHandle,
                 };
         }
@@ -680,15 +680,19 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     };
 
     useEffect(() => {
+        let lastW = 0;
         const updateWidth = () => {
             if (cardContainerRef.current) {
-                const w = cardContainerRef.current.getBoundingClientRect().width;
-                if (w > 0) setContainerWidth(w);
+                const w = Math.round(cardContainerRef.current.getBoundingClientRect().width);
+                if (w > 0 && Math.abs(w - lastW) >= 2) {
+                    lastW = w;
+                    setContainerWidth(w);
+                }
             }
         };
 
         updateWidth();
-        window.addEventListener("resize", updateWidth);
+        window.addEventListener("resize", updateWidth, { passive: true });
         const ro = new ResizeObserver(updateWidth);
         if (cardContainerRef.current) ro.observe(cardContainerRef.current);
 
@@ -827,61 +831,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         if (profile?.customLink) legacy.push({ label: "Link", url: profile.customLink });
         return legacy.slice(0, 4);
     }, [profile]);
-
-    // Smart Layout Measurement:
-    // Determine whether the right details card exceeds the LinkedIn 3D card height.
-    const rightDetailsRef = useRef<HTMLDivElement>(null);
-    const [rightDetailsHeight, setRightDetailsHeight] = useState<number>(0);
-    const [isDesktop, setIsDesktop] = useState<boolean>(() => {
-        if (typeof window !== "undefined") {
-            return window.innerWidth >= 1024;
-        }
-        return true;
-    });
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsDesktop(window.innerWidth >= 1024);
-        };
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
-
-    useEffect(() => {
-        const updateDetailsHeight = () => {
-            if (rightDetailsRef.current) {
-                const h = rightDetailsRef.current.offsetHeight;
-                if (h > 0) setRightDetailsHeight(h);
-            }
-        };
-
-        updateDetailsHeight();
-        window.addEventListener("resize", updateDetailsHeight);
-        const ro = new ResizeObserver(updateDetailsHeight);
-        if (rightDetailsRef.current) ro.observe(rightDetailsRef.current);
-
-        return () => {
-            window.removeEventListener("resize", updateDetailsHeight);
-            ro.disconnect();
-        };
-    }, [profile, displayLinks.length]);
-
-    const linkedInCardHeight = 627 * cardScale;
-    const estimatedLinksInRightHeight = displayLinks.length > 0 ? 45 + displayLinks.length * 62 : 0;
-    const effectiveDetailsHeight = rightDetailsHeight > 0 ? rightDetailsHeight : (
-        120 +
-        (profile?.bio ? Math.min(profile.bio.length * 0.45, 160) : 30) +
-        (profile?.location ? 28 : 0) +
-        (profile?.skills && profile.skills.length > 0 ? 70 : 0) +
-        (profile?.isOpenToWork || profile?.isHireable ? 45 : 0) +
-        45 +
-        (profile?.resumeUrl && profile?.isResumePublic !== false ? 55 : 0)
-    );
-    const projectedRightHeight = effectiveDetailsHeight + estimatedLinksInRightHeight;
-
-    // When the right card height exceeds the LinkedIn card height, switch links to sit cleanly below the LinkedIn card.
-    const shouldMoveLinksToLeft =
-        isDesktop && displayLinks.length > 0 && projectedRightHeight > linkedInCardHeight;
 
     // Loading Skeleton
     if (loading) {
@@ -1148,10 +1097,13 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         DEFAULT_AVATAR_URL;
 
     return (
-        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen pb-16 bg-[#FAF6EE] relative"} text-neutral-900 font-sans antialiased selection:bg-black selection:text-white`}>
-            {/* Eye-friendly subtle canvas dot grid across the entire page flow */}
+        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen pb-16 bg-[#FAF6EE] relative scroll-smooth"} text-neutral-900 font-sans antialiased selection:bg-black selection:text-white`}>
+            {/* Eye-friendly subtle canvas dot grid cached on GPU without fixed viewport re-rasterization */}
             {!isEmbedded && (
-                <div className="fixed inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
+                <div
+                    className="absolute inset-0 h-full w-full bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70"
+                    style={{ willChange: "transform", transform: "translateZ(0)" }}
+                />
             )}
 
             {/* Minimal Orbix Header — Navigates to "/" (Hidden when embedded in hero showcase) */}
@@ -1180,7 +1132,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             )}
 
             {/* Profile Showcase Container - Full Width */}
-            <main className={`w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 ${isEmbedded ? "pb-4" : "pb-16"} min-w-0`}>
+            <main className={`w-full px-2.5 xs:px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 ${isEmbedded ? "pb-4" : "pb-16"} min-w-0`}>
                 {/* 3/4 Main Card + 1/4 Sidebar Card Section */}
                 <div className="w-full max-w-[1600px] mx-auto mb-10">
                     {/* Header Strip with Controls */}
@@ -1194,15 +1146,17 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
                         {(profile.isPublic !== false || profile.isOwner) && (
                             <div className="flex items-center gap-2.5">
-                                <button
+                                <motion.button
                                     type="button"
+                                    whileHover={{ scale: 1.03, y: -1 }}
+                                    whileTap={{ scale: 0.97 }}
                                     onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black hover:bg-neutral-900 text-white text-xs sm:text-sm font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black hover:bg-neutral-900 text-white text-xs sm:text-sm font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-all cursor-pointer"
                                     title="Flip to view card back with QR code"
                                 >
                                     <Repeat className={`w-3.5 h-3.5 transition-transform duration-500 ${cardFace === "back" ? "rotate-180" : ""}`} />
                                     <span>{cardFace === "front" ? "Flip To Back" : "Flip To Front"}</span>
-                                </button>
+                                </motion.button>
                             </div>
                         )}
                     </div>
@@ -1450,56 +1404,62 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 </motion.div>
                             </div>
 
-                            {/* Smart Connected Links Strip (Rendered below LinkedIn Card when right card is taller) */}
-                            {shouldMoveLinksToLeft && displayLinks.length > 0 && (
-                                <div
-                                    style={{ width: 1200 * cardScale, maxWidth: "100%" }}
-                                    className="mt-8 sm:mt-10 w-full relative z-10"
+                            {/* Smart Connected Links Strip: Dedicated Neo-Brutalist Grid (Consistent & Smart Allocation) */}
+                            {displayLinks.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.35, delay: 0.1 }}
+                                    style={{ width: Math.max(1200 * cardScale, 260), maxWidth: "100%" }}
+                                    className="mt-6 sm:mt-8 w-full relative z-10"
                                 >
-                                    <div className={`grid ${displayLinks.length === 1 ? "grid-cols-1" : displayLinks.length === 2 ? "grid-cols-1 sm:grid-cols-2" : displayLinks.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"} gap-3.5 sm:gap-4`}>
+                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
                                         {displayLinks.map((item, idx) => {
                                             const formattedUrl = sanitizePlatformUrl(item.url);
                                             const cleanHandle = getCleanDisplayHandle(item.url, item.label, item.platform);
                                             return (
-                                                <a
+                                                <motion.a
                                                     key={idx}
                                                     href={formattedUrl}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer group min-w-0"
+                                                    whileHover={{ y: -3, scale: 1.015 }}
+                                                    whileTap={{ scale: 0.98, y: 0 }}
+                                                    transition={{ type: "spring", stiffness: 450, damping: 25 }}
+                                                    className="flex items-center justify-between gap-2.5 p-3 sm:p-4 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] transition-colors cursor-pointer group min-w-0"
                                                     title={formattedUrl}
                                                 >
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center flex-shrink-0 shadow-[1.5px_1.5px_0px_#000] group-hover:scale-105 group-hover:bg-[#FFE566] transition-all">
+                                                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000] group-hover:scale-105 group-hover:bg-[#FFE566] transition-all">
                                                             {getPlatformIcon(
                                                                 item.platform || item.label || formattedUrl,
-                                                                "w-5 h-5 flex-shrink-0"
+                                                                "w-4 h-4 sm:w-5 sm:h-5 shrink-0"
                                                             )}
                                                         </div>
                                                         <div className="min-w-0 text-left">
                                                             <span className="text-xs sm:text-sm font-black text-black block truncate tracking-tight">
                                                                 {item.label || item.platform || "Link"}
                                                             </span>
-                                                            <span className="text-[11px] sm:text-xs font-mono text-neutral-600 font-bold block truncate">
+                                                            <span className="text-[10px] sm:text-xs font-mono text-neutral-600 font-bold block truncate">
                                                                 {cleanHandle}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <ExternalLink className="w-4 h-4 text-black group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all stroke-[2.5] flex-shrink-0" />
-                                                </a>
+                                                    <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform stroke-[2.5] shrink-0" />
+                                                </motion.a>
                                             );
                                         })}
                                     </div>
-                                </div>
+                                </motion.div>
                             )}
                                 </>
                             )}
                         </div>
 
-                        {/* RIGHT (1/4 Screen Width on Large Screens): Bio, Location & Connected Links Card */}
+                        {/* RIGHT (1/4 Screen Width on Large Screens): Bio, Location & Developer Info Card */}
                         <div className="lg:col-span-3 flex flex-col min-w-0">
-                            <div className={`w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 flex flex-col select-none ${shouldMoveLinksToLeft ? "justify-start space-y-4" : "h-full justify-between space-y-5"}`}>
-                                <div ref={rightDetailsRef} className="space-y-4">
+                            <div className="w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-3.5 xs:p-4 sm:p-5 md:p-6 flex flex-col select-none justify-between space-y-4">
+                                <div className="space-y-4">
                                     {/* Card Subheader */}
                                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/15">
                                         <div className="flex items-center gap-2">
@@ -1646,7 +1606,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                 {profile.skills.map((skill) => (
                                                     <span
                                                         key={skill}
-                                                        className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border-2 border-black text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                        className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#FAF6EE] border-2 border-black text-[11px] sm:text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]"
                                                     >
                                                         {skill}
                                                     </span>
@@ -1657,10 +1617,10 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
                                     {/* Status & Actions: Open to work & Hire me (Only rendered if profile is Public) */}
                                     {profile.isPublic !== false && (profile.isOpenToWork || profile.isHireable) && (
-                                        <div className="grid grid-cols-2 gap-2.5 pt-2 pb-0.5 border-t-2 border-black/15">
+                                        <div className="grid grid-cols-2 gap-2 pt-2 pb-0.5 border-t-2 border-black/15">
                                             {profile.isOpenToWork && (
                                                 <div
-                                                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000] select-none ${!profile.isHireable ? "col-span-2" : ""}`}
+                                                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000] select-none ${!profile.isHireable ? "col-span-2" : ""}`}
                                                     title="Open to Work"
                                                 >
                                                     <Briefcase className="w-3.5 h-3.5 text-black stroke-[2.5] flex-shrink-0" />
@@ -1669,15 +1629,17 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                             )}
 
                                             {profile.isHireable && (
-                                                <button
+                                                <motion.button
                                                     type="button"
+                                                    whileHover={{ y: -2, scale: 1.02 }}
+                                                    whileTap={{ scale: 0.98 }}
                                                     onClick={() => setIsHireModalOpen(true)}
-                                                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer ${!profile.isOpenToWork ? "col-span-2" : ""}`}
+                                                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-colors cursor-pointer ${!profile.isOpenToWork ? "col-span-2" : ""}`}
                                                     title={`Message ${profile.firstName || profile.displayName}`}
                                                 >
                                                     <Mail className="w-3.5 h-3.5 text-white flex-shrink-0" />
                                                     <span className="truncate">Hire me</span>
-                                                </button>
+                                                </motion.button>
                                             )}
                                         </div>
                                     )}
@@ -1695,29 +1657,33 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                     className="w-full"
                                                 />
                                             </div>
-                                            <button
+                                            <motion.button
                                                 type="button"
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
                                                 onClick={() => setIsBlockModalOpen(true)}
                                                 className="p-2 rounded-xl bg-white hover:bg-rose-50 text-neutral-600 hover:text-rose-600 border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-colors"
                                                 title="Block User"
                                             >
                                                 <ShieldAlert className="w-4 h-4 stroke-[2.5]" />
-                                            </button>
+                                            </motion.button>
                                         </div>
                                     )}
 
                                     {/* Dynamic Action Buttons: Get the card (Card hidden for visitors if private) */}
                                     {(profile.isPublic !== false || profile.isOwner) && (
                                         <div className="pt-1 pb-1">
-                                            <button
+                                            <motion.button
                                                 type="button"
+                                                whileHover={{ y: -2, scale: 1.01 }}
+                                                whileTap={{ scale: 0.98 }}
                                                 onClick={() => setIsCardModalOpen(true)}
-                                                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs sm:text-sm font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-colors cursor-pointer"
                                                 title="View and download LinkedIn and Instagram Story cards"
                                             >
                                                 <CreditCard className="w-3.5 h-3.5 text-white flex-shrink-0" />
                                                 <span className="truncate">Get the card</span>
-                                            </button>
+                                            </motion.button>
                                         </div>
                                     )}
 
@@ -1733,75 +1699,33 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                <button
+                                                <motion.button
                                                     type="button"
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
                                                     onClick={() => setIsResumePreviewOpen(true)}
                                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-neutral-100 text-black text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
                                                     title="Preview Resume"
                                                 >
                                                     <Eye className="w-3 h-3 stroke-[2.5]" />
                                                     <span>View</span>
-                                                </button>
-                                                <a
+                                                </motion.button>
+                                                <motion.a
                                                     href={profile.resumeUrl}
                                                     download={profile.resumeFilename || "resume.pdf"}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
                                                     className="p-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black text-[11px] border border-black shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
                                                     title="Download PDF"
                                                 >
                                                     <Download className="w-3 h-3 stroke-[2.5]" />
-                                                </a>
+                                                </motion.a>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-
-                                {/* Fallback Links when NOT moved to left */}
-                                {!shouldMoveLinksToLeft && displayLinks.length > 0 && (
-                                    <div className="space-y-3 pt-3 border-t-2 border-black/15">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-black">
-                                                Links ({displayLinks.length})
-                                            </span>
-                                        </div>
-
-                                        <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 scrollbar-thin">
-                                            {displayLinks.map((item, idx) => {
-                                                const formattedUrl = sanitizePlatformUrl(item.url);
-                                                const cleanHandle = getCleanDisplayHandle(item.url, item.label, item.platform);
-                                                return (
-                                                    <a
-                                                        key={idx}
-                                                        href={formattedUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all group"
-                                                        title={formattedUrl}
-                                                    >
-                                                        <div className="flex items-center gap-2.5 min-w-0">
-                                                            <div className="w-8 h-8 rounded-lg bg-[#FAF6EE] border-2 border-black flex items-center justify-center flex-shrink-0 shadow-[1px_1px_0px_#000] group-hover:scale-105 group-hover:bg-[#FFE566] transition-transform">
-                                                                {getPlatformIcon(
-                                                                    item.platform || item.label || formattedUrl,
-                                                                    "w-4 h-4 flex-shrink-0"
-                                                                )}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <span className="text-xs font-black text-black block truncate group-hover:text-black">
-                                                                    {item.label || item.platform || "Link"}
-                                                                </span>
-                                                                <span className="text-[10px] font-mono text-neutral-600 font-bold block truncate">
-                                                                    {cleanHandle}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <ExternalLink className="w-3.5 h-3.5 text-black stroke-[2.5] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
-                                                    </a>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -1844,37 +1768,43 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 </p>
                             </div>
 
-                            {/* Two Dashboard Fields Switcher: Practice & Development */}
-                            <div className="inline-flex items-center p-1.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] self-start sm:self-auto gap-1">
-                                <button
+                            {/* Smart Responsive Dashboard Fields Switcher: Practice, Development & Projects */}
+                            <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start p-1 sm:p-1.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] gap-1 overflow-x-auto no-scrollbar">
+                                <motion.button
                                     type="button"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => setActiveField("practice")}
-                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "practice"
+                                    className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "practice"
                                         ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
                                         : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                         }`}
                                 >
                                     <Code2 className="w-3.5 h-3.5 text-[#a2ff86] stroke-[2.5]" />
                                     <span>Practice</span>
-                                </button>
+                                </motion.button>
 
-                                <button
+                                <motion.button
                                     type="button"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => setActiveField("development")}
-                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "development"
+                                    className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "development"
                                         ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
                                         : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                         }`}
                                 >
                                     <GitBranch className="w-3.5 h-3.5 text-[#FFE566] stroke-[2.5]" />
                                     <span>Development</span>
-                                </button>
+                                </motion.button>
 
                                 {publishedProjects.length > 0 && (
-                                    <button
+                                    <motion.button
                                         type="button"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
                                         onClick={() => setActiveField("projects")}
-                                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "projects"
+                                        className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "projects"
                                             ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
                                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                             }`}
@@ -1884,58 +1814,88 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-[#a2ff86] text-black">
                                             {publishedProjects.length}
                                         </span>
-                                    </button>
+                                    </motion.button>
                                 )}
                             </div>
                         </div>
 
-                        {/* Practice Field: Multi-Platform Coding Submissions (Excluding GitHub), Monthly Stats, DSA & Topic Analytics, and Contest Performance */}
-                        {activeField === "practice" && (
-                            <div className="w-full animate-fadeIn space-y-6">
-                                <CodingSubmissionsTable
-                                    connectedPortals={connectedPortals}
-                                    username={profile.username}
-                                />
-                                <PracticeAnalyticsSection
-                                    connectedPortals={connectedPortals}
-                                    username={profile.username}
-                                />
-                                <ContestPerformanceSection
-                                    connectedPortals={connectedPortals}
-                                    username={profile.username}
-                                />
-                            </div>
-                        )}
-
-                        {/* Development Field: Development Metrics, Languages & Contributions (GitHub) */}
-                        {activeField === "development" && (
-                            <div className="w-full animate-fadeIn space-y-6">
-                                <DevelopmentContributionsTable
-                                    connectedPortals={connectedPortals}
-                                    username={profile.username}
-                                />
-                                <DevelopmentAnalyticsSection
-                                    connectedPortals={connectedPortals}
-                                    username={profile.username}
-                                />
-                            </div>
-                        )}
-
-                        {/* Projects Field: Flagship Architecture Showcase & GitHub Intelligence */}
-                        {activeField === "projects" && publishedProjects.length > 0 && (
-                            <div className="w-full animate-fadeIn space-y-6 mt-4 sm:mt-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-                                    {publishedProjects.map((project) => (
-                                        <ProjectCard
-                                            key={project.id}
-                                            project={project}
-                                            isManageMode={false}
-                                            onViewDetails={(p) => setViewingProject(p)}
+                        {/* Interactive Tab Content with Framer Motion transitions & GPU-friendly content-visibility */}
+                        <AnimatePresence mode="wait">
+                            {/* Practice Field: Multi-Platform Coding Submissions (Excluding GitHub), Monthly Stats, DSA & Topic Analytics, and Contest Performance */}
+                            {activeField === "practice" && (
+                                <motion.div
+                                    key="practice"
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -12 }}
+                                    transition={{ duration: 0.25, ease: "easeOut" }}
+                                    className="w-full space-y-6"
+                                >
+                                    <CodingSubmissionsTable
+                                        connectedPortals={connectedPortals}
+                                        username={profile.username}
+                                    />
+                                    <div style={{ contentVisibility: "auto", containIntrinsicSize: "800px" }}>
+                                        <PracticeAnalyticsSection
+                                            connectedPortals={connectedPortals}
+                                            username={profile.username}
                                         />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                                    </div>
+                                    <div style={{ contentVisibility: "auto", containIntrinsicSize: "800px" }}>
+                                        <ContestPerformanceSection
+                                            connectedPortals={connectedPortals}
+                                            username={profile.username}
+                                        />
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* Development Field: Development Metrics, Languages & Contributions (GitHub) */}
+                            {activeField === "development" && (
+                                <motion.div
+                                    key="development"
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -12 }}
+                                    transition={{ duration: 0.25, ease: "easeOut" }}
+                                    className="w-full space-y-6"
+                                >
+                                    <DevelopmentContributionsTable
+                                        connectedPortals={connectedPortals}
+                                        username={profile.username}
+                                    />
+                                    <div style={{ contentVisibility: "auto", containIntrinsicSize: "700px" }}>
+                                        <DevelopmentAnalyticsSection
+                                            connectedPortals={connectedPortals}
+                                            username={profile.username}
+                                        />
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* Projects Field: Flagship Architecture Showcase & GitHub Intelligence */}
+                            {activeField === "projects" && publishedProjects.length > 0 && (
+                                <motion.div
+                                    key="projects"
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -12 }}
+                                    transition={{ duration: 0.25, ease: "easeOut" }}
+                                    className="w-full space-y-6 mt-4 sm:mt-6"
+                                >
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                                        {publishedProjects.map((project) => (
+                                            <ProjectCard
+                                                key={project.id}
+                                                project={project}
+                                                isManageMode={false}
+                                                onViewDetails={(p) => setViewingProject(p)}
+                                            />
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </section>
                 )}
 
@@ -1945,6 +1905,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 {publishedProjects.length > 0 && activeField !== "projects" && (
                     <section
                         aria-label="Flagship Projects Showcase"
+                        style={{ contentVisibility: "auto", containIntrinsicSize: "600px" }}
                         className="w-full max-w-[1600px] mx-auto space-y-6 mt-14 sm:mt-20 pt-2"
                     >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">

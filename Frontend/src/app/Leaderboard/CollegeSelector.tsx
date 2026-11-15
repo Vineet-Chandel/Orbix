@@ -51,19 +51,12 @@ export const CollegeSelector: React.FC<CollegeSelectorProps> = ({
         const timer = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const primaryEndpoint = buildApiUrl(`/api/institutions/search?q=${encodeURIComponent(searchQuery)}&limit=15`);
-                const endpoints = import.meta.env.DEV
-                    ? [primaryEndpoint, `http://localhost:3000/api/institutions/search?q=${encodeURIComponent(searchQuery)}&limit=15`]
-                    : [primaryEndpoint];
-
+                const searchUrl = buildApiUrl(`/api/institutions/search?q=${encodeURIComponent(searchQuery)}&limit=15`);
                 let res: Response | null = null;
-                for (const url of endpoints) {
-                    try {
-                        res = await fetch(url);
-                        if (res.ok) break;
-                    } catch {
-                        // try next fallback
-                    }
+                try {
+                    res = await fetch(searchUrl);
+                } catch {
+                    // network error
                 }
 
                 if (res && res.ok) {

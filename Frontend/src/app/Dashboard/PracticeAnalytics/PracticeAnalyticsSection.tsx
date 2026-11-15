@@ -32,11 +32,11 @@ export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> =
     return (
         <section
             aria-label="Practice Analytics Section"
-            className="w-full rounded-2xl bg-white border-2 border-black text-neutral-900 p-6 sm:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans"
+            className="w-full rounded-2xl bg-white border-2 border-black text-neutral-900 p-4 sm:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans"
         >
-            <div className="relative z-10 space-y-8">
+            <div className="relative z-10 space-y-6 sm:space-y-8">
                 {/* Row 1: Topic strength (left) & Recently solved (right) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-stretch">
                     <div className="flex flex-col justify-between h-full">
                         <TopicStrengthCard data={data} isLoading={isLoading} />
                     </div>
@@ -49,7 +49,7 @@ export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> =
                 <div className="w-full h-[2px] bg-black/15" />
 
                 {/* Row 2: DSA topic analysis (left) & Problems solved (right) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-stretch">
                     <div className="flex flex-col justify-between h-full">
                         <DsaTopicAnalysisCard data={data} isLoading={isLoading} />
                     </div>

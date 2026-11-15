@@ -200,19 +200,20 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
             {/* Top Charts: Contributions by month & Your coding days */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full">
                 {/* Card 1: Contributions by month */}
-                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] relative overflow-hidden flex flex-col justify-between transition-all hover:translate-x-0.5 hover:-translate-y-0.5">
+                <div className="rounded-2xl bg-white border-2 border-black p-4 sm:p-6 shadow-[4px_4px_0px_#000] relative overflow-hidden flex flex-col justify-between transition-all hover:translate-x-0.5 hover:-translate-y-0.5">
                     {/* Header */}
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">
                             <Calendar className="w-4.5 h-4.5 text-black" />
                         </div>
-                        <h4 className="text-lg sm:text-xl font-black text-black tracking-tight">
+                        <h4 className="text-base sm:text-xl font-black text-black tracking-tight">
                             Contributions by month
                         </h4>
                     </div>
 
-                    {/* 12 Months Bar Chart */}
-                    <div className="grid grid-cols-12 gap-1 sm:gap-2 items-end h-44 sm:h-48 pt-6 pb-1">
+                    {/* 12 Months Bar Chart with Smooth Horizontal Touch Scroll */}
+                    <div className="overflow-x-auto no-scrollbar pb-1">
+                        <div className="grid grid-cols-12 gap-1 sm:gap-2 items-end h-44 sm:h-48 pt-6 pb-1 min-w-[280px]">
                         {monthlyContributions.map((item, idx) => {
                             const heightPct =
                                 item.count === 0
@@ -249,11 +250,12 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                 </div>
                             );
                         })}
+                        </div>
                     </div>
                 </div>
 
                 {/* Card 2: Your coding days */}
-                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] relative overflow-hidden flex flex-col justify-between transition-all hover:translate-x-0.5 hover:-translate-y-0.5">
+                <div className="rounded-2xl bg-white border-2 border-black p-4 sm:p-6 shadow-[4px_4px_0px_#000] relative overflow-hidden flex flex-col justify-between transition-all hover:translate-x-0.5 hover:-translate-y-0.5">
                     {/* Header with dynamic busiest day */}
                     <div className="flex items-center gap-3 mb-4 flex-wrap">
                         <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">

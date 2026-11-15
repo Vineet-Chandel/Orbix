@@ -149,10 +149,7 @@ export default function SignupForm() {
         const lastName = formData.lastName.trim();
 
         try {
-            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
-                : [primaryEndpoint, "/api/signup/send-email-otp"];
+            const endpoints = [buildApiUrl("/api/auth/signup/send-email-otp")];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -225,10 +222,7 @@ export default function SignupForm() {
 
         setResendingOtp(true);
         try {
-            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
-                : [primaryEndpoint, "/api/signup/send-email-otp"];
+            const endpoints = [buildApiUrl("/api/auth/signup/send-email-otp")];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -291,10 +285,7 @@ export default function SignupForm() {
 
         try {
             // Step 1: Verify OTP and acquire cryptographic proof token
-            const primaryVerify = buildApiUrl("/api/auth/signup/verify-email-otp");
-            const verifyEndpoints = import.meta.env.DEV
-                ? [primaryVerify, "http://localhost:3000/api/auth/signup/verify-email-otp", "/api/signup/verify-email-otp"]
-                : [primaryVerify, "/api/signup/verify-email-otp"];
+            const verifyEndpoints = [buildApiUrl("/api/auth/signup/verify-email-otp")];
 
             let verifyResponse: Response | null = null;
             let verifyData: any = null;
@@ -338,10 +329,7 @@ export default function SignupForm() {
                 verificationToken,
             };
 
-            const primarySignup = buildApiUrl("/api/auth/signup");
-            const signupEndpoints = import.meta.env.DEV
-                ? [primarySignup, "http://localhost:3000/api/auth/signup"]
-                : [primarySignup];
+            const signupEndpoints = [buildApiUrl("/api/auth/signup")];
 
             let signupResponse: Response | null = null;
             let signupData: any = null;

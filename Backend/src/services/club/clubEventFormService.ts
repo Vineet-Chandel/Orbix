@@ -345,6 +345,36 @@ export class ClubEventFormService {
         canSubmit = !isClosed;
         } // End of if (!cachedShared) DB fetch block
 
+        // Dynamic Timeline Stage Check: Verify current server time against the Registration stage
+        const regStageRes = await query(
+            `SELECT id, name, starts_at, ends_at, status 
+             FROM club_event_stages 
+             WHERE event_id = $1 AND (type = 'registration' OR action_type = 'registration')
+             ORDER BY stage_order ASC LIMIT 1;`,
+            [eventId]
+        );
+
+        if (regStageRes.rows.length > 0) {
+            const regStage = regStageRes.rows[0];
+            const now = new Date();
+            const rEnd = new Date(regStage.ends_at);
+            const rStart = new Date(regStage.starts_at);
+
+            if (regStage.status === "completed" || regStage.status === "cancelled" || now > rEnd) {
+                isClosed = true;
+                closedReason = `The registration window for this event concluded on ${rEnd.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST. Applications are no longer accepted.`;
+                canSubmit = false;
+            } else if (now < rStart) {
+                isClosed = true;
+                closedReason = `Registration for this event opens on ${rStart.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`;
+                canSubmit = false;
+            }
+        } else if (event?.endsAt && new Date() > new Date(event.endsAt)) {
+            isClosed = true;
+            closedReason = "The event schedule has concluded. Applications are closed.";
+            canSubmit = false;
+        }
+
         // Check user's existing registration and verified student identity if logged in
         let userResponse: any = null;
         let studentProfile: any = null;
@@ -2173,6 +2203,43 @@ Organizer Request: ${userPrompt}`;
             if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
                 const error: any = new Error("The event registration deadline has passed.");
                 error.statusCode = 403;
+                throw error;
+            }
+
+            // Dynamic Timeline Registration Stage Validation
+            const regStageRes = await client.query(
+                `SELECT id, name, starts_at, ends_at, status 
+                 FROM club_event_stages 
+                 WHERE event_id = $1 AND (type = 'registration' OR action_type = 'registration')
+                 ORDER BY stage_order ASC LIMIT 1;`,
+                [eventId]
+            );
+
+            if (regStageRes.rows.length > 0) {
+                const regStage = regStageRes.rows[0];
+                const now = new Date();
+                const rEnd = new Date(regStage.ends_at);
+                const rStart = new Date(regStage.starts_at);
+
+                if (regStage.status === "completed" || regStage.status === "cancelled" || now > rEnd) {
+                    const formatted = rEnd.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+                    const error: any = new Error(`Registration for this event concluded on ${formatted} IST. Applications are no longer accepted.`);
+                    error.statusCode = 403;
+                    error.code = "REGISTRATION_DEADLINE_PASSED";
+                    throw error;
+                }
+
+                if (now < rStart) {
+                    const formatted = rStart.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+                    const error: any = new Error(`Registration for this event opens on ${formatted} IST.`);
+                    error.statusCode = 403;
+                    error.code = "REGISTRATION_NOT_STARTED";
+                    throw error;
+                }
+            } else if (event.ends_at && new Date() > new Date(event.ends_at)) {
+                const error: any = new Error("The event schedule has concluded. Applications are closed.");
+                error.statusCode = 403;
+                error.code = "EVENT_CONCLUDED";
                 throw error;
             }
 

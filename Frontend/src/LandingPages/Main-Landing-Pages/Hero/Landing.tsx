@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
+import PublicClubProfilePage from '../../../app/Club/PublicClubProfilePage';
+import { DEMO_CLUB_SLUG } from '../../../data/demoClubProfileData';
 
 export interface PlatformItem {
     id: string;
@@ -482,6 +485,229 @@ export const OPPORTUNITIES: OPPORTUNITIES[] = [
     },
 ];
 
+export interface ClubPillItem {
+    id: string;
+    name: string;
+    renderIcon: (className?: string) => React.ReactNode;
+}
+
+export const CLUB_EVENTS: ClubPillItem[] = [
+    {
+        id: "events",
+        name: "Events",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="17" rx="3.5" fill="#FFFFFF" stroke="black" strokeWidth="1.8" />
+                <path d="M3 9H21" stroke="black" strokeWidth="1.8" />
+                <path d="M3 7.5C3 5.567 4.567 4 6.5 4H17.5C19.433 4 21 5.567 21 7.5V9H3V7.5Z" fill="#FF5C5C" stroke="black" strokeWidth="1.8" />
+                <line x1="8" y1="2" x2="8" y2="5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <line x1="16" y1="2" x2="16" y2="5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="8" cy="13" r="1.3" fill="black" />
+                <circle cx="12" cy="13" r="1.3" fill="black" />
+                <circle cx="16" cy="13" r="1.3" fill="black" />
+                <circle cx="8" cy="17" r="1.3" fill="black" />
+                <circle cx="12" cy="17" r="1.3" fill="#FF5C5C" />
+                <circle cx="16" cy="17" r="1.3" fill="black" />
+            </svg>
+        ),
+    },
+    {
+        id: "hackathons",
+        name: "Hackathons",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="3" width="20" height="18" rx="4" fill="#6366F1" stroke="black" strokeWidth="1.8" />
+                <path d="M7 10L4.5 12.5L7 15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M17 10L19.5 12.5L17 15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M13 8L10 17" stroke="#FDE047" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    {
+        id: "contests",
+        name: "Contests",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path d="M19 4H17V3C17 2.45 16.55 2 16 2H8C7.45 2 7 2.45 7 3V4H5C3.9 4 3 4.9 3 6V8C3 11.3 5.4 14.1 8.6 14.8C9.5 16.1 10.9 17 12.5 17.2V19.5H9C8.45 19.5 8 19.95 8 20.5V22H16V20.5C16 19.95 15.55 19.5 15 19.5H11.5V17.2C13.1 17 14.5 16.1 15.4 14.8C18.6 14.1 21 11.3 21 8V6C21 4.9 20.1 4 19 4ZM5 8V6H7V11.8C5.8 11.2 5 9.7 5 8ZM19 8C19 9.7 18.2 11.2 17 11.8V6H19V8Z" fill="#FFA116" stroke="black" strokeWidth="1.2" />
+            </svg>
+        ),
+    },
+    {
+        id: "workshops",
+        name: "Workshops",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="3" width="20" height="14" rx="3" fill="#10B981" stroke="black" strokeWidth="1.8" />
+                <path d="M7 10L10 13L17 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8 21H16" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 17V21" stroke="black" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    {
+        id: "webinars",
+        name: "Webinars",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="4" width="14" height="16" rx="3" fill="#0EA5E9" stroke="black" strokeWidth="1.8" />
+                <polygon points="16,9 22,6 22,18 16,15" fill="#38BDF8" stroke="black" strokeWidth="1.8" strokeLinejoin="round" />
+                <circle cx="9" cy="12" r="3" fill="white" stroke="black" strokeWidth="1.2" />
+                <polygon points="8,10.5 11,12 8,13.5" fill="#0284C7" />
+            </svg>
+        ),
+    },
+    {
+        id: "ideathons",
+        name: "Ideathons",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path d="M9 18H15M10 21H14" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 2C7.58 2 4 5.58 4 10C4 13.04 5.7 15.68 8.19 17H15.81C18.3 15.68 20 13.04 20 10C20 5.58 16.42 2 12 2Z" fill="#FBBF24" stroke="black" strokeWidth="1.8" />
+                <path d="M10 10L12 7L14 10" stroke="#78350F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="12" y1="10" x2="12" y2="13" stroke="#78350F" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    {
+        id: "tech-fests",
+        name: "Tech Fests",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path d="M14 2L20 8L16 12L12 8L14 2Z" fill="#EC4899" stroke="black" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M12 8L4 16L3 21L8 20L16 12" fill="#F43F5E" stroke="black" strokeWidth="1.8" strokeLinejoin="round" />
+                <circle cx="10" cy="14" r="1.5" fill="white" />
+                <path d="M3 21L6 18" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <path d="M18 3L22 7" stroke="#FDE047" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    {
+        id: "conferences",
+        name: "Conferences",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="8" y="2" width="8" height="12" rx="4" fill="#8B5CF6" stroke="black" strokeWidth="1.8" />
+                <path d="M5 10C5 13.866 8.134 17 12 17C15.866 17 19 13.866 19 10" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M12 17V22M8 22H16" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <line x1="10" y1="6" x2="14" y2="6" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    {
+        id: "e-summits",
+        name: "ESummits",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <polygon points="12,2 2,21 22,21" fill="#3B82F6" stroke="black" strokeWidth="1.8" strokeLinejoin="round" />
+                <polygon points="12,2 7.5,10.5 16.5,10.5" fill="#FFFFFF" stroke="black" strokeWidth="1.5" strokeLinejoin="round" />
+                <polygon points="12,10.5 9.5,15.5 14.5,15.5" fill="#1D4ED8" />
+                <path d="M12 2V0M10 0H14" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+];
+
+export const CLUB_UNLOCKS: ClubPillItem[] = [
+    {
+        id: "sponsorships",
+        name: "Sponsorships",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <polygon points="12,2 21,8.5 17,21.5 7,21.5 3,8.5" fill="#F59E0B" stroke="black" strokeWidth="1.8" strokeLinejoin="round" />
+                <polygon points="12,2 7,8.5 12,21.5 17,8.5" fill="#FDE68A" stroke="black" strokeWidth="1.4" strokeLinejoin="round" />
+                <line x1="3" y1="8.5" x2="21" y2="8.5" stroke="black" strokeWidth="1.5" />
+            </svg>
+        ),
+    },
+    {
+        id: "brand-partnerships",
+        name: "Brand Partnerships",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="3" width="20" height="18" rx="4" fill="#10B981" stroke="black" strokeWidth="1.8" />
+                <path d="M6 13L9 16L13 11L18 15" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="8" cy="8" r="2" fill="#FDE047" stroke="black" strokeWidth="1.2" />
+            </svg>
+        ),
+    },
+    {
+        id: "campus-reach",
+        name: "Campus Reach",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L2 7.5L12 13L22 7.5L12 2Z" fill="#3B82F6" stroke="black" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M6 10.5V17C6 17 8.5 19.5 12 19.5C15.5 19.5 18 17 18 17V10.5" fill="#93C5FD" stroke="black" strokeWidth="1.8" />
+                <path d="M22 10.5V17" stroke="black" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    {
+        id: "pan-india-reach",
+        name: "Pan India Reach",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9.5" fill="#FFFFFF" stroke="black" strokeWidth="1.8" />
+                <path d="M3.5 8C5.5 6.5 8.5 6.5 12 6.5C15.5 6.5 18.5 6.5 20.5 8" stroke="#FF9933" strokeWidth="2.4" strokeLinecap="round" />
+                <path d="M3.5 16C5.5 17.5 8.5 17.5 12 17.5C15.5 17.5 18.5 17.5 20.5 16" stroke="#138808" strokeWidth="2.4" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="2.2" stroke="#000080" strokeWidth="1.4" />
+            </svg>
+        ),
+    },
+    {
+        id: "college-collaborations",
+        name: "College Collaborations",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="7" width="8" height="14" rx="2" fill="#8B5CF6" stroke="black" strokeWidth="1.8" />
+                <rect x="14" y="4" width="8" height="17" rx="2" fill="#A78BFA" stroke="black" strokeWidth="1.8" />
+                <path d="M10 14H14" stroke="black" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="6" cy="11" r="1" fill="white" />
+                <circle cx="6" cy="15" r="1" fill="white" />
+                <circle cx="18" cy="8" r="1" fill="white" />
+                <circle cx="18" cy="12" r="1" fill="white" />
+                <circle cx="18" cy="16" r="1" fill="white" />
+            </svg>
+        ),
+    },
+    {
+        id: "community-growth",
+        name: "Community Growth",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path d="M3 20L9 14L13 18L21 8" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <polyline points="16,8 21,8 21,13" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="8" cy="7" r="3" fill="#34D399" stroke="black" strokeWidth="1.5" />
+            </svg>
+        ),
+    },
+    {
+        id: "industry-partnerships",
+        name: "Industry Partnerships",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect x="4" y="3" width="16" height="18" rx="3" fill="#475569" stroke="black" strokeWidth="1.8" />
+                <line x1="8" y1="7" x2="10" y2="7" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" />
+                <line x1="14" y1="7" x2="16" y2="7" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" />
+                <line x1="8" y1="11" x2="10" y2="11" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" />
+                <line x1="14" y1="11" x2="16" y2="11" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" />
+                <rect x="9" y="16" width="6" height="5" fill="#F8FAFC" stroke="black" strokeWidth="1.5" />
+            </svg>
+        ),
+    },
+    {
+        id: "brand-visibility",
+        name: "Brand Visibility",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path d="M3 10V14C3 15.1 3.9 16 5 16H7L12 20V4L7 8H5C3.9 8 3 8.9 3 10Z" fill="#F43F5E" stroke="black" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M16 8.5C17.5 10 17.5 14 16 15.5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <path d="M19 5.5C22 9 22 15 19 18.5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <path d="M6 16V19.5C6 20.05 6.45 20.5 7 20.5H8" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+];
+
 // White sticker border filter for all SVG platform logos
 const WHITE_STICKER_FILTER = [
     "drop-shadow(2.5px 0 0 #ffffff)",
@@ -495,28 +721,218 @@ const WHITE_STICKER_FILTER = [
     "drop-shadow(0 1.5px 2px rgba(0,0,0,0.12))",
 ].join(" ");
 
-const HeroHeadlines = React.memo(function HeroHeadlines() {
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
+interface AnimatedPillProps {
+    item: {
+        id?: string;
+        name: string;
+        renderIcon: (className?: string) => React.ReactNode;
+    };
+    onClick: () => void;
+    onPause: () => void;
+    onResume: () => void;
+    title: string;
+    enterDelay?: number;
+    enterRotate?: number;
+}
+
+const AnimatedPill = React.memo(function AnimatedPill({
+    item,
+    onClick,
+    onPause,
+    onResume,
+    title,
+}: AnimatedPillProps) {
+    const ghostRef = useRef<HTMLSpanElement>(null);
+    const [textWidth, setTextWidth] = useState<number | null>(null);
+
+    const itemKey = item.id || item.name;
+
+    useLayoutEffect(() => {
+        const el = ghostRef.current;
+        if (!el) return;
+
+        const updateWidth = () => {
+            const measured = el.offsetWidth + 1;
+            setTextWidth((prev) => (prev === null || Math.abs(prev - measured) >= 0.5 ? measured : prev));
+        };
+
+        updateWidth();
+
+        if (typeof ResizeObserver !== "undefined") {
+            const observer = new ResizeObserver(() => {
+                updateWidth();
+            });
+            observer.observe(el);
+            return () => observer.disconnect();
+        }
+    }, [itemKey]);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 360, damping: 24, mass: 0.7 }}
+            whileHover={{ scale: 1.05, y: -2, transition: { type: "spring", stiffness: 420, damping: 26, mass: 0.6 } }}
+            whileTap={{ scale: 0.94, transition: { type: "spring", stiffness: 500, damping: 30, mass: 0.5 } }}
+            onClick={onClick}
+            onMouseEnter={onPause}
+            onMouseLeave={onResume}
+            className="relative bg-white border-[1.5px] sm:border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1 sm:gap-2 md:gap-3 cursor-pointer select-none shrink-0 transition-shadow duration-200 overflow-hidden focus:outline-none"
+            title={title}
+            style={{ willChange: "transform" }}
+        >
+            {/* Flashing light sweep effect */}
+            <motion.div
+                initial={{ x: "-120%", opacity: 1 }}
+                animate={{ x: "250%", opacity: 0 }}
+                transition={{ duration: 0.7, delay: 0.12, ease: "easeOut" }}
+                style={{ willChange: "transform, opacity" }}
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
+            />
+
+            {/* Ambient white bloom shockwave on every platform/word transition */}
+            <AnimatePresence mode="popLayout">
+                <motion.div
+                    key={`pill-bloom-${itemKey}`}
+                    initial={{ opacity: 0.9, scale: 0.65 }}
+                    animate={{ opacity: 0, scale: 1.55 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.52, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,1)_0%,_rgba(255,255,255,0.75)_40%,_rgba(255,255,255,0)_75%)] pointer-events-none rounded-full z-10"
+                    style={{ willChange: "transform, opacity" }}
+                />
+            </AnimatePresence>
+
+            <div className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible z-20">
+                <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.div
+                        key={itemKey}
+                        initial={{ scale: 0.3, rotate: 12, opacity: 0 }}
+                        animate={{ scale: 1, rotate: -8.5, opacity: 1 }}
+                        exit={{ scale: 1.25, rotate: -16, opacity: 0, transition: { duration: 0.18, ease: "easeIn" } }}
+                        transition={{
+                            scale: { type: "spring", stiffness: 360, damping: 22, mass: 0.75 },
+                            rotate: { type: "spring", stiffness: 320, damping: 20 },
+                            opacity: { duration: 0.2, ease: [0.16, 1, 0.3, 1] },
+                        }}
+                        style={{ filter: WHITE_STICKER_FILTER, willChange: "transform, opacity" }}
+                        className="w-[1.0625em] h-[1.0625em] shrink-0 flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
+                    >
+                        {item.renderIcon("w-full h-full")}
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+
+            <motion.span
+                initial={false}
+                animate={textWidth === null ? undefined : { width: textWidth }}
+                transition={{ duration: 0.45, ease: EASE_OUT }}
+                style={{ paddingBlock: "0.12em", marginBlock: "-0.12em" }}
+                className="relative inline-block overflow-visible whitespace-nowrap text-inherit font-MyCustomFont3 z-20"
+            >
+                <span ref={ghostRef} aria-hidden="true" className="invisible inline-block whitespace-nowrap">
+                    {item.name}
+                </span>
+
+                <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                        key={itemKey}
+                        initial={{
+                            scale: 0.4,
+                            opacity: 0,
+                            filter: "blur(6px) brightness(1.3)",
+                            transformOrigin: "left center",
+                        }}
+                        animate={{
+                            scale: 1,
+                            opacity: 1,
+                            filter: "blur(0px) brightness(1)",
+                            transformOrigin: "left center",
+                        }}
+                        exit={{
+                            scale: 1.2,
+                            opacity: 0,
+                            filter: "blur(5px) brightness(1.2)",
+                            transformOrigin: "left center",
+                            transition: { duration: 0.18, ease: "easeIn" },
+                        }}
+                        transition={{
+                            scale: { type: "spring", stiffness: 360, damping: 22, mass: 0.75 },
+                            opacity: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
+                            filter: { duration: 0.25, ease: "easeOut" },
+                        }}
+                        style={{ willChange: "transform, opacity, filter" }}
+                        className="absolute left-0 top-[0.12em] text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
+                    >
+                        {item.name}
+                    </motion.span>
+                </AnimatePresence>
+            </motion.span>
+        </motion.div>
+    );
+});
+
+export interface HeroProps {
+    mode?: "developer" | "club";
+}
+
+interface HeroHeadlinesProps {
+    mode?: "developer" | "club";
+}
+
+const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesProps) {
+    const location = useLocation();
+    const isClub = mode ? mode === "club" : location.pathname.startsWith("/clubs");
+
+    // Developer mode ticker state
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
 
     const [oppIndex, setOppIndex] = useState(0);
     const [isOppPaused, setIsOppPaused] = useState(false);
 
+    // Club mode ticker state
+    const [clubEventIndex, setClubEventIndex] = useState(0);
+    const [isClubEventPaused, setIsClubEventPaused] = useState(false);
+
+    const [clubUnlockIndex, setClubUnlockIndex] = useState(0);
+    const [isClubUnlockPaused, setIsClubUnlockPaused] = useState(false);
+
+    // Developer mode tickers
     useEffect(() => {
-        if (isPaused) return;
+        if (isClub || isPaused) return;
         const timer = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % CONNECTABLE_PLATFORMS.length);
         }, 2800);
         return () => clearInterval(timer);
-    }, [isPaused]);
+    }, [isClub, isPaused]);
 
     useEffect(() => {
-        if (isOppPaused) return;
+        if (isClub || isOppPaused) return;
         const timer = setInterval(() => {
             setOppIndex((prev) => (prev + 1) % OPPORTUNITIES.length);
         }, 3200);
         return () => clearInterval(timer);
-    }, [isOppPaused]);
+    }, [isClub, isOppPaused]);
+
+    // Club mode tickers
+    useEffect(() => {
+        if (!isClub || isClubEventPaused) return;
+        const timer = setInterval(() => {
+            setClubEventIndex((prev) => (prev + 1) % CLUB_EVENTS.length);
+        }, 2800);
+        return () => clearInterval(timer);
+    }, [isClub, isClubEventPaused]);
+
+    useEffect(() => {
+        if (!isClub || isClubUnlockPaused) return;
+        const timer = setInterval(() => {
+            setClubUnlockIndex((prev) => (prev + 1) % CLUB_UNLOCKS.length);
+        }, 3200);
+        return () => clearInterval(timer);
+    }, [isClub, isClubUnlockPaused]);
 
     const handleNext = () => {
         setCurrentIndex((prev) => (prev + 1) % CONNECTABLE_PLATFORMS.length);
@@ -525,6 +941,57 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
     const handleNextOpp = () => {
         setOppIndex((prev) => (prev + 1) % OPPORTUNITIES.length);
     };
+
+    const handleNextClubEvent = () => {
+        setClubEventIndex((prev) => (prev + 1) % CLUB_EVENTS.length);
+    };
+
+    const handleNextClubUnlock = () => {
+        setClubUnlockIndex((prev) => (prev + 1) % CLUB_UNLOCKS.length);
+    };
+
+    if (isClub) {
+        const currentEvent = CLUB_EVENTS[clubEventIndex];
+        const currentUnlock = CLUB_UNLOCKS[clubUnlockIndex];
+
+        return (
+            <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(0.52rem,2.45vw,0.92rem)] sm:text-[clamp(0.95rem,2.65vw,3.25rem)] text-black font-MyCustomFont3 pt-[95px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-1.5 sm:px-4 md:px-6 max-w-full text-center leading-[1.25] sm:leading-[1.18] md:leading-[1.15] select-none">
+                {/* Line 1: Strictly single line, never wraps */}
+                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
+                    <span>A complete ecosystem for clubs to organize</span>
+
+                    <AnimatedPill
+                        item={currentEvent}
+                        onClick={handleNextClubEvent}
+                        onPause={() => setIsClubEventPaused(true)}
+                        onResume={() => setIsClubEventPaused(false)}
+                        title="Click to switch event type"
+                        enterDelay={0.2}
+                        enterRotate={-12}
+                    />
+                </div>
+
+                {/* Line 2: Strictly single line, never wraps */}
+                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
+                    <span>and unlock</span>
+                    <AnimatedPill
+                        item={currentUnlock}
+                        onClick={handleNextClubUnlock}
+                        onPause={() => setIsClubUnlockPaused(true)}
+                        onResume={() => setIsClubUnlockPaused(false)}
+                        title="Click to switch benefit"
+                        enterDelay={0.42}
+                        enterRotate={12}
+                    />
+                </div>
+
+                {/* Line 3: Strictly single line */}
+                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center text-center max-w-full'>
+                    <span>with registrations, certificates, and Pan India reach.</span>
+                </div>
+            </div>
+        );
+    }
 
     const current = CONNECTABLE_PLATFORMS[currentIndex];
     const currentOpp = OPPORTUNITIES[oppIndex];
@@ -535,188 +1002,30 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
             <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>A developer tool to connect</span>
 
-                <motion.div
-                    layout
-                    initial={{
-                        y: 85,
-                        opacity: 0,
-                        scale: 0.35,
-                        rotate: -12,
-                        filter: "brightness(2.4)",
-                    }}
-                    animate={{
-                        y: 0,
-                        opacity: 1,
-                        scale: 1,
-                        rotate: 0,
-                        filter: "brightness(1)",
-                    }}
-                    transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 13,
-                        mass: 0.85,
-                        delay: 0.2,
-                    }}
+                <AnimatedPill
+                    item={current}
                     onClick={handleNext}
-                    onMouseEnter={() => setIsPaused(true)}
-                    onMouseLeave={() => setIsPaused(false)}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.94 }}
-                    className="relative bg-white border-[1.5px] sm:border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1 sm:gap-2 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    onPause={() => setIsPaused(true)}
+                    onResume={() => setIsPaused(false)}
                     title="Click to switch platform"
-                >
-                    {/* Flashing light sweep effect as it bounces out of the underground */}
-                    <motion.div
-                        initial={{ x: "-120%", opacity: 1 }}
-                        animate={{ x: "250%", opacity: 0 }}
-                        transition={{ duration: 0.65, delay: 0.32, ease: "easeOut" }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
-                    />
-
-                    <div
-                        className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
-                        style={{ filter: WHITE_STICKER_FILTER }}
-                    >
-                        <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.div
-                                key={current.id}
-                                initial={{
-                                    scale: 0.05,
-                                    rotate: 0,
-                                    opacity: 0
-                                }}
-                                animate={{
-                                    scale: 1.25,
-                                    rotate: -8.5,
-                                    opacity: 1
-                                }}
-                                exit={{
-                                    scale: 0.1,
-                                    rotate: 0,
-                                    opacity: 0,
-                                    transition: { duration: 0.12, ease: "easeIn" }
-                                }}
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 380,
-                                    damping: 18,
-                                    mass: 0.75
-                                }}
-                                className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
-                            >
-                                {current.renderIcon("w-full h-full")}
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-
-                    <AnimatePresence mode="popLayout" initial={false}>
-                        <motion.span
-                            key={current.id}
-                            initial={{ scale: 0.92, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 1.05, opacity: 0 }}
-                            transition={{ duration: 0.12, ease: "easeOut" }}
-                            className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
-                        >
-                            {current.name}
-                        </motion.span>
-                    </AnimatePresence>
-                </motion.div>
+                    enterDelay={0.2}
+                    enterRotate={-12}
+                />
                 <span>,</span>
             </div>
 
             {/* Line 2: Strictly single line, never wraps regardless of text changes */}
             <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>and redirecting</span>
-                <motion.div
-                    layout
-                    initial={{
-                        y: 85,
-                        opacity: 0,
-                        scale: 0.35,
-                        rotate: 12,
-                        filter: "brightness(2.4)",
-                    }}
-                    animate={{
-                        y: 0,
-                        opacity: 1,
-                        scale: 1,
-                        rotate: 0,
-                        filter: "brightness(1)",
-                    }}
-                    transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 13,
-                        mass: 0.85,
-                        delay: 0.42,
-                    }}
+                <AnimatedPill
+                    item={currentOpp}
                     onClick={handleNextOpp}
-                    onMouseEnter={() => setIsOppPaused(true)}
-                    onMouseLeave={() => setIsOppPaused(false)}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.94 }}
-                    className="relative bg-white border-[1.5px] sm:border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1 sm:gap-2 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    onPause={() => setIsOppPaused(true)}
+                    onResume={() => setIsOppPaused(false)}
                     title="Click to switch opportunity"
-                >
-                    {/* Flashing light sweep effect as it bounces out of the underground */}
-                    <motion.div
-                        initial={{ x: "-120%", opacity: 1 }}
-                        animate={{ x: "250%", opacity: 0 }}
-                        transition={{ duration: 0.65, delay: 0.54, ease: "easeOut" }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
-                    />
-
-                    <div
-                        className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
-                        style={{ filter: WHITE_STICKER_FILTER }}
-                    >
-                        <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.div
-                                key={currentOpp.id || currentOpp.name}
-                                initial={{
-                                    scale: 0.05,
-                                    rotate: 0,
-                                    opacity: 0
-                                }}
-                                animate={{
-                                    scale: 1.25,
-                                    rotate: -8.5,
-                                    opacity: 1
-                                }}
-                                exit={{
-                                    scale: 0.1,
-                                    rotate: 0,
-                                    opacity: 0,
-                                    transition: { duration: 0.12, ease: "easeIn" }
-                                }}
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 380,
-                                    damping: 18,
-                                    mass: 0.75
-                                }}
-                                className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
-                            >
-                                {currentOpp.renderIcon("w-full h-full")}
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-
-                    <AnimatePresence mode="popLayout" initial={false}>
-                        <motion.span
-                            key={currentOpp.id || currentOpp.name}
-                            initial={{ scale: 0.92, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 1.05, opacity: 0 }}
-                            transition={{ duration: 0.12, ease: "easeOut" }}
-                            className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
-                        >
-                            {currentOpp.name}
-                        </motion.span>
-                    </AnimatePresence>
-                </motion.div>
+                    enterDelay={0.42}
+                    enterRotate={12}
+                />
                 <span>economics for</span>
             </div>
 
@@ -728,7 +1037,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
     );
 });
 
-const Landing = () => {
+const Landing = ({ mode }: HeroProps) => {
     const trackRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -781,7 +1090,7 @@ const Landing = () => {
     return (
         <div className="relative w-full flex flex-col items-center bg-[#FAF6EE] text-neutral-900 select-none">
             {/* Hero Headline (Isolated ticker state so pinned showcase never re-renders) */}
-            <HeroHeadlines />
+            <HeroHeadlines mode={mode} />
 
             {/* Pinned Scroll Showcase Section: Holds the box fixed in screen center while inner page scrolls */}
             <div
@@ -805,11 +1114,15 @@ const Landing = () => {
                                     <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
-                                    <span className="truncate">orbix.dev/profile/u/Vineet-Chandel</span>
+                                    <span className="truncate">
+                                        {mode === 'club' ? `orbix.dev/clubs/${DEMO_CLUB_SLUG}` : 'orbix.dev/profile/u/Vineet-Chandel'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-mono text-black font-black">
                                     <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 border border-black animate-pulse" />
-                                    <span className="hidden sm:inline font-black tracking-wider">LIVE PROFILE</span>
+                                    <span className="hidden sm:inline font-black tracking-wider">
+                                        {mode === 'club' ? 'LIVE CLUB PROFILE' : 'LIVE PROFILE'}
+                                    </span>
                                 </div>
                             </div>
 
@@ -820,7 +1133,11 @@ const Landing = () => {
                                     style={{ y: contentY }}
                                     className="embedded-showcase-container w-full will-change-transform transform-gpu"
                                 >
-                                    <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
+                                    {mode === 'club' ? (
+                                        <PublicClubProfilePage overrideSlug={DEMO_CLUB_SLUG} isEmbedded={true} />
+                                    ) : (
+                                        <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
+                                    )}
                                 </motion.div>
                             </div>
                         </div>

@@ -40,6 +40,13 @@ export interface CollegeEventItem {
     ticketCode: string | null;
     registrationsCount: number;
     totalApplicationsCount?: number;
+    registrationStartsAt?: string | null;
+    registrationDeadline?: string | null;
+    isRegistrationClosed?: boolean;
+    isRegistrationUpcoming?: boolean;
+    currentStageName?: string | null;
+    currentStageOrder?: number | null;
+    stagesCount?: number;
 }
 
 export interface CollegeEventsResponse {

@@ -76,8 +76,8 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                         studentProfile={formData.studentProfile}
                         userResponse={formData.userResponse}
                         draftResponse={formData.draftResponse}
-                        isClosed={formData.isClosed}
-                        closedReason={formData.closedReason}
+                        isClosed={formData.isClosed || event.isRegistrationClosed}
+                        closedReason={formData.closedReason || (event.isRegistrationClosed ? "The registration window for this event has closed. Applications are no longer accepted." : undefined)}
                         onSuccess={(reg) => {
                             setIsSubmitted(true);
                             onSuccess({
@@ -130,8 +130,8 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                         studentProfile={formData.studentProfile}
                         userResponse={formData.userResponse}
                         draftResponse={formData.draftResponse}
-                        isClosed={formData.isClosed}
-                        closedReason={formData.closedReason}
+                        isClosed={formData.isClosed || event.isRegistrationClosed}
+                        closedReason={formData.closedReason || (event.isRegistrationClosed ? "The registration window for this event has closed. Applications are no longer accepted." : undefined)}
                         onSuccess={(reg) => {
                             setIsSubmitted(true);
                             onSuccess({

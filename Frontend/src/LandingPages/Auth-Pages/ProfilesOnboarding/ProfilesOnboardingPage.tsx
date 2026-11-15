@@ -234,7 +234,7 @@ export default function ProfilesOnboardingPage() {
                 if (token) headers["Authorization"] = `Bearer ${token}`;
 
                 const primarySave = buildApiUrl("/api/portals/save");
-                const endpoints = import.meta.env.DEV ? [primarySave, "http://localhost:3000/api/portals/save"] : [primarySave];
+                const endpoints = [primarySave];
                 let serverLinks: any[] = [];
 
                 for (const url of endpoints) {
@@ -326,7 +326,7 @@ export default function ProfilesOnboardingPage() {
 
                     try {
                         const primaryFetch = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`);
-                        const endpoints = import.meta.env.DEV ? [primaryFetch, `http://localhost:3000${primaryFetch}`] : [primaryFetch];
+                        const endpoints = [primaryFetch];
                         for (const url of endpoints) {
                             try {
                                 const res = await fetch(url);
@@ -590,33 +590,17 @@ export default function ProfilesOnboardingPage() {
                 syncMode: "exact",
             };
 
-            // Call primary endpoint, fallback to secondary if needed in dev
+            // Call standardized endpoint
             const saveUrl = buildApiUrl("/api/portals/save");
-            let saveSuccessful = false;
             try {
-                const res = await fetch(saveUrl, {
+                await fetch(saveUrl, {
                     method: "POST",
                     headers,
                     credentials: "include",
                     body: JSON.stringify(savePayload),
                 });
-                if (res.ok) saveSuccessful = true;
             } catch {
-                // try fallback
-            }
-
-            if (!saveSuccessful && import.meta.env.DEV) {
-                try {
-                    const fallbackRes = await fetch("http://localhost:3000/api/portals/save", {
-                        method: "POST",
-                        headers,
-                        credentials: "include",
-                        body: JSON.stringify(savePayload),
-                    });
-                    if (fallbackRes.ok) saveSuccessful = true;
-                } catch {
-                    // Non-fatal offline fallback
-                }
+                // Non-fatal offline fallback
             }
 
             // Reset dirty snapshot
