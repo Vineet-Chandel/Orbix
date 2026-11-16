@@ -16,7 +16,6 @@ import {
     FileText,
     Check,
     ChevronDown,
-    Sparkles,
     Shield,
     Info,
     X,
