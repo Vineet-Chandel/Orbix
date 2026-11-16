@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
     Ticket,
     Calendar,
@@ -58,11 +58,22 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     initialSegment = "applications",
 }) => {
     const toast = useToast();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get("tab") || searchParams.get("segment");
 
     // Active Segment: "applications" | "sessions" | "certificates"
-    const [activeSegment, setActiveSegment] = useState<"applications" | "sessions" | "certificates">(
-        initialSegment
-    );
+    const [activeSegment, setActiveSegment] = useState<"applications" | "sessions" | "certificates">(() => {
+        if (tabParam === "sessions" || tabParam === "certificates" || tabParam === "applications") {
+            return tabParam;
+        }
+        return initialSegment;
+    });
+
+    useEffect(() => {
+        if (tabParam === "sessions" || tabParam === "certificates" || tabParam === "applications") {
+            setActiveSegment(tabParam);
+        }
+    }, [tabParam]);
 
     // Applications & Sessions data
     const [applications, setApplications] = useState<StudentApplicationItem[]>([]);
@@ -310,7 +321,14 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 {/* Segment Switcher Navigation */}
                 <div className="p-1.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-wrap gap-2">
                     <button
-                        onClick={() => setActiveSegment("applications")}
+                        onClick={() => {
+                            setActiveSegment("applications");
+                            setSearchParams((prev) => {
+                                const next = new URLSearchParams(prev);
+                                next.set("tab", "applications");
+                                return next;
+                            });
+                        }}
                         className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-xl border-2 text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 ${
                             activeSegment === "applications"
                                 ? "bg-[#a2ff86] border-black text-black shadow-[2px_2px_0px_#000]"
@@ -325,7 +343,14 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                     </button>
 
                     <button
-                        onClick={() => setActiveSegment("sessions")}
+                        onClick={() => {
+                            setActiveSegment("sessions");
+                            setSearchParams((prev) => {
+                                const next = new URLSearchParams(prev);
+                                next.set("tab", "sessions");
+                                return next;
+                            });
+                        }}
                         className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-xl border-2 text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 ${
                             activeSegment === "sessions"
                                 ? "bg-[#FFDE59] border-black text-black shadow-[2px_2px_0px_#000]"
@@ -340,7 +365,14 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                     </button>
 
                     <button
-                        onClick={() => setActiveSegment("certificates")}
+                        onClick={() => {
+                            setActiveSegment("certificates");
+                            setSearchParams((prev) => {
+                                const next = new URLSearchParams(prev);
+                                next.set("tab", "certificates");
+                                return next;
+                            });
+                        }}
                         className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-xl border-2 text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 ${
                             activeSegment === "certificates"
                                 ? "bg-[#A6E3E9] border-black text-black shadow-[2px_2px_0px_#000]"

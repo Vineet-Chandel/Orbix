@@ -23,6 +23,7 @@ import {
     AlertCircle,
     Menu,
     FileText,
+    Ticket,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
@@ -642,6 +643,15 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                                         </div>
                                     </div>
                                 )}
+                                <div className="pt-1">
+                                    <Link
+                                        to="/activity?tab=sessions"
+                                        className="w-full py-2 px-3 rounded-xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                    >
+                                        <Ticket className="w-3.5 h-3.5 text-emerald-950" />
+                                        <span>View Session Ticket in Activity</span>
+                                    </Link>
+                                </div>
                             </div>
                         ) : event.registrationStatus === "pending" || event.isPending ? (
                             <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-600 space-y-2.5 text-center">
@@ -654,7 +664,7 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                                 </p>
                                 <div className="pt-1">
                                     <Link
-                                        to="/student/activity?tab=applications"
+                                        to="/activity?tab=applications"
                                         className="w-full py-2 px-3 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-950 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                     >
                                         <FileText className="w-3.5 h-3.5 text-amber-950" />
