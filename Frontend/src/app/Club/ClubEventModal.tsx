@@ -170,7 +170,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         const hasValidEndDate = Boolean(endsAtStr && !isNaN(new Date(endsAtStr).getTime()) && new Date(endsAtStr).getTime() > sDate.getTime());
         const eDate = hasValidEndDate ? new Date(endsAtStr!) : new Date(sDate.getTime() + 7 * 86400000);
 
-        const totalMs = Math.max(eDate.getTime() - sDate.getTime(), 3 * 3600 * 1000);
+        // Calculate total duration strictly bounded by eDate when valid end date is present
+        const totalMs = hasValidEndDate
+            ? Math.max(eDate.getTime() - sDate.getTime(), 60000)
+            : Math.max(eDate.getTime() - sDate.getTime(), 3 * 3600 * 1000);
 
         let stage1EndMs: number;
         let stage2EndMs: number;
@@ -179,12 +182,15 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             stage1EndMs = sDate.getTime() + Math.min(4 * 86400000, Math.floor(totalMs * 0.35));
             stage2EndMs = stage1EndMs + Math.min(7 * 86400000, Math.floor((totalMs - (stage1EndMs - sDate.getTime())) * 0.7));
         } else {
-            stage1EndMs = sDate.getTime() + Math.floor(totalMs * 0.4);
-            stage2EndMs = sDate.getTime() + Math.floor(totalMs * 0.8);
+            stage1EndMs = sDate.getTime() + Math.floor(totalMs * 0.35);
+            stage2EndMs = sDate.getTime() + Math.floor(totalMs * 0.7);
         }
 
-        const stage1End = new Date(stage1EndMs);
-        const stage2End = new Date(stage2EndMs);
+        // Guarantee boundaries: sDate <= stage1End <= stage2End <= eDate
+        const sTime = sDate.getTime();
+        const eTime = eDate.getTime();
+        const stage1End = new Date(Math.max(sTime, Math.min(stage1EndMs, eTime)));
+        const stage2End = new Date(Math.max(stage1End.getTime(), Math.min(stage2EndMs, eTime)));
         const stage3End = eDate;
 
         return [
@@ -620,6 +626,46 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
         const effectiveBanner = form.coverImageUrl.trim() || getRandomPresetBanner().dataUrl;
 
+        const eventStartMs = new Date(form.startsAt).getTime();
+        const eventEndMs = form.endsAt ? new Date(form.endsAt).getTime() : NaN;
+
+        // Ensure every stage timeline is cleanly bounded and formatted as valid ISO strings
+        const sanitizedStages = Array.isArray(stages) && stages.length > 0
+            ? stages.map((st, idx) => {
+                let sStart = st.startsAt ? new Date(st.startsAt).getTime() : eventStartMs;
+                let sEnd = st.endsAt ? new Date(st.endsAt).getTime() : NaN;
+
+                // Clamp startsAt so it never starts before event starts
+                if (isNaN(sStart) || sStart < eventStartMs) {
+                    sStart = eventStartMs;
+                }
+                // If event has an end time, clamp stage start so it doesn't start after event ends
+                if (!isNaN(eventEndMs) && sStart > eventEndMs) {
+                    sStart = eventStartMs;
+                }
+
+                // If endsAt is missing or invalid
+                if (isNaN(sEnd)) {
+                    sEnd = !isNaN(eventEndMs) ? eventEndMs : sStart + 3600000;
+                }
+                // Clamp stage endsAt within event bounds
+                if (!isNaN(eventEndMs) && sEnd > eventEndMs) {
+                    sEnd = eventEndMs;
+                }
+                // Ensure stage endsAt is not earlier than its startsAt
+                if (sEnd < sStart) {
+                    sEnd = !isNaN(eventEndMs) ? eventEndMs : sStart + 3600000;
+                }
+
+                return {
+                    ...st,
+                    stageOrder: typeof st.stageOrder === "number" ? st.stageOrder : idx + 1,
+                    startsAt: new Date(sStart).toISOString(),
+                    endsAt: new Date(sEnd).toISOString(),
+                };
+            })
+            : [];
+
         // Construct clean payload with valid details only
         const payload: CreateClubEventPayload = {
             title: form.title.trim(),
@@ -641,7 +687,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             initialFormStructure: formStructure,
             initialFormSettings: formSettings,
             initialFormTheme: formTheme,
-            initialStages: stages,
+            initialStages: sanitizedStages,
         };
 
         // Fire callback immediately for optimistic update

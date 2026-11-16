@@ -2186,21 +2186,32 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
             const eventEndMs = endsAt ? new Date(endsAt).getTime() : NaN;
 
             for (const stage of initialStages) {
-                const sStartMs = stage.startsAt ? new Date(stage.startsAt).getTime() : NaN;
-                const sEndMs = stage.endsAt ? new Date(stage.endsAt).getTime() : NaN;
+                let sStartMs = stage.startsAt ? new Date(stage.startsAt).getTime() : NaN;
+                let sEndMs = stage.endsAt ? new Date(stage.endsAt).getTime() : NaN;
                 const stageName = stage.name || stage.stageName || "Round";
 
+                // Sub-minute boundary drift tolerance: auto-clamp if within 60s
                 if (!isNaN(sStartMs) && !isNaN(eventStartMs) && sStartMs < eventStartMs) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Round "${stageName}" cannot start before event start time.`,
-                    });
+                    if (eventStartMs - sStartMs <= 60000) {
+                        sStartMs = eventStartMs;
+                        stage.startsAt = new Date(eventStartMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" cannot start before event start time.`,
+                        });
+                    }
                 }
                 if (!isNaN(sStartMs) && !isNaN(eventEndMs) && sStartMs > eventEndMs) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Round "${stageName}" cannot start after event end time.`,
-                    });
+                    if (sStartMs - eventEndMs <= 60000) {
+                        sStartMs = eventEndMs;
+                        stage.startsAt = new Date(eventEndMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" cannot start after event end time.`,
+                        });
+                    }
                 }
                 if (!isNaN(sStartMs) && !isNaN(sEndMs) && sEndMs < sStartMs) {
                     return res.status(400).json({
@@ -2209,16 +2220,26 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                     });
                 }
                 if (!isNaN(sEndMs) && !isNaN(eventEndMs) && sEndMs > eventEndMs) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Round "${stageName}" submission deadline cannot be after event end time.`,
-                    });
+                    if (sEndMs - eventEndMs <= 60000) {
+                        sEndMs = eventEndMs;
+                        stage.endsAt = new Date(eventEndMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" submission deadline cannot be after event end time.`,
+                        });
+                    }
                 }
                 if (!isNaN(sEndMs) && !isNaN(eventStartMs) && sEndMs < eventStartMs) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Round "${stageName}" submission deadline cannot be before event start time.`,
-                    });
+                    if (eventStartMs - sEndMs <= 60000) {
+                        sEndMs = eventStartMs;
+                        stage.endsAt = new Date(eventStartMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" submission deadline cannot be before event start time.`,
+                        });
+                    }
                 }
             }
         }
