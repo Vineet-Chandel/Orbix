@@ -15,19 +15,23 @@ export interface EventTeamMember {
 export interface EventTeamInvitation {
     id: string;
     teamId: string;
-    eventId: string;
-    inviterUserId: string;
-    inviteeUserId: string;
-    status: "pending" | "accepted" | "declined" | "expired";
+    eventId?: string;
+    inviterUserId?: string;
+    inviteeUserId?: string;
+    status: "pending" | "accepted" | "declined" | "expired" | "cancelled";
     createdAt: string;
     respondedAt?: string | null;
-    teamName: string;
-    teamCode: string;
-    eventTitle: string;
-    startsAt: string;
-    inviterName: string;
-    inviterUsername: string;
+    teamName?: string;
+    teamCode?: string;
+    eventTitle?: string;
+    startsAt?: string;
+    inviterName?: string;
+    inviterUsername?: string;
     inviterAvatarUrl?: string;
+    inviteeUsername?: string;
+    inviteeName?: string;
+    inviteeEmail?: string;
+    inviteeAvatarUrl?: string | null;
 }
 
 export interface EventTeamDetails {
@@ -51,6 +55,7 @@ export interface EventTeamDetails {
     lockReason?: string | null;
     registrationDeadline?: string | null;
     members: EventTeamMember[];
+    pendingInvitations?: EventTeamInvitation[];
 }
 
 export interface SearchUserResult {
@@ -153,6 +158,21 @@ export const clubEventTeamApi = {
         const data = await res.json();
         if (!res.ok) {
             throw new Error(data.message || "Failed to send invitation.");
+        }
+        return data;
+    },
+
+    /**
+     * Revoke / cancel a pending team invitation (Leader only)
+     */
+    async cancelInvitation(eventId: string, teamId: string, invitationId: string): Promise<{ success: boolean; message: string }> {
+        const res = await fetch(buildApiUrl(`/events/${eventId}/teams/${teamId}/invites/${invitationId}`), {
+            method: "DELETE",
+            headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to revoke invitation.");
         }
         return data;
     },

@@ -417,14 +417,63 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
                                                 </span>
                                             ) : Array.isArray(answerVal) ? (
                                                 <div className="flex flex-wrap gap-1.5 pt-1">
-                                                    {answerVal.map((item, idx) => (
-                                                        <span
-                                                            key={idx}
-                                                            className="px-2.5 py-0.5 rounded-full bg-white border border-black text-xs font-bold text-black shadow-[1px_1px_0px_#000]"
-                                                        >
-                                                            {String(item)}
-                                                        </span>
-                                                    ))}
+                                                    {answerVal.map((item, idx) => {
+                                                        if (item && typeof item === "object") {
+                                                            const displayName = item.name || item.fullName || item.applicantName || item.username || `Teammate ${idx + 1}`;
+                                                            const userTag = item.username ? `@${String(item.username).replace(/^@/, "")}` : "";
+                                                            const email = item.email || item.applicantEmail || "";
+                                                            const status = String(item.status || "pending").toLowerCase();
+                                                            const isAccepted = status === "accepted" || status === "registered" || status === "leader";
+                                                            const isDeclined = status === "declined" || status === "rejected";
+
+                                                            return (
+                                                                <div
+                                                                    key={item.id || idx}
+                                                                    className="p-2 rounded-xl bg-white border border-black shadow-[1.5px_1.5px_0px_#000] space-y-1 w-full max-w-sm"
+                                                                >
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                            <span className="font-black text-black text-xs truncate">{displayName}</span>
+                                                                            {userTag && (
+                                                                                <a
+                                                                                    href={`/profile/${userTag.replace(/^@/, "")}`}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="text-[11px] font-mono text-neutral-500 hover:text-black hover:underline"
+                                                                                >
+                                                                                    {userTag}
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                        <span
+                                                                            className={`px-1.5 py-0.5 rounded-md font-black text-[9px] uppercase tracking-wider shrink-0 border ${
+                                                                                isAccepted
+                                                                                    ? "bg-[#a2ff86] text-black border-black/40"
+                                                                                    : isDeclined
+                                                                                    ? "bg-rose-100 text-rose-800 border-rose-300"
+                                                                                    : "bg-[#FFE566] text-amber-950 border-amber-500"
+                                                                            }`}
+                                                                        >
+                                                                            {isAccepted ? "Accepted" : isDeclined ? "Declined" : "Pending Invite"}
+                                                                        </span>
+                                                                    </div>
+                                                                    {email && (
+                                                                        <div className="text-[11px] font-mono text-neutral-600 truncate">
+                                                                            {email}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <span
+                                                                key={idx}
+                                                                className="px-2.5 py-0.5 rounded-full bg-white border border-black text-xs font-bold text-black shadow-[1px_1px_0px_#000]"
+                                                            >
+                                                                {String(item)}
+                                                            </span>
+                                                        );
+                                                    })}
                                                 </div>
                                             ) : String(answerVal).startsWith("http://") ||
                                                 String(answerVal).startsWith("https://") ? (

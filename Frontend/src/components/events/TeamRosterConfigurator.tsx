@@ -22,6 +22,7 @@ export interface StagedTeammate {
     id: string;
     username: string;
     name: string;
+    email?: string;
     avatarUrl?: string | null;
     collegeName?: string | null;
 }
@@ -168,6 +169,7 @@ export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
             id: u.id,
             username: u.username,
             name: u.name,
+            email: u.email,
             avatarUrl: u.avatarUrl,
             collegeName: (u as any).collegeName || null,
         };

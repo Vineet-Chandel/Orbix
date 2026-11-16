@@ -12,6 +12,7 @@ import {
     Paperclip,
     Users,
     X,
+    AlertCircle,
 } from "lucide-react";
 import type { ClubEventApplicantRow } from "../../../api/collegeEventsApi";
 import { batchUpdateApplicantStatus } from "../../../api/collegeEventsApi";
@@ -39,6 +40,9 @@ interface ApplicationsRosterTableProps {
     ) => Promise<void>;
     updatingApplicantId: string | null;
     eventId?: string;
+    isTeamEvent?: boolean;
+    minTeamSize?: number;
+    maxTeamSize?: number;
     onBatchStatusChange?: (
         applicants: ClubEventApplicantRow[],
         status: "registered" | "rejected",
@@ -56,6 +60,9 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
     onStatusChange,
     updatingApplicantId,
     eventId,
+    isTeamEvent,
+    minTeamSize,
+    maxTeamSize,
     onBatchStatusChange,
 }) => {
     const toast = useToast();
@@ -239,6 +246,27 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
             stickyOffset: 238,
         };
 
+        // Determine if this is a team event or if any registration has team metadata
+        const hasTeamData = Boolean(
+            isTeamEvent ||
+            applications.some((a) => a.teamId || a.teamName || (a.answers && (a.answers.__teamName || a.answers.__stagedTeammates)))
+        );
+
+        // Group B2: Team Readiness / Status (only for team events / registrations)
+        const colTeamReadiness: TableColumnDefinition[] = hasTeamData
+            ? [
+                  {
+                      id: "teamReadiness",
+                      label: "TEAM READINESS",
+                      group: "status",
+                      type: "text",
+                      minWidth: "min-w-[170px]",
+                      sortable: true,
+                      filterable: true,
+                  },
+              ]
+            : [];
+
         // Group C: Student Personal Information (Exact sequence)
         const groupCColumns: TableColumnDefinition[] = [
             {
@@ -349,8 +377,8 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
             filterable: false,
         };
 
-        return [colSelect, colAction, colStatus, ...groupCColumns, ...groupDColumns, colTimestamp];
-    }, [dynamicQuestions]);
+        return [colSelect, colAction, colStatus, ...colTeamReadiness, ...groupCColumns, ...groupDColumns, colTimestamp];
+    }, [dynamicQuestions, isTeamEvent, applications]);
 
     const renderCellContent = (app: ClubEventApplicantRow, col: TableColumnDefinition) => {
         // GROUP 0: SELECTION CHECKBOX (Sticky Left 0)
@@ -499,6 +527,51 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
                 >
                     {label}
                 </span>
+            );
+        }
+
+        // GROUP B2: TEAM READINESS
+        if (col.id === "teamReadiness") {
+            const teamName = app.teamName || (app.answers && app.answers.__teamName) || (app.formResponse && app.formResponse.__teamName) || "";
+            const isTeam = Boolean(app.teamId || teamName);
+            if (!isTeam) {
+                return <span className="text-neutral-400 font-normal">—</span>;
+            }
+
+            const minSize = minTeamSize || 2;
+            const maxSize = maxTeamSize || minSize;
+            const confirmedCount = app.teamMembersCount ?? (app.teamMembers ? app.teamMembers.length : 1);
+            const pendingCount = app.teamPendingCount ?? (app.teamPendingInvites ? app.teamPendingInvites.length : (Array.isArray(app.answers?.__stagedTeammates) ? app.answers.__stagedTeammates.length : 0));
+            const isReady = confirmedCount >= minSize;
+
+            return (
+                <div className="flex flex-col gap-0.5 text-left">
+                    <div className="flex items-center gap-1.5">
+                        <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-[1px_1px_0px_#000] ${
+                                isReady
+                                    ? "bg-[#a2ff86] text-black border-black"
+                                    : "bg-amber-100 text-amber-950 border-amber-600"
+                            }`}
+                        >
+                            {isReady ? (
+                                <CheckCircle2 className="w-2.5 h-2.5" />
+                            ) : (
+                                <AlertCircle className="w-2.5 h-2.5 text-amber-700" />
+                            )}
+                            <span>{isReady ? `Ready (${confirmedCount}/${maxSize})` : `Incomplete (${confirmedCount}/${minSize})`}</span>
+                        </span>
+                    </div>
+                    {pendingCount > 0 ? (
+                        <span className="text-[9px] font-bold text-amber-700 pl-1">
+                            +{pendingCount} invite{pendingCount === 1 ? "" : "s"} pending
+                        </span>
+                    ) : (
+                        <span className="text-[9px] font-medium text-neutral-500 pl-1 truncate max-w-[150px]">
+                            {teamName ? `Team: ${teamName}` : "Squad confirmed"}
+                        </span>
+                    )}
+                </div>
             );
         }
 
@@ -672,6 +745,80 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
             }
         }
 
+        // Special live renderer for Teammates & Invites column
+        if (col.id === "__stagedTeammates" || col.id === "teamMembers") {
+            const liveMembers = app.teamMembers || [];
+            const livePending = app.teamPendingInvites || [];
+            if (liveMembers.length > 0 || livePending.length > 0) {
+                return (
+                    <div className="flex flex-col gap-1.5 min-w-[210px] max-w-[320px] py-1 text-left">
+                        {liveMembers.map((m, idx) => (
+                            <div
+                                key={m.userId || idx}
+                                className="p-1.5 rounded-xl bg-white border border-black/30 shadow-[1px_1px_0px_#000] space-y-0.5"
+                            >
+                                <div className="flex items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-1 min-w-0">
+                                        <span className="font-black text-black text-[11px] truncate">
+                                            {m.name || m.username}
+                                        </span>
+                                        <a
+                                            href={`/profile/${m.username}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="text-[10px] font-mono text-neutral-500 hover:text-black hover:underline truncate"
+                                        >
+                                            @{m.username}
+                                        </a>
+                                    </div>
+                                    <span className="px-1.5 py-0.2 rounded-md font-black text-[8px] uppercase tracking-wider shrink-0 bg-[#a2ff86] text-black border border-black/40">
+                                        {m.role === "leader" ? "Leader" : "Accepted"}
+                                    </span>
+                                </div>
+                                {m.email && (
+                                    <div className="text-[10px] font-mono text-neutral-500 truncate" title={m.email}>
+                                        {m.email}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        {livePending.map((inv, idx) => (
+                            <div
+                                key={inv.invitationId || idx}
+                                className="p-1.5 rounded-xl bg-amber-50/70 border border-dashed border-amber-500 shadow-[1px_1px_0px_#000] space-y-0.5"
+                            >
+                                <div className="flex items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-1 min-w-0">
+                                        <span className="font-black text-black text-[11px] truncate">
+                                            {inv.name || inv.username}
+                                        </span>
+                                        <a
+                                            href={`/profile/${inv.username}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="text-[10px] font-mono text-neutral-500 hover:text-black hover:underline truncate"
+                                        >
+                                            @{inv.username}
+                                        </a>
+                                    </div>
+                                    <span className="px-1.5 py-0.2 rounded-md font-black text-[8px] uppercase tracking-wider shrink-0 bg-[#FFE566] text-amber-950 border border-amber-500">
+                                        Pending Invite
+                                    </span>
+                                </div>
+                                {inv.email && (
+                                    <div className="text-[10px] font-mono text-neutral-500 truncate" title={inv.email}>
+                                        {inv.email}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                );
+            }
+        }
+
         // 2. Answer values
         const ansObj = { ...(app.answers || {}), ...(app.formResponse || {}) };
         let val = ansObj[col.id];
@@ -687,6 +834,74 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
 
         if (Array.isArray(val)) {
             if (val.length === 0) return <span className="text-neutral-400 font-normal">—</span>;
+
+            const hasObjects = val.some((item) => item && typeof item === "object");
+            if (hasObjects) {
+                return (
+                    <div className="flex flex-col gap-1.5 min-w-[210px] max-w-[320px] py-1 text-left">
+                        {val.map((item: any, idx: number) => {
+                            if (!item || typeof item !== "object") {
+                                return (
+                                    <span
+                                        key={idx}
+                                        className="px-2 py-0.5 rounded-full bg-[#FAF6EE] border border-black/30 text-[10px] font-bold text-black"
+                                    >
+                                        {String(item)}
+                                    </span>
+                                );
+                            }
+
+                            const displayName = item.name || item.fullName || item.applicantName || item.username || `Teammate ${idx + 1}`;
+                            const userTag = item.username ? `@${String(item.username).replace(/^@/, "")}` : "";
+                            const email = item.email || item.applicantEmail || "";
+                            const status = String(item.status || "pending").toLowerCase();
+                            const isAccepted = status === "accepted" || status === "registered" || status === "leader";
+                            const isDeclined = status === "declined" || status === "rejected";
+
+                            return (
+                                <div
+                                    key={item.id || idx}
+                                    className="p-1.5 rounded-xl bg-white border border-black/30 shadow-[1px_1px_0px_#000] space-y-0.5"
+                                >
+                                    <div className="flex items-center justify-between gap-1.5">
+                                        <div className="flex items-center gap-1 min-w-0">
+                                            <span className="font-black text-black text-[11px] truncate">{displayName}</span>
+                                            {userTag && (
+                                                <a
+                                                    href={`/profile/${userTag.replace(/^@/, "")}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="text-[10px] font-mono text-neutral-500 hover:text-black hover:underline truncate"
+                                                >
+                                                    {userTag}
+                                                </a>
+                                            )}
+                                        </div>
+                                        <span
+                                            className={`px-1.5 py-0.2 rounded-md font-black text-[8px] uppercase tracking-wider shrink-0 border ${
+                                                isAccepted
+                                                    ? "bg-[#a2ff86] text-black border-black/40"
+                                                    : isDeclined
+                                                    ? "bg-rose-100 text-rose-800 border-rose-300"
+                                                    : "bg-[#FFE566] text-amber-950 border-amber-500"
+                                            }`}
+                                        >
+                                            {isAccepted ? "Accepted" : isDeclined ? "Declined" : "Pending Invite"}
+                                        </span>
+                                    </div>
+                                    {email && (
+                                        <div className="text-[10px] font-mono text-neutral-500 truncate" title={email}>
+                                            {email}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            }
+
             return (
                 <div className="flex flex-wrap gap-1 max-w-[220px]">
                     {val.map((item, idx) => (

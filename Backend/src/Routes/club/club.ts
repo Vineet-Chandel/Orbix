@@ -4051,7 +4051,26 @@ clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount
                 r.team_id AS "teamId",
                 r.team_role AS "teamRole",
                 t.name AS "teamName",
-                t.code AS "teamCode"
+                t.code AS "teamCode",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_team_members tm WHERE tm.team_id = r.team_id), 0) AS "teamMembersCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_team_invitations ti WHERE ti.team_id = r.team_id AND ti.status = 'pending'), 0) AS "teamPendingCount",
+                (SELECT json_agg(json_build_object(
+                    'userId', m.user_id,
+                    'username', mu.username,
+                    'name', TRIM(CONCAT(mu.firstname, ' ', COALESCE(mu.lastname, ''))),
+                    'email', mu.email,
+                    'role', m.role,
+                    'status', 'accepted'
+                )) FROM club_event_team_members m JOIN users mu ON mu.id = m.user_id WHERE m.team_id = r.team_id) AS "teamMembers",
+                (SELECT json_agg(json_build_object(
+                    'invitationId', i.id,
+                    'userId', i.invitee_user_id,
+                    'username', iu.username,
+                    'name', TRIM(CONCAT(iu.firstname, ' ', COALESCE(iu.lastname, ''))),
+                    'email', iu.email,
+                    'role', 'invitee',
+                    'status', i.status
+                )) FROM club_event_team_invitations i JOIN users iu ON iu.id = i.invitee_user_id WHERE i.team_id = r.team_id AND i.status = 'pending') AS "teamPendingInvites"
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
              LEFT JOIN club_event_teams t ON t.id = r.team_id

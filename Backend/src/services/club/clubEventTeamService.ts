@@ -30,6 +30,7 @@ export interface EventTeamInvitation {
     inviteeUserId: string;
     inviteeUsername: string;
     inviteeName: string;
+    inviteeEmail?: string;
     inviteeAvatarUrl: string | null;
     status: "pending" | "accepted" | "declined" | "cancelled";
     createdAt: string;
@@ -113,8 +114,10 @@ export class ClubEventTeamService {
         const stageRes = await query(
             `SELECT id, name, type, action_type, status, ends_at AS "endsAt"
              FROM club_event_stages
-             WHERE event_id = $1 AND (type = 'registration' OR action_type = 'registration' OR stage_order = 1)
-             ORDER BY stage_order ASC
+             WHERE event_id = $1
+             ORDER BY 
+                 CASE WHEN type = 'registration' OR action_type = 'registration' THEN 0 ELSE 1 END,
+                 stage_order ASC
              LIMIT 1;`,
             [eventId]
         );
@@ -499,8 +502,19 @@ export class ClubEventTeamService {
             throw err;
         }
 
-        if (team.membersCount >= event.maxTeamSize) {
-            const err: any = new Error(`Team is already full (${event.maxTeamSize} members).`);
+        // Check capacity limit: confirmed members + pending invitations cannot exceed maxTeamSize
+        const pendingCountRes = await query(
+            `SELECT COUNT(*)::int AS count FROM club_event_team_invitations 
+             WHERE team_id = $1 AND status = 'pending';`,
+            [teamId]
+        );
+        const pendingCount = pendingCountRes.rows[0]?.count || 0;
+        const totalAllocated = team.membersCount + pendingCount;
+
+        if (totalAllocated >= event.maxTeamSize) {
+            const err: any = new Error(
+                `Your team has reached its maximum capacity of ${event.maxTeamSize} members (currently ${team.membersCount} confirmed, ${pendingCount} pending invite${pendingCount === 1 ? "" : "s"}). Revoke a pending invitation or remove a member to invite someone else.`
+            );
             err.statusCode = 400;
             throw err;
         }
@@ -586,6 +600,74 @@ export class ClubEventTeamService {
             success: true,
             message: `Invitation sent to @${targetUser.username}!`,
             invitation: invRes.rows[0],
+        };
+    }
+
+    /**
+     * 4b. Revoke / Cancel a Pending Team Invitation (Leader power)
+     */
+    static async cancelInvitation(
+        eventId: string,
+        teamId: string,
+        leaderUserId: string,
+        invitationId: string
+    ) {
+        const event = await this.getTeamEvent(eventId);
+        await this.assertRegistrationOpen(eventId, event.startsAt, event.endsAt);
+
+        // Verify caller is team leader
+        const teamCheck = await query(
+            `SELECT id, name, leader_id AS "leaderId"
+             FROM club_event_teams WHERE id = $1 AND event_id = $2 LIMIT 1;`,
+            [teamId, eventId]
+        );
+
+        if (!teamCheck.rows[0]) {
+            const err: any = new Error("Team not found.");
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const team = teamCheck.rows[0];
+        if (team.leaderId !== leaderUserId) {
+            const err: any = new Error("Only the team leader can revoke invitations.");
+            err.statusCode = 403;
+            throw err;
+        }
+
+        // Verify invitation exists and is pending
+        const invCheck = await query(
+            `SELECT i.id, i.status, u.username
+             FROM club_event_team_invitations i
+             JOIN users u ON u.id = i.invitee_user_id
+             WHERE i.id = $1 AND i.team_id = $2 LIMIT 1;`,
+            [invitationId, teamId]
+        );
+
+        if (!invCheck.rows[0]) {
+            const err: any = new Error("Invitation not found.");
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const inv = invCheck.rows[0];
+        if (inv.status !== "pending") {
+            const err: any = new Error(`Cannot revoke this invitation because it is already ${inv.status}.`);
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Update invitation status to cancelled
+        await query(
+            `UPDATE club_event_team_invitations 
+             SET status = 'cancelled', responded_at = NOW() 
+             WHERE id = $1;`,
+            [invitationId]
+        );
+
+        return {
+            success: true,
+            message: `Invitation to @${inv.username} has been revoked.`,
         };
     }
 
@@ -1041,8 +1123,10 @@ export class ClubEventTeamService {
         const stageRes = await query(
             `SELECT id, name, type, action_type, status, ends_at AS "endsAt"
              FROM club_event_stages
-             WHERE event_id = $1 AND (type = 'registration' OR action_type = 'registration' OR stage_order = 1)
-             ORDER BY stage_order ASC
+             WHERE event_id = $1
+             ORDER BY 
+                 CASE WHEN type = 'registration' OR action_type = 'registration' THEN 0 ELSE 1 END,
+                 stage_order ASC
              LIMIT 1;`,
             [t.eventId]
         );
@@ -1061,6 +1145,9 @@ export class ClubEventTeamService {
                 isLocked = true;
                 lockReason = "The registration round deadline has passed.";
             }
+        } else if (t.endsAt && Date.now() >= new Date(t.endsAt).getTime()) {
+            isLocked = true;
+            lockReason = "This event has concluded.";
         }
 
         // Fetch all members with user profiles & contact emails
@@ -1097,6 +1184,7 @@ export class ClubEventTeamService {
                     invitee.username AS "inviteeUsername",
                     invitee.firstname AS "inviteeFirstName",
                     invitee.lastname AS "inviteeLastName",
+                    invitee.email AS "inviteeEmail",
                     COALESCE(invitee.avatar_url, '') AS "inviteeAvatarUrl"
              FROM club_event_team_invitations i
              JOIN users inviter ON inviter.id = i.inviter_user_id
@@ -1114,6 +1202,7 @@ export class ClubEventTeamService {
             inviteeUserId: row.inviteeUserId,
             inviteeUsername: row.inviteeUsername,
             inviteeName: `${row.inviteeFirstName || ""} ${row.inviteeLastName || ""}`.trim() || row.inviteeUsername,
+            inviteeEmail: row.inviteeEmail || "",
             inviteeAvatarUrl: row.inviteeAvatarUrl || null,
             status: row.status as any,
             createdAt: row.createdAt,

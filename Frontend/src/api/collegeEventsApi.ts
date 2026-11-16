@@ -144,6 +144,25 @@ export interface ClubEventApplicantRow {
     teamRole?: "leader" | "member" | null;
     teamName?: string | null;
     teamCode?: string | null;
+    teamMembersCount?: number;
+    teamPendingCount?: number;
+    teamMembers?: Array<{
+        userId: string;
+        username: string;
+        name: string;
+        email: string;
+        role: "leader" | "member";
+        status: string;
+    }>;
+    teamPendingInvites?: Array<{
+        invitationId: string;
+        userId: string;
+        username: string;
+        name: string;
+        email: string;
+        role: string;
+        status: string;
+    }>;
     status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled";
     registeredAt: string;
     checkedInAt: string | null;

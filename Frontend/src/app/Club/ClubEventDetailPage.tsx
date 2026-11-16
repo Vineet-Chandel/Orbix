@@ -480,14 +480,22 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     if (!seenIds.has(k)) {
                         seenIds.add(k);
                         let cleanLabel = k;
-                        if (cleanLabel.startsWith("q_")) {
+                        if (cleanLabel === "__stagedTeammates") {
+                            cleanLabel = "Teammates & Invites";
+                        } else if (cleanLabel === "__teamName") {
+                            cleanLabel = "Team Name";
+                        } else if (cleanLabel === "__teamCode") {
+                            cleanLabel = "Team Join Code";
+                        } else if (cleanLabel === "__teamAction") {
+                            cleanLabel = "Team Registration Mode";
+                        } else if (cleanLabel.startsWith("q_")) {
                             cleanLabel = cleanLabel.substring(2).replace(/_/g, " ");
                             cleanLabel = cleanLabel.charAt(0).toUpperCase() + cleanLabel.slice(1);
                         }
                         questions.push({
                             id: k,
                             label: cleanLabel,
-                            type: "text",
+                            type: k === "__stagedTeammates" ? "team_members" : "text",
                         });
                     }
                 });
@@ -1283,6 +1291,9 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     onStatusChange={handleApplicantStatusChange}
                                     updatingApplicantId={updatingApplicantId}
                                     eventId={event?.id}
+                                    isTeamEvent={event?.isTeamEvent}
+                                    minTeamSize={event?.minTeamSize}
+                                    maxTeamSize={event?.maxTeamSize}
                                     onBatchStatusChange={handleBatchApplicantStatusChange}
                                 />
                             )}

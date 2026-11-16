@@ -179,6 +179,28 @@ eventTeamRouter.post("/events/:eventId/teams/:teamId/invites", authenticate, asy
 });
 
 /**
+ * DELETE /api/events/:eventId/teams/:teamId/invites/:invitationId
+ * Leader revokes / cancels a pending invitation
+ */
+eventTeamRouter.delete("/events/:eventId/teams/:teamId/invites/:invitationId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = req.params.eventId as string;
+        const teamId = req.params.teamId as string;
+        const invitationId = req.params.invitationId as string;
+        const leaderUserId = req.user!.id;
+
+        const result = await ClubEventTeamService.cancelInvitation(eventId, teamId, leaderUserId, invitationId);
+        return res.json(result);
+    } catch (err: any) {
+        console.error("Cancel invitation error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to revoke invitation.",
+        });
+    }
+});
+
+/**
  * GET /api/events/invitations/my
  * Returns all active pending invitations received by the logged in user
  */
