@@ -1446,28 +1446,43 @@ export class ClubProfileService {
         // Fetch published events
         const eventsRes = await query(
             `SELECT
-                id,
-                title,
-                slug,
-                summary,
-                description,
-                starts_at AS "startsAt",
-                ends_at AS "endsAt",
-                timezone,
-                location_type AS "locationType",
-                venue_or_location AS "venueOrLocation",
-                registration_url AS "registrationUrl",
-                cover_image_url AS "coverImageUrl",
-                published_at AS "publishedAt"
-             FROM club_events
-             WHERE club_id = $1 AND status IN ('published', 'completed')
-             ORDER BY starts_at ASC;`,
+                e.id,
+                e.club_id AS "clubId",
+                e.title,
+                e.slug,
+                e.summary,
+                e.description,
+                COALESCE(e.scope, 'CAMPUS') AS "scope",
+                COALESCE(e.is_team_event, false) AS "isTeamEvent",
+                COALESCE(e.min_team_size, 1) AS "minTeamSize",
+                COALESCE(e.max_team_size, 4) AS "maxTeamSize",
+                e.starts_at AS "startsAt",
+                e.ends_at AS "endsAt",
+                e.timezone,
+                CASE WHEN e.location_type = 'online' THEN 'virtual' ELSE e.location_type END AS "locationType",
+                e.venue_or_location AS "venueOrLocation",
+                e.registration_url AS "registrationUrl",
+                e.cover_image_url AS "coverImageUrl",
+                COALESCE(e.sponsors, '[]'::jsonb) AS "sponsors",
+                e.status,
+                e.published_at AS "publishedAt",
+                e.created_at AS "createdAt",
+                e.updated_at AS "updatedAt",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'pending'), 0) AS "pendingCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status NOT IN ('cancelled', 'blocked')), 0) AS "totalApplicationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'attended'), 0) AS "attendeesCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('rejected', 'cancelled', 'blocked')), 0) AS "rejectedCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_likes cel WHERE cel.event_id = e.id), 0) AS "likesCount"
+             FROM club_events e
+             WHERE e.club_id = $1 AND e.status IN ('published', 'completed')
+             ORDER BY e.starts_at ASC;`,
             [club.id]
         );
 
         const now = new Date();
-        const upcomingEvents = eventsRes.rows.filter((e) => new Date(e.startsAt) >= now);
-        const pastEvents = eventsRes.rows.filter((e) => new Date(e.startsAt) < now);
+        const upcomingEvents = eventsRes.rows.filter((e) => new Date(e.startsAt) >= now && e.status !== "completed");
+        const pastEvents = eventsRes.rows.filter((e) => new Date(e.startsAt) < now || e.status === "completed");
 
         // Fetch public coordinators
         const coordRes = await query(
