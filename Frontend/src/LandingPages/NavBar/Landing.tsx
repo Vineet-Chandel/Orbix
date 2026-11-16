@@ -22,6 +22,7 @@ import {
     type UserNotification,
 } from '../../utils/profileApi';
 import { OrbixLoader } from '../../components/ui/loader';
+import { DEFAULT_AVATAR_URL } from '../../utils/avatarConstants';
 
 export interface NavItem {
     id: string;
@@ -259,22 +260,36 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
         }
     };
 
-    const displayName = currentUser?.firstName
-        ? `${currentUser.firstName} ${currentUser.lastName || ""}`.trim()
-        : currentUser?.username || "Developer";
+    const isClubAccount = currentUser?.accountType === "club";
 
-    const avatarSrc = currentUser?.photoUrl
+    const displayName = isClubAccount
+        ? (currentUser?.verifiedClub?.name || currentUser?.clubName || currentUser?.application?.clubName || currentUser?.firstName || currentUser?.username || "Club")
+        : (currentUser?.firstName
+            ? `${currentUser.firstName} ${currentUser.lastName || ""}`.trim()
+            : currentUser?.username || "Developer");
+
+    const avatarSrc = (isClubAccount && currentUser?.verifiedClub?.logoUrl)
+        || (isClubAccount && (currentUser as any)?.verifiedClub?.logo_url)
+        || currentUser?.photoUrl
         || currentUser?.avatarUrl
         || (currentUser as any)?.photo_url
         || (currentUser as any)?.avatar_url
         || (currentUser as any)?.avatar
-        || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=111827&color=fff&size=128&bold=true`;
+        || DEFAULT_AVATAR_URL;
 
     const handleWorkspaceClick = (e: React.MouseEvent) => {
         e.preventDefault();
         if (loading) return;
         if (isLoggedIn) {
-            navigate("/dashboard");
+            if (isClubAccount) {
+                if (currentUser?.clubStatus === "approved" || currentUser?.verifiedClub) {
+                    navigate("/club/dashboard");
+                } else {
+                    navigate("/club/status");
+                }
+            } else {
+                navigate("/dashboard");
+            }
         } else {
             navigate("/auth/signin");
         }
@@ -493,9 +508,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                 src={avatarSrc}
                                 alt={displayName}
                                 onError={(e) => {
-                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                        displayName
-                                    )}&background=111827&color=fff&size=128&bold=true`;
+                                    (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                 }}
                                 className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover ring-1 ring-white/20 shadow-xs flex-shrink-0"
                             />

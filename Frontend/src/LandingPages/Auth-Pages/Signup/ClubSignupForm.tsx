@@ -46,6 +46,7 @@ interface ClubSignupFormProps {
 const CATEGORY_OPTIONS = [
     { value: "coding", label: "Coding and Competitive Programming" },
     { value: "technology", label: "Technology & Software Development" },
+    { value: "cloud_devops", label: "Cloud Computing & DevOps" },
     { value: "ai_ml", label: "AI / Machine Learning & Data Science" },
     { value: "robotics", label: "Robotics & Hardware Systems" },
     { value: "entrepreneurship", label: "Entrepreneurship & Innovation" },

@@ -4,7 +4,7 @@
 
 export interface ClubLink {
     id?: string;
-    platform: "website" | "github" | "linkedin" | "instagram" | "x" | "discord" | "youtube" | "other" | string;
+    platform: "website" | "github" | "linkedin" | "instagram" | "whatsapp" | "x" | "discord" | "youtube" | "other" | string;
     url: string;
     label?: string;
     displayOrder: number;

@@ -6,6 +6,7 @@ import { VerifiedBadge } from "../../../components/VerifiedBadge";
 
 export const CLUB_CATEGORIES = [
     "Technical & Coding",
+    "Cloud Computing & DevOps",
     "Robotics & Hardware",
     "Design & Creative Arts",
     "Artificial Intelligence & ML",

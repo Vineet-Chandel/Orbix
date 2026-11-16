@@ -17,6 +17,7 @@ import { getBlockState } from "../../services/relationship/blockService.js";
 import { resolveRelationshipState, resolveRelationshipStatesBatch } from "../../services/relationship/relationshipService.js";
 import { enrichUserWithClubData } from "../../services/club/clubEnrichmentService.js";
 import { isDemoProfileHandle } from "../../validators/usernamePolicy.js";
+import { DEFAULT_AVATAR_URL } from "../../constants/avatar.js";
 
 const profileRouter = express.Router();
 
@@ -130,6 +131,15 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
 
         // Club accounts have a dedicated profile & dashboard. Return club session details cleanly
         if (authUser.accountType === "club" || (authUser as any).account_type === "club") {
+            const userRowRes = await query(
+                `SELECT firstname AS "firstName", lastname AS "lastName",
+                        COALESCE(photo_url, avatar_url, $2) AS "avatarUrl",
+                        COALESCE(photo_url, avatar_url, $2) AS "photoUrl"
+                 FROM users WHERE id = $1 LIMIT 1;`,
+                [authUser.id, DEFAULT_AVATAR_URL]
+            );
+            const userRow = userRowRes.rows[0];
+
             const verifiedClubRes = await query(
                 `SELECT vc.id, vc.name, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername", vc.category, vc.college_name, vc.logo_url, vc.is_active 
                  FROM verified_clubs vc 
@@ -145,14 +155,23 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             );
             const application = reqRes.rows[0];
 
+            const effectiveClubLogo = verifiedClub?.logo_url || userRow?.photoUrl || userRow?.avatarUrl || DEFAULT_AVATAR_URL;
+            const effectiveClubName = verifiedClub?.name || application?.club_name || userRow?.firstName || authUser.username;
+
             return res.json({
                 success: true,
                 user: {
                     id: authUser.id,
                     username: authUser.username,
                     gmail: authUser.gmail,
+                    firstName: effectiveClubName,
+                    lastName: userRow?.lastName || "Club",
                     accountType: "club",
+                    avatarUrl: effectiveClubLogo,
+                    photoUrl: effectiveClubLogo,
                     clubStatus: verifiedClub ? "approved" : (application?.status || "pending"),
+                    clubName: effectiveClubName,
+                    clubId: verifiedClub?.id || application?.id || null,
                     verifiedClub: verifiedClub ? {
                         id: verifiedClub.id,
                         name: verifiedClub.name,
@@ -350,6 +369,15 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
 
         // Club accounts have a dedicated profile & dashboard. Return club session details cleanly
         if (authUser.accountType === "club" || (authUser as any).account_type === "club") {
+            const userRowRes = await query(
+                `SELECT firstname AS "firstName", lastname AS "lastName",
+                        COALESCE(photo_url, avatar_url, $2) AS "avatarUrl",
+                        COALESCE(photo_url, avatar_url, $2) AS "photoUrl"
+                 FROM users WHERE id = $1 LIMIT 1;`,
+                [authUser.id, DEFAULT_AVATAR_URL]
+            );
+            const userRow = userRowRes.rows[0];
+
             const verifiedClubRes = await query(
                 `SELECT vc.id, vc.name, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername", vc.category, vc.college_name, vc.logo_url, vc.is_active 
                  FROM verified_clubs vc 
@@ -365,14 +393,23 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             );
             const application = reqRes.rows[0];
 
+            const effectiveClubLogo = verifiedClub?.logo_url || userRow?.photoUrl || userRow?.avatarUrl || DEFAULT_AVATAR_URL;
+            const effectiveClubName = verifiedClub?.name || application?.club_name || userRow?.firstName || authUser.username;
+
             return res.json({
                 success: true,
                 user: {
                     id: authUser.id,
                     username: authUser.username,
                     gmail: authUser.gmail,
+                    firstName: effectiveClubName,
+                    lastName: userRow?.lastName || "Club",
                     accountType: "club",
+                    avatarUrl: effectiveClubLogo,
+                    photoUrl: effectiveClubLogo,
                     clubStatus: verifiedClub ? "approved" : (application?.status || "pending"),
+                    clubName: effectiveClubName,
+                    clubId: verifiedClub?.id || application?.id || null,
                     verifiedClub: verifiedClub ? {
                         id: verifiedClub.id,
                         name: verifiedClub.name,

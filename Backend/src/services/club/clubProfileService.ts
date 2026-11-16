@@ -511,7 +511,7 @@ export class ClubProfileService {
             if (Array.isArray(payload.links)) {
                 cleanLinks = [];
                 const seenSinglePlatforms = new Set<string>();
-                const singlePlatforms = new Set(["website", "github", "linkedin", "instagram", "x", "twitter", "discord", "youtube"]);
+                const singlePlatforms = new Set(["website", "github", "linkedin", "instagram", "whatsapp", "x", "twitter", "discord", "youtube"]);
                 syncedSocialLinks = {};
 
                 for (let i = 0; i < payload.links.length; i++) {
@@ -543,7 +543,7 @@ export class ClubProfileService {
 
                     if (plat === "website" && !syncedWebsiteUrl) {
                         syncedWebsiteUrl = rawUrl;
-                    } else if (["github", "linkedin", "instagram", "x", "twitter", "discord", "youtube"].includes(plat)) {
+                    } else if (["github", "linkedin", "instagram", "whatsapp", "x", "twitter", "discord", "youtube"].includes(plat)) {
                         const socKey = plat === "twitter" ? "x" : plat;
                         syncedSocialLinks[socKey] = rawUrl;
                     }

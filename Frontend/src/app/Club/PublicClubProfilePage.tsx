@@ -91,6 +91,7 @@ interface PublicClub {
         github?: string;
         linkedin?: string;
         instagram?: string;
+        whatsapp?: string;
         x?: string;
         twitter?: string;
         discord?: string;
@@ -368,22 +369,20 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
                         )}
 
                         {/* Top Badges */}
-                        <div className="absolute top-4 right-4 flex items-center gap-2">
-                            {club.visibility === "unlisted" && (
-                                <span className="px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
-                                    Unlisted Profile
-                                </span>
-                            )}
-                            {club.visibility === "draft" && (
-                                <span className="px-3 py-1 rounded-full bg-neutral-100 border-2 border-black text-xs font-black text-neutral-800 shadow-[2px_2px_0px_#000]">
-                                    Draft Preview
-                                </span>
-                            )}
-                            <span className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-xs border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
-                                <VerifiedBadge size="sm" />
-                                <span>Verified on Orbix</span>
-                            </span>
-                        </div>
+                        {(club.visibility === "unlisted" || club.visibility === "draft") && (
+                            <div className="absolute top-4 right-4 flex items-center gap-2">
+                                {club.visibility === "unlisted" && (
+                                    <span className="px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                        Unlisted Profile
+                                    </span>
+                                )}
+                                {club.visibility === "draft" && (
+                                    <span className="px-3 py-1 rounded-full bg-neutral-100 border-2 border-black text-xs font-black text-neutral-800 shadow-[2px_2px_0px_#000]">
+                                        Draft Preview
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Profile Information Row */}
@@ -495,7 +494,7 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
                                         className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000] transition-colors"
                                     >
                                         {getPlatformIcon(linkItem.platform || linkItem.url, "w-3.5 h-3.5")}
-                                        <span>{linkItem.label || (linkItem.platform === "x" ? "X / Twitter" : linkItem.platform.charAt(0).toUpperCase() + linkItem.platform.slice(1))}</span>
+                                        <span>{linkItem.label || (linkItem.platform === "x" ? "X / Twitter" : linkItem.platform === "whatsapp" ? "WhatsApp Community" : linkItem.platform.charAt(0).toUpperCase() + linkItem.platform.slice(1))}</span>
                                     </a>
                                 ))
                             ) : (
@@ -542,6 +541,17 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
                                         >
                                             {getPlatformIcon("instagram", "w-3.5 h-3.5")}
                                             <span>Instagram</span>
+                                        </a>
+                                    )}
+                                    {social.whatsapp && (
+                                        <a
+                                            href={social.whatsapp}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("whatsapp", "w-3.5 h-3.5")}
+                                            <span>WhatsApp</span>
                                         </a>
                                     )}
                                     {(social.x || social.twitter) && (

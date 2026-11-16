@@ -14,13 +14,14 @@ export const PLATFORM_OPTIONS = [
     { value: "github", label: "GitHub Organization", placeholder: "https://github.com/your-club" },
     { value: "linkedin", label: "LinkedIn Page", placeholder: "https://linkedin.com/company/your-club" },
     { value: "instagram", label: "Instagram Handle", placeholder: "https://instagram.com/yourclub" },
+    { value: "whatsapp", label: "WhatsApp Community", placeholder: "https://whatsapp.com/channel/... or https://chat.whatsapp.com/..." },
     { value: "x", label: "X (Twitter)", placeholder: "https://x.com/yourclub" },
     { value: "discord", label: "Discord Server", placeholder: "https://discord.gg/yourinvite" },
     { value: "youtube", label: "YouTube Channel", placeholder: "https://youtube.com/@yourclub" },
     { value: "other", label: "Custom Link", placeholder: "https://..." },
 ];
 
-const SINGLE_PLATFORMS = new Set(["website", "github", "linkedin", "instagram", "x", "discord", "youtube"]);
+const SINGLE_PLATFORMS = new Set(["website", "github", "linkedin", "instagram", "whatsapp", "x", "discord", "youtube"]);
 
 export const DynamicLinksManager: React.FC<DynamicLinksManagerProps> = ({ links, onChange }) => {
     const handleAddLink = () => {
