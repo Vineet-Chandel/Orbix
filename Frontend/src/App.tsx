@@ -1,5 +1,5 @@
 import { useEffect, Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import MainLanding from "./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Landing";
 import ClubLanding from "./LandingPages/Main-Landing-Pages/Club-Account-Landing-Pages/Landing";
 import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
@@ -70,6 +70,15 @@ const SingleBlogParamRedirect = () => {
     return <Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />;
   }
   return <Navigate to={`/blog/aws-sbg-psit/aws-launchpad-2026/${pageId}`} replace />;
+};
+
+const LegacyActivityRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  if (!params.has("tab") && !params.has("segment")) {
+    params.set("tab", "applications");
+  }
+  return <Navigate to={`/activity?${params.toString()}`} replace />;
 };
 
 const App = () => {
@@ -164,6 +173,11 @@ const App = () => {
               <Route path="/auth/callback" element={<OAuthCallbackPage />} />
               <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
               <Route path="/workspace" element={<WorkspaceRedirect />} />
+
+              {/* Legacy Activity, Tracker & Invitation Redirects */}
+              <Route path="/student/activity" element={<LegacyActivityRedirect />} />
+              <Route path="/events/tracker" element={<LegacyActivityRedirect />} />
+              <Route path="/workspace-invite" element={<JoinClubPage />} />
 
               {/* Club Verification, Dedicated Dashboard & Public Presence */}
               <Route path="/club/team-workspace/join" element={<JoinClubPage />} />

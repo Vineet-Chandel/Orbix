@@ -22,6 +22,7 @@ export default function SignInPage() {
             : "signin";
 
     const [activeIdentifier, setActiveIdentifier] = useState("");
+    const redirectParam = searchParams.get("redirect") || searchParams.get("returnUrl");
 
     useEffect(() => {
         if (errorParam) {
@@ -37,6 +38,9 @@ export default function SignInPage() {
         if (authView === "forgot_password") {
             nextParams.view = "forgot-password";
         }
+        if (redirectParam) {
+            nextParams.redirect = redirectParam;
+        }
         setSearchParams(nextParams);
     };
 
@@ -44,6 +48,9 @@ export default function SignInPage() {
         const nextParams: Record<string, string> = { tab: "club" };
         if (authView === "forgot_password") {
             nextParams.view = "forgot-password";
+        }
+        if (redirectParam) {
+            nextParams.redirect = redirectParam;
         }
         setSearchParams(nextParams);
     };
@@ -122,10 +129,10 @@ export default function SignInPage() {
             switchLinkHref={
                 authView === "forgot_password"
                     ? loginMode === "club"
-                        ? "/auth/signin?tab=club"
-                        : "/auth/signin"
+                        ? (redirectParam ? `/auth/signin?tab=club&redirect=${encodeURIComponent(redirectParam)}` : "/auth/signin?tab=club")
+                        : (redirectParam ? `/auth/signin?redirect=${encodeURIComponent(redirectParam)}` : "/auth/signin")
                     : loginMode === "personal"
-                    ? "/auth/signup"
+                    ? (redirectParam ? `/auth/signup?redirect=${encodeURIComponent(redirectParam)}` : "/auth/signup")
                     : ""
             }
             showSocialAuth={loginMode === "personal" && authView === "signin"}

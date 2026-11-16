@@ -11,6 +11,7 @@ export default function SignUpPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const tabParam = searchParams.get("tab");
     const errorParam = searchParams.get("error");
+    const redirectParam = searchParams.get("redirect") || searchParams.get("returnUrl");
     const toast = useToast();
     const [registrationMode, setRegistrationMode] = useState<"personal" | "club">(
         tabParam === "club" ? "club" : "personal"
@@ -42,18 +43,24 @@ export default function SignUpPage() {
     const handleConfirmClubModal = () => {
         setIsClubModalOpen(false);
         setRegistrationMode("club");
-        setSearchParams({ tab: "club" });
+        const nextParams: Record<string, string> = { tab: "club" };
+        if (redirectParam) nextParams.redirect = redirectParam;
+        setSearchParams(nextParams);
     };
 
     const handleCancelClubModal = () => {
         setIsClubModalOpen(false);
         setRegistrationMode("personal");
-        setSearchParams({ tab: "personal" });
+        const nextParams: Record<string, string> = { tab: "personal" };
+        if (redirectParam) nextParams.redirect = redirectParam;
+        setSearchParams(nextParams);
     };
 
     const handleSwitchToPersonal = () => {
         setRegistrationMode("personal");
-        setSearchParams({ tab: "personal" });
+        const nextParams: Record<string, string> = { tab: "personal" };
+        if (redirectParam) nextParams.redirect = redirectParam;
+        setSearchParams(nextParams);
     };
 
     return (
@@ -68,7 +75,11 @@ export default function SignUpPage() {
                 trigger={false}
                 switchText={registrationMode === "personal" ? "Already a member?" : "Already registered your club?"}
                 switchLinkText="Log in"
-                switchLinkHref={registrationMode === "personal" ? "/auth/signin" : "/auth/signin?tab=club"}
+                switchLinkHref={
+                    registrationMode === "personal"
+                        ? (redirectParam ? `/auth/signin?redirect=${encodeURIComponent(redirectParam)}` : "/auth/signin")
+                        : (redirectParam ? `/auth/signin?tab=club&redirect=${encodeURIComponent(redirectParam)}` : "/auth/signin?tab=club")
+                }
                 showSocialAuth={registrationMode === "personal"}
                 wide={registrationMode === "club"}
             >

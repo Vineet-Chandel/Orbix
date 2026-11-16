@@ -146,7 +146,7 @@ export async function sendSoleRegistrationEmail({
         badge,
         contentHtml,
         ctaText: "View Your Applications",
-        ctaUrl: `${FRONTEND_URL}/events/tracker`,
+        ctaUrl: `${FRONTEND_URL}/activity?tab=applications`,
     });
 
     return dispatchEmail({
@@ -216,7 +216,7 @@ export async function sendTeamCreatedEmail({
         badge,
         contentHtml,
         ctaText: "Manage Team Roster & Invite",
-        ctaUrl: `${FRONTEND_URL}/events/tracker`,
+        ctaUrl: `${FRONTEND_URL}/activity?tab=applications`,
     });
 
     return dispatchEmail({
@@ -282,7 +282,7 @@ export async function sendTeamInvitationEmail({
         badge,
         contentHtml,
         ctaText: "Review & Accept Invitation",
-        ctaUrl: `${FRONTEND_URL}/events/tracker`,
+        ctaUrl: `${FRONTEND_URL}/activity?tab=applications`,
     });
 
     return dispatchEmail({
@@ -361,7 +361,7 @@ export async function sendTeamMemberJoinedEmail({
         badge,
         contentHtml,
         ctaText: "View Team Roster",
-        ctaUrl: `${FRONTEND_URL}/events/tracker`,
+        ctaUrl: `${FRONTEND_URL}/activity?tab=applications`,
     });
 
     return dispatchEmail({
@@ -419,7 +419,7 @@ export async function sendTeamMemberLeftOrRemovedEmail({
         badge,
         contentHtml,
         ctaText: "View Event Details",
-        ctaUrl: `${FRONTEND_URL}/events/tracker`,
+        ctaUrl: `${FRONTEND_URL}/activity?tab=applications`,
     });
 
     return dispatchEmail({
@@ -483,7 +483,7 @@ export async function sendTeamRegistrationConfirmedEmail({
         badge,
         contentHtml,
         ctaText: "Show Your Admission Pass",
-        ctaUrl: `${FRONTEND_URL}/events/tracker?tab=sessions`,
+        ctaUrl: `${FRONTEND_URL}/activity?tab=sessions`,
     });
 
     return dispatchEmail({

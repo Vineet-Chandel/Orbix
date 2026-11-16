@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, useOutletContext } from "react-router-dom";
+import { Link, Navigate, Outlet, useOutletContext, useLocation } from "react-router-dom";
 import { Building2, Lock, ArrowRight } from "lucide-react";
 import { useAppSelector } from "./store";
 import { OrbixLoader } from "./components/ui/loader";
@@ -6,6 +6,7 @@ import { OrbixLoader } from "./components/ui/loader";
 const ProtectedRoute = () => {
     const { user, loading } = useAppSelector((state) => state.user);
     const context = useOutletContext();
+    const location = useLocation();
 
     if (loading && !user) {
         return (
@@ -16,7 +17,8 @@ const ProtectedRoute = () => {
     }
 
     if (!user) {
-        return <Navigate to="/auth/signin" replace />;
+        const redirectParam = encodeURIComponent(location.pathname + location.search);
+        return <Navigate to={`/auth/signin?redirect=${redirectParam}`} replace />;
     }
 
     // Restrict club accounts from personal-user features (dashboard, profile, resume, settings)
@@ -33,6 +35,7 @@ const ProtectedRoute = () => {
 export const ClubProtectedRoute = () => {
     const { user, loading } = useAppSelector((state) => state.user);
     const context = useOutletContext();
+    const location = useLocation();
 
     if (loading && !user) {
         return (
@@ -43,7 +46,8 @@ export const ClubProtectedRoute = () => {
     }
 
     if (!user) {
-        return <Navigate to="/auth/signin?tab=club" replace />;
+        const redirectParam = encodeURIComponent(location.pathname + location.search);
+        return <Navigate to={`/auth/signin?tab=club&redirect=${redirectParam}`} replace />;
     }
 
     // Strict isolation: personal accounts must sign in separately via the Club Portal
