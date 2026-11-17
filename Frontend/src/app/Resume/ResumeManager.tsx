@@ -264,10 +264,10 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                 <button
                                     type="button"
                                     onClick={onOpenMobileSidebar}
-                                    className="lg:hidden mt-0.5 p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer shrink-0"
+                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
                                     aria-label="Open sidebar"
                                 >
-                                    <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <line x1="3" y1="12" x2="21" y2="12" />
                                         <line x1="3" y1="6" x2="21" y2="6" />
                                         <line x1="3" y1="18" x2="21" y2="18" />
@@ -292,15 +292,6 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
 
                         {/* Top Header Actions */}
                         <div className="flex items-center gap-2.5 flex-wrap shrink-0 self-start lg:self-center">
-                            <button
-                                type="button"
-                                onClick={() => setIsUploadModalOpen(true)}
-                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                            >
-                                <UploadCloud className="w-4 h-4 stroke-[2.5]" />
-                                <span>{resumeData?.hasResume ? "Upload New Resume" : "Upload Resume"}</span>
-                            </button>
-
                             <Link
                                 to="/docs/resume-intelligence-algorithm"
                                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"

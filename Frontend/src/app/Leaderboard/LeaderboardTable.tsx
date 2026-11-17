@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Flame, Award, Building2 } from "lucide-react";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import type { LeaderboardEntry } from "./types";
+import { OrbixSkeleton } from "../../components/ui/loader";
 
 interface LeaderboardTableProps {
     entries: LeaderboardEntry[];
@@ -23,11 +24,14 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 }) => {
     if (isLoading) {
         return (
-            <div className="w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-12 text-center space-y-3">
-                <div className="w-8 h-8 border-4 border-black border-t-[#a2ff86] rounded-full animate-spin mx-auto shadow-[1px_1px_0px_#000]" />
-                <p className="text-xs font-black uppercase tracking-wider text-black">
-                    Loading {scope === "college" ? "College League" : "Global"} Standings...
-                </p>
+            <div className="w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-6 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                    <span className="text-xs font-black uppercase tracking-wider text-neutral-700">
+                        Loading {scope === "college" ? "College League" : "Global"} Standings...
+                    </span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black animate-pulse" />
+                </div>
+                <OrbixSkeleton variant="table-row" count={5} />
             </div>
         );
     }

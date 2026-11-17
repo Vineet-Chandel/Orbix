@@ -51,7 +51,7 @@ import { CertificateStudioWorkspace } from "./CertificateStudio/CertificateStudi
 import { EventScopeSelectionModal } from "./EventScopeSelectionModal";
 import { ClubCredibilityWorkspace } from "./Credibility/ClubCredibilityWorkspace";
 import { ClubEventCard } from "./ClubEventCard";
-import { OrbixLoader } from "../../components/ui/loader";
+import { DashboardRouteSkeleton } from "../../components/ui/loader";
 
 interface VerifiedClub {
     id: string;
@@ -438,11 +438,7 @@ export default function ClubDashboardPage() {
     }).format(new Date());
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center text-black">
-                <OrbixLoader size="lg" />
-            </div>
-        );
+        return <DashboardRouteSkeleton />;
     }
 
     if (!club) {

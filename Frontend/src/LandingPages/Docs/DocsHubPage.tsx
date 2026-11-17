@@ -298,12 +298,12 @@ export const DocsHubPage: React.FC = () => {
                                                         {/* Image-like View Header (Thumbnail Banner) */}
                                                         <Link
                                                             to={`/docs/${file.slug}`}
-                                                            className="block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 h-48 sm:h-[300px]"
+                                                            className="block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 aspect-video sm:aspect-auto sm:h-[300px] flex items-center justify-center"
                                                         >
                                                             <img
                                                                 src={file.image}
                                                                 alt={file.title}
-                                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 block"
+                                                                className="w-full h-full object-contain sm:object-cover transition-transform duration-500 group-hover:scale-105 block"
                                                             />
                                                         </Link>
 

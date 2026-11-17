@@ -72,11 +72,23 @@ export async function apiFetch<T = any>(
         delete mergedHeaders["Content-Type"];
     }
 
-    const response = await fetch(url, {
-        ...restOptions,
-        headers: mergedHeaders,
-        credentials: "include",
-    });
+    let response: Response;
+    try {
+        response = await fetch(url, {
+            ...restOptions,
+            headers: mergedHeaders,
+            credentials: "include",
+        });
+    } catch (networkErr: any) {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            const offlineError = new Error("You appear to be offline. Please verify your internet connection.") as any;
+            offlineError.isOffline = true;
+            offlineError.status = 0;
+            offlineError.originalError = networkErr;
+            throw offlineError;
+        }
+        throw networkErr;
+    }
 
     if (!response.ok) {
         let errMessage = `Request failed with status ${response.status}`;

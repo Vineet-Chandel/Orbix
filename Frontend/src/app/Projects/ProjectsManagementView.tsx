@@ -6,7 +6,6 @@ import {
     AlertCircle,
     RefreshCw,
     Info,
-    Menu,
     Zap,
     BookOpen,
     Rocket,
@@ -155,24 +154,30 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
                 {/* Header Card */}
                 <div className="rounded-3xl bg-white border-[3px] border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000] space-y-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 pb-6 border-b-2 border-black">
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-2.5">
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex items-start sm:items-center gap-2.5">
                                 {onOpenMobileSidebar && (
                                     <button
                                         type="button"
                                         onClick={onOpenMobileSidebar}
-                                        className="lg:hidden p-2 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition-all cursor-pointer mr-1"
+                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
                                         aria-label="Open sidebar"
                                     >
-                                        <Menu className="w-4 h-4 text-black" />
+                                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <line x1="3" y1="12" x2="21" y2="12" />
+                                            <line x1="3" y1="6" x2="21" y2="6" />
+                                            <line x1="3" y1="18" x2="21" y2="18" />
+                                        </svg>
                                     </button>
                                 )}
-                                <span className="p-2 rounded-xl bg-black text-[#a2ff86] border border-black shadow-[2px_2px_0px_#000]">
-                                    <FolderKanban className="w-5 h-5" />
-                                </span>
-                                <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                    Project Showcase & Repositories
-                                </h1>
+                                <div className="flex items-start sm:items-center justify-between sm:justify-start gap-3 sm:gap-2.5 min-w-0 flex-1">
+                                    <h1 className="text-xl sm:text-3xl font-black text-black tracking-tight sm:order-2">
+                                        Project Showcase & Repositories
+                                    </h1>
+                                    <span className="p-2 rounded-xl bg-black text-[#a2ff86] border border-black shadow-[2px_2px_0px_#000] shrink-0 sm:order-1">
+                                        <FolderKanban className="w-5 h-5" />
+                                    </span>
+                                </div>
                             </div>
                             <p className="text-xs sm:text-sm text-neutral-600 font-bold max-w-2xl leading-relaxed">
                                 Curate your top 4 flagship engineering architectures. Showcase verifiable GitHub intelligence, systems writeups, and live production deployments to recruiters and peer engineers.
