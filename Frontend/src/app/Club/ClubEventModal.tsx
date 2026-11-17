@@ -34,10 +34,13 @@ import {
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import { EventTimelineBuilder } from "./TimelineBuilder/EventTimelineBuilder";
 import { EventWizardReviewStep } from "./TimelineBuilder/EventWizardReviewStep";
+import { EventSponsorsStep } from "./EventSponsorsStep";
 import type { ConfiguredStage } from "./TimelineBuilder/types";
 import {
     evaluateStepNavigation,
     validateStep1,
+    validateStageTiming,
+    formatDateToInput,
     type FormErrors,
 } from "./eventWizardNavigationGuard";
 import { fetchEventStages } from "../../api/eventLifecycleApi";
@@ -49,6 +52,7 @@ import type {
     ClubEvent,
     CreateClubEventPayload,
     ClubEventStatus,
+    EventSponsor,
 } from "../../store/clubEventsSlice";
 
 export interface ClubEventModalProps {
@@ -82,6 +86,7 @@ interface FormState {
     isTeamEvent: boolean;
     minTeamSize: number;
     maxTeamSize: number;
+    sponsors: EventSponsor[];
 }
 
 const DEFAULT_QUESTIONS: FormQuestion[] = [
@@ -145,7 +150,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     const toast = useToast();
     const modalId = useId();
 
-    const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+    const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
 
     const formatForInput = (isoStr: string | null | undefined): string => {
         if (!isoStr) return "";
@@ -160,8 +165,33 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     };
 
     const buildDefaultStages = (startsAtStr?: string, endsAtStr?: string): ConfiguredStage[] => {
-        const sDate = startsAtStr ? new Date(startsAtStr) : new Date();
-        const eDate = endsAtStr ? new Date(endsAtStr) : new Date(Date.now() + 7 * 86400000);
+        const now = new Date();
+        const sDate = startsAtStr && !isNaN(new Date(startsAtStr).getTime()) ? new Date(startsAtStr) : now;
+        const hasValidEndDate = Boolean(endsAtStr && !isNaN(new Date(endsAtStr).getTime()) && new Date(endsAtStr).getTime() > sDate.getTime());
+        const eDate = hasValidEndDate ? new Date(endsAtStr!) : new Date(sDate.getTime() + 7 * 86400000);
+
+        // Calculate total duration strictly bounded by eDate when valid end date is present
+        const totalMs = hasValidEndDate
+            ? Math.max(eDate.getTime() - sDate.getTime(), 60000)
+            : Math.max(eDate.getTime() - sDate.getTime(), 3 * 3600 * 1000);
+
+        let stage1EndMs: number;
+        let stage2EndMs: number;
+
+        if (totalMs >= 7 * 86400000) {
+            stage1EndMs = sDate.getTime() + Math.min(4 * 86400000, Math.floor(totalMs * 0.35));
+            stage2EndMs = stage1EndMs + Math.min(7 * 86400000, Math.floor((totalMs - (stage1EndMs - sDate.getTime())) * 0.7));
+        } else {
+            stage1EndMs = sDate.getTime() + Math.floor(totalMs * 0.35);
+            stage2EndMs = sDate.getTime() + Math.floor(totalMs * 0.7);
+        }
+
+        // Guarantee boundaries: sDate <= stage1End <= stage2End <= eDate
+        const sTime = sDate.getTime();
+        const eTime = eDate.getTime();
+        const stage1End = new Date(Math.max(sTime, Math.min(stage1EndMs, eTime)));
+        const stage2End = new Date(Math.max(stage1End.getTime(), Math.min(stage2EndMs, eTime)));
+        const stage3End = eDate;
 
         return [
             {
@@ -171,8 +201,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 description: "Initial participant signup, profile matching, and admission screening.",
                 instructions: "Complete all required questionnaire fields to secure your admission pass.",
                 stageOrder: 1,
-                startsAt: sDate.toISOString().slice(0, 16),
-                endsAt: new Date(sDate.getTime() + 4 * 86400000).toISOString().slice(0, 16),
+                startsAt: formatDateToInput(sDate),
+                endsAt: formatDateToInput(stage1End),
                 timezone: "Asia/Kolkata",
                 status: "active",
                 eligibilityType: "all_registered",
@@ -194,8 +224,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 description: "Build, commit, and submit project source repository, live demo, and presentation pitch.",
                 instructions: "Submit your GitHub repository, live URL, and architecture deck before the deadline.",
                 stageOrder: 2,
-                startsAt: new Date(sDate.getTime() + 4 * 86400000).toISOString().slice(0, 16),
-                endsAt: new Date(sDate.getTime() + 6 * 86400000).toISOString().slice(0, 16),
+                startsAt: formatDateToInput(stage1End),
+                endsAt: formatDateToInput(stage2End),
                 timezone: "Asia/Kolkata",
                 status: "scheduled",
                 eligibilityType: "accepted_only",
@@ -251,8 +281,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 description: "Final evaluation, jury score compilation, and credential issuance.",
                 instructions: "Scores will be revealed live. Verified certificates are dispatched to the student portfolio.",
                 stageOrder: 3,
-                startsAt: new Date(sDate.getTime() + 6 * 86400000).toISOString().slice(0, 16),
-                endsAt: eDate.toISOString().slice(0, 16),
+                startsAt: formatDateToInput(stage2End),
+                endsAt: formatDateToInput(stage3End),
                 timezone: "Asia/Kolkata",
                 status: "scheduled",
                 eligibilityType: "all_registered",
@@ -271,6 +301,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     };
 
     const [stages, setStages] = useState<ConfiguredStage[]>(() => buildDefaultStages());
+    const [hasCustomizedStages, setHasCustomizedStages] = useState(false);
+
+    const handleStagesChange = (updatedStages: ConfiguredStage[]) => {
+        setHasCustomizedStages(true);
+        setStages(updatedStages);
+    };
 
     const [form, setForm] = useState<FormState>({
         title: "",
@@ -288,6 +324,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         isTeamEvent: Boolean(editingEvent?.isTeamEvent),
         minTeamSize: editingEvent?.minTeamSize || 1,
         maxTeamSize: editingEvent?.maxTeamSize || 4,
+        sponsors: editingEvent?.sponsors || [],
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -324,6 +361,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     useEffect(() => {
         if (isOpen) {
             setCurrentStep(1);
+            setHasCustomizedStages(false);
             if (editingEvent) {
                 setForm({
                     title: editingEvent.title || "",
@@ -341,6 +379,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     isTeamEvent: Boolean(editingEvent.isTeamEvent),
                     minTeamSize: editingEvent.minTeamSize || 1,
                     maxTeamSize: editingEvent.maxTeamSize || 4,
+                    sponsors: editingEvent.sponsors || [],
                 });
 
                 if (editingEvent.id) {
@@ -403,6 +442,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     isTeamEvent: false,
                     minTeamSize: 1,
                     maxTeamSize: 4,
+                    sponsors: [],
                 });
                 setStages(buildDefaultStages());
                 setFormStructure({
@@ -483,7 +523,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     };
 
     // Centralized Step Navigation Guard (Sequential Forward & Unrestricted Backward)
-    const handleNavigateToStep = (targetStep: 1 | 2 | 3 | 4 | 5): boolean => {
+    const handleNavigateToStep = (targetStep: 1 | 2 | 3 | 4 | 5 | 6): boolean => {
         const result = evaluateStepNavigation(currentStep, targetStep, {
             form,
             stages,
@@ -512,13 +552,15 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     ? "Timeline Stage Required"
                     : result.blockingStep === 3
                     ? "Registration Form Required"
-                    : "Banner Required",
+                    : result.blockingStep === 4
+                    ? "Banner Required"
+                    : "Sponsors Verification Required",
             });
             return false;
         }
 
-        // When entering Step 4 or Step 5, ensure a banner exists if missing
-        if ((targetStep === 4 || targetStep === 5) && !form.coverImageUrl) {
+        // When entering Step 4, 5, or 6, ensure a banner exists if missing
+        if ((targetStep === 4 || targetStep === 5 || targetStep === 6) && !form.coverImageUrl) {
             setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
         }
 
@@ -531,13 +573,14 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     const handleGoToStep3 = () => handleNavigateToStep(3);
     const handleGoToStep4 = () => handleNavigateToStep(4);
     const handleGoToStep5 = () => handleNavigateToStep(5);
+    const handleGoToStep6 = () => handleNavigateToStep(6);
 
     // Final Submission Handler (Atomic Launch or Edit Save)
     const handleSubmitFinal = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
         // Validate all preceding steps before final launch
-        const navCheck = evaluateStepNavigation(currentStep, 5, {
+        const navCheck = evaluateStepNavigation(currentStep, 6, {
             form,
             stages,
             totalQuestions,
@@ -564,6 +607,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 setCurrentStep(3);
             } else if (navCheck.blockingStep === 4) {
                 setCurrentStep(4);
+            } else if (navCheck.blockingStep === 5) {
+                setCurrentStep(5);
             }
             toast.error(navCheck.errorMessage || "Please fix validation errors before proceeding.", {
                 title: navCheck.blockingStep === 1
@@ -572,12 +617,54 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     ? "Timeline Required"
                     : navCheck.blockingStep === 3
                     ? "Registration Form Required"
-                    : "Banner Required",
+                    : navCheck.blockingStep === 4
+                    ? "Banner Required"
+                    : "Sponsors Verification Required",
             });
             return;
         }
 
         const effectiveBanner = form.coverImageUrl.trim() || getRandomPresetBanner().dataUrl;
+
+        const eventStartMs = new Date(form.startsAt).getTime();
+        const eventEndMs = form.endsAt ? new Date(form.endsAt).getTime() : NaN;
+
+        // Ensure every stage timeline is cleanly bounded and formatted as valid ISO strings
+        const sanitizedStages = Array.isArray(stages) && stages.length > 0
+            ? stages.map((st, idx) => {
+                let sStart = st.startsAt ? new Date(st.startsAt).getTime() : eventStartMs;
+                let sEnd = st.endsAt ? new Date(st.endsAt).getTime() : NaN;
+
+                // Clamp startsAt so it never starts before event starts
+                if (isNaN(sStart) || sStart < eventStartMs) {
+                    sStart = eventStartMs;
+                }
+                // If event has an end time, clamp stage start so it doesn't start after event ends
+                if (!isNaN(eventEndMs) && sStart > eventEndMs) {
+                    sStart = eventStartMs;
+                }
+
+                // If endsAt is missing or invalid
+                if (isNaN(sEnd)) {
+                    sEnd = !isNaN(eventEndMs) ? eventEndMs : sStart + 3600000;
+                }
+                // Clamp stage endsAt within event bounds
+                if (!isNaN(eventEndMs) && sEnd > eventEndMs) {
+                    sEnd = eventEndMs;
+                }
+                // Ensure stage endsAt is not earlier than its startsAt
+                if (sEnd < sStart) {
+                    sEnd = !isNaN(eventEndMs) ? eventEndMs : sStart + 3600000;
+                }
+
+                return {
+                    ...st,
+                    stageOrder: typeof st.stageOrder === "number" ? st.stageOrder : idx + 1,
+                    startsAt: new Date(sStart).toISOString(),
+                    endsAt: new Date(sEnd).toISOString(),
+                };
+            })
+            : [];
 
         // Construct clean payload with valid details only
         const payload: CreateClubEventPayload = {
@@ -596,10 +683,11 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             isTeamEvent: form.isTeamEvent,
             minTeamSize: form.minTeamSize,
             maxTeamSize: form.maxTeamSize,
+            sponsors: form.sponsors,
             initialFormStructure: formStructure,
             initialFormSettings: formSettings,
             initialFormTheme: formTheme,
-            initialStages: stages,
+            initialStages: sanitizedStages,
         };
 
         // Fire callback immediately for optimistic update
@@ -656,7 +744,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             </span>
                         </div>
                         <p className="text-[11px] sm:text-xs text-neutral-600 font-medium truncate">
-                            Step {currentStep} of 5: {
+                            Step {currentStep} of 6: {
                                 currentStep === 1
                                     ? "Event Information & Schedule"
                                     : currentStep === 2
@@ -665,13 +753,15 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             ? "Registration Form Builder"
                                             : currentStep === 4
                                                 ? "Banner Selection & Preview"
-                                                : "Review & Publish"
+                                                : currentStep === 5
+                                                    ? "Sponsors & Partners"
+                                                    : "Review & Publish"
                             }
                         </p>
                     </div>
                 </div>
 
-                {/* Center / Right: 5-Step Wizard Navigation Stepper */}
+                {/* Center / Right: 6-Step Wizard Navigation Stepper */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Stepper Pills */}
                     <div className="flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1 overflow-x-auto max-w-full">
@@ -687,17 +777,27 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <span>Event Info</span>
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={() => handleNavigateToStep(2)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 2
-                                ? "bg-[#C084FC] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
-                                : "text-neutral-700 hover:text-black hover:bg-white/60"
-                                }`}
-                        >
-                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">2</span>
-                            <span>Timeline ({stages.length})</span>
-                        </button>
+                        {(() => {
+                            const hasStageErrors = stages.some((s) => validateStageTiming(s, form.startsAt, form.endsAt).hasError);
+                            return (
+                                <button
+                                    type="button"
+                                    onClick={() => handleNavigateToStep(2)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 2
+                                        ? "bg-[#C084FC] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                        : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                        }`}
+                                >
+                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${hasStageErrors ? "bg-rose-600 text-white" : "bg-black text-white"}`}>
+                                        2
+                                    </span>
+                                    <span>Timeline ({stages.length})</span>
+                                    {hasStageErrors && (
+                                        <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" title="Timeline boundary violation" />
+                                    )}
+                                </button>
+                            );
+                        })()}
 
                         <button
                             type="button"
@@ -727,11 +827,23 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             type="button"
                             onClick={() => handleNavigateToStep(5)}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 5
-                                ? "bg-[#FDE047] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                ? "bg-[#FB923C] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                                 : "text-neutral-700 hover:text-black hover:bg-white/60"
                                 }`}
                         >
                             <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">5</span>
+                            <span>Sponsors ({form.sponsors.length})</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleNavigateToStep(6)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${currentStep === 6
+                                ? "bg-[#FDE047] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                : "text-neutral-700 hover:text-black hover:bg-white/60"
+                                }`}
+                        >
+                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">6</span>
                             <span>Review</span>
                         </button>
                     </div>
@@ -742,7 +854,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 1: EVENT INFORMATION & SCHEDULE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 1 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
@@ -870,9 +982,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             required
                                             value={form.startsAt}
                                             onChange={(val) => {
-                                                setForm({ ...form, startsAt: val });
+                                                setForm((prev) => ({ ...prev, startsAt: val }));
                                                 if (errors.startsAt) {
-                                                    setErrors({ ...errors, startsAt: undefined });
+                                                    setErrors((prev) => ({ ...prev, startsAt: undefined }));
+                                                }
+                                                if (!editingEvent && !hasCustomizedStages && val) {
+                                                    setStages(buildDefaultStages(val, form.endsAt));
                                                 }
                                             }}
                                             onBlur={() => handleBlur("startsAt")}
@@ -880,12 +995,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             placeholder="Pick event start date & time"
                                             mode="datetime"
                                         />
-                                        {touched.startsAt && errors.startsAt && (
-                                            <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                                                <AlertCircle className="w-3 h-3 shrink-0" />
-                                                <span>{errors.startsAt}</span>
-                                            </p>
-                                        )}
                                     </div>
 
                                     <div>
@@ -893,9 +1002,12 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             label="Ends At (Optional)"
                                             value={form.endsAt}
                                             onChange={(val) => {
-                                                setForm({ ...form, endsAt: val });
+                                                setForm((prev) => ({ ...prev, endsAt: val }));
                                                 if (errors.endsAt) {
-                                                    setErrors({ ...errors, endsAt: undefined });
+                                                    setErrors((prev) => ({ ...prev, endsAt: undefined }));
+                                                }
+                                                if (!editingEvent && !hasCustomizedStages && form.startsAt) {
+                                                    setStages(buildDefaultStages(form.startsAt, val));
                                                 }
                                             }}
                                             onBlur={() => handleBlur("endsAt")}
@@ -903,12 +1015,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             placeholder="Pick event end date & time"
                                             mode="datetime"
                                         />
-                                        {touched.endsAt && errors.endsAt && (
-                                            <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                                                <AlertCircle className="w-3 h-3 shrink-0" />
-                                                <span>{errors.endsAt}</span>
-                                            </p>
-                                        )}
                                     </div>
                                 </div>
 
@@ -1307,7 +1413,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 2: TIMELINE & ROUND ARCHITECTURE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 2 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
@@ -1327,7 +1433,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                     <EventTimelineBuilder
                         stages={stages}
-                        onChange={setStages}
+                        onChange={handleStagesChange}
                         eventStartsAt={form.startsAt}
                         eventEndsAt={form.endsAt}
                         isTeamEvent={form.isTeamEvent}
@@ -1416,7 +1522,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 4: BANNER SELECTION STUDIO */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 4 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
@@ -1590,21 +1696,34 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             iconRight={<ArrowRight className="w-4 h-4" />}
                             className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000] whitespace-nowrap shrink-0"
                         >
-                            Next: Review & Publish
+                            Next: Sponsors ({form.sponsors.length})
                         </OrbixButton>
                     </div>
                 </div>
             )}
 
             {/* ---------------------------------------------------------------- */}
-            {/* STEP 5: REVIEW & PUBLISH PRE-FLIGHT CHECKLIST */}
+            {/* STEP 5: EVENT SPONSORS & PARTNERS BUILDER */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 5 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                <EventSponsorsStep
+                    sponsors={form.sponsors}
+                    onChange={(newSponsors) => setForm((prev) => ({ ...prev, sponsors: newSponsors }))}
+                    clubId={clubId}
+                    onBack={() => setCurrentStep(4)}
+                    onNext={handleGoToStep6}
+                />
+            )}
+
+            {/* ---------------------------------------------------------------- */}
+            {/* STEP 6: REVIEW & PUBLISH PRE-FLIGHT CHECKLIST */}
+            {/* ---------------------------------------------------------------- */}
+            {currentStep === 6 && (
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-500">
-                                Step 5 of 5
+                                Step 6 of 6
                             </span>
                             <h3 className="text-lg sm:text-xl md:text-2xl font-black text-black">Pre-Flight Review & Launch Checklist</h3>
                             <p className="text-xs text-neutral-600 font-medium mt-0.5">
@@ -1617,19 +1736,20 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         form={form}
                         stages={stages}
                         formQuestions={formStructure.sections.flatMap((s) => s.questions)}
+                        sponsors={form.sponsors}
                         collegeName={collegeName}
                         onJumpToStep={(st) => handleNavigateToStep(st as any)}
                     />
 
-                    {/* Step 5 Footer */}
+                    {/* Step 6 Footer */}
                     <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
                         <button
                             type="button"
-                            onClick={() => setCurrentStep(4)}
+                            onClick={() => setCurrentStep(5)}
                             className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
                         >
                             <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Back: Banner Studio</span>
+                            <span>Back: Sponsors</span>
                         </button>
                         <OrbixButton
                             type="button"

@@ -293,7 +293,7 @@ export const OrbixButton = React.forwardRef<HTMLButtonElement, OrbixButtonProps>
                         aria-hidden={loading ? "true" : undefined}
                     >
                         {renderedIcon && <span className="shrink-0 flex items-center justify-center">{renderedIcon}</span>}
-                        {children && <span className="truncate leading-none">{children}</span>}
+                        {children && <span className="truncate leading-none inline-flex items-center justify-center gap-1.5">{children}</span>}
                         {renderedIconRight && <span className="shrink-0 flex items-center justify-center">{renderedIconRight}</span>}
                     </span>
 

@@ -1,5 +1,15 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 
+export interface EventSponsor {
+    id: string;
+    name: string;
+    logoUrl?: string;
+    imageUrl?: string;
+    websiteUrl?: string;
+    link?: string;
+    description?: string;
+}
+
 export interface ClubEvent {
     id: string;
     clubId: string;
@@ -19,6 +29,7 @@ export interface ClubEvent {
     isTeamEvent?: boolean;
     minTeamSize?: number;
     maxTeamSize?: number;
+    sponsors?: EventSponsor[];
     publishedAt: string | null;
     createdAt: string;
     updatedAt?: string;
@@ -46,6 +57,7 @@ export interface CreateClubEventPayload {
     isTeamEvent?: boolean;
     minTeamSize?: number;
     maxTeamSize?: number;
+    sponsors?: EventSponsor[];
     initialFormStructure?: any;
     initialFormSettings?: any;
     initialFormTheme?: any;

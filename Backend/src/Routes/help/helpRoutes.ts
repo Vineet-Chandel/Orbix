@@ -1,11 +1,127 @@
 // Backend/src/Routes/help/helpRoutes.ts
 import express, { type Request, type Response } from "express";
+import crypto from "node:crypto";
 import validator from "../../utils/validation.js";
 import { query } from "../../database/client.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { requireSupportStaff } from "../../middlewares/staff.middleware.js";
+import {
+    assertCloudinaryConfigured,
+    isCloudinaryConfigured,
+    cloudinary,
+} from "../../config/cloudinary.js";
+import { sendHelpTicketCreatedEmail } from "../../services/email/resendService.js";
 
 export const helpRouter = express.Router();
+
+/**
+ * POST /api/help/upload-signature
+ * Generate signed Cloudinary upload credentials for screenshots and attachments.
+ */
+helpRouter.post("/upload-signature", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        if (!isCloudinaryConfigured()) {
+            return res.status(503).json({
+                success: false,
+                message: "Cloudinary upload service is not configured.",
+            });
+        }
+
+        const { cloudName, apiKey, apiSecret } = assertCloudinaryConfigured();
+        const timestamp = Math.round(Date.now() / 1000);
+        const randomHex = crypto.randomBytes(6).toString("hex");
+        const safeUserId = (authUser.id || authUser.username || "user").replace(/[^a-zA-Z0-9_-]/g, "");
+        const folder = "orbix/help_tickets";
+        const publicId = `${folder}/ht_${safeUserId}_${timestamp}_${randomHex}`;
+
+        const paramsToSign: Record<string, any> = {
+            public_id: publicId,
+            timestamp,
+        };
+
+        const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
+
+        return res.status(200).json({
+            success: true,
+            uploadConfig: {
+                cloudName,
+                apiKey,
+                timestamp,
+                signature,
+                publicId,
+                folder,
+                uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+                maxBytes: 10 * 1024 * 1024,
+                allowedFormats: ["jpg", "jpeg", "png", "webp", "gif", "avif"],
+            },
+        });
+    } catch (err: any) {
+        console.error("[Help] Signature generation error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to generate upload signature.",
+        });
+    }
+});
+
+/**
+ * POST /api/help/upload
+ * Direct server-side upload fallback using base64 image or data URL.
+ */
+helpRouter.post("/upload", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        const { image, file } = req.body;
+        const uploadPayload = image || file;
+
+        if (!uploadPayload || typeof uploadPayload !== "string") {
+            return res.status(400).json({ success: false, message: "Image data is required" });
+        }
+
+        if (!isCloudinaryConfigured()) {
+            return res.status(503).json({
+                success: false,
+                message: "Cloudinary upload service is not configured.",
+            });
+        }
+
+        assertCloudinaryConfigured();
+
+        const safeUserId = (authUser.id || authUser.username || "user").replace(/[^a-zA-Z0-9_-]/g, "");
+        const timestamp = Math.round(Date.now() / 1000);
+        const randomHex = crypto.randomBytes(6).toString("hex");
+
+        const result = await cloudinary.uploader.upload(uploadPayload, {
+            folder: "orbix/help_tickets",
+            public_id: `ht_${safeUserId}_${timestamp}_${randomHex}`,
+            resource_type: "image",
+            allowed_formats: ["jpg", "jpeg", "png", "webp", "gif", "avif"],
+            transformation: [{ quality: "auto" }, { fetch_format: "auto" }],
+        });
+
+        return res.status(200).json({
+            success: true,
+            secureUrl: result.secure_url,
+            url: result.url,
+            publicId: result.public_id,
+        });
+    } catch (err: any) {
+        console.error("[Help] Direct upload error:", err);
+        return res.status(500).json({
+            success: false,
+            message: err?.message || "Failed to upload image.",
+        });
+    }
+});
 
 export interface HelpTicketInput {
     category: "bug_report" | "sync_issue" | "college_verification" | "feature_request" | "general_inquiry";
@@ -221,6 +337,23 @@ helpRouter.post("/tickets", authenticate, async (req: Request, res: Response) =>
             );
         } catch (notifErr: any) {
             console.warn("[Help] Notification dispatch non-blocking error:", notifErr?.message);
+        }
+
+        // 7. Reassuring & Caring Confirmation Email Dispatch
+        try {
+            await sendHelpTicketCreatedEmail({
+                to: targetEmail,
+                name: authUser.firstName || authUser.username || "Developer",
+                ticketNumber: newTicket.ticket_number,
+                category: newTicket.category,
+                subject: newTicket.subject,
+                description: newTicket.description,
+                priority: newTicket.priority,
+                attachmentUrl: newTicket.attachment_url,
+                createdAt: newTicket.created_at,
+            });
+        } catch (emailErr: any) {
+            console.warn("[Help] Email dispatch non-blocking error:", emailErr?.message);
         }
 
         return res.status(201).json({
@@ -612,7 +745,7 @@ const DEFAULT_FALLBACK_FAQS = [
 helpRouter.get("/faqs", async (req: Request, res: Response) => {
     try {
         const { category, q } = req.query;
-        let sql = `SELECT id, category, question, answer, helpful_count, unhelpful_count, sort_order
+        let sql = `SELECT id, slug, category, question, answer, helpful_count, not_helpful_count AS unhelpful_count, order_index AS sort_order
                    FROM help_faqs
                    WHERE is_published = true`;
         const params: any[] = [];
@@ -627,13 +760,14 @@ helpRouter.get("/faqs", async (req: Request, res: Response) => {
             sql += ` AND (question ILIKE $${params.length} OR answer ILIKE $${params.length})`;
         }
 
-        sql += ` ORDER BY sort_order ASC, created_at ASC;`;
+        sql += ` ORDER BY order_index ASC, created_at ASC;`;
 
         const dbRes = await query(sql, params);
 
         if (dbRes.rows && dbRes.rows.length > 0) {
             const faqs = dbRes.rows.map((row) => ({
                 id: row.id,
+                slug: row.slug,
                 category: row.category,
                 question: row.question,
                 answer: row.answer,
@@ -678,13 +812,23 @@ helpRouter.post("/faqs/:id/feedback", async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: "isHelpful must be a boolean." });
         }
 
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
         if (isHelpful) {
-            await query(`UPDATE help_faqs SET helpful_count = helpful_count + 1 WHERE id = $1;`, [id]);
+            if (isUuid) {
+                await query(`UPDATE help_faqs SET helpful_count = helpful_count + 1 WHERE id = $1;`, [id]);
+            } else {
+                await query(`UPDATE help_faqs SET helpful_count = helpful_count + 1 WHERE slug = $1;`, [id]);
+            }
         } else {
-            await query(`UPDATE help_faqs SET unhelpful_count = unhelpful_count + 1 WHERE id = $1;`, [id]);
+            if (isUuid) {
+                await query(`UPDATE help_faqs SET not_helpful_count = not_helpful_count + 1 WHERE id = $1;`, [id]);
+            } else {
+                await query(`UPDATE help_faqs SET not_helpful_count = not_helpful_count + 1 WHERE slug = $1;`, [id]);
+            }
         }
 
-        if (userId) {
+        if (userId && isUuid) {
             try {
                 await query(
                     `INSERT INTO help_faq_feedback (faq_id, user_id, is_helpful, user_ip)

@@ -1,5 +1,5 @@
-import type { EventItem } from "../../../store";
-import { buildApiUrl } from "../../../api/apiClient";
+import type { EventItem } from "../../../../store";
+import { buildApiUrl } from "../../../../api/apiClient";
 
 // Helper to create consistent contest items
 export const createContest = (
@@ -570,8 +570,8 @@ export const getInitialLandingEvents = (): EventItem[] => {
                             status: (now >= e.endTimestamp
                                 ? "FINISHED"
                                 : now >= e.startTimestamp
-                                ? "LIVE"
-                                : "UPCOMING") as "UPCOMING" | "LIVE" | "FINISHED",
+                                    ? "LIVE"
+                                    : "UPCOMING") as "UPCOMING" | "LIVE" | "FINISHED",
                         }));
                     }
                 }
@@ -597,26 +597,21 @@ export const saveLandingEventsProfile = (events: EventItem[]): void => {
 
 // Fetch live contest events from search API (/api/events)
 export const fetchLandingEventsApi = async (): Promise<EventItem[] | null> => {
-    const primaryUrl = buildApiUrl("/api/events");
-    const endpoints = import.meta.env.DEV
-        ? [primaryUrl, "http://localhost:3000/api/events"]
-        : [primaryUrl];
+    const url = buildApiUrl("/api/events");
 
-    for (const ep of endpoints) {
-        try {
-            const res = await fetch(ep, {
-                signal: AbortSignal.timeout(800),
-                headers: { Accept: "application/json" },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data && Array.isArray(data.events) && data.events.length > 0) {
-                    return data.events;
-                }
+    try {
+        const res = await fetch(url, {
+            signal: AbortSignal.timeout(5000),
+            headers: { Accept: "application/json" },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.events) && data.events.length > 0) {
+                return data.events;
             }
-        } catch {
-            // Try fallback endpoint
         }
+    } catch {
+        // Fall back to offline/mock events gracefully
     }
     return null;
 };
@@ -633,8 +628,8 @@ export const mergeLandingEvents = (apiEvents: EventItem[]): EventItem[] => {
         const status = (now >= ev.endTimestamp
             ? "FINISHED"
             : now >= ev.startTimestamp
-            ? "LIVE"
-            : "UPCOMING") as "UPCOMING" | "LIVE" | "FINISHED";
+                ? "LIVE"
+                : "UPCOMING") as "UPCOMING" | "LIVE" | "FINISHED";
         combinedMap.set(key, { ...ev, status });
     }
 

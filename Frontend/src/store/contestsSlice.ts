@@ -179,39 +179,33 @@ export const fetchContestPerformance = createAsyncThunk<
         if (token) reqHeaders["Authorization"] = `Bearer ${token}`;
 
         const primaryUrl = `/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force || portalsMismatched ? "&refresh=true" : ""}${portalsQuery}`;
-        const endpoints = import.meta.env.DEV
-            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-            : [primaryUrl];
 
-        let lastError = "Failed to fetch contest performance";
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    headers: reqHeaders,
-                    signal: AbortSignal.timeout(10000),
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.success) {
-                        return {
-                            username: effectiveUser,
-                            timestamp: data.timestamp || new Date().toISOString(),
-                            platforms: data.platforms || [],
-                            recentContests: data.recentContests || [],
-                            summary: data.summary || {
-                                totalRatedContests: 0,
-                                platformContestCounts: {},
-                            },
-                        };
-                    }
-                    lastError = data.message || lastError;
+        try {
+            const res = await fetch(primaryUrl, {
+                headers: reqHeaders,
+                signal: AbortSignal.timeout(10000),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    return {
+                        username: effectiveUser,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        platforms: data.platforms || [],
+                        recentContests: data.recentContests || [],
+                        summary: data.summary || {
+                            totalRatedContests: 0,
+                            platformContestCounts: {},
+                        },
+                    };
                 }
-            } catch (err: any) {
-                lastError = err.message || lastError;
+                return rejectWithValue(data.message || "Failed to fetch contest performance");
             }
+            const errData = await res.json().catch(() => null);
+            return rejectWithValue(errData?.message || `Failed to fetch contest performance (${res.status})`);
+        } catch (err: any) {
+            return rejectWithValue(err.message || "Failed to fetch contest performance");
         }
-
-        return rejectWithValue(lastError);
     }
 );
 

@@ -12,6 +12,8 @@ import {
     validateQuestionSchema,
     sanitizeFormStructure,
     sanitizeStudentAnswers,
+    resolveAllowedExtensions,
+    computeFormContentHash,
 } from "../../utils/formSecuritySanitizer.js";
 import type {
     ClubEventFormRecord,
@@ -345,6 +347,36 @@ export class ClubEventFormService {
         canSubmit = !isClosed;
         } // End of if (!cachedShared) DB fetch block
 
+        // Dynamic Timeline Stage Check: Verify current server time against the Registration stage
+        const regStageRes = await query(
+            `SELECT id, name, starts_at, ends_at, status 
+             FROM club_event_stages 
+             WHERE event_id = $1 AND (type = 'registration' OR action_type = 'registration')
+             ORDER BY stage_order ASC LIMIT 1;`,
+            [eventId]
+        );
+
+        if (regStageRes.rows.length > 0) {
+            const regStage = regStageRes.rows[0];
+            const now = new Date();
+            const rEnd = new Date(regStage.ends_at);
+            const rStart = new Date(regStage.starts_at);
+
+            if (regStage.status === "completed" || regStage.status === "cancelled" || now > rEnd) {
+                isClosed = true;
+                closedReason = `The registration window for this event concluded on ${rEnd.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST. Applications are no longer accepted.`;
+                canSubmit = false;
+            } else if (now < rStart) {
+                isClosed = true;
+                closedReason = `Registration for this event opens on ${rStart.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`;
+                canSubmit = false;
+            }
+        } else if (event?.endsAt && new Date() > new Date(event.endsAt)) {
+            isClosed = true;
+            closedReason = "The event schedule has concluded. Applications are closed.";
+            canSubmit = false;
+        }
+
         // Check user's existing registration and verified student identity if logged in
         let userResponse: any = null;
         let studentProfile: any = null;
@@ -677,9 +709,16 @@ export class ClubEventFormService {
         const clubId = evCheck.rows[0].clubId;
         await this.assertStaffAccess(userId, clubId);
 
-        // Fetch existing form row for optimistic concurrency control
+        // Fetch existing form row for optimistic concurrency control and idempotency check
         const existingForm = await query(
-            `SELECT id, version_count AS "versionCount", settings, theme_settings AS "themeSettings"
+            `SELECT id, event_id AS "eventId", club_id AS "clubId", created_by AS "createdBy",
+                    title, description, status, current_draft_version_id AS "currentDraftVersionId",
+                    published_version_id AS "publishedVersionId", header_image_url AS "headerImageUrl",
+                    header_image_public_id AS "headerImagePublicId", theme_settings AS "themeSettings",
+                    settings, default_settings AS "defaultSettings", structure,
+                    is_published AS "isPublished", version_count AS "versionCount",
+                    schema_version AS "schemaVersion", created_at AS "createdAt",
+                    updated_at AS "updatedAt", published_at AS "publishedAt"
              FROM club_event_forms WHERE event_id = $1 LIMIT 1;`,
             [eventId]
         );
@@ -736,6 +775,47 @@ export class ClubEventFormService {
             confirmationMessage: payload.settings?.confirmationMessage || existingSettings.confirmationMessage || "Thank you! Your registration has been submitted successfully.",
             notifyOnRegistration: payload.settings?.notifyOnRegistration ?? existingSettings.notifyOnRegistration ?? true,
         };
+
+        // Backend Idempotency: If working draft cards, structure, and settings are identical, return existing record
+        if (existingForm.rows[0]) {
+            const existingRow = existingForm.rows[0];
+            const existingHash = computeFormContentHash(existingRow);
+            const incomingHash = computeFormContentHash({
+                title,
+                description,
+                headerImageUrl,
+                headerImagePublicId,
+                themeSettings: defaultTheme,
+                settings: mergedSettings,
+                structure: validatedStructure,
+            });
+
+            if (existingHash === incomingHash) {
+                return {
+                    id: existingRow.id,
+                    eventId: existingRow.eventId,
+                    clubId: existingRow.clubId || clubId,
+                    createdBy: existingRow.createdBy || userId,
+                    title: existingRow.title,
+                    description: existingRow.description,
+                    status: existingRow.status || "draft",
+                    currentDraftVersionId: existingRow.currentDraftVersionId,
+                    publishedVersionId: existingRow.publishedVersionId,
+                    headerImageUrl: existingRow.headerImageUrl,
+                    headerImagePublicId: existingRow.headerImagePublicId,
+                    themeSettings: existingRow.themeSettings,
+                    settings: existingRow.settings,
+                    defaultSettings: existingRow.defaultSettings || existingSettings,
+                    structure: existingRow.structure,
+                    isPublished: existingRow.isPublished,
+                    versionCount: existingRow.versionCount,
+                    schemaVersion: existingRow.schemaVersion || 1,
+                    createdAt: existingRow.createdAt,
+                    updatedAt: existingRow.updatedAt,
+                    publishedAt: existingRow.publishedAt,
+                };
+            }
+        }
 
         const upsertRes = await query(
             `INSERT INTO club_event_forms (
@@ -889,6 +969,8 @@ export class ClubEventFormService {
         changeSummary?: string
     ): Promise<{
         success: boolean;
+        isUnchanged?: boolean;
+        message?: string;
         version: FormVersionRecord;
         form: ClubEventFormRecord;
     }> {
@@ -935,6 +1017,66 @@ export class ClubEventFormService {
                 const error: any = new Error(`Cannot publish form: ${graphCheck.errors.join("; ")}`);
                 error.statusCode = 400;
                 throw error;
+            }
+
+            // Check if form is already published and whether the working draft is identical to the active published version
+            const activePublishedRes = await client.query(
+                `SELECT id, form_id AS "formId", event_id AS "eventId", version_number AS "versionNumber",
+                        title, description, header_image_url AS "headerImageUrl",
+                        header_image_public_id AS "headerImagePublicId", structure, settings,
+                        theme_settings AS "themeSettings", change_summary AS "changeSummary",
+                        is_published AS "isPublished", published_by AS "publishedBy",
+                        created_by AS "createdBy", created_at AS "createdAt", published_at AS "publishedAt"
+                 FROM club_event_form_versions
+                 WHERE form_id = $1 AND is_published = true
+                 ORDER BY version_number DESC LIMIT 1;`,
+                [formRow.id]
+            );
+
+            const activePublished: FormVersionRecord | undefined = activePublishedRes.rows[0];
+            if (activePublished && formRow.is_published) {
+                const draftHash = computeFormContentHash(formRow);
+                const publishedHash = computeFormContentHash(activePublished);
+
+                if (draftHash === publishedHash) {
+                    await client.query("COMMIT;");
+                    FormLogger.info("FORM_PUBLISH_UNCHANGED", `Form publish skipped: cards and schema are identical to active Version ${activePublished.versionNumber}`, {
+                        eventId,
+                        meta: {
+                            formId: formRow.id,
+                            versionNumber: activePublished.versionNumber,
+                        },
+                    });
+                    return {
+                        success: true,
+                        isUnchanged: true,
+                        message: `Form is already up to date with Version ${activePublished.versionNumber}. No changes detected.`,
+                        version: activePublished,
+                        form: {
+                            id: formRow.id,
+                            eventId: formRow.event_id || formRow.eventId || eventId,
+                            clubId: formRow.club_id || formRow.clubId || clubId,
+                            createdBy: formRow.created_by || formRow.createdBy || userId,
+                            title: formRow.title,
+                            description: formRow.description,
+                            status: formRow.status || "published",
+                            currentDraftVersionId: formRow.current_draft_version_id || formRow.currentDraftVersionId || null,
+                            publishedVersionId: formRow.published_version_id || formRow.publishedVersionId || activePublished.id,
+                            headerImageUrl: formRow.header_image_url || formRow.headerImageUrl || null,
+                            headerImagePublicId: formRow.header_image_public_id || formRow.headerImagePublicId || null,
+                            themeSettings: formRow.theme_settings || formRow.themeSettings || null,
+                            settings: formRow.settings,
+                            defaultSettings: formRow.default_settings || formRow.defaultSettings,
+                            structure: formRow.structure,
+                            isPublished: true,
+                            versionCount: formRow.version_count || formRow.versionCount || 1,
+                            schemaVersion: formRow.schema_version || formRow.schemaVersion || 1,
+                            createdAt: formRow.created_at || formRow.createdAt,
+                            updatedAt: formRow.updated_at || formRow.updatedAt,
+                            publishedAt: formRow.published_at || formRow.publishedAt,
+                        },
+                    };
+                }
             }
 
             // Compute next version number
@@ -1943,23 +2085,30 @@ Organizer Request: ${userPrompt}`;
     /**
      * Register a media asset in the database
      */
-    static async registerMediaAsset(data: {
-        formId?: string | null;
-        eventId?: string | null;
-        uploaderUserId?: string | null;
-        publicId: string;
-        secureUrl: string;
-        resourceType?: string;
-        format?: string | null;
-        bytes?: number | null;
-        width?: number | null;
-        height?: number | null;
-        assetPurpose: "form_header" | "question_image" | "option_image" | "student_attachment";
-        questionId?: string | null;
-        responseId?: string | null;
-        metadata?: Record<string, any>;
-    }): Promise<MediaAssetRecord> {
-        const res = await query(
+    static async registerMediaAsset(
+        data: {
+            formId?: string | null;
+            eventId?: string | null;
+            uploaderUserId?: string | null;
+            publicId: string;
+            secureUrl: string;
+            resourceType?: string;
+            format?: string | null;
+            bytes?: number | null;
+            width?: number | null;
+            height?: number | null;
+            assetPurpose: "form_header" | "question_image" | "option_image" | "student_attachment";
+            questionId?: string | null;
+            responseId?: string | null;
+            metadata?: Record<string, any>;
+        },
+        dbClient?: any
+    ): Promise<MediaAssetRecord> {
+        const queryFn = dbClient
+            ? (sql: string, params?: any[]) => dbClient.query(sql, params)
+            : query;
+
+        const res = await queryFn(
             `INSERT INTO club_form_media_assets (
                 form_id, event_id, uploader_user_id, public_id, secure_url, resource_type,
                 format, bytes, width, height, asset_purpose, question_id, response_id, metadata
@@ -2032,11 +2181,39 @@ Organizer Request: ${userPrompt}`;
             folder = `orbix/forms/${eventId}/attachments/${userId}`;
             maxBytes = 25 * 1024 * 1024;
             allowedFormats = ["pdf", "jpg", "jpeg", "png", "webp", "zip", "docx", "xlsx", "csv"];
+
+            // If questionId is provided, dynamically refine size and format bounds from question configuration
+            if (options?.questionId) {
+                try {
+                    const formRes = await query(
+                        `SELECT f.structure AS "draftStructure", v.structure AS "publishedStructure"
+                         FROM club_event_forms f
+                         LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
+                         WHERE f.event_id = $1 LIMIT 1;`,
+                        [eventId]
+                    );
+                    const activeStructure = formRes.rows[0]?.publishedStructure || formRes.rows[0]?.draftStructure;
+                    const matchedQ = (activeStructure?.sections || [])
+                        .flatMap((s: any) => s.questions || [])
+                        .find((q: any) => q.id === options.questionId);
+
+                    if (matchedQ) {
+                        if (matchedQ.validation?.maxFileSizeMb && matchedQ.validation.maxFileSizeMb > 0) {
+                            maxBytes = matchedQ.validation.maxFileSizeMb * 1024 * 1024;
+                        }
+                        if (matchedQ.validation?.allowedFileTypes && matchedQ.validation.allowedFileTypes.length > 0) {
+                            const resolved = resolveAllowedExtensions(matchedQ.validation.allowedFileTypes);
+                            allowedFormats = Array.from(resolved.allowedExtensions);
+                        }
+                    }
+                } catch (qErr) {
+                    console.warn("Could not inspect question file config for signature:", qErr);
+                }
+            }
         }
 
-        const publicId = `${folder}/${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+        const publicId = `${folder}/orbix_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
         const paramsToSign: Record<string, any> = {
-            folder,
             public_id: publicId,
             timestamp,
         };
@@ -2053,6 +2230,105 @@ Organizer Request: ${userPrompt}`;
             uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
             maxBytes,
             allowedFormats,
+        };
+    }
+
+    /**
+     * Direct Server-Side Upload fallback for student attachments
+     */
+    static async uploadAttachmentDirect(
+        eventId: string,
+        userId: string,
+        questionId: string,
+        file: Express.Multer.File
+    ): Promise<FileAttachmentMeta> {
+        if (!file || !file.buffer) {
+            const error: any = new Error("No file was uploaded.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // Fetch event form and question config
+        const formRes = await query(
+            `SELECT f.id AS "formId", f.structure AS "draftStructure", v.structure AS "publishedStructure"
+             FROM club_event_forms f
+             LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
+             WHERE f.event_id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        const formRow = formRes.rows[0];
+        const activeStructure = formRow?.publishedStructure || formRow?.draftStructure;
+        const matchedQ = (activeStructure?.sections || [])
+            .flatMap((s: any) => s.questions || [])
+            .find((q: any) => q.id === questionId);
+
+        if (!matchedQ || matchedQ.type !== "file_upload") {
+            const error: any = new Error("Invalid question or target question is not a file upload field.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const allowedTypes = matchedQ.validation?.allowedFileTypes;
+        const maxMb = matchedQ.validation?.maxFileSizeMb ?? 10;
+
+        // Security, extension, and size validation
+        const secVal = validateAttachmentSecurity(
+            {
+                fileName: file.originalname,
+                fileSize: file.size,
+                fileUrl: "https://res.cloudinary.com/placeholder",
+            },
+            allowedTypes,
+            maxMb
+        );
+
+        if (!secVal.valid) {
+            const error: any = new Error(secVal.error || "File validation failed.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const { cloudName } = assertCloudinaryConfigured();
+        const folder = `orbix/forms/${eventId}/attachments/${userId}`;
+        const randomHex = crypto.randomBytes(4).toString("hex");
+        const publicId = `${folder}/orbix_${Date.now()}_${randomHex}`;
+
+        const uploadResult: any = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    public_id: publicId,
+                    resource_type: "auto",
+                },
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+            uploadStream.end(file.buffer);
+        });
+
+        // Register media asset tracking
+        await this.registerMediaAsset({
+            formId: formRow?.formId,
+            eventId,
+            uploaderUserId: userId,
+            publicId: uploadResult.public_id,
+            secureUrl: uploadResult.secure_url,
+            assetPurpose: "student_attachment",
+            questionId,
+            bytes: file.size,
+            resourceType: uploadResult.resource_type || "auto",
+            format: uploadResult.format,
+        });
+
+        return {
+            questionId,
+            questionTitle: matchedQ.title,
+            fileName: file.originalname,
+            fileUrl: uploadResult.secure_url,
+            filePublicId: uploadResult.public_id,
+            fileSize: file.size,
+            mimeType: file.mimetype || "application/octet-stream",
         };
     }
 
@@ -2137,7 +2413,7 @@ Organizer Request: ${userPrompt}`;
                         v.id AS "activeVersionId"
                  FROM club_event_forms f
                  LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
-                 WHERE f.event_id = $1 FOR UPDATE OF f;`,
+                 WHERE f.event_id = $1;`,
                 [eventId]
             );
 
@@ -2173,6 +2449,43 @@ Organizer Request: ${userPrompt}`;
             if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
                 const error: any = new Error("The event registration deadline has passed.");
                 error.statusCode = 403;
+                throw error;
+            }
+
+            // Dynamic Timeline Registration Stage Validation
+            const regStageRes = await client.query(
+                `SELECT id, name, starts_at, ends_at, status 
+                 FROM club_event_stages 
+                 WHERE event_id = $1 AND (type = 'registration' OR action_type = 'registration')
+                 ORDER BY stage_order ASC LIMIT 1;`,
+                [eventId]
+            );
+
+            if (regStageRes.rows.length > 0) {
+                const regStage = regStageRes.rows[0];
+                const now = new Date();
+                const rEnd = new Date(regStage.ends_at);
+                const rStart = new Date(regStage.starts_at);
+
+                if (regStage.status === "completed" || regStage.status === "cancelled" || now > rEnd) {
+                    const formatted = rEnd.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+                    const error: any = new Error(`Registration for this event concluded on ${formatted} IST. Applications are no longer accepted.`);
+                    error.statusCode = 403;
+                    error.code = "REGISTRATION_DEADLINE_PASSED";
+                    throw error;
+                }
+
+                if (now < rStart) {
+                    const formatted = rStart.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+                    const error: any = new Error(`Registration for this event opens on ${formatted} IST.`);
+                    error.statusCode = 403;
+                    error.code = "REGISTRATION_NOT_STARTED";
+                    throw error;
+                }
+            } else if (event.ends_at && new Date() > new Date(event.ends_at)) {
+                const error: any = new Error("The event schedule has concluded. Applications are closed.");
+                error.statusCode = 403;
+                error.code = "EVENT_CONCLUDED";
                 throw error;
             }
 
@@ -2301,8 +2614,9 @@ Organizer Request: ${userPrompt}`;
                     .flatMap((s) => s.questions || [])
                     .find((q) => q.id === att.questionId);
                 const allowedTypes = matchingQ?.validation?.allowedFileTypes;
+                const maxMb = matchingQ?.validation?.maxFileSizeMb;
 
-                const secValidation = validateAttachmentSecurity(att, allowedTypes);
+                const secValidation = validateAttachmentSecurity(att, allowedTypes, maxMb);
                 if (!secValidation.valid) {
                     const error: any = new Error(secValidation.error || `Invalid file attachment "${att.fileName}".`);
                     error.statusCode = 400;
@@ -2334,15 +2648,23 @@ Organizer Request: ${userPrompt}`;
                     const val = answers[question.id];
                     const isProvided = val !== undefined && val !== null && (typeof val === "string" ? val.trim() !== "" : true);
 
-                    if (question.required) {
-                        if (question.type === "file_upload") {
-                            const hasFile = fileAttachments.some((f: any) => f.questionId === question.id);
-                            if (!hasFile) {
-                                const error: any = new Error(`Required file missing: Please upload a file for "${question.title}".`);
-                                error.statusCode = 400;
-                                throw error;
-                            }
-                        } else if (!isProvided) {
+                    if (question.type === "file_upload") {
+                        const matchingFiles = fileAttachments.filter((f: any) => f.questionId === question.id);
+                        const maxFiles = question.validation?.maxFiles ?? 1;
+
+                        if (question.required && matchingFiles.length === 0) {
+                            const error: any = new Error(`Required file missing: Please upload at least one file for "${question.title}".`);
+                            error.statusCode = 400;
+                            throw error;
+                        }
+
+                        if (matchingFiles.length > maxFiles) {
+                            const error: any = new Error(`Too many files: "${question.title}" allows at most ${maxFiles} file(s), but ${matchingFiles.length} were attached.`);
+                            error.statusCode = 400;
+                            throw error;
+                        }
+                    } else if (question.required) {
+                        if (!isProvided) {
                             const error: any = new Error(`Required question unanswered: "${question.title}".`);
                             error.statusCode = 400;
                             throw error;
@@ -2669,17 +2991,20 @@ Organizer Request: ${userPrompt}`;
                         // Track media assets
                         for (const att of fileAttachments) {
                             if (att.filePublicId) {
-                                await this.registerMediaAsset({
-                                    formId,
-                                    eventId,
-                                    uploaderUserId: userId,
-                                    publicId: att.filePublicId,
-                                    secureUrl: att.fileUrl,
-                                    assetPurpose: "student_attachment",
-                                    questionId: att.questionId,
-                                    responseId: updateRes.rows[0].id,
-                                    bytes: att.fileSize,
-                                });
+                                await this.registerMediaAsset(
+                                    {
+                                        formId,
+                                        eventId,
+                                        uploaderUserId: userId,
+                                        publicId: att.filePublicId,
+                                        secureUrl: att.fileUrl,
+                                        assetPurpose: "student_attachment",
+                                        questionId: att.questionId,
+                                        responseId: updateRes.rows[0].id,
+                                        bytes: att.fileSize,
+                                    },
+                                    client
+                                );
                             }
                         }
 
@@ -2888,17 +3213,20 @@ Organizer Request: ${userPrompt}`;
             // Track uploaded attachments in media assets table
             for (const att of fileAttachments) {
                 if (att.filePublicId) {
-                    await this.registerMediaAsset({
-                        formId,
-                        eventId,
-                        uploaderUserId: userId || null,
-                        publicId: att.filePublicId,
-                        secureUrl: att.fileUrl,
-                        assetPurpose: "student_attachment",
-                        questionId: att.questionId,
-                        responseId: newReg.id,
-                        bytes: att.fileSize ?? null,
-                    });
+                    await this.registerMediaAsset(
+                        {
+                            formId,
+                            eventId,
+                            uploaderUserId: userId || null,
+                            publicId: att.filePublicId,
+                            secureUrl: att.fileUrl,
+                            assetPurpose: "student_attachment",
+                            questionId: att.questionId,
+                            responseId: newReg.id,
+                            bytes: att.fileSize ?? null,
+                        },
+                        client
+                    );
                 }
             }
 
@@ -3404,7 +3732,11 @@ Organizer Request: ${userPrompt}`;
         status: string,
         reviewNotes?: string
     ) {
-        const evCheck = await query(`SELECT club_id AS "clubId", title FROM club_events WHERE id = $1;`, [eventId]);
+        const evCheck = await query(
+            `SELECT club_id AS "clubId", title, COALESCE(is_team_event, false) AS "isTeamEvent", COALESCE(min_team_size, 2) AS "minTeamSize" 
+             FROM club_events WHERE id = $1;`,
+            [eventId]
+        );
         if (!evCheck.rows[0]) {
             const error: any = new Error("Event not found.");
             error.statusCode = 404;
@@ -3417,6 +3749,34 @@ Organizer Request: ${userPrompt}`;
             const error: any = new Error(`Invalid status: ${status}. Must be one of ${validStatuses.join(", ")}`);
             error.statusCode = 400;
             throw error;
+        }
+
+        // Strict validation: In team events, registrations cannot be accepted/approved unless team meets minimum size requirement
+        if ((status === "registered" || status === "attended") && evCheck.rows[0].isTeamEvent) {
+            const teamCheck = await query(
+                `SELECT t.id, t.name,
+                        (SELECT COUNT(*)::int FROM club_event_team_members WHERE team_id = t.id) AS "membersCount"
+                 FROM club_event_registrations r
+                 JOIN club_event_teams t ON t.id = r.team_id
+                 WHERE r.id = $1 AND r.event_id = $2;`,
+                [registrationId, eventId]
+            );
+
+            if (!teamCheck.rows[0]) {
+                const error: any = new Error("Cannot approve registration: Applicant has not created or joined a team for this team event.");
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const team = teamCheck.rows[0];
+            const minSize = evCheck.rows[0].minTeamSize || 2;
+            if (team.membersCount < minSize) {
+                const error: any = new Error(
+                    `Cannot accept registration: Team "${team.name}" has only ${team.membersCount} member(s). A minimum of ${minSize} members is strictly required before this application can be accepted.`
+                );
+                error.statusCode = 400;
+                throw error;
+            }
         }
 
         const isAttended = status === "attended";

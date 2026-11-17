@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { ListOrdered } from "lucide-react";
 import { type PracticeAnalyticsData } from "../../../store";
 import { getPortalIcon } from "../../../utils/portalIcons";
@@ -9,7 +10,10 @@ interface RecentlySolvedCardProps {
 }
 
 export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, isLoading }) => {
-    const list = data?.recentlySolved || [];
+    // Strictly filter out any github entries
+    const list = (data?.recentlySolved || []).filter(
+        (item) => item && item.portal && item.portal.toLowerCase() !== "github"
+    );
 
     const handleOpenProblem = (url?: string) => {
         if (url && typeof window !== "undefined") {
@@ -58,27 +62,44 @@ export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, is
                     ) : (
                         <div className="divide-y divide-black/10">
                             {list.slice(0, 8).map((item) => (
-                                <div
+                                <motion.div
                                     key={item.id}
+                                    whileHover={{ x: 3 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                     onClick={() => handleOpenProblem(item.url)}
-                                    className="py-3 px-3 -mx-2 rounded-xl group hover:bg-[#FAF6EE] border-2 border-transparent hover:border-black transition-all cursor-pointer flex items-center justify-between gap-3 hover:shadow-[2px_2px_0px_#000]"
+                                    className="py-2.5 sm:py-3 px-2 sm:px-3 -mx-1 sm:-mx-2 rounded-xl group hover:bg-[#FAF6EE] border-2 border-transparent hover:border-black transition-colors cursor-pointer flex items-center justify-between gap-2.5 sm:gap-3 hover:shadow-[2px_2px_0px_#000]"
                                     title={`View problem on ${item.platformName}`}
                                 >
-                                    {/* Left: Platform Icon + Problem Title */}
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-7 h-7 rounded-lg bg-white border-2 border-black shadow-[1px_1px_0px_#000] p-1 flex items-center justify-center flex-shrink-0">
+                                    {/* Left: Platform Icon + Problem Title (Safely truncated at any width) */}
+                                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white border-2 border-black shadow-[1px_1px_0px_#000] p-1 flex items-center justify-center shrink-0">
                                             {getPortalIcon(item.portal, "w-full h-full object-contain")}
                                         </div>
-                                        <span className="text-sm sm:text-base font-black text-black group-hover:underline transition-colors truncate max-w-[240px] sm:max-w-[420px]">
+                                        <span className="text-xs sm:text-sm md:text-base font-black text-black group-hover:underline transition-colors truncate min-w-0 flex-1">
                                             {item.title}
                                         </span>
                                     </div>
 
-                                    {/* Right: Relative Time */}
-                                    <span className="text-xs sm:text-sm text-black flex-shrink-0 font-bold font-mono bg-[#FAF6EE] border border-black px-2 py-0.5 rounded shadow-[1px_1px_0px_#000]">
-                                        {item.relativeTime}
-                                    </span>
-                                </div>
+                                    {/* Right: Difficulty badge + Relative Time */}
+                                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                        {item.difficulty && (
+                                            <span
+                                                className={`text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000] hidden xs:inline-flex ${
+                                                    item.difficulty === "Easy"
+                                                        ? "bg-[#a2ff86] text-black"
+                                                        : item.difficulty === "Medium"
+                                                        ? "bg-[#FFE566] text-black"
+                                                        : "bg-[#FF6B6B] text-black"
+                                                }`}
+                                            >
+                                                {item.difficulty}
+                                            </span>
+                                        )}
+                                        <span className="text-[10px] sm:text-xs md:text-sm text-black shrink-0 font-bold font-mono bg-[#FAF6EE] border border-black px-1.5 sm:px-2 py-0.5 rounded shadow-[1px_1px_0px_#000]">
+                                            {item.relativeTime}
+                                        </span>
+                                    </div>
+                                </motion.div>
                             ))}
                         </div>
                     )}

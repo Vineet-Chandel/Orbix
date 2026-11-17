@@ -11,7 +11,18 @@ function escapeCsvValue(val: unknown): string {
 
     let str = "";
     if (Array.isArray(val)) {
-        str = val.join(", ");
+        str = val
+            .map((item) => {
+                if (item && typeof item === "object") {
+                    const name = item.name || item.fullName || "";
+                    const user = item.username ? `@${String(item.username).replace(/^@/, "")}` : "";
+                    const email = item.email ? `(${item.email})` : "";
+                    const st = item.status ? `[${item.status}]` : "";
+                    return [name, user, email, st].filter(Boolean).join(" ");
+                }
+                return String(item);
+            })
+            .join(" ; ");
     } else if (typeof val === "object") {
         str = JSON.stringify(val);
     } else {

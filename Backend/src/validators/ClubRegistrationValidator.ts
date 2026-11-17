@@ -1,10 +1,12 @@
 import validator from "../utils/validation.js";
 import { ValidationError } from "./SignupValidator.js";
 import { normalizePhoneNumber } from "../services/sms/smsGatewayService.js";
+import { checkStaticHandleAvailability } from "./usernamePolicy.js";
 
 export const VALID_CLUB_CATEGORIES = [
     "coding",
     "technology",
+    "cloud_devops",
     "ai_ml",
     "robotics",
     "entrepreneurship",
@@ -132,6 +134,11 @@ export default function ClubRegistrationValidator(
         "coding and competitive programming": "coding",
         technology: "technology",
         tech: "technology",
+        cloud_devops: "cloud_devops",
+        "cloud computing & devops": "cloud_devops",
+        "cloud computing": "cloud_devops",
+        cloud: "cloud_devops",
+        devops: "cloud_devops",
         ai_ml: "ai_ml",
         "ai / machine learning": "ai_ml",
         "ai/ml": "ai_ml",
@@ -219,11 +226,18 @@ export default function ClubRegistrationValidator(
     // 5. Account Credentials
     const username = typeof data.username === "string" ? data.username.trim().toLowerCase() : "";
     if (!options?.isExistingUser) {
-        if (!username || !/^[a-z0-9._-]{3,20}$/.test(username)) {
-            throw new ValidationError("Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -");
+        if (!username) {
+            throw new ValidationError("Username is required.");
         }
-    } else if (username && !/^[a-z0-9._-]{3,20}$/.test(username)) {
-        throw new ValidationError("Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -");
+        const usernameCheck = checkStaticHandleAvailability(username, "club");
+        if (!usernameCheck.available) {
+            throw new ValidationError(usernameCheck.reason || "This club username is not permitted.");
+        }
+    } else if (username) {
+        const usernameCheck = checkStaticHandleAvailability(username, "club");
+        if (!usernameCheck.available) {
+            throw new ValidationError(usernameCheck.reason || "This club username is not permitted.");
+        }
     }
 
     const password = typeof data.password === "string" ? data.password : "";

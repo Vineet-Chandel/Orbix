@@ -71,9 +71,17 @@ export const ExplainScoreModal: React.FC<ExplainScoreModalProps> = ({
                         <p className="font-mono text-xs sm:text-sm text-neutral-200 break-words">
                             Resume Score = Σ (Dimension Score × Dimension Weight) / Σ Assessed Dimension Weights
                         </p>
-                        <div className="pt-2 border-t border-neutral-700 text-[11px] font-mono text-neutral-400">
+                        <div className="pt-2 border-t border-neutral-700 text-[11px] font-mono text-neutral-400 break-all">
                             {scoring.formula}
                         </div>
+                        {scoring.totalAssessedWeight < 1.0 && (
+                            <div className="mt-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs leading-relaxed">
+                                <span className="font-bold text-amber-300 uppercase tracking-wider text-[10px] block mb-0.5">
+                                    ★ Dynamic Denominator Normalization Active
+                                </span>
+                                Missing/unassessable dimensions were removed from the denominator ({Math.round(scoring.totalAssessedWeight * 100)}% evaluated). The remaining assessed dimensions scale to 100% so your score is never unfairly penalized for omitted contact channels.
+                            </div>
+                        )}
                     </div>
 
                     {/* 3 Distinct Confidence Indicators */}
@@ -130,13 +138,26 @@ export const ExplainScoreModal: React.FC<ExplainScoreModalProps> = ({
                                             <p className="text-xs text-neutral-600 mt-0.5">{dim.explanation}</p>
                                         </div>
 
-                                        <div className="flex items-center gap-2 self-start sm:self-center">
-                                            <span className="text-xs font-mono font-bold text-neutral-500">
-                                                Contribution: {(dim.score * dim.weight).toFixed(1)} pts
-                                            </span>
-                                            <span className="px-2.5 py-1 text-xs font-black rounded-lg bg-[#FFE566] text-black border border-black">
-                                                {dim.score}/100
-                                            </span>
+                                        <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+                                            {dim.assessed ? (
+                                                <>
+                                                    <span className="text-xs font-mono font-bold text-neutral-500">
+                                                        Contribution: {(dim.score * dim.weight).toFixed(1)} pts
+                                                    </span>
+                                                    <span className="px-2.5 py-1 text-xs font-black rounded-lg bg-[#FFE566] text-black border border-black">
+                                                        {dim.score}/100
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="text-xs font-mono font-bold text-neutral-500">
+                                                        Excluded from Denominator
+                                                    </span>
+                                                    <span className="px-2.5 py-1 text-xs font-black rounded-lg bg-neutral-200 text-neutral-700 border border-neutral-400">
+                                                        Unassessed
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 

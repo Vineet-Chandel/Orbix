@@ -671,6 +671,23 @@ CREATE TABLE IF NOT EXISTS public.club_event_registrations (
     CONSTRAINT unique_event_user_registration UNIQUE (event_id, user_id)
 );
 
+-- Table: club_event_shares
+CREATE TABLE IF NOT EXISTS public.club_event_shares (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_id uuid NOT NULL,
+    user_id uuid,
+    idempotency_key character varying(128) NOT NULL,
+    platform character varying(50) DEFAULT 'web_share'::character varying NOT NULL,
+    share_type character varying(32) DEFAULT 'external'::character varying NOT NULL,
+    recipient_user_id uuid,
+    account_type character varying(32) DEFAULT 'personal'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT club_event_shares_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_event_share_idempotency UNIQUE (event_id, idempotency_key),
+    CONSTRAINT check_club_event_shares_type CHECK (share_type IN ('internal', 'external', 'copy_link')),
+    CONSTRAINT check_club_event_shares_account_type CHECK (account_type IN ('personal', 'club'))
+);
+
 -- Table: club_event_response_drafts
 CREATE TABLE IF NOT EXISTS public.club_event_response_drafts (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -860,6 +877,7 @@ CREATE TABLE IF NOT EXISTS public.club_events (
     is_team_event boolean DEFAULT false NOT NULL,
     min_team_size integer DEFAULT 1 NOT NULL,
     max_team_size integer DEFAULT 4 NOT NULL,
+    sponsors jsonb DEFAULT '[]'::jsonb NOT NULL,
     CONSTRAINT club_events_check CHECK (((ends_at IS NULL) OR (ends_at >= starts_at))),
     CONSTRAINT club_events_location_type_check CHECK (((location_type)::text = ANY ((ARRAY['in_person'::character varying, 'online'::character varying, 'virtual'::character varying, 'hybrid'::character varying])::text[]))),
     CONSTRAINT club_events_scope_check CHECK (((scope)::text = ANY ((ARRAY['CAMPUS'::character varying, 'PAN_INDIA'::character varying])::text[]))),
@@ -1332,14 +1350,20 @@ CREATE TABLE IF NOT EXISTS public.leaderboard_entries (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
     username character varying(100) NOT NULL,
+    display_name character varying(150),
+    avatar_url text,
+    college character varying(255),
+    college_id uuid,
+    is_verified boolean DEFAULT false,
     score integer DEFAULT 0,
     orbix_score integer DEFAULT 0,
+    score_breakdown jsonb DEFAULT '{}'::jsonb,
     total_solved integer DEFAULT 0,
     total_contests integer DEFAULT 0,
+    platform_ratings jsonb DEFAULT '{}'::jsonb,
+    streak integer DEFAULT 0,
     global_rank integer,
-    is_verified boolean DEFAULT false,
     is_public boolean DEFAULT true,
-    college_id uuid,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT leaderboard_entries_pkey PRIMARY KEY (id),
@@ -2323,6 +2347,121 @@ CREATE TABLE IF NOT EXISTS public.workspace_outbox_events (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT workspace_outbox_events_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'published'::character varying, 'failed'::character varying])::text[]))),
     CONSTRAINT workspace_outbox_events_pkey PRIMARY KEY (id)
+);
+
+-- Table: email_outbox_campaigns
+CREATE TABLE IF NOT EXISTS public.email_outbox_campaigns (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_id uuid,
+    club_id uuid,
+    campaign_type character varying(64) NOT NULL,
+    title character varying(255) NOT NULL,
+    status character varying(32) DEFAULT 'PENDING'::character varying NOT NULL,
+    total_recipients integer DEFAULT 0 NOT NULL,
+    processed_recipients integer DEFAULT 0 NOT NULL,
+    successful_recipients integer DEFAULT 0 NOT NULL,
+    failed_recipients integer DEFAULT 0 NOT NULL,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    idempotency_key character varying(255) NOT NULL,
+    error_message text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT email_outbox_campaigns_pkey PRIMARY KEY (id),
+    CONSTRAINT email_outbox_campaigns_idempotency_key_key UNIQUE (idempotency_key),
+    CONSTRAINT email_outbox_campaigns_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROCESSING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+-- Table: email_delivery_jobs
+CREATE TABLE IF NOT EXISTS public.email_delivery_jobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    campaign_id uuid,
+    event_id uuid,
+    user_id uuid,
+    recipient_email character varying(255) NOT NULL,
+    recipient_name character varying(150),
+    subject character varying(255) NOT NULL,
+    html_body text NOT NULL,
+    text_body text,
+    email_type character varying(64) NOT NULL,
+    priority character varying(20) DEFAULT 'NORMAL'::character varying NOT NULL,
+    status character varying(32) DEFAULT 'PENDING'::character varying NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    max_attempts integer DEFAULT 8 NOT NULL,
+    next_attempt_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_attempt_at timestamp with time zone,
+    sent_at timestamp with time zone,
+    failed_at timestamp with time zone,
+    provider character varying(32),
+    provider_message_id character varying(255),
+    idempotency_key character varying(255) NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    error_category character varying(64),
+    last_error text,
+    locked_by character varying(128),
+    locked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT email_delivery_jobs_pkey PRIMARY KEY (id),
+    CONSTRAINT email_delivery_jobs_idempotency_key_key UNIQUE (idempotency_key),
+    CONSTRAINT email_delivery_jobs_priority_check CHECK (((priority)::text = ANY ((ARRAY['HIGH'::character varying, 'NORMAL'::character varying, 'LOW'::character varying])::text[]))),
+    CONSTRAINT email_delivery_jobs_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'QUEUED'::character varying, 'PROCESSING'::character varying, 'RETRY_WAIT'::character varying, 'SENT'::character varying, 'DEAD_LETTER'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+-- Table: email_delivery_attempts
+CREATE TABLE IF NOT EXISTS public.email_delivery_attempts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    job_id uuid NOT NULL,
+    attempt_number integer NOT NULL,
+    worker_id character varying(128),
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    duration_ms integer,
+    status character varying(32) NOT NULL,
+    provider character varying(32),
+    provider_message_id character varying(255),
+    provider_response jsonb,
+    error_category character varying(64),
+    error_code character varying(64),
+    error_message text,
+    next_retry_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT email_delivery_attempts_pkey PRIMARY KEY (id),
+    CONSTRAINT email_delivery_attempts_status_check CHECK (((status)::text = ANY ((ARRAY['SUCCESS'::character varying, 'TRANSIENT_FAILURE'::character varying, 'PERMANENT_FAILURE'::character varying, 'SYSTEMIC_FAILURE'::character varying])::text[])))
+);
+
+-- Table: email_dead_letters
+CREATE TABLE IF NOT EXISTS public.email_dead_letters (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    original_job_id uuid,
+    idempotency_key character varying(255) NOT NULL,
+    campaign_id uuid,
+    event_id uuid,
+    user_id uuid,
+    recipient_email character varying(255) NOT NULL,
+    email_type character varying(64) NOT NULL,
+    subject character varying(255),
+    payload jsonb,
+    failure_stage character varying(64) NOT NULL,
+    failure_category character varying(64) NOT NULL,
+    error_code character varying(64),
+    error_message text,
+    error_stack text,
+    total_attempts integer DEFAULT 0 NOT NULL,
+    first_attempt_at timestamp with time zone,
+    last_attempt_at timestamp with time zone,
+    failed_at timestamp with time zone DEFAULT now() NOT NULL,
+    provider character varying(32),
+    provider_message_id character varying(255),
+    provider_response jsonb,
+    recovered_at timestamp with time zone,
+    recovered_by uuid,
+    discarded boolean DEFAULT false NOT NULL,
+    discarded_at timestamp with time zone,
+    discarded_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT email_dead_letters_pkey PRIMARY KEY (id),
+    CONSTRAINT email_dead_letters_idempotency_key_key UNIQUE (idempotency_key)
 );
 
 -- Table: workspace_permission_overrides

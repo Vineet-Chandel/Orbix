@@ -417,7 +417,7 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
     try {
         let rankRes = await query(
             `SELECT 
-                le.user_id, le.username, le.display_name, le.avatar_url, le.college, le.college_id, le.is_verified,
+                le.user_id, le.username, COALESCE(le.display_name, le.username) AS display_name, COALESCE(le.avatar_url, '') AS avatar_url, le.college, le.college_id, le.is_verified,
                 le.score, le.score_breakdown, le.total_solved, le.total_contests, le.platform_ratings, le.streak,
                 ranked.rank, le.updated_at,
                 i.city as "collegeCity", i.state as "collegeState"
@@ -439,7 +439,7 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
             await syncLeaderboardForUser(username);
             rankRes = await query(
                 `SELECT 
-                    le.user_id, le.username, le.display_name, le.avatar_url, le.college, le.college_id, le.is_verified,
+                    le.user_id, le.username, COALESCE(le.display_name, le.username) AS display_name, COALESCE(le.avatar_url, '') AS avatar_url, le.college, le.college_id, le.is_verified,
                     le.score, le.score_breakdown, le.total_solved, le.total_contests, le.platform_ratings, le.streak,
                     ranked.rank, le.updated_at,
                     i.city as "collegeCity", i.state as "collegeState"
@@ -871,17 +871,46 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
         }
         if (search) {
             countParams.push(`%${search}%`);
-            countWhere += ` AND (username ILIKE $${countParams.length} OR display_name ILIKE $${countParams.length})`;
+            countWhere += ` AND (username ILIKE $${countParams.length} OR COALESCE(display_name, '') ILIKE $${countParams.length})`;
         }
 
         const countRes = await query(`SELECT COUNT(*)::int as total FROM leaderboard_entries ${countWhere};`, countParams);
         const totalCoders = countRes.rows[0]?.total || 0;
         const totalPages = Math.max(1, Math.ceil(totalCoders / limit));
 
+        // If no coders exist in this college yet, return clean empty payload immediately
+        if (totalCoders === 0) {
+            const emptyPayload: CollegeLeaderboardResponse = {
+                success: true,
+                college: {
+                    id: collegeMeta.id,
+                    name: collegeMeta.name,
+                    code: collegeMeta.code,
+                    city: collegeMeta.city,
+                    country: collegeMeta.country,
+                    totalStudents: 0,
+                },
+                metadata: {
+                    title: `${collegeMeta.name} Coding League`,
+                    description: `Internal competitive programming standings for ${collegeMeta.name}.`,
+                    period,
+                    totalCoders: 0,
+                    page: 1,
+                    limit,
+                    totalPages: 1,
+                    lastUpdated: new Date().toISOString(),
+                },
+                podium: [],
+                entries: [],
+                currentUser: null,
+            };
+            return res.status(200).json(emptyPayload);
+        }
+
         // 4. College Podium (Top 3 in this college)
         const podiumQuery = `
             SELECT 
-                user_id, username, display_name, avatar_url, college, college_id, is_verified,
+                user_id, username, COALESCE(display_name, username) AS display_name, COALESCE(avatar_url, '') AS avatar_url, college, college_id, is_verified,
                 score, score_breakdown, total_solved, total_contests, platform_ratings, streak,
                 rank, updated_at
             FROM (
@@ -927,7 +956,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
         }
         if (search) {
             queryParams.push(`%${search}%`);
-            whereClause += ` AND (username ILIKE $${queryParams.length} OR display_name ILIKE $${queryParams.length})`;
+            whereClause += ` AND (username ILIKE $${queryParams.length} OR COALESCE(display_name, '') ILIKE $${queryParams.length})`;
         }
 
         queryParams.push(limit);
@@ -937,7 +966,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
 
         const paginatedQuery = `
             SELECT 
-                user_id, username, display_name, avatar_url, college, college_id, is_verified,
+                user_id, username, COALESCE(display_name, username) AS display_name, COALESCE(avatar_url, '') AS avatar_url, college, college_id, is_verified,
                 score, score_breakdown, total_solved, total_contests, platform_ratings, streak,
                 rank, updated_at
             FROM (
@@ -1015,7 +1044,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
         console.error("Error in GET /api/leaderboard/colleges/:collegeId:", error);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch college leaderboard",
+            message: "College standings are syncing. Please refresh shortly.",
             error: error.message || error,
         });
     }
@@ -1056,7 +1085,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
         }
         if (search) {
             countParams.push(`%${search}%`);
-            countWhere += ` AND (username ILIKE $${countParams.length} OR display_name ILIKE $${countParams.length} OR college ILIKE $${countParams.length})`;
+            countWhere += ` AND (username ILIKE $${countParams.length} OR COALESCE(display_name, '') ILIKE $${countParams.length} OR COALESCE(college, '') ILIKE $${countParams.length})`;
         }
 
         const countQuery = `SELECT COUNT(*)::int as total FROM leaderboard_entries ${countWhere};`;
@@ -1067,10 +1096,34 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
         // 3. Distinct Colleges Represented Count
         const collegesRepresentedCount = await getCollegesRepresentedCount();
 
+        // If no coders exist on the leaderboard yet, return clean empty payload immediately
+        if (totalCoders === 0) {
+            const emptyPayload = {
+                success: true,
+                scope: "global",
+                metadata: {
+                    title: "Global Ranking",
+                    description:
+                        "Ranked by Orbix Score, a unified measure of problem-solving performance, rated contest participation, coding consistency, and supported developer contributions.",
+                    period,
+                    totalCoders: 0,
+                    page: 1,
+                    limit,
+                    totalPages: 1,
+                    collegesRepresentedCount: 0,
+                    lastUpdated: new Date().toISOString(),
+                },
+                podium: [],
+                entries: [],
+                currentUser: null,
+            };
+            return res.status(200).json(emptyPayload);
+        }
+
         // 4. Top-3 Podium Query (Always fetch overall rank 1, 2, 3)
         const podiumQuery = `
             SELECT 
-                le.user_id, le.username, le.display_name, le.avatar_url, le.college, le.college_id, le.is_verified,
+                le.user_id, le.username, COALESCE(le.display_name, le.username) AS display_name, COALESCE(le.avatar_url, '') AS avatar_url, le.college, le.college_id, le.is_verified,
                 le.score, le.score_breakdown, le.total_solved, le.total_contests, le.platform_ratings, le.streak,
                 ranked.rank, le.updated_at,
                 i.city as "collegeCity", i.state as "collegeState"
@@ -1117,7 +1170,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
         }
         if (search) {
             queryParams.push(`%${search}%`);
-            whereClause += ` AND (le.username ILIKE $${queryParams.length} OR le.display_name ILIKE $${queryParams.length} OR le.college ILIKE $${queryParams.length})`;
+            whereClause += ` AND (le.username ILIKE $${queryParams.length} OR COALESCE(le.display_name, '') ILIKE $${queryParams.length} OR COALESCE(le.college, '') ILIKE $${queryParams.length})`;
         }
 
         queryParams.push(limit);
@@ -1127,7 +1180,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
 
         const paginatedQuery = `
             SELECT 
-                le.user_id, le.username, le.display_name, le.avatar_url, le.college, le.college_id, le.is_verified,
+                le.user_id, le.username, COALESCE(le.display_name, le.username) AS display_name, COALESCE(le.avatar_url, '') AS avatar_url, le.college, le.college_id, le.is_verified,
                 le.score, le.score_breakdown, le.total_solved, le.total_contests, le.platform_ratings, le.streak,
                 ranked.rank, le.updated_at,
                 i.city as "collegeCity", i.state as "collegeState"
@@ -1201,7 +1254,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
         console.error("Error in GET /api/leaderboard:", error);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch global coding leaderboard",
+            message: "Leaderboard standings are syncing. Please refresh shortly.",
             error: error.message || error,
         });
     }

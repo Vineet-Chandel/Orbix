@@ -67,6 +67,19 @@ export interface BlockedUserItem {
 
 const API_BASE = "/api";
 
+function getRelationshipHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+    if (typeof window !== "undefined") {
+        const token = localStorage.getItem("orbix_token") || localStorage.getItem("token");
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+        }
+    }
+    return headers;
+}
+
 /**
  * Broadcasts relationship state change across all open views in the browser
  */
@@ -87,19 +100,23 @@ export async function fetchRelationshipStatesBatch(
     userIds: string[]
 ): Promise<Record<string, RelationshipStatePayload>> {
     if (!userIds || userIds.length === 0) return {};
-    const res = await fetch(`${API_BASE}/relationships/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ userIds }),
-    });
+    try {
+        const res = await fetch(`${API_BASE}/relationships/batch`, {
+            method: "POST",
+            headers: getRelationshipHeaders(),
+            credentials: "include",
+            body: JSON.stringify({ userIds }),
+        });
 
-    if (!res.ok) {
-        throw new Error(`Failed to fetch relationships batch (${res.status})`);
+        if (!res.ok) {
+            return {};
+        }
+
+        const data = await res.json();
+        return data.relationships || {};
+    } catch {
+        return {};
     }
-
-    const data = await res.json();
-    return data.relationships || {};
 }
 
 // DataLoader-style in-flight request batcher: collects all single-user requests
@@ -141,9 +158,23 @@ function flushBatch() {
                 listeners.forEach((l) => l.resolve(payload));
             }
         })
-        .catch((err) => {
-            for (const listeners of queue.values()) {
-                listeners.forEach((l) => l.reject(err));
+        .catch(() => {
+            for (const [id, listeners] of queue.entries()) {
+                const payload: RelationshipStatePayload = {
+                    success: true,
+                    state: "none",
+                    relationshipId: null,
+                    requestedBy: null,
+                    targetUserId: id,
+                    canRequest: true,
+                    canAccept: false,
+                    canDecline: false,
+                    canCancel: false,
+                    canRemove: false,
+                    canBlock: true,
+                    canUnblock: false,
+                };
+                listeners.forEach((l) => l.resolve(payload));
             }
         });
 }
@@ -178,7 +209,7 @@ export async function fetchRelationshipState(userId: string): Promise<Relationsh
 export async function sendConnectionRequest(userId: string): Promise<RelationshipMutationResponse> {
     const res = await fetch(`${API_BASE}/relationships/${encodeURIComponent(userId)}/request`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -195,7 +226,7 @@ export async function sendConnectionRequest(userId: string): Promise<Relationshi
 export async function acceptConnectionRequest(userId: string): Promise<RelationshipMutationResponse> {
     const res = await fetch(`${API_BASE}/relationships/${encodeURIComponent(userId)}/accept`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -212,7 +243,7 @@ export async function acceptConnectionRequest(userId: string): Promise<Relations
 export async function declineConnectionRequest(userId: string): Promise<RelationshipMutationResponse> {
     const res = await fetch(`${API_BASE}/relationships/${encodeURIComponent(userId)}/decline`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -229,7 +260,7 @@ export async function declineConnectionRequest(userId: string): Promise<Relation
 export async function cancelConnectionRequest(userId: string): Promise<RelationshipMutationResponse> {
     const res = await fetch(`${API_BASE}/relationships/${encodeURIComponent(userId)}/cancel`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -246,7 +277,7 @@ export async function cancelConnectionRequest(userId: string): Promise<Relations
 export async function removeActiveConnection(userId: string): Promise<RelationshipMutationResponse> {
     const res = await fetch(`${API_BASE}/relationships/${encodeURIComponent(userId)}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -263,7 +294,7 @@ export async function removeActiveConnection(userId: string): Promise<Relationsh
 export async function blockTargetUser(userId: string, reason?: string): Promise<{ success: boolean; message: string; outcome?: string; retryAfter?: number }> {
     const res = await fetch(`${API_BASE}/blocks/${encodeURIComponent(userId)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         body: JSON.stringify({ reason }),
         credentials: "include",
     });
@@ -281,7 +312,7 @@ export async function blockTargetUser(userId: string, reason?: string): Promise<
 export async function unblockTargetUser(userId: string): Promise<{ success: boolean; message: string }> {
     const res = await fetch(`${API_BASE}/blocks/${encodeURIComponent(userId)}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -312,7 +343,7 @@ export async function fetchUserConnectionsList(
 
     const res = await fetch(`${API_BASE}/settings/connections?${params.toString()}`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -341,7 +372,7 @@ export async function fetchBlockedUsersList(
 
     const res = await fetch(`${API_BASE}/settings/blocked?${params.toString()}`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -369,7 +400,7 @@ export async function sendUserDirectNotification(
 }> {
     const res = await fetch(`${API_BASE}/notifications/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         body: JSON.stringify({
             recipientId,
             title,
@@ -420,7 +451,7 @@ export async function fetchPendingRequests(
 
     const res = await fetch(`${API_BASE}/relationships/requests/pending?${params.toString()}`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 
@@ -451,7 +482,7 @@ export async function fetchRelationshipQuota(): Promise<{
 }> {
     const res = await fetch(`${API_BASE}/relationships/quota`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: getRelationshipHeaders(),
         credentials: "include",
     });
 

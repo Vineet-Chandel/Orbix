@@ -31,6 +31,7 @@ export interface NetworkState {
         isLoading: boolean;
         isLoadingMore: boolean;
         error: string | null;
+        availableColleges: string[];
     };
     connections: {
         items: ConnectedUserItem[];
@@ -67,6 +68,7 @@ const initialState: NetworkState = {
         isLoading: false,
         isLoadingMore: false,
         error: null,
+        availableColleges: [],
     },
     connections: {
         items: [],
@@ -125,6 +127,7 @@ export const fetchExploreDevelopersThunk = createAsyncThunk(
                 total: res.total,
                 page: res.page,
                 totalPages: res.totalPages,
+                availableColleges: res.availableColleges || [],
                 isInitial: params.isInitial ?? false,
             };
         } catch (err: any) {
@@ -414,7 +417,12 @@ export const networkSlice = createSlice({
             .addCase(fetchExploreDevelopersThunk.fulfilled, (state, action) => {
                 state.explore.isLoading = false;
                 state.explore.isLoadingMore = false;
-                const { users, total, page, totalPages, isInitial } = action.payload;
+                const { users, total, page, totalPages, isInitial, availableColleges } = action.payload;
+
+                if (availableColleges && availableColleges.length > 0) {
+                    const mergedColleges = new Set([...state.explore.availableColleges, ...availableColleges]);
+                    state.explore.availableColleges = Array.from(mergedColleges).sort((a, b) => a.localeCompare(b));
+                }
 
                 if (isInitial) {
                     state.explore.items = users;

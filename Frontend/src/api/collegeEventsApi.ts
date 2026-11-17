@@ -1,3 +1,5 @@
+import type { EventSponsor } from "../store/clubEventsSlice";
+
 export interface CollegeEventItem {
     id: string;
     clubId: string;
@@ -17,6 +19,7 @@ export interface CollegeEventItem {
     isTeamEvent?: boolean;
     minTeamSize?: number;
     maxTeamSize?: number;
+    sponsors?: EventSponsor[];
     teamId?: string | null;
     teamRole?: "leader" | "member" | null;
     publishedAt: string | null;
@@ -37,6 +40,13 @@ export interface CollegeEventItem {
     ticketCode: string | null;
     registrationsCount: number;
     totalApplicationsCount?: number;
+    registrationStartsAt?: string | null;
+    registrationDeadline?: string | null;
+    isRegistrationClosed?: boolean;
+    isRegistrationUpcoming?: boolean;
+    currentStageName?: string | null;
+    currentStageOrder?: number | null;
+    stagesCount?: number;
 }
 
 export interface CollegeEventsResponse {
@@ -105,6 +115,8 @@ export interface StudentApplicationItem {
     isTeamEvent?: boolean;
     minTeamSize?: number;
     maxTeamSize?: number;
+    registrationDeadline?: string | null;
+    isRegistrationClosed?: boolean;
     teamId?: string | null;
     teamRole?: "leader" | "member" | null;
     teamName?: string | null;
@@ -132,6 +144,25 @@ export interface ClubEventApplicantRow {
     teamRole?: "leader" | "member" | null;
     teamName?: string | null;
     teamCode?: string | null;
+    teamMembersCount?: number;
+    teamPendingCount?: number;
+    teamMembers?: Array<{
+        userId: string;
+        username: string;
+        name: string;
+        email: string;
+        role: "leader" | "member";
+        status: string;
+    }>;
+    teamPendingInvites?: Array<{
+        invitationId: string;
+        userId: string;
+        username: string;
+        name: string;
+        email: string;
+        role: string;
+        status: string;
+    }>;
     status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled";
     registeredAt: string;
     checkedInAt: string | null;
@@ -334,6 +365,28 @@ export async function updateApplicantStatus(
     if (!res.ok || !data.success) {
         throw new Error(data?.message || "Failed to update applicant status.");
     }
+}
+
+/**
+ * Club staff batch updates multiple applicant statuses at once (accept all or reject all)
+ */
+export async function batchUpdateApplicantStatus(
+    eventId: string,
+    registrationIds: string[],
+    status: "registered" | "rejected",
+    reviewNotes?: string
+): Promise<{ count: number; registrations: any[] }> {
+    const res = await fetch(`/api/club/events/${eventId}/applications/batch`, {
+        method: "PATCH",
+        headers: getAuthHeaders(true),
+        credentials: "include",
+        body: JSON.stringify({ registrationIds, status, reviewNotes }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to batch update applicant statuses.");
+    }
+    return { count: data.count || registrationIds.length, registrations: data.registrations || [] };
 }
 
 /**

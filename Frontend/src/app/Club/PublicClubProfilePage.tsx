@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useState, useMemo } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ClubMarkdownRenderer } from "./Profile/ClubMarkdownRenderer";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import {
@@ -11,7 +11,6 @@ import {
     Calendar,
     MapPin,
     ExternalLink,
-    Clock,
     AlertCircle,
     ArrowLeft,
     MessageSquare,
@@ -21,13 +20,15 @@ import {
     Users,
     FileText,
     Radio,
+    Search,
 } from "lucide-react";
 import { OrbixLoader } from "../../components/ui/loader";
 import { getPlatformIcon } from "../../utils/platformLinks";
 import MessageClubModal from "./MessageClubModal";
-import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
+import { isDemoClubSlug, getDemoClubProfileBundle } from "../../data/demoClubProfileData";
+import { ClubEventCard } from "./ClubEventCard";
 
 interface PublicCoordinator {
     id: string;
@@ -90,6 +91,7 @@ interface PublicClub {
         github?: string;
         linkedin?: string;
         instagram?: string;
+        whatsapp?: string;
         x?: string;
         twitter?: string;
         discord?: string;
@@ -106,6 +108,7 @@ interface PublicClub {
     recruitmentStatus: "open" | "closed" | "upcoming";
     recruitmentAnnouncement: string | null;
     recruitmentUrl: string | null;
+    authUserId?: string | null;
     verifiedAt: string;
     createdAt: string;
 }
@@ -126,10 +129,15 @@ interface PublicEvent {
     publishedAt: string | null;
 }
 
-export default function PublicClubProfilePage() {
-    const { slug } = useParams<{ slug: string }>();
+export interface PublicClubProfilePageProps {
+    overrideSlug?: string;
+    isEmbedded?: boolean;
+}
 
-    const toast = useToast();
+export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false }: PublicClubProfilePageProps = {}) {
+    const params = useParams<{ slug: string }>();
+    const slug = overrideSlug || params.slug;
+
     const { user } = useAppSelector((state) => state.user);
 
     const [club, setClub] = useState<PublicClub | null>(null);
@@ -144,11 +152,31 @@ export default function PublicClubProfilePage() {
     const [notFound, setNotFound] = useState(false);
     const [isBlockedByClub, setIsBlockedByClub] = useState(false);
     const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
-    const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState<"about" | "coordinators" | "achievements" | "teams" | "events">("about");
+    const navigate = useNavigate();
+    const [eventFilter, setEventFilter] = useState<"all" | "upcoming" | "past">("all");
+    const [eventSearch, setEventSearch] = useState<string>("");
 
     useEffect(() => {
         if (!slug) return;
+
+        if (isDemoClubSlug(slug)) {
+            const bundle = getDemoClubProfileBundle(slug);
+            setClub(bundle.club);
+            setCoordinators(bundle.coordinators);
+            setAchievements(bundle.achievements);
+            setTeams(bundle.teams);
+            setUpcomingEvents(bundle.upcomingEvents);
+            setPastEvents(bundle.pastEvents);
+            setIsManagerOrMember(false);
+            setLoading(false);
+            setNotFound(false);
+            setIsBlockedByClub(false);
+            if (!isEmbedded) {
+                document.title = `${bundle.club.name} | Verified Collegiate Club on Orbix`;
+            }
+            return;
+        }
 
         const fetchClub = async () => {
             try {
@@ -175,7 +203,9 @@ export default function PublicClubProfilePage() {
                     setIsManagerOrMember(Boolean(data.isManagerOrMember));
 
                     // Dynamic Document Title & SEO meta
-                    document.title = `${data.club.name} | Verified Collegiate Club on Orbix`;
+                    if (!isEmbedded) {
+                        document.title = `${data.club.name} | Verified Collegiate Club on Orbix`;
+                    }
                 } else {
                     setNotFound(true);
                 }
@@ -188,40 +218,73 @@ export default function PublicClubProfilePage() {
         };
 
         fetchClub();
-    }, [slug]);
+    }, [slug, isEmbedded]);
 
-    const handleRegisterEvent = async (eventId: string) => {
-        if (!user) {
-            toast.info("Please sign in to register for club events.");
+    const handleSelectEvent = (eventId: string, eventSlug?: string) => {
+        if (user?.accountType === "club") {
+            if (isManagerOrMember || club?.authUserId === user?.id || (user?.verifiedClub && user.verifiedClub.id === club?.id)) {
+                navigate(`/club/events/${eventId}`);
+                return;
+            }
+            navigate(`/college-events/${eventId}${eventSlug ? `/${eventSlug}` : ""}`);
             return;
         }
 
-        setRegisteringEventId(eventId);
-        try {
-            const res = await fetch(`/api/club/events/${eventId}/register`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-            const data = await res.json().catch(() => null);
-
-            if (!res.ok) {
-                if (res.status === 403) {
-                    toast.error("Access Restricted: You don't have permission to register for events by this club.", {
-                        title: "Registration Denied",
-                    });
-                    return;
-                }
-                throw new Error(data?.message || "Failed to register for event.");
-            }
-
-            toast.success(data?.message || "Successfully registered for this event!", { title: "RSVP Confirmed" });
-        } catch (err: any) {
-            toast.error(err.message || "Failed to complete event RSVP.", { title: "Error" });
-        } finally {
-            setRegisteringEventId(null);
-        }
+        navigate(`/college-events/${eventId}${eventSlug ? `/${eventSlug}` : ""}`);
     };
+
+    const filteredEvents = useMemo(() => {
+        const mapEvent = (e: any, isPast: boolean) => ({
+            id: e.id,
+            clubId: e.clubId || club?.id || "",
+            title: e.title || "Untitled Session",
+            slug: e.slug || "",
+            summary: e.summary || null,
+            description: e.description || null,
+            startsAt: e.startsAt,
+            endsAt: e.endsAt || null,
+            timezone: e.timezone || "Asia/Kolkata",
+            locationType: (e.locationType === "online" ? "virtual" : e.locationType) || "in_person",
+            venueOrLocation: e.venueOrLocation || null,
+            registrationUrl: e.registrationUrl || null,
+            coverImageUrl: e.coverImageUrl || null,
+            status: e.status || (isPast ? "completed" : "published"),
+            scope: e.scope || "CAMPUS",
+            isTeamEvent: Boolean(e.isTeamEvent),
+            minTeamSize: e.minTeamSize || 1,
+            maxTeamSize: e.maxTeamSize || 4,
+            registrationsCount: Number(e.registrationsCount) || 0,
+            attendeesCount: Number(e.attendeesCount) || 0,
+            rejectedCount: Number(e.rejectedCount) || 0,
+            likesCount: Number(e.likesCount) || 0,
+            sharesCount: Number(e.sharesCount) || 0,
+            isOptimistic: false,
+        });
+
+        const upcoming = (upcomingEvents || []).map((e) => mapEvent(e, false));
+        const past = (pastEvents || []).map((e) => mapEvent(e, true));
+
+        let list: any[] = [];
+        if (eventFilter === "upcoming") {
+            list = upcoming;
+        } else if (eventFilter === "past") {
+            list = past;
+        } else {
+            list = [...upcoming, ...past];
+        }
+
+        if (eventSearch.trim()) {
+            const q = eventSearch.toLowerCase().trim();
+            list = list.filter(
+                (e) =>
+                    e.title.toLowerCase().includes(q) ||
+                    (e.summary && e.summary.toLowerCase().includes(q)) ||
+                    (e.venueOrLocation && e.venueOrLocation.toLowerCase().includes(q))
+            );
+        }
+
+        return list;
+    }, [upcomingEvents, pastEvents, eventFilter, eventSearch, club]);
 
     if (loading) {
         return (
@@ -284,51 +347,53 @@ export default function PublicClubProfilePage() {
     const social = club.socialLinks || {};
 
     return (
-        <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black">
+        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen bg-[#FAF6EE]"} bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black`}>
             {/* Top Navigation Bar */}
-            <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                    <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
-                        <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
-                        <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
-                        <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                            Clubs Directory
-                        </span>
-                    </Link>
+            {!isEmbedded && (
+                <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black">
+                    <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+                        <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
+                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                            <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
+                            <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                Clubs Directory
+                            </span>
+                        </Link>
 
-                    <div className="flex items-center gap-2.5">
-                        <button
-                            type="button"
-                            onClick={() => setIsMessageModalOpen(true)}
-                            className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
-                        >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>Message Chapter</span>
-                        </button>
-
-                        {isManagerOrMember && (
-                            <Link
-                                to="/club/profile"
-                                className="px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => setIsMessageModalOpen(true)}
+                                className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
                             >
-                                Edit Profile
-                            </Link>
-                        )}
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>Message Chapter</span>
+                            </button>
+
+                            {isManagerOrMember && (
+                                <Link
+                                    to="/club/profile"
+                                    className="px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    Edit Profile
+                                </Link>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            )}
 
             {/* Main Profile Canvas */}
-            <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+            <main className={`${isEmbedded ? "w-full max-w-none px-2.5 xs:px-3 sm:px-5 lg:px-6 py-3.5 sm:py-5" : "max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8"} space-y-6`}>
                 {/* Header Banner & Hero Card */}
                 <div className="rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] overflow-hidden">
-                    {/* Header Banner Image (100% full view, never cropped) */}
-                    <div className="w-full aspect-[2.4/1] sm:aspect-[2.8/1] max-h-80 bg-neutral-950 border-b-2 border-black relative overflow-hidden flex items-center justify-center">
+                    {/* Header Banner Image (Full-width showcase) */}
+                    <div className="w-full aspect-[2.4/1] sm:aspect-[3.2/1] lg:aspect-[3.8/1] max-h-80 bg-neutral-950 border-b-2 border-black relative overflow-hidden flex items-center justify-center">
                         {club.coverImageUrl ? (
                             <img
                                 src={club.coverImageUrl}
                                 alt={club.name}
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-cover object-center"
                             />
                         ) : (
                             <div className="w-full h-full bg-[#FFE566] bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:16px_16px] flex items-center justify-center">
@@ -339,22 +404,20 @@ export default function PublicClubProfilePage() {
                         )}
 
                         {/* Top Badges */}
-                        <div className="absolute top-4 right-4 flex items-center gap-2">
-                            {club.visibility === "unlisted" && (
-                                <span className="px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
-                                    Unlisted Profile
-                                </span>
-                            )}
-                            {club.visibility === "draft" && (
-                                <span className="px-3 py-1 rounded-full bg-neutral-100 border-2 border-black text-xs font-black text-neutral-800 shadow-[2px_2px_0px_#000]">
-                                    Draft Preview
-                                </span>
-                            )}
-                            <span className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-xs border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
-                                <VerifiedBadge size="sm" />
-                                <span>Verified on Orbix</span>
-                            </span>
-                        </div>
+                        {(club.visibility === "unlisted" || club.visibility === "draft") && (
+                            <div className="absolute top-4 right-4 flex items-center gap-2">
+                                {club.visibility === "unlisted" && (
+                                    <span className="px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                        Unlisted Profile
+                                    </span>
+                                )}
+                                {club.visibility === "draft" && (
+                                    <span className="px-3 py-1 rounded-full bg-neutral-100 border-2 border-black text-xs font-black text-neutral-800 shadow-[2px_2px_0px_#000]">
+                                        Draft Preview
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Profile Information Row */}
@@ -466,7 +529,7 @@ export default function PublicClubProfilePage() {
                                         className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000] transition-colors"
                                     >
                                         {getPlatformIcon(linkItem.platform || linkItem.url, "w-3.5 h-3.5")}
-                                        <span>{linkItem.label || (linkItem.platform === "x" ? "X / Twitter" : linkItem.platform.charAt(0).toUpperCase() + linkItem.platform.slice(1))}</span>
+                                        <span>{linkItem.label || (linkItem.platform === "x" ? "X / Twitter" : linkItem.platform === "whatsapp" ? "WhatsApp Community" : linkItem.platform.charAt(0).toUpperCase() + linkItem.platform.slice(1))}</span>
                                     </a>
                                 ))
                             ) : (
@@ -513,6 +576,17 @@ export default function PublicClubProfilePage() {
                                         >
                                             {getPlatformIcon("instagram", "w-3.5 h-3.5")}
                                             <span>Instagram</span>
+                                        </a>
+                                    )}
+                                    {social.whatsapp && (
+                                        <a
+                                            href={social.whatsapp}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("whatsapp", "w-3.5 h-3.5")}
+                                            <span>WhatsApp</span>
                                         </a>
                                     )}
                                     {(social.x || social.twitter) && (
@@ -899,112 +973,93 @@ export default function PublicClubProfilePage() {
                 {/* TAB 5: EVENTS & SESSIONS */}
                 {activeSection === "events" && (
                     <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-6">
-                        <div className="pb-4 border-b border-black/10">
-                            <h3 className="text-base font-black text-black">Events, Hackathons & Workshops</h3>
-                            <p className="text-xs font-medium text-neutral-600 mt-0.5">
-                                Chapter schedule of upcoming meetups, coding sessions, and archive of past events.
-                            </p>
+                        {/* Header & Search */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/10">
+                            <div>
+                                <h3 className="text-lg font-black text-black">Events, Hackathons & Workshops</h3>
+                                <p className="text-xs font-medium text-neutral-600 mt-0.5">
+                                    Official chapter schedule of upcoming meetups, hackathons, and archive of verified campus sessions.
+                                </p>
+                            </div>
+
+                            {/* Search bar */}
+                            <div className="relative min-w-[240px] sm:w-72">
+                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                                <input
+                                    type="text"
+                                    value={eventSearch}
+                                    onChange={(e) => setEventSearch(e.target.value)}
+                                    placeholder="Search sessions by title, venue..."
+                                    className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-black text-xs font-bold bg-[#FAF6EE] focus:outline-none focus:ring-2 focus:ring-[#a2ff86]"
+                                />
+                            </div>
                         </div>
 
-                        {/* Upcoming Events */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black" />
-                                Upcoming Sessions ({upcomingEvents.length})
-                            </h4>
-
-                            {upcomingEvents.length === 0 ? (
-                                <div className="p-6 rounded-xl bg-[#FAF6EE] border-2 border-dashed border-black/30 text-center text-xs font-bold text-neutral-500">
-                                    No upcoming sessions scheduled at this moment. Stay tuned!
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {upcomingEvents.map((evt) => (
-                                        <div
-                                            key={evt.id}
-                                            className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3 flex flex-col justify-between"
-                                        >
-                                            <div className="space-y-1.5">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span className="px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000]">
-                                                        {evt.locationType}
-                                                    </span>
-                                                    <span className="text-[11px] font-black text-neutral-600 flex items-center gap-1">
-                                                        <Clock className="w-3 h-3" />
-                                                        {new Date(evt.startsAt).toLocaleDateString("en-US", {
-                                                            month: "short",
-                                                            day: "numeric",
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                        })}
-                                                    </span>
-                                                </div>
-                                                <h5 className="text-sm font-black text-black">{evt.title}</h5>
-                                                {evt.summary && (
-                                                    <p className="text-xs font-medium text-neutral-700 leading-relaxed">
-                                                        {evt.summary}
-                                                    </p>
-                                                )}
-                                                {evt.venueOrLocation && (
-                                                    <p className="text-[11px] font-bold text-neutral-500 flex items-center gap-1">
-                                                        <MapPin className="w-3 h-3" />
-                                                        {evt.venueOrLocation}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <div className="pt-2 border-t border-black/10 flex items-center justify-between gap-2">
-                                                <button
-                                                    type="button"
-                                                    disabled={registeringEventId === evt.id}
-                                                    onClick={() => handleRegisterEvent(evt.id)}
-                                                    className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                                >
-                                                    {registeringEventId === evt.id ? "Registering..." : "RSVP / Register"}
-                                                </button>
-                                                {evt.registrationUrl && (
-                                                    <a
-                                                        href={evt.registrationUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs font-black text-blue-600 hover:underline flex items-center gap-1"
-                                                    >
-                                                        <span>Event Details</span>
-                                                        <ExternalLink className="w-3 h-3" />
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                        {/* Filter Tabs */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => setEventFilter("all")}
+                                className={`px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer ${
+                                    eventFilter === "all"
+                                        ? "bg-black text-white"
+                                        : "bg-white text-black hover:bg-neutral-100"
+                                }`}
+                            >
+                                All ({upcomingEvents.length + pastEvents.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setEventFilter("upcoming")}
+                                className={`px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    eventFilter === "upcoming"
+                                        ? "bg-[#a2ff86] text-black"
+                                        : "bg-white text-black hover:bg-neutral-100"
+                                }`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                                <span>Upcoming ({upcomingEvents.length})</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setEventFilter("past")}
+                                className={`px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    eventFilter === "past"
+                                        ? "bg-[#FFDE59] text-black"
+                                        : "bg-white text-black hover:bg-neutral-100"
+                                }`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-amber-600" />
+                                <span>Past Sessions ({pastEvents.length})</span>
+                            </button>
                         </div>
 
-                        {/* Past Events Archive */}
-                        {pastEvents.length > 0 && (
-                            <div className="space-y-3 pt-6 border-t border-black/10">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-neutral-400 border border-black" />
-                                    Past Sessions ({pastEvents.length})
-                                </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                    {pastEvents.map((evt) => (
-                                        <div
-                                            key={evt.id}
-                                            className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black text-neutral-700 space-y-1"
-                                        >
-                                            <span className="text-[10px] font-bold text-neutral-500">
-                                                {new Date(evt.startsAt).toLocaleDateString()}
-                                            </span>
-                                            <h5 className="text-xs font-black text-black">{evt.title}</h5>
-                                            {evt.summary && (
-                                                <p className="text-[11px] font-medium text-neutral-600 line-clamp-2">
-                                                    {evt.summary}
-                                                </p>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
+                        {/* Events Grid */}
+                        {filteredEvents.length === 0 ? (
+                            <div className="p-12 text-center rounded-2xl bg-[#FAF6EE] border-2 border-dashed border-black/30 space-y-3">
+                                <Calendar className="w-10 h-10 text-neutral-400 mx-auto" />
+                                <h4 className="text-base font-black text-black">No sessions found</h4>
+                                <p className="text-xs font-bold text-neutral-500 max-w-sm mx-auto">
+                                    {eventSearch.trim()
+                                        ? `No events matching "${eventSearch}". Try a different search term.`
+                                        : "No sessions scheduled in this category at this moment. Stay tuned!"}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                                {filteredEvents.map((evt) => (
+                                    <ClubEventCard
+                                        key={evt.id}
+                                        event={evt}
+                                        onSelect={(id, eventSlug) => handleSelectEvent(id, eventSlug)}
+                                        actionLabel="Open Event"
+                                        footerSubtitle={
+                                            user?.accountType === "club" && (isManagerOrMember || club?.authUserId === user?.id)
+                                                ? "Manage roster, agenda & analytics"
+                                                : "View schedule, roster & registration"
+                                        }
+                                    />
+                                ))}
                             </div>
                         )}
                     </div>

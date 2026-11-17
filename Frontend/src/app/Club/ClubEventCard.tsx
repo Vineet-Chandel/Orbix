@@ -15,15 +15,22 @@ import { EventActionRow } from "../../components/events/EventActionRow";
 
 export interface ClubEventCardProps {
     event: ClubEvent;
-    onSelect: (eventId: string) => void;
+    onSelect: (eventId: string, slug?: string) => void;
+    actionLabel?: string;
+    footerSubtitle?: string;
 }
 
-export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelect }) => {
+export const ClubEventCard: React.FC<ClubEventCardProps> = ({
+    event: ev,
+    onSelect,
+    actionLabel = "Open Event",
+    footerSubtitle = "Manage roster, agenda & analytics",
+}) => {
     const isPanIndia = ev.scope === "PAN_INDIA";
 
     return (
         <div
-            onClick={() => onSelect(ev.id)}
+            onClick={() => onSelect(ev.id, ev.slug)}
             className="relative overflow-hidden p-5 sm:p-6 rounded-3xl bg-white border-4 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 transition-all cursor-pointer flex flex-col justify-between group"
         >
             {/* Scope Architectural SVG Backdrop (India Map for Pan-India, Architectural Pillars for Campus) */}
@@ -41,30 +48,36 @@ export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelec
 
             <div className="relative z-10 flex flex-col justify-between h-full">
                 <div>
-                    {/* Cover Banner if attached (100% full view, never cropped) */}
-                    {ev.coverImageUrl && (
-                        <div className="w-full aspect-[2.4/1] rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
+                    {/* Cover Banner (100% full view, never cropped) */}
+                    <div className="w-full aspect-[2.4/1] rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
+                        {ev.coverImageUrl ? (
                             <img
                                 src={ev.coverImageUrl}
                                 alt={ev.title}
                                 className="w-full h-full object-contain group-hover:scale-102 transition-transform duration-300"
                             />
-                            {ev.isOptimistic && (
-                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
-                                    Syncing...
+                        ) : (
+                            <div className="w-full h-full bg-[#FAF6EE] flex items-center justify-center p-4 text-center">
+                                <span className="font-black text-neutral-900 text-sm sm:text-base line-clamp-2">
+                                    {ev.title}
                                 </span>
-                            )}
-                            <div className="absolute top-2.5 right-2.5 px-3 py-1 rounded-full bg-white/95 border-2 border-black shadow-[2px_2px_0px_#000] flex items-center backdrop-blur-sm">
-                                <EventActionRow
-                                    eventId={ev.id}
-                                    eventTitle={ev.title}
-                                    initialLikeCount={ev.likesCount}
-                                    initialShareCount={(ev as any).sharesCount}
-                                    size="sm"
-                                />
                             </div>
+                        )}
+                        {ev.isOptimistic && (
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                Syncing...
+                            </span>
+                        )}
+                        <div className="absolute top-2.5 right-2.5 px-3 py-1 rounded-full bg-white/95 border-2 border-black shadow-[2px_2px_0px_#000] flex items-center backdrop-blur-sm">
+                            <EventActionRow
+                                eventId={ev.id}
+                                eventTitle={ev.title}
+                                initialLikeCount={ev.likesCount}
+                                initialShareCount={(ev as any).sharesCount}
+                                size="sm"
+                            />
                         </div>
-                    )}
+                    </div>
 
                     <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -144,6 +157,25 @@ export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelec
                         )}
                     </div>
 
+                    {/* Team Size Widget */}
+                    <div className="mt-3 flex items-center gap-2">
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <div className="w-6 h-6 rounded-lg border border-black bg-[#FAF6EE] flex items-center justify-center shrink-0">
+                                <Users className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                    Team Size:
+                                </span>
+                                <span className="font-black text-black">
+                                    {ev.isTeamEvent
+                                        ? `${ev.minTeamSize || 2} - ${ev.maxTeamSize || 4} Members`
+                                        : "Individual Participation"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Event-wise Key Analytics Metrics */}
                     <div className="mt-3 flex items-center gap-2 text-xs font-bold flex-wrap">
                         <span className="inline-flex items-center gap-1 text-sky-950 bg-sky-50 px-2 py-0.5 rounded-md border border-black/20">
@@ -172,14 +204,14 @@ export const ClubEventCard: React.FC<ClubEventCardProps> = ({ event: ev, onSelec
                     </div>
                 </div>
 
-                {/* Clean Action Footer: clicking navigates to dedicated event console */}
+                {/* Clean Action Footer: clicking navigates to dedicated event console or public event detail */}
                 <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-neutral-500 group-hover:text-black transition-colors">
-                        Manage roster, agenda & analytics
+                        {footerSubtitle}
                     </span>
 
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] group-hover:bg-[#8ee673] group-hover:translate-x-0.5 transition-all shrink-0">
-                        <span>Open Event</span>
+                        <span>{actionLabel}</span>
                         <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
                     </span>
                 </div>

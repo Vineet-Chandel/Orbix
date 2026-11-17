@@ -17,6 +17,8 @@ import {
     ExternalLink,
     Edit3,
     FileText,
+    FileSpreadsheet,
+    FileArchive,
     Sparkles,
     Star,
     Heart,
@@ -31,7 +33,13 @@ import {
     ChevronUp,
     Lightbulb,
     ClipboardList,
+    Users,
 } from "lucide-react";
+import { clubEventTeamApi } from "../../../api/clubEventTeamApi";
+import {
+    TeamRosterConfigurator,
+    type StagedTeammate,
+} from "../../../components/events/TeamRosterConfigurator";
 import type {
     ClubEventFormRecord,
     FormQuestion,
@@ -43,8 +51,10 @@ import { NeoSelect } from "../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
 import {
-    requestAttachmentUploadSignature,
-    uploadFileToCloudinary,
+    uploadStudentAttachment,
+    getAcceptStringForAllowedTypes,
+    getAllowedTypeBadges,
+    validateLocalFile,
     submitEventFormResponse,
     saveStudentDraft,
     clearStudentDraft,
@@ -143,12 +153,33 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const [showAnswersSummary, setShowAnswersSummary] = useState(true);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
+    // Team registration state (when event is team-based)
+    const [teamAction, setTeamAction] = useState<"create" | "join">(() => {
+        return (userResponse?.answers || {})["__teamAction"] || "create";
+    });
+    const [teamName, setTeamName] = useState<string>(() => {
+        return (userResponse?.answers || {})["__teamName"] || "";
+    });
+    const [teamCode, setTeamCode] = useState<string>(() => {
+        return (userResponse?.answers || {})["__teamCode"] || "";
+    });
+    const [stagedTeammates, setStagedTeammates] = useState<StagedTeammate[]>(() => {
+        try {
+            const raw = (userResponse?.answers || {})["__stagedTeammates"];
+            return Array.isArray(raw) ? raw : [];
+        } catch {
+            return [];
+        }
+    });
+
     // Autosave states
     const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "offline">("saved");
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [draftRestoredNotice, setDraftRestoredNotice] = useState<string | null>(null);
     const isInitialMount = useRef(true);
+    const hasRestoredDraftRef = useRef(false);
+    const [dragOverQuestionId, setDragOverQuestionId] = useState<string | null>(null);
 
     // Storage key for local storage persistence
     const storageKey = `orbix_student_draft_${user?.id || "guest"}_${form.eventId}_${form.publishedVersionId || "v1"}`;
@@ -227,14 +258,23 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         }
     }, [user, studentProfile, userResponse, sections]);
 
-    // Restore unfinished draft from Server or Local Storage on initial load
+    // Restore unfinished draft from Server or Local Storage on initial load (runs once per mount)
     useEffect(() => {
+        if (hasRestoredDraftRef.current) return;
+
         if (!userResponse && !submittedRegistration && isAutosaveEnabled) {
+            hasRestoredDraftRef.current = true;
             let restored = false;
 
             // 1. Try server draft first
             if (draftResponse && draftResponse.answers && Object.keys(draftResponse.answers).length > 0) {
                 setAnswers((prev) => ({ ...prev, ...draftResponse.answers }));
+                if (draftResponse.answers["__teamAction"]) setTeamAction(draftResponse.answers["__teamAction"]);
+                if (draftResponse.answers["__teamName"]) setTeamName(draftResponse.answers["__teamName"]);
+                if (draftResponse.answers["__teamCode"]) setTeamCode(draftResponse.answers["__teamCode"]);
+                if (Array.isArray(draftResponse.answers["__stagedTeammates"])) {
+                    setStagedTeammates(draftResponse.answers["__stagedTeammates"]);
+                }
                 if (draftResponse.fileAttachments && Array.isArray(draftResponse.fileAttachments)) {
                     setFileAttachments(draftResponse.fileAttachments);
                 }
@@ -257,6 +297,12 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         const parsed = JSON.parse(localRaw);
                         if (parsed && typeof parsed === "object" && parsed.answers && Object.keys(parsed.answers).length > 0) {
                             setAnswers((prev) => ({ ...prev, ...parsed.answers }));
+                            if (parsed.answers["__teamAction"]) setTeamAction(parsed.answers["__teamAction"]);
+                            if (parsed.answers["__teamName"]) setTeamName(parsed.answers["__teamName"]);
+                            if (parsed.answers["__teamCode"]) setTeamCode(parsed.answers["__teamCode"]);
+                            if (Array.isArray(parsed.answers["__stagedTeammates"])) {
+                                setStagedTeammates(parsed.answers["__stagedTeammates"]);
+                            }
                             if (parsed.fileAttachments && Array.isArray(parsed.fileAttachments)) {
                                 setFileAttachments(parsed.fileAttachments);
                             }
@@ -397,56 +443,87 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         }
     };
 
-    // File Upload Handler
-    const handleFileUpload = async (question: FormQuestion, e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    // File Upload Handler (Supports single and multiple files with format validation and server fallback)
+    const handleFilesUpload = async (question: FormQuestion, files: FileList | File[]) => {
+        if (!files || files.length === 0) return;
 
-        // Max size check
-        const maxMb = question.validation?.maxFileSizeMb ?? 10;
-        if (file.size > maxMb * 1024 * 1024) {
-            toast.error(`File size exceeds limit of ${maxMb} MB.`);
+        const maxFiles = question.validation?.maxFiles ?? 1;
+        const currentFiles = fileAttachments.filter((f) => f.questionId === question.id);
+        const availableSlots = maxFiles - currentFiles.length;
+
+        if (availableSlots <= 0) {
+            toast.error(`Maximum file limit of ${maxFiles} reached for this question.`);
             return;
         }
 
-        try {
-            setUploadProgress((prev) => ({ ...prev, [question.id]: 1 }));
-            const signatureConfig = await requestAttachmentUploadSignature(form.eventId, question.id, file.type);
-            const uploaded = await uploadFileToCloudinary(signatureConfig, file, (percent) => {
-                setUploadProgress((prev) => ({ ...prev, [question.id]: percent }));
-            });
+        const filesToUpload = Array.from(files).slice(0, availableSlots);
+        if (files.length > availableSlots) {
+            toast.info(`Only uploading the first ${availableSlots} file(s) due to the max file limit.`);
+        }
 
-            const newAttachment: FileAttachmentMeta = {
-                questionId: question.id,
-                questionTitle: question.title,
-                fileName: uploaded.fileName,
-                fileUrl: uploaded.secureUrl,
-                filePublicId: uploaded.publicId,
-                fileSize: uploaded.fileSize,
-                mimeType: uploaded.mimeType,
-            };
+        for (const file of filesToUpload) {
+            // Client-side format & size check
+            const localCheck = validateLocalFile(file, question.validation);
+            if (!localCheck.valid) {
+                toast.error(localCheck.error || `Invalid file "${file.name}".`);
+                continue;
+            }
 
-            setFileAttachments((prev) => [
-                ...prev.filter((f) => f.questionId !== question.id),
-                newAttachment,
-            ]);
-            setAnswer(question.id, uploaded.secureUrl);
-            toast.success(`Attached "${file.name}"!`);
-        } catch (err: any) {
-            toast.error(err.message || "File upload failed.");
-        } finally {
-            setUploadProgress((prev) => {
-                const copy = { ...prev };
-                delete copy[question.id];
-                return copy;
-            });
-            e.target.value = "";
+            try {
+                setUploadProgress((prev) => ({ ...prev, [question.id]: 10 }));
+                const uploaded = await uploadStudentAttachment(form.eventId, question.id, file, (percent) => {
+                    setUploadProgress((prev) => ({ ...prev, [question.id]: Math.max(10, percent) }));
+                });
+
+                const newAttachment: FileAttachmentMeta = {
+                    questionId: question.id,
+                    questionTitle: question.title,
+                    fileName: uploaded.fileName,
+                    fileUrl: uploaded.secureUrl,
+                    filePublicId: uploaded.publicId,
+                    fileSize: uploaded.fileSize,
+                    mimeType: uploaded.mimeType,
+                };
+
+                setFileAttachments((prev) => {
+                    if (maxFiles === 1) {
+                        return [...prev.filter((f) => f.questionId !== question.id), newAttachment];
+                    }
+                    return [
+                        ...prev.filter((f) => !(f.questionId === question.id && f.fileName === newAttachment.fileName)),
+                        newAttachment,
+                    ];
+                });
+
+                setAnswer(question.id, uploaded.secureUrl);
+                toast.success(`Attached "${file.name}"!`);
+            } catch (err: any) {
+                console.error("Attachment upload error:", err);
+                toast.error(err.message || `Failed to upload "${file.name}".`);
+            } finally {
+                setUploadProgress((prev) => {
+                    const copy = { ...prev };
+                    delete copy[question.id];
+                    return copy;
+                });
+            }
         }
     };
 
-    const handleRemoveFile = (questionId: string) => {
-        setFileAttachments((prev) => prev.filter((f) => f.questionId !== questionId));
-        setAnswer(questionId, undefined);
+    const handleRemoveSpecificFile = (questionId: string, filePublicIdOrUrl: string) => {
+        setFileAttachments((prev) => {
+            const updated = prev.filter(
+                (f) => !(f.questionId === questionId && (f.filePublicId === filePublicIdOrUrl || f.fileUrl === filePublicIdOrUrl))
+            );
+            const remainingForQ = updated.filter((f) => f.questionId === questionId);
+            if (remainingForQ.length === 0) {
+                setAnswer(questionId, undefined);
+            } else {
+                setAnswer(questionId, remainingForQ[remainingForQ.length - 1].fileUrl);
+            }
+            return updated;
+        });
+        toast.info("Attachment removed.");
     };
 
     // Validate current section before navigating forward or submitting
@@ -650,6 +727,26 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         const studentName = answers["q_student_name"] || effectiveProfile.fullName || "Student";
         const studentEmail = answers["q_student_email"] || effectiveProfile.email || "";
 
+        if (event?.isTeamEvent) {
+            if (teamAction === "create") {
+                if (!teamName.trim() || teamName.trim().length < 2) {
+                    toast.error("Please provide a team name (at least 2 characters).");
+                    return;
+                }
+                const minReq = event.minTeamSize || 2;
+                const totalSquad = 1 + stagedTeammates.length;
+                if (totalSquad < minReq) {
+                    toast.error(`Team requires at least ${minReq} members. Please add ${minReq - totalSquad} more teammate(s) before submitting.`);
+                    return;
+                }
+            } else {
+                if (!teamCode.trim() || teamCode.trim().length < 4) {
+                    toast.error("Please enter the team join code provided by your leader.");
+                    return;
+                }
+            }
+        }
+
         if (isPreview) {
             toast.success("Preview response simulated successfully! (Preview Mode)", {
                 title: "Form Submission Simulation",
@@ -685,12 +782,45 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 institutionName: effectiveProfile.college || undefined,
             });
 
+            // Process team creation or joining if this is a team event
+            let teamCreatedOrJoined: any = null;
+            if (event?.isTeamEvent) {
+                try {
+                    if (teamAction === "create") {
+                        const teamRes = await clubEventTeamApi.createTeam(form.eventId, teamName.trim());
+                        teamCreatedOrJoined = teamRes.team;
+
+                        // Auto-dispatch official team invitations to all staged teammates
+                        if (stagedTeammates.length > 0 && teamRes.team?.id) {
+                            for (const member of stagedTeammates) {
+                                try {
+                                    await clubEventTeamApi.inviteMember(form.eventId, teamRes.team.id, member.username);
+                                } catch (invErr: any) {
+                                    console.warn(`Failed to auto-invite @${member.username}:`, invErr);
+                                }
+                            }
+                        }
+                    } else {
+                        const teamRes = await clubEventTeamApi.joinTeamByCode(form.eventId, teamCode.trim().toUpperCase());
+                        teamCreatedOrJoined = teamRes.team;
+                    }
+                } catch (teamErr: any) {
+                    console.warn("Team creation/joining notice:", teamErr);
+                    toast.warning(teamErr.message || "Team squad was not linked. You can manage your team in the activity view.");
+                }
+            }
+
             const regRecord = {
                 ...res.registration,
                 applicantName: studentName,
                 applicantEmail: studentEmail,
                 answers: res.registration?.answers || answers,
                 fileAttachments: res.registration?.fileAttachments || fileAttachments,
+                teamId: teamCreatedOrJoined?.id || res.registration?.teamId,
+                teamRole: teamAction === "create" ? "leader" : "member",
+                teamName: teamCreatedOrJoined?.name,
+                teamCode: teamCreatedOrJoined?.code,
+                teamMembersCount: teamCreatedOrJoined?.membersCount || 1,
             };
 
             setSubmittedRegistration(regRecord);
@@ -703,7 +833,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 }
             } catch {}
 
-            toast.success(res.message || "Registration submitted successfully!");
+            toast.success(
+                event?.isTeamEvent && teamCreatedOrJoined
+                    ? `Registered in team "${teamCreatedOrJoined.name}" for ${event?.title || form.title}!`
+                    : res.message || "Registration submitted successfully!"
+            );
             if (onSuccess) {
                 onSuccess(regRecord);
             }
@@ -1528,6 +1662,129 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 )}
             </div>
 
+            {/* Team Registration Configuration (when event is team-based) */}
+            {event?.isTeamEvent && !submittedRegistration && !userResponse && (
+                <div
+                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] space-y-3.5"
+                    style={{ backgroundColor: cardSurfaceColor || undefined }}
+                >
+                    <div className="flex items-center justify-between pb-2 border-b-2 border-black/10">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
+                                <Users className="w-4 h-4 text-black" />
+                            </div>
+                            <div>
+                                <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-black">
+                                    Team Registration ({event.minTeamSize || 2} - {event.maxTeamSize || 4} Members)
+                                </h4>
+                                <span className="text-[11px] font-bold text-neutral-500">
+                                    Squad configuration required before registration can be finalized
+                                </span>
+                            </div>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] text-black">
+                            Required
+                        </span>
+                    </div>
+
+                    {/* Team Action Tabs */}
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-[#FAF6EE] rounded-2xl border-2 border-black">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTeamAction("create");
+                                setAnswer("__teamAction", "create");
+                            }}
+                            className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                teamAction === "create"
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black"
+                            }`}
+                        >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Create New Team</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTeamAction("join");
+                                setAnswer("__teamAction", "join");
+                            }}
+                            className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                teamAction === "join"
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black"
+                            }`}
+                        >
+                            <Users className="w-3.5 h-3.5" />
+                            <span>Join with Code</span>
+                        </button>
+                    </div>
+
+                    {teamAction === "create" ? (
+                        <div className="space-y-3 pt-1">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black text-black block">
+                                    Team / Squad Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={teamName}
+                                    onChange={(e) => {
+                                        setTeamName(e.target.value);
+                                        setAnswer("__teamName", e.target.value);
+                                    }}
+                                    placeholder="e.g. Algorithm Aces, Byte Warriors..."
+                                    maxLength={80}
+                                    className="w-full p-2.5 text-xs font-bold bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                                />
+                            </div>
+
+                            {/* Live Team Roster & Teammate Search & Invite */}
+                            <TeamRosterConfigurator
+                                eventId={form.eventId}
+                                teamId="new"
+                                minTeamSize={event?.minTeamSize || 2}
+                                maxTeamSize={event?.maxTeamSize || 5}
+                                currentUser={{
+                                    id: user?.id || "current_user",
+                                    username: user?.username || "leader",
+                                    fullName: effectiveProfile.fullName || user?.username,
+                                    avatarUrl: user?.avatarUrl,
+                                    collegeName: effectiveProfile.college,
+                                }}
+                                stagedMembers={stagedTeammates}
+                                onStagedMembersChange={(members) => {
+                                    setStagedTeammates(members);
+                                    setAnswer("__stagedTeammates", members);
+                                }}
+                            />
+                        </div>
+                    ) : (
+                        <div className="space-y-1.5 pt-1">
+                            <label className="text-xs font-black text-black block">
+                                Team Join Code <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={teamCode}
+                                onChange={(e) => {
+                                    const val = e.target.value.toUpperCase();
+                                    setTeamCode(val);
+                                    setAnswer("__teamCode", val);
+                                }}
+                                placeholder="e.g. ALGO-A1B2C3"
+                                maxLength={20}
+                                className="w-full p-2.5 text-xs font-mono font-black uppercase bg-[#FAF6EE] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-hidden"
+                            />
+                            <p className="text-[10px] font-bold text-neutral-500">
+                                Enter the unique code provided by your team leader to join their squad for this event.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Multi-Section Progress Bar (4.2 Multi-Section Forms) */}
             {totalSections > 1 && form.settings?.showProgressBar && (
                 <div className="space-y-1.5">
@@ -2011,97 +2268,263 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                     );
                                 })()}
 
-                                {/* Input Type: File Upload to Cloudinary */}
-                                {question.type === "file_upload" && (
-                                    <div className="space-y-3">
-                                        {fileAttachments.some((f) => f.questionId === question.id) ? (
-                                            <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-                                                <div className="flex items-center gap-2 truncate">
-                                                    <Paperclip className="w-4 h-4 text-emerald-600 shrink-0" />
-                                                    <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">
-                                                        {fileAttachments.find((f) => f.questionId === question.id)?.fileName}
+                                {/* Input Type: File Upload with Production Security & Multi-file Support */}
+                                {question.type === "file_upload" && (() => {
+                                    const matchingFiles = fileAttachments.filter((f) => f.questionId === question.id);
+                                    const maxFiles = question.validation?.maxFiles ?? 1;
+                                    const maxMb = question.validation?.maxFileSizeMb ?? 10;
+                                    const allowedBadges = getAllowedTypeBadges(question.validation?.allowedFileTypes);
+                                    const acceptString = getAcceptStringForAllowedTypes(question.validation?.allowedFileTypes);
+                                    const isLimitReached = matchingFiles.length >= maxFiles;
+                                    const isUploading = Boolean(uploadProgress[question.id]);
+                                    const isDragActive = dragOverQuestionId === question.id;
+
+                                    return (
+                                        <div className="space-y-3.5">
+                                            {/* File Requirements & Capacity Bar */}
+                                            <div className="p-3 rounded-2xl bg-neutral-100/90 dark:bg-neutral-900/60 border-2 border-black/10 dark:border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <span className="font-black text-neutral-600 dark:text-neutral-400 text-[11px] uppercase tracking-wider">
+                                                        Allowed Formats:
+                                                    </span>
+                                                    {allowedBadges.map((badge) => (
+                                                        <span
+                                                            key={badge.id}
+                                                            className="px-2 py-0.5 rounded-lg font-black text-[10px] tracking-wide uppercase bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-black/20 dark:border-white/20 shadow-[1px_1px_0px_#00000015]"
+                                                            title={badge.label}
+                                                        >
+                                                            {badge.badge}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <div className="flex items-center gap-2 font-bold text-[11px] text-neutral-700 dark:text-neutral-300">
+                                                    <span className="px-2.5 py-1 rounded-xl bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800/60 font-black">
+                                                        Max {maxMb} MB
+                                                    </span>
+                                                    <span className={`px-2.5 py-1 rounded-xl font-black border ${
+                                                        isLimitReached
+                                                            ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
+                                                            : "bg-white text-neutral-800 border-black/20 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700"
+                                                    }`}>
+                                                        {matchingFiles.length} of {maxFiles} file{maxFiles > 1 ? "s" : ""}
                                                     </span>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveFile(question.id)}
-                                                    className="p-1 rounded-lg text-neutral-400 hover:text-rose-600 cursor-pointer transition-colors"
-                                                    title="Remove file"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
                                             </div>
-                                        ) : (
-                                            <>
-                                                {/* 1-Click Verified Resume Quick-Attach */}
-                                                {effectiveProfile.resumeUrl &&
-                                                    question.title.toLowerCase().includes("resume") && (
-                                                        <div className="flex items-center justify-between p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/60 shadow-sm">
-                                                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                                                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center shrink-0">
-                                                                    <FileText className="w-4 h-4" />
-                                                                </div>
-                                                                <div className="min-w-0">
-                                                                    <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-                                                                        <span>Use Verified Orbix Resume</span>
-                                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                                                                            Verified
-                                                                        </span>
-                                                                    </p>
-                                                                    <p className="text-[11px] text-neutral-500 font-normal truncate">
-                                                                        {effectiveProfile.resumeFilename}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const newAttachment: FileAttachmentMeta = {
-                                                                        questionId: question.id,
-                                                                        questionTitle: question.title,
-                                                                        fileName:
-                                                                            effectiveProfile.resumeFilename ||
-                                                                            "Verified_Orbix_Resume.pdf",
-                                                                        fileUrl: effectiveProfile.resumeUrl!,
-                                                                        filePublicId: "verified_profile_resume",
-                                                                        fileSize: 1024 * 1024,
-                                                                        mimeType: "application/pdf",
-                                                                    };
-                                                                    setFileAttachments((prev) => [
-                                                                        ...prev.filter((f) => f.questionId !== question.id),
-                                                                        newAttachment,
-                                                                    ]);
-                                                                    setAnswer(question.id, effectiveProfile.resumeUrl!);
-                                                                    toast.success("Attached verified Orbix resume!");
-                                                                }}
-                                                                className="px-3.5 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs shadow-sm cursor-pointer shrink-0 hover:bg-neutral-800 transition-colors"
-                                                            >
-                                                                Attach
-                                                            </button>
-                                                        </div>
-                                                    )}
 
-                                                <label className="border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-neutral-900 dark:hover:border-neutral-400 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer bg-neutral-50/70 dark:bg-neutral-900/50 hover:bg-neutral-100/70 transition-colors">
-                                                    <UploadCloud className="w-5 h-5 text-neutral-500" />
-                                                    <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                                                        {uploadProgress[question.id]
-                                                            ? `Uploading (${uploadProgress[question.id]}%)...`
-                                                            : "Select or Drop File to Upload"}
-                                                    </span>
-                                                    <span className="text-[10px] text-neutral-400 font-normal">
-                                                        Max {question.validation?.maxFileSizeMb ?? 10} MB
-                                                    </span>
-                                                    <input
-                                                        type="file"
-                                                        onChange={(e) => handleFileUpload(question, e)}
-                                                        disabled={Boolean(uploadProgress[question.id])}
-                                                        className="hidden"
-                                                    />
-                                                </label>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                                            {/* 1-Click Verified Resume Quick-Attach */}
+                                            {effectiveProfile.resumeUrl &&
+                                                question.title.toLowerCase().includes("resume") &&
+                                                !isLimitReached &&
+                                                !matchingFiles.some((f) => f.filePublicId === "verified_profile_resume") && (
+                                                    <div className="flex items-center justify-between p-3.5 rounded-2xl border-2 border-black/15 dark:border-white/10 bg-white dark:bg-neutral-900/60 shadow-[2px_2px_0px_#00000015]">
+                                                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                                            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center shrink-0">
+                                                                <FileText className="w-4 h-4" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-black text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                                                                    <span>Use Verified Orbix Resume</span>
+                                                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300">
+                                                                        Verified
+                                                                    </span>
+                                                                </p>
+                                                                <p className="text-[11px] text-neutral-500 font-normal truncate">
+                                                                    {effectiveProfile.resumeFilename}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newAttachment: FileAttachmentMeta = {
+                                                                    questionId: question.id,
+                                                                    questionTitle: question.title,
+                                                                    fileName: effectiveProfile.resumeFilename || "Verified_Orbix_Resume.pdf",
+                                                                    fileUrl: effectiveProfile.resumeUrl!,
+                                                                    filePublicId: "verified_profile_resume",
+                                                                    fileSize: 1024 * 1024,
+                                                                    mimeType: "application/pdf",
+                                                                };
+                                                                setFileAttachments((prev) => [
+                                                                    ...(maxFiles === 1 ? prev.filter((f) => f.questionId !== question.id) : prev),
+                                                                    newAttachment,
+                                                                ]);
+                                                                setAnswer(question.id, effectiveProfile.resumeUrl!);
+                                                                toast.success("Attached verified Orbix resume!");
+                                                            }}
+                                                            className="px-3.5 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer shrink-0 hover:bg-neutral-800 transition-colors"
+                                                        >
+                                                            Attach
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                            {/* Attached Files Cards List */}
+                                            {matchingFiles.length > 0 && (
+                                                <div className="space-y-2">
+                                                    {matchingFiles.map((file, fIdx) => {
+                                                        const isImage = /\.(png|jpe?g|webp|gif)$/i.test(file.fileName);
+                                                        const isPdf = /\.pdf$/i.test(file.fileName);
+                                                        const isSpreadsheet = /\.(xlsx?|csv)$/i.test(file.fileName);
+                                                        const isZip = /\.(zip|rar|7z|tar|gz)$/i.test(file.fileName);
+                                                        const sizeFormatted = file.fileSize
+                                                            ? file.fileSize > 1024 * 1024
+                                                                ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                                                                : `${Math.round(file.fileSize / 1024)} KB`
+                                                            : "";
+
+                                                        return (
+                                                            <div
+                                                                key={file.filePublicId || `${file.fileName}_${fIdx}`}
+                                                                className="flex items-center justify-between p-3 rounded-2xl border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 shadow-[2px_2px_0px_#10b98120] transition-all"
+                                                            >
+                                                                <div className="flex items-center gap-3 min-w-0 pr-2">
+                                                                    {/* Thumbnail or Icon */}
+                                                                    {isImage ? (
+                                                                        <div className="w-11 h-11 rounded-xl overflow-hidden border border-emerald-500/40 bg-white shrink-0 relative shadow-sm">
+                                                                            <img
+                                                                                src={file.fileUrl}
+                                                                                alt={file.fileName}
+                                                                                className="w-full h-full object-cover"
+                                                                            />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 flex items-center justify-center shrink-0 shadow-sm">
+                                                                            {isPdf ? (
+                                                                                <FileText className="w-5 h-5" />
+                                                                            ) : isSpreadsheet ? (
+                                                                                <FileSpreadsheet className="w-5 h-5" />
+                                                                            ) : isZip ? (
+                                                                                <FileArchive className="w-5 h-5" />
+                                                                            ) : (
+                                                                                <Paperclip className="w-5 h-5" />
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="min-w-0">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-xs font-black text-neutral-900 dark:text-neutral-100 truncate block">
+                                                                                {file.fileName}
+                                                                            </span>
+                                                                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-200 dark:bg-emerald-900 text-emerald-950 dark:text-emerald-100 shrink-0 border border-emerald-300 dark:border-emerald-700">
+                                                                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                                                Uploaded
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 text-[11px] text-neutral-500 mt-0.5">
+                                                                            {sizeFormatted && <span className="font-bold">{sizeFormatted}</span>}
+                                                                            {sizeFormatted && <span>•</span>}
+                                                                            <a
+                                                                                href={file.fileUrl}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-0.5 font-bold"
+                                                                            >
+                                                                                <span>Preview</span>
+                                                                                <ExternalLink className="w-3 h-3" />
+                                                                            </a>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveSpecificFile(question.id, file.filePublicId || file.fileUrl)}
+                                                                    className="p-2 rounded-xl text-neutral-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer transition-colors shrink-0"
+                                                                    title="Remove file"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {/* Drag & Drop Upload Dropzone (Visible if under limit) */}
+                                            {!isLimitReached ? (
+                                                <div
+                                                    onDragOver={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setDragOverQuestionId(question.id);
+                                                    }}
+                                                    onDragLeave={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setDragOverQuestionId(null);
+                                                    }}
+                                                    onDrop={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setDragOverQuestionId(null);
+                                                        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                                            handleFilesUpload(question, e.dataTransfer.files);
+                                                        }
+                                                    }}
+                                                    className={`border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
+                                                        isDragActive
+                                                            ? "border-sky-500 bg-sky-50/80 dark:bg-sky-950/40 shadow-[4px_4px_0px_#0284c7] scale-[1.01]"
+                                                            : "border-black/20 dark:border-white/20 hover:border-black dark:hover:border-white bg-white/60 dark:bg-neutral-900/40 hover:bg-white shadow-[2px_2px_0px_#00000010]"
+                                                    }`}
+                                                >
+                                                    <label className="w-full flex flex-col items-center justify-center cursor-pointer">
+                                                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-1.5 transition-transform ${
+                                                            isDragActive
+                                                                ? "bg-sky-100 text-sky-600 scale-110 shadow-[2px_2px_0px_#0284c7]"
+                                                                : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-black/10"
+                                                        }`}>
+                                                            <UploadCloud className="w-5 h-5 stroke-[2.5]" />
+                                                        </div>
+
+                                                        <span className="text-xs font-black text-neutral-900 dark:text-neutral-100 text-center">
+                                                            {isUploading
+                                                                ? `Uploading (${uploadProgress[question.id]}%)...`
+                                                                : isDragActive
+                                                                ? "Drop File to Upload Now"
+                                                                : matchingFiles.length > 0
+                                                                ? `Add Another File (${matchingFiles.length}/${maxFiles})`
+                                                                : "Select or Drop File to Upload"}
+                                                        </span>
+
+                                                        <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-bold text-center mt-0.5">
+                                                            Allowed: {allowedBadges.map((b) => b.badge).join(", ")} • Max {maxMb} MB per file
+                                                        </span>
+
+                                                        {isUploading && (
+                                                            <div className="w-full max-w-xs mt-3 bg-neutral-200 dark:bg-neutral-700 h-2 rounded-full overflow-hidden border border-black/10">
+                                                                <div
+                                                                    className="bg-sky-500 h-full transition-all duration-200 rounded-full"
+                                                                    style={{ width: `${uploadProgress[question.id]}%` }}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <input
+                                                            type="file"
+                                                            accept={acceptString}
+                                                            multiple={maxFiles > 1}
+                                                            onChange={(e) => {
+                                                                if (e.target.files && e.target.files.length > 0) {
+                                                                    handleFilesUpload(question, e.target.files);
+                                                                    e.target.value = "";
+                                                                }
+                                                            }}
+                                                            disabled={isUploading}
+                                                            className="hidden"
+                                                        />
+                                                    </label>
+                                                </div>
+                                            ) : (
+                                                <div className="p-3 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 text-center text-xs text-amber-900 dark:text-amber-200 font-bold flex items-center justify-center gap-1.5">
+                                                    <Check className="w-4 h-4 text-emerald-600" />
+                                                    <span>Maximum file limit reached ({matchingFiles.length}/{maxFiles}). Remove a file above to upload a replacement.</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Input Type: Grids */}
                                 {(question.type === "multiple_choice_grid" || question.type === "checkbox_grid") && (

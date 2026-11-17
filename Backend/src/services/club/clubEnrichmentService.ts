@@ -1,4 +1,5 @@
 import { query } from "../../database/client.js";
+import { DEFAULT_AVATAR_URL } from "../../constants/avatar.js";
 
 /**
  * Enriches a user object with their verified club or pending club application details.
@@ -51,6 +52,10 @@ export async function enrichUserWithClubData(userObj: any, userId: string) {
             userObj.clubStatus = "approved";
             userObj.clubName = verifiedClub.name;
             userObj.clubId = verifiedClub.id;
+            if (verifiedClub.logo_url) {
+                userObj.avatarUrl = verifiedClub.logo_url;
+                userObj.photoUrl = verifiedClub.logo_url;
+            }
         } else if (application) {
             userObj.verifiedClub = null;
             userObj.clubStatus = application.status;
@@ -69,6 +74,14 @@ export async function enrichUserWithClubData(userObj: any, userId: string) {
             userObj.clubName = null;
             userObj.clubId = null;
             userObj.application = null;
+        }
+
+        if (!userObj.avatarUrl && !userObj.photoUrl) {
+            userObj.avatarUrl = DEFAULT_AVATAR_URL;
+            userObj.photoUrl = DEFAULT_AVATAR_URL;
+        }
+        if (userObj.clubName && !userObj.firstName) {
+            userObj.firstName = userObj.clubName;
         }
     } catch (clubErr) {
         console.warn("Notice: club data enrichment warning:", clubErr);

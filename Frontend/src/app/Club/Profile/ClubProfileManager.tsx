@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
     Save,
-    ChevronDown,
     Check,
     ArrowLeft,
     ArrowRight,
+    Plus,
 } from "lucide-react";
 import type { ClubProfileData, ClubLink, ClubVisibilityTier } from "../../../utils/clubProfileApi";
 import { useAppDispatch, useAppSelector, fetchClubProfile, saveClubProfile } from "../../../store";
@@ -72,68 +72,135 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
     const [validationMissingItems, setValidationMissingItems] = useState<string[]>([]);
-    const [showCompletionDetails, setShowCompletionDetails] = useState(false);
-    const completionRef = useRef<HTMLDivElement>(null);
 
-    // Dismiss completion popover on outside click or Escape
-    useEffect(() => {
-        if (!showCompletionDetails) return;
-        const handleClickOutside = (e: MouseEvent) => {
-            if (completionRef.current && !completionRef.current.contains(e.target as Node)) {
-                setShowCompletionDetails(false);
-            }
-        };
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                setShowCompletionDetails(false);
-            }
-        };
-        window.addEventListener("mousedown", handleClickOutside);
-        window.addEventListener("keydown", handleKeyDown);
-        return () => {
-            window.removeEventListener("mousedown", handleClickOutside);
-            window.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [showCompletionDetails]);
+    // Profile sections breakdown for completeness scoring and direct step-navigation
+    const profileSections = useMemo(() => [
+        {
+            id: "name",
+            label: "Club Identity & Name",
+            description: "Official chapter title (min 2 characters)",
+            stepId: 1,
+            isRequired: true,
+            isCompleted: Boolean(name.trim().length >= 2),
+        },
+        {
+            id: "category",
+            label: "Primary Category",
+            description: "Specialized domain (Coding, Robotics, etc.)",
+            stepId: 1,
+            isRequired: true,
+            isCompleted: Boolean(category.trim()),
+        },
+        {
+            id: "college",
+            label: "College Affiliation",
+            description: "Verified institutional directory link",
+            stepId: 1,
+            isRequired: true,
+            isCompleted: Boolean(club?.collegeName || club?.collegeId),
+        },
+        {
+            id: "status",
+            label: "Operating Status & Era",
+            description: "Active chapter status & founded year",
+            stepId: 1,
+            isRequired: false,
+            isCompleted: Boolean(operatingStatus && foundedYear),
+        },
+        {
+            id: "about",
+            label: "Chapter Story & About",
+            description: "Comprehensive narrative (20+ characters)",
+            stepId: 2,
+            isRequired: true,
+            isCompleted: Boolean(about.trim().length >= 20),
+        },
+        {
+            id: "branding",
+            label: "Logo & Showcase Banner",
+            description: "High-resolution avatar & cover assets",
+            stepId: 2,
+            isRequired: false,
+            isCompleted: Boolean(logoUrl || coverImageUrl),
+        },
+        {
+            id: "coordinators",
+            label: "Student Leads & Roster",
+            description: "Appointed student coordinators & leads",
+            stepId: 3,
+            isRequired: false,
+            isCompleted: Boolean(coordinators && coordinators.length > 0),
+        },
+        {
+            id: "contact",
+            label: "Contact & Social Channels",
+            description: "Public contact email & verified handles",
+            stepId: 4,
+            isRequired: false,
+            isCompleted: Boolean(publicEmail || (links && links.length > 0)),
+        },
+        {
+            id: "publishing",
+            label: "Recruitment & Publishing",
+            description: "Auditions drive & public showcase tier",
+            stepId: 5,
+            isRequired: false,
+            isCompleted: Boolean(recruitmentStatus && (visibility === "public" || visibility === "unlisted")),
+        },
+    ], [
+        name,
+        category,
+        club?.collegeName,
+        club?.collegeId,
+        operatingStatus,
+        foundedYear,
+        about,
+        logoUrl,
+        coverImageUrl,
+        coordinators,
+        publicEmail,
+        links,
+        recruitmentStatus,
+        visibility,
+    ]);
 
-    // Dynamic completion tier theme with interactive border and vibrant neo-brutalist styling
-    const completionTheme = useMemo(() => {
-        const pct = completion.percentage || 0;
-        if (pct >= 100) {
+    const completedCount = useMemo(() => {
+        return profileSections.filter((s) => s.isCompleted).length;
+    }, [profileSections]);
+
+    const displayPercentage = useMemo(() => {
+        const calculated = Math.round((completedCount / profileSections.length) * 100);
+        return Math.max(completion?.percentage || 0, calculated);
+    }, [completedCount, profileSections.length, completion?.percentage]);
+
+    const completionBadge = useMemo(() => {
+        if (displayPercentage >= 100) {
             return {
-                borderClass: "border-emerald-500 hover:border-black",
-                shadowClass: "shadow-[3px_3px_0px_#10b981] hover:shadow-[4px_4px_0px_#059669]",
-                badgeBg: "bg-[#a2ff86] text-black border-2 border-black",
-                accentText: "text-emerald-700",
-                label: "Complete",
+                label: "Fully Complete",
+                bg: "bg-[#a2ff86]",
+                text: "text-black",
             };
         }
-        if (pct >= 70) {
+        if (displayPercentage >= 70) {
             return {
-                borderClass: "border-sky-500 hover:border-black",
-                shadowClass: "shadow-[3px_3px_0px_#0284c7] hover:shadow-[4px_4px_0px_#0369a1]",
-                badgeBg: "bg-sky-100 text-sky-950 border-2 border-sky-400",
-                accentText: "text-sky-700",
-                label: "Almost Done",
+                label: "Almost Ready",
+                bg: "bg-[#FFE566]",
+                text: "text-black",
             };
         }
-        if (pct >= 40) {
+        if (displayPercentage >= 40) {
             return {
-                borderClass: "border-amber-500 hover:border-black",
-                shadowClass: "shadow-[3px_3px_0px_#f59e0b] hover:shadow-[4px_4px_0px_#d97706]",
-                badgeBg: "bg-amber-100 text-amber-950 border-2 border-amber-400",
-                accentText: "text-amber-700",
                 label: "In Progress",
+                bg: "bg-[#FFE566]",
+                text: "text-black",
             };
         }
         return {
-            borderClass: "border-rose-500 hover:border-black",
-            shadowClass: "shadow-[3px_3px_0px_#f43f5e] hover:shadow-[4px_4px_0px_#e11d48]",
-            badgeBg: "bg-rose-100 text-rose-950 border-2 border-rose-400",
-            accentText: "text-rose-700",
             label: "Getting Started",
+            bg: "bg-neutral-100",
+            text: "text-neutral-700",
         };
-    }, [completion.percentage]);
+    }, [displayPercentage]);
 
     // Snapshot for dirty-state tracking
     const initialSnapshotRef = useRef<string>("");
@@ -434,111 +501,110 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
     return (
         <div className="space-y-6 pb-28">
-            {/* Top Bar: Title & Lightweight Profile Completion Indicator */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-5">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#FFE566] border border-black text-[10px] font-black uppercase text-black">
-                            Profile Management
+            {/* Main Profile Completeness Block (Replaces redundant second heading & enhances completion experience) */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
+                {/* Header & Percentage */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                                Profile Completeness
+                            </h2>
+                            <span className={`px-2.5 py-0.5 rounded-full border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000] ${completionBadge.bg} ${completionBadge.text}`}>
+                                {completionBadge.label}
+                            </span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-neutral-600 font-medium mt-1">
+                            Complete your chapter attributes to maximize student trust, event reach, and official institutional verification.
+                        </p>
+                    </div>
+
+                    <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-0.5 shrink-0">
+                        <span className="text-2xl sm:text-3xl font-black font-mono text-black">
+                            {displayPercentage}%
+                        </span>
+                        <span className="text-xs font-bold text-neutral-500 font-mono">
+                            ({completedCount}/{profileSections.length} sections)
                         </span>
                     </div>
-                    <h1 className="text-xl sm:text-2xl font-black text-black tracking-tight mt-1">
-                        Manage Club Profile
-                    </h1>
-                    <p className="text-xs text-neutral-600 font-medium mt-0.5">
-                        Create a credible, professional chapter profile in 5 streamlined steps.
-                    </p>
                 </div>
 
-                {/* Completion Action */}
-                <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
-                    {/* Completion Pill with Popover */}
-                    <div className="relative" ref={completionRef}>
-                        <button
-                            type="button"
-                            onClick={() => setShowCompletionDetails(!showCompletionDetails)}
-                            className={`px-3.5 py-2 rounded-2xl bg-white border-2 ${completionTheme.borderClass} ${completionTheme.shadowClass} flex items-center gap-3 transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:translate-x-0 select-none group`}
-                            title="View profile completion breakdown"
-                            aria-expanded={showCompletionDetails}
+                {/* Sleek Progress Bar (Using the specified green #a2ff86) */}
+                <div className="w-full h-3.5 bg-neutral-100 rounded-full border-2 border-black overflow-hidden relative shadow-[inset_1px_1px_2px_rgba(0,0,0,0.08)]">
+                    <div
+                        className="h-full bg-[#a2ff86] border-r-2 border-black transition-all duration-500 rounded-full"
+                        style={{ width: `${Math.max(displayPercentage, 2)}%` }}
+                    />
+                </div>
+
+                {/* Section Checklist Grid (Inspired by UI with Orbix Neo-Brutalist Theme) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    {profileSections.map((section) => (
+                        <div
+                            key={section.id}
+                            className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-between gap-3 ${
+                                section.isCompleted
+                                    ? "bg-[#fafdf8] border-black shadow-[2px_2px_0px_#000]"
+                                    : "bg-white border-neutral-300 hover:border-black hover:shadow-[2px_2px_0px_#000]"
+                            }`}
                         >
-                            <div className={`px-2.5 py-1 rounded-xl ${completionTheme.badgeBg} flex items-center justify-center text-sm sm:text-base font-black font-mono shadow-[1.5px_1.5px_0px_#000]`}>
-                                {completion.percentage}%
-                            </div>
-                            <div className="flex flex-col text-left">
-                                <span className="text-xs font-black text-black group-hover:text-neutral-800 transition-colors leading-tight">
-                                    Profile Completion
-                                </span>
-                                <span className={`text-[10px] font-bold ${completionTheme.accentText} leading-tight`}>
-                                    {completionTheme.label}
-                                </span>
-                            </div>
-                            <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform duration-200 ${showCompletionDetails ? "rotate-180" : ""}`} />
-                        </button>
-
-                        {/* Completion Details Popover */}
-                        {showCompletionDetails && (
-                            <div className="absolute right-0 top-14 z-40 w-80 p-4 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-3 animate-in fade-in zoom-in-95 duration-100">
-                                <div className="flex items-center justify-between border-b border-black/10 pb-2">
-                                    <h4 className="text-xs font-black text-black uppercase tracking-wider">
-                                        Completion Score
-                                    </h4>
-                                    <span className="text-xs font-mono font-black text-black">
-                                        {completion.percentage}%
-                                    </span>
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                    className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border-2 ${
+                                        section.isCompleted
+                                            ? "bg-[#a2ff86] border-black shadow-[1px_1px_0px_#000]"
+                                            : "bg-neutral-100 border-neutral-400"
+                                    }`}
+                                >
+                                    {section.isCompleted ? (
+                                        <Check className="w-4 h-4 text-black stroke-[3]" />
+                                    ) : (
+                                        <div className="w-2 h-2 rounded-full bg-neutral-400" />
+                                    )}
                                 </div>
-
-                                <div className="space-y-2 text-xs">
-                                    <div>
-                                        <span className="text-[10px] font-black uppercase text-neutral-500 block mb-1">
-                                            Essential for Publishing:
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs sm:text-sm font-black text-black leading-tight truncate">
+                                            {section.label}
                                         </span>
-                                        <div className="space-y-1">
-                                            {[
-                                                { label: "Official Club Name", done: Boolean(name.trim().length >= 2) },
-                                                { label: "Primary Category", done: Boolean(category.trim()) },
-                                                { label: "About the Club (20+ chars)", done: Boolean(about.trim().length >= 20) },
-                                                { label: "Verified Institution Record", done: Boolean(club?.collegeName || club?.collegeId) },
-                                            ].map((item, i) => (
-                                                <div key={i} className="flex items-center justify-between text-[11px]">
-                                                    <span className={item.done ? "text-neutral-800 font-medium" : "text-neutral-500 font-bold"}>
-                                                        {item.label}
-                                                    </span>
-                                                    {item.done ? (
-                                                        <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-                                                    ) : (
-                                                        <span className="text-[10px] font-black text-rose-500">Required</span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
+                                        {section.isRequired && !section.isCompleted && (
+                                            <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-rose-100 text-rose-600 border border-rose-300">
+                                                Required
+                                            </span>
+                                        )}
                                     </div>
-
-                                    <div className="pt-2 border-t border-black/10">
-                                        <span className="text-[10px] font-black uppercase text-neutral-500 block mb-1">
-                                            Recommended:
-                                        </span>
-                                        <div className="space-y-1">
-                                            {[
-                                                { label: "Club Logo", done: Boolean(logoUrl) },
-                                                { label: "Header Banner", done: Boolean(coverImageUrl) },
-                                                { label: "Coordinators Added", done: coordinators.length > 0 },
-                                                { label: "Contact / Links Added", done: Boolean(publicEmail || links.length > 0) },
-                                            ].map((item, i) => (
-                                                <div key={i} className="flex items-center justify-between text-[11px]">
-                                                    <span className="text-neutral-600">{item.label}</span>
-                                                    {item.done ? (
-                                                        <Check className="w-3 h-3 text-emerald-600" />
-                                                    ) : (
-                                                        <span className="text-[10px] text-neutral-400">Optional</span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    <p className="text-[11px] text-neutral-500 font-medium truncate mt-0.5">
+                                        {section.description}
+                                    </p>
                                 </div>
                             </div>
-                        )}
-                    </div>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCurrentStep(section.stepId);
+                                    const el = document.getElementById("club-step-content");
+                                    if (el) {
+                                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    }
+                                }}
+                                className={`px-3 py-1.5 rounded-lg border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] shrink-0 flex items-center gap-1 ${
+                                    section.isCompleted
+                                        ? "bg-white text-neutral-800 hover:bg-neutral-100"
+                                        : "bg-[#FFE566] text-black hover:bg-[#ffd83b]"
+                                }`}
+                            >
+                                {section.isCompleted ? (
+                                    <span>Edit</span>
+                                ) : (
+                                    <>
+                                        <span>Add</span>
+                                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -616,7 +682,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             </div>
 
             {/* Active Step Canvas Surface */}
-            <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
+            <div id="club-step-content" className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] scroll-mt-6">
                 {currentStep === 1 && (
                     <StepIdentity
                         name={name}

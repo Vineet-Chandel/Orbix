@@ -12,6 +12,7 @@ import ClubRegistrationValidator, {
     type ValidatedClubRegistrationData,
 } from "../../validators/ClubRegistrationValidator.js";
 import { ValidationError } from "../../validators/SignupValidator.js";
+import { checkHandleAvailabilityAcrossPlatform, isDemoProfileHandle, isDemoClubHandle, isSystemReservedHandle } from "../../validators/usernamePolicy.js";
 import { EmailVerificationService } from "../../services/email/emailVerificationService.js";
 import { PhoneVerificationService } from "../../services/sms/phoneVerificationService.js";
 import { normalizePhoneNumber } from "../../services/sms/smsGatewayService.js";
@@ -357,21 +358,13 @@ clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request,
         }
 
         if (username) {
-            if (!/^[a-z0-9._-]{3,20}$/.test(username)) {
+            const availability = await checkHandleAvailabilityAcrossPlatform(username, { entityType: "club" });
+            if (!availability.available) {
                 return res.json({
                     success: true,
                     available: false,
                     field: "username",
-                    message: "Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -."
-                });
-            }
-            const userRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`, [username]);
-            if (userRes.rows[0]) {
-                return res.json({
-                    success: true,
-                    available: false,
-                    field: "username",
-                    message: "This club username is already taken. Please choose another."
+                    message: availability.reason || "This club username is not available. Please choose another."
                 });
             }
             return res.json({
@@ -754,15 +747,12 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
         const authoritativeCollegeCountry = "India";
         const authoritativeCollegeWebsite = verifiedInst.website || validated.collegeWebsiteUrl || null;
 
-        // 2. Enforce username availability across the platform
-        const userByUsername = await query(
-            `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
-            [validated.username]
-        );
-        if (userByUsername.rows[0]) {
+        // 2. Enforce username & slug availability across the platform (demo profiles, demo clubs, reserved namespaces, and collisions)
+        const handleAvailability = await checkHandleAvailabilityAcrossPlatform(validated.username, { entityType: "club" });
+        if (!handleAvailability.available) {
             return res.status(409).json({
                 success: false,
-                message: "This club username is already taken. Please choose another username.",
+                message: handleAvailability.reason || "This club username is already taken. Please choose another username.",
             });
         }
 
@@ -1234,8 +1224,7 @@ clubRouter.get("/application-status", authenticate, requireClubAccount, async (r
                 college_id,
                 is_email_verified,
                 is_phone_verified,
-                phone_verified_at,
-                applicant_user_id
+                phone_verified_at
             FROM club_verification_requests
             WHERE auth_user_id = $1
             ORDER BY submitted_at DESC
@@ -1707,8 +1696,19 @@ const handlePromoteClub = async (req: Request, res: Response) => {
         let candidateSlug = baseSlug;
         let counter = 1;
         while (true) {
+            // Guard against demo profiles, demo clubs, and system reserved route collision
+            if (
+                isDemoProfileHandle(candidateSlug) ||
+                isDemoClubHandle(candidateSlug) ||
+                isSystemReservedHandle(candidateSlug)
+            ) {
+                counter++;
+                candidateSlug = `${baseSlug}-${counter}`;
+                continue;
+            }
+
             const slugCheck = await client.query(
-                `SELECT id FROM verified_clubs WHERE slug = $1 LIMIT 1;`,
+                `SELECT id FROM verified_clubs WHERE LOWER(slug) = LOWER($1) LIMIT 1;`,
                 [candidateSlug]
             );
             if (!slugCheck.rows[0]) break;
@@ -1943,6 +1943,7 @@ clubRouter.get("/events", authenticate, requireClubAccount, async (req: Request,
                 e.venue_or_location AS "venueOrLocation",
                 e.registration_url AS "registrationUrl",
                 e.cover_image_url AS "coverImageUrl",
+                COALESCE(e.sponsors, '[]'::jsonb) AS "sponsors",
                 e.status,
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
@@ -2063,6 +2064,7 @@ clubRouter.get("/events/:eventId", authenticate, requireClubAccount, async (req:
                 e.venue_or_location AS "venueOrLocation",
                 e.registration_url AS "registrationUrl",
                 e.cover_image_url AS "coverImageUrl",
+                COALESCE(e.sponsors, '[]'::jsonb) AS "sponsors",
                 e.status,
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
@@ -2129,6 +2131,7 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
             isTeamEvent = false,
             minTeamSize = 1,
             maxTeamSize = 4,
+            sponsors = [],
             initialFormStructure,
             initialFormSettings,
             initialFormTheme,
@@ -2177,6 +2180,70 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
             return res.status(400).json({ success: false, message: "endsAt cannot be earlier than startsAt." });
         }
 
+        const { initialStages } = req.body;
+        if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
+            const eventStartMs = new Date(startsAt).getTime();
+            const eventEndMs = endsAt ? new Date(endsAt).getTime() : NaN;
+
+            for (const stage of initialStages) {
+                let sStartMs = stage.startsAt ? new Date(stage.startsAt).getTime() : NaN;
+                let sEndMs = stage.endsAt ? new Date(stage.endsAt).getTime() : NaN;
+                const stageName = stage.name || stage.stageName || "Round";
+
+                // Sub-minute boundary drift tolerance: auto-clamp if within 60s
+                if (!isNaN(sStartMs) && !isNaN(eventStartMs) && sStartMs < eventStartMs) {
+                    if (eventStartMs - sStartMs <= 60000) {
+                        sStartMs = eventStartMs;
+                        stage.startsAt = new Date(eventStartMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" cannot start before event start time.`,
+                        });
+                    }
+                }
+                if (!isNaN(sStartMs) && !isNaN(eventEndMs) && sStartMs > eventEndMs) {
+                    if (sStartMs - eventEndMs <= 60000) {
+                        sStartMs = eventEndMs;
+                        stage.startsAt = new Date(eventEndMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" cannot start after event end time.`,
+                        });
+                    }
+                }
+                if (!isNaN(sStartMs) && !isNaN(sEndMs) && sEndMs < sStartMs) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Round "${stageName}" submission deadline must be on or after round start time.`,
+                    });
+                }
+                if (!isNaN(sEndMs) && !isNaN(eventEndMs) && sEndMs > eventEndMs) {
+                    if (sEndMs - eventEndMs <= 60000) {
+                        sEndMs = eventEndMs;
+                        stage.endsAt = new Date(eventEndMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" submission deadline cannot be after event end time.`,
+                        });
+                    }
+                }
+                if (!isNaN(sEndMs) && !isNaN(eventStartMs) && sEndMs < eventStartMs) {
+                    if (eventStartMs - sEndMs <= 60000) {
+                        sEndMs = eventStartMs;
+                        stage.endsAt = new Date(eventStartMs).toISOString();
+                    } else {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Round "${stageName}" submission deadline cannot be before event start time.`,
+                        });
+                    }
+                }
+            }
+        }
+
         let baseSlug = generateSlug(title);
         if (!baseSlug) baseSlug = "event";
         let candidateSlug = baseSlug;
@@ -2217,9 +2284,10 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                 is_team_event,
                 min_team_size,
                 max_team_size,
+                sponsors,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, NOW(), NOW())
             RETURNING
                 id,
                 club_id AS "clubId",
@@ -2238,6 +2306,7 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                 venue_or_location AS "venueOrLocation",
                 registration_url AS "registrationUrl",
                 cover_image_url AS "coverImageUrl",
+                COALESCE(sponsors, '[]'::jsonb) AS "sponsors",
                 status,
                 published_at AS "publishedAt",
                 created_at AS "createdAt";`,
@@ -2260,6 +2329,7 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
                 Boolean(isTeamEvent),
                 Math.max(1, parseInt(String(minTeamSize), 10) || 1),
                 Math.max(1, parseInt(String(maxTeamSize), 10) || 4),
+                Array.isArray(sponsors) ? JSON.stringify(sponsors) : JSON.stringify([]),
             ]
         );
 
@@ -2286,7 +2356,6 @@ clubRouter.post("/events", authenticate, requireClubAccount, async (req: Request
         }
 
         // Save initial timeline stages configured during 5-step event creation wizard
-        const { initialStages } = req.body;
         if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
             try {
                 await EventStageService.syncEventStages(newEvent.id, clubId, initialStages);
@@ -2369,6 +2438,7 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
             isTeamEvent,
             minTeamSize,
             maxTeamSize,
+            sponsors,
         } = req.body;
 
         const current = existingEvent.rows[0];
@@ -2494,8 +2564,9 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                 is_team_event = COALESCE($14, is_team_event),
                 min_team_size = COALESCE($15, min_team_size),
                 max_team_size = COALESCE($16, max_team_size),
+                sponsors = COALESCE($17::jsonb, sponsors),
                 updated_at = NOW()
-             WHERE id = $17 AND club_id = $18
+             WHERE id = $18 AND club_id = $19
              RETURNING id;`,
             [
                 title ? title.trim() : null,
@@ -2514,6 +2585,7 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                 isTeamEvent !== undefined ? Boolean(isTeamEvent) : null,
                 minTeamSize !== undefined ? Math.max(1, parseInt(String(minTeamSize), 10) || 1) : null,
                 maxTeamSize !== undefined ? Math.max(1, parseInt(String(maxTeamSize), 10) || 4) : null,
+                sponsors !== undefined && Array.isArray(sponsors) ? JSON.stringify(sponsors) : null,
                 eventId,
                 clubId,
             ]
@@ -2538,6 +2610,7 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
                 e.venue_or_location AS "venueOrLocation",
                 e.registration_url AS "registrationUrl",
                 e.cover_image_url AS "coverImageUrl",
+                COALESCE(e.sponsors, '[]'::jsonb) AS "sponsors",
                 e.status,
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
@@ -2691,8 +2764,9 @@ clubRouter.patch("/events/:eventId", authenticate, requireClubAccount, async (re
         if (initialStages && Array.isArray(initialStages) && initialStages.length > 0) {
             try {
                 await EventStageService.syncEventStages(String(eventId), clubId, initialStages);
-            } catch (stageErr) {
+            } catch (stageErr: any) {
                 console.error("[PATCH /events/:eventId] Error syncing stages:", stageErr);
+                return res.status(400).json({ success: false, message: stageErr?.message || "Invalid stage timing." });
             }
         }
 
@@ -3149,6 +3223,7 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
                 e.venue_or_location AS "venueOrLocation",
                 e.registration_url AS "registrationUrl",
                 e.cover_image_url AS "coverImageUrl",
+                COALESCE(e.sponsors, '[]'::jsonb) AS "sponsors",
                 e.status,
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
@@ -3167,7 +3242,22 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
                 CASE WHEN $1::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
                 CASE WHEN $1::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
-                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount"
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount",
+                (SELECT s.starts_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationStartsAt",
+                (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
+                COALESCE(
+                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN (e.ends_at IS NOT NULL AND NOW() > e.ends_at) OR e.status = 'completed' THEN true ELSE false END
+                ) AS "isRegistrationClosed",
+                COALESCE(
+                    (SELECT CASE WHEN NOW() < s.starts_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN NOW() < e.starts_at THEN true ELSE false END
+                ) AS "isRegistrationUpcoming",
+                (SELECT s.name FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageName",
+                (SELECT s.stage_order FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageOrder",
+                (SELECT COUNT(*)::int FROM club_event_stages s WHERE s.event_id = e.id) AS "stagesCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
             WHERE e.status IN ('published', 'completed') AND vc.is_active = true
@@ -3194,6 +3284,24 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
             sql += ` AND (COALESCE(e.ends_at, e.starts_at) < NOW() OR e.status = 'completed')`;
         } else if (timeFilter === "today") {
             sql += ` AND (DATE(e.starts_at) = CURRENT_DATE OR (e.starts_at <= NOW() AND COALESCE(e.ends_at, e.starts_at) >= NOW()))`;
+        } else if (timeFilter === "closed") {
+            sql += ` AND (
+                e.status != 'completed' AND (
+                    EXISTS (
+                        SELECT 1 FROM club_event_stages s 
+                        WHERE s.event_id = e.id 
+                          AND (s.type = 'registration' OR s.action_type = 'registration') 
+                          AND (s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at)
+                    )
+                    OR (
+                        NOT EXISTS (
+                            SELECT 1 FROM club_event_stages s 
+                            WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration')
+                        )
+                        AND e.ends_at IS NOT NULL AND NOW() > e.ends_at
+                    )
+                )
+            )`;
         }
 
         if (search) {
@@ -3249,6 +3357,7 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 e.venue_or_location AS "venueOrLocation",
                 e.registration_url AS "registrationUrl",
                 e.cover_image_url AS "coverImageUrl",
+                COALESCE(e.sponsors, '[]'::jsonb) AS "sponsors",
                 e.status,
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
@@ -3269,7 +3378,22 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_id FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamId",
                 CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_role FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamRole",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
-                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount"
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount",
+                (SELECT s.starts_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationStartsAt",
+                (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
+                COALESCE(
+                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN (e.ends_at IS NOT NULL AND NOW() > e.ends_at) OR e.status = 'completed' THEN true ELSE false END
+                ) AS "isRegistrationClosed",
+                COALESCE(
+                    (SELECT CASE WHEN NOW() < s.starts_at THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN NOW() < e.starts_at THEN true ELSE false END
+                ) AS "isRegistrationUpcoming",
+                (SELECT s.name FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageName",
+                (SELECT s.stage_order FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageOrder",
+                (SELECT COUNT(*)::int FROM club_event_stages s WHERE s.event_id = e.id) AS "stagesCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
             WHERE e.id = $1 AND e.status IN ('published', 'completed')
@@ -3356,6 +3480,18 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 
         if (event.status !== "published") {
             return res.status(400).json({ success: false, message: "Registration is not open for this event." });
+        }
+
+        // Enforce Timeline Registration Window
+        const regWindow = await EventStageService.validateRegistrationWindow(eventId);
+        if (!regWindow.isOpen) {
+            return res.status(403).json({
+                success: false,
+                code: regWindow.code || "REGISTRATION_CLOSED",
+                message: regWindow.message || "Registration is closed for this event.",
+                deadline: regWindow.deadline,
+                startsAt: regWindow.startsAt,
+            });
         }
 
         // 1. Enforce Block Check
@@ -3806,11 +3942,21 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
                 COALESCE(e.is_team_event, false) AS "isTeamEvent",
                 COALESCE(e.min_team_size, 1) AS "minTeamSize",
                 COALESCE(e.max_team_size, 4) AS "maxTeamSize",
-                r.team_id AS "teamId",
-                r.team_role AS "teamRole",
-                t.name AS "teamName",
-                t.code AS "teamCode",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_team_members tm WHERE tm.team_id = r.team_id), 0) AS "teamMembersCount",
+                (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration' OR s.stage_order = 1) ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
+                COALESCE(
+                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR (s.ends_at IS NOT NULL AND NOW() > s.ends_at) THEN true ELSE false END
+                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration' OR s.stage_order = 1) ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN e.status IN ('completed', 'cancelled') OR (e.ends_at IS NOT NULL AND NOW() > e.ends_at) THEN true ELSE false END
+                ) AS "isRegistrationClosed",
+                COALESCE(r.team_id, (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1)) AS "teamId",
+                COALESCE(r.team_role, (SELECT tm.role FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1), 'leader') AS "teamRole",
+                COALESCE(t.name, (SELECT t2.name FROM club_event_teams t2 WHERE t2.id = (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1))) AS "teamName",
+                COALESCE(t.code, (SELECT t2.code FROM club_event_teams t2 WHERE t2.id = (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1))) AS "teamCode",
+                COALESCE(
+                    (SELECT COUNT(*)::int FROM club_event_team_members tm 
+                     WHERE tm.team_id = COALESCE(r.team_id, (SELECT tm2.team_id FROM club_event_team_members tm2 WHERE tm2.event_id = r.event_id AND tm2.user_id = r.user_id LIMIT 1))),
+                    0
+                ) AS "teamMembersCount",
                 vc.name AS "clubName",
                 vc.slug AS "clubSlug",
                 COALESCE(vc.logo_url, '') AS "clubLogoUrl",
@@ -3905,7 +4051,26 @@ clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount
                 r.team_id AS "teamId",
                 r.team_role AS "teamRole",
                 t.name AS "teamName",
-                t.code AS "teamCode"
+                t.code AS "teamCode",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_team_members tm WHERE tm.team_id = r.team_id), 0) AS "teamMembersCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_team_invitations ti WHERE ti.team_id = r.team_id AND ti.status = 'pending'), 0) AS "teamPendingCount",
+                (SELECT json_agg(json_build_object(
+                    'userId', m.user_id,
+                    'username', mu.username,
+                    'name', TRIM(CONCAT(mu.firstname, ' ', COALESCE(mu.lastname, ''))),
+                    'email', mu.email,
+                    'role', m.role,
+                    'status', 'accepted'
+                )) FROM club_event_team_members m JOIN users mu ON mu.id = m.user_id WHERE m.team_id = r.team_id) AS "teamMembers",
+                (SELECT json_agg(json_build_object(
+                    'invitationId', i.id,
+                    'userId', i.invitee_user_id,
+                    'username', iu.username,
+                    'name', TRIM(CONCAT(iu.firstname, ' ', COALESCE(iu.lastname, ''))),
+                    'email', iu.email,
+                    'role', 'invitee',
+                    'status', i.status
+                )) FROM club_event_team_invitations i JOIN users iu ON iu.id = i.invitee_user_id WHERE i.team_id = r.team_id AND i.status = 'pending') AS "teamPendingInvites"
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
              LEFT JOIN club_event_teams t ON t.id = r.team_id
@@ -3949,6 +4114,197 @@ clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount
     } catch (err: any) {
         console.error("Fetch event applications error:", err);
         return res.status(500).json({ success: false, message: "Failed to load event applications." });
+    }
+});
+
+/**
+ * PATCH /api/club/events/:eventId/applications/batch
+ * Bulk updates multiple applicant statuses at once (accept all or reject all).
+ */
+clubRouter.patch("/events/:eventId/applications/batch", authenticate, requireClubAccount, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
+
+        const { registrationIds, status, reviewNotes } = req.body;
+        const userId = req.user!.id;
+
+        if (!Array.isArray(registrationIds) || registrationIds.length === 0) {
+            return res.status(400).json({ success: false, message: "registrationIds array is required and cannot be empty." });
+        }
+
+        const validIds = registrationIds.filter((id) =>
+            typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+        );
+        if (validIds.length === 0) {
+            return res.status(400).json({ success: false, message: "No valid UUIDs found in registrationIds." });
+        }
+
+        const allowedStatuses = ["registered", "rejected"];
+        if (!status || !allowedStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Valid batch status is required: 'registered' (Accept) or 'rejected' (Reject).`,
+            });
+        }
+
+        const eventRes = await query(
+            `SELECT e.id, e.club_id, e.title, vc.name AS "clubName", vc.slug AS "clubSlug", e.starts_at, e.venue_or_location
+             FROM club_events e
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE e.id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        if (!eventRes.rows[0]) return res.status(404).json({ success: false, message: "Event not found." });
+
+        const staffClub = await getStaffClub(userId, eventRes.rows[0].club_id);
+        if (!staffClub) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        // Enforce Minor Protection when accepting in batch
+        let eligibleIds = validIds;
+        if (status === "registered") {
+            const consentCheck = await query(
+                `SELECT id, applicant_name
+                 FROM club_event_registrations
+                 WHERE id = ANY($1::uuid[]) AND event_id = $2::uuid
+                   AND is_attendee_under_18 = true
+                   AND guardian_consent_status != 'verified';`,
+                [validIds, eventId]
+            );
+            if (consentCheck.rows.length > 0) {
+                const blockedNames = consentCheck.rows.map((r: any) => r.applicant_name).join(", ");
+                const blockedSet = new Set(consentCheck.rows.map((r: any) => r.id));
+                eligibleIds = validIds.filter((id) => !blockedSet.has(id));
+                if (eligibleIds.length === 0) {
+                    return res.status(400).json({
+                        success: false,
+                        code: "GUARDIAN_CONSENT_REQUIRED",
+                        message: `Cannot accept selected applicant(s) under 18 years without verified guardian consent: ${blockedNames}.`,
+                    });
+                }
+            }
+        }
+
+        const updateRes = await query(
+            `UPDATE club_event_registrations
+             SET status = $1::varchar,
+                 reviewed_at = NOW(),
+                 reviewed_by_user_id = $2::uuid,
+                 review_notes = COALESCE($3, review_notes),
+                 updated_at = NOW()
+             WHERE id = ANY($4::uuid[]) AND event_id = $5::uuid
+             RETURNING id, user_id AS "userId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                       department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                       status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
+            [status, userId, reviewNotes || null, eligibleIds, eventId]
+        );
+
+        const updatedRows = updateRes.rows;
+
+        // Background dispatch notifications for updated applicants
+        try {
+            const userIds = updatedRows.map((r: any) => r.userId).filter(Boolean);
+            if (userIds.length > 0) {
+                const usersRes = await query(`SELECT id, username FROM users WHERE id = ANY($1::uuid[]);`, [userIds]);
+                const userMap = new Map(usersRes.rows.map((u: any) => [u.id, u.username]));
+
+                const eventTitle = eventRes.rows[0].title;
+                const clubName = eventRes.rows[0].clubName;
+                const clubSlug = eventRes.rows[0].clubSlug;
+                const startsAt = eventRes.rows[0].starts_at;
+                const venueOrLocation = eventRes.rows[0].venue_or_location;
+
+                for (const updatedRow of updatedRows) {
+                    const username = userMap.get(updatedRow.userId);
+                    if (!username) continue;
+
+                    if (status === "registered") {
+                        await query(
+                            `INSERT INTO user_notifications (
+                                user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                            ) VALUES (
+                                $1::uuid, $1::uuid, $2,
+                                'Application Accepted! 🎉',
+                                $3,
+                                'club_event',
+                                'application_approved',
+                                $4::jsonb,
+                                $5,
+                                false,
+                                NOW()
+                            ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                            [
+                                updatedRow.userId,
+                                username,
+                                `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now ready!`,
+                                JSON.stringify({
+                                    eventId,
+                                    registrationId: updatedRow.id,
+                                    ticketCode: updatedRow.ticketCode,
+                                    eventTitle,
+                                    clubName,
+                                    clubSlug: clubSlug || "",
+                                    startsAt,
+                                    venueOrLocation,
+                                    applicantName: updatedRow.applicantName,
+                                    rollNumber: updatedRow.rollNumber,
+                                    department: updatedRow.department,
+                                    action: "application_approved",
+                                    status: "registered",
+                                }),
+                                `app-approved-${updatedRow.id}-${Date.now()}`,
+                            ]
+                        ).catch(() => {});
+                    } else if (status === "rejected") {
+                        await query(
+                            `INSERT INTO user_notifications (
+                                user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                            ) VALUES (
+                                $1::uuid, $1::uuid, $2,
+                                'Application Update',
+                                $3,
+                                'club_event',
+                                'application_rejected',
+                                $4::jsonb,
+                                $5,
+                                false,
+                                NOW()
+                            ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                            [
+                                updatedRow.userId,
+                                username,
+                                `Your application for "${eventTitle}" was not selected by ${clubName}.`,
+                                JSON.stringify({
+                                    eventId,
+                                    registrationId: updatedRow.id,
+                                    eventTitle,
+                                    clubName,
+                                    action: "application_rejected",
+                                    status: "rejected",
+                                }),
+                                `app-rejected-${updatedRow.id}-${Date.now()}`,
+                            ]
+                        ).catch(() => {});
+                    }
+                }
+            }
+        } catch (notifErr) {
+            console.warn("Batch applicant notifications warning (non-fatal):", notifErr);
+        }
+
+        const actionWord = status === "registered" ? "accepted" : "rejected";
+        return res.json({
+            success: true,
+            message: `Successfully ${actionWord} ${updatedRows.length} applicant(s).`,
+            count: updatedRows.length,
+            registrations: updatedRows,
+        });
+    } catch (err: any) {
+        console.error("Batch update applicant status error:", err);
+        return res.status(500).json({ success: false, message: "Failed to batch update applicant status." });
     }
 });
 

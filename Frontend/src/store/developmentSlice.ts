@@ -115,9 +115,6 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
 
         const isRefreshing = force || hasGhMismatch;
         const primaryUrl = `/api/portals/development/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`;
-        const endpoints = import.meta.env.DEV
-            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-            : [primaryUrl];
 
         let authToken = "";
         try {
@@ -129,38 +126,34 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-        let lastError = "Failed to fetch development contributions";
-
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    headers,
-                    credentials: "include",
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.success) {
-                        return {
-                            username: effectiveUser,
-                            totalContributions: data.totalContributions || data.totalSubmissions || 0,
-                            totalSubmissions: data.totalSubmissions || data.totalContributions || 0,
-                            activeDays: data.activeDays || 0,
-                            dayStreak: data.dayStreak || 0,
-                            platformBreakdown: data.platformBreakdown || {},
-                            dailyMerged: data.dailyMerged || {},
-                            connectedPlatformsCount:
-                                data.connectedPlatformsCount ||
-                                Object.keys(data.platformBreakdown || {}).length,
-                            timestamp: data.timestamp || new Date().toISOString(),
-                        };
-                    }
+        try {
+            const res = await fetch(primaryUrl, {
+                headers,
+                credentials: "include",
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.success) {
+                    return {
+                        username: effectiveUser,
+                        totalContributions: data.totalContributions || data.totalSubmissions || 0,
+                        totalSubmissions: data.totalSubmissions || data.totalContributions || 0,
+                        activeDays: data.activeDays || 0,
+                        dayStreak: data.dayStreak || 0,
+                        platformBreakdown: data.platformBreakdown || {},
+                        dailyMerged: data.dailyMerged || {},
+                        connectedPlatformsCount:
+                            data.connectedPlatformsCount ||
+                            Object.keys(data.platformBreakdown || {}).length,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                    };
                 }
-            } catch (err: any) {
-                lastError = err?.message || lastError;
             }
+            const errData = await res.json().catch(() => null);
+            return rejectWithValue(errData?.message || `Failed to fetch development contributions (${res.status})`);
+        } catch (err: any) {
+            return rejectWithValue(err?.message || "Failed to fetch development contributions");
         }
-
-        return rejectWithValue(lastError);
     },
     {
         // Prevent duplicate network calls

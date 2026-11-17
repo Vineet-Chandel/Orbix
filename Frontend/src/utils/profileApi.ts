@@ -93,7 +93,7 @@ function getAuthHeaders(): Record<string, string> {
 
 /**
  * Robust API fetch wrapper:
- * - Uses Vite proxy path (/api/...) and direct backend fallback (http://localhost:3000/api/...)
+ * - Uses standardized Vite proxy path (/api/...)
  * - Attaches auth credentials
  * - Immediately returns or throws authoritative backend errors (401, 403, 429, 500) without masking
  */
@@ -102,44 +102,26 @@ async function apiFetch<T = any>(
     options: RequestInit = {}
 ): Promise<T> {
     const cleanPath = path.startsWith("/api") ? path : `/api${path}`;
-    const endpoints = import.meta.env.DEV
-        ? [cleanPath, `http://localhost:3000${cleanPath}`]
-        : [cleanPath];
 
-    let lastError = "Request failed";
-
-    for (const url of endpoints) {
-        let response: Response;
-        try {
-            response = await fetch(url, {
-                ...options,
-                headers: {
-                    ...getAuthHeaders(),
-                    ...(options.headers || {}),
-                },
-                credentials: "include",
-            });
-        } catch (netErr: any) {
-            // If the request was explicitly aborted (e.g. debounced typing), do not fall back or wrap in generic Error
-            if (options?.signal?.aborted || netErr?.name === "AbortError" || String(netErr?.message || "").toLowerCase().includes("abort")) {
-                throw netErr;
-            }
-            lastError = netErr?.message || "Network request failed";
-            continue; // Fall back to direct backend port if network/proxy failed
-        }
+    try {
+        const response = await fetch(cleanPath, {
+            ...options,
+            headers: {
+                ...getAuthHeaders(),
+                ...(options.headers || {}),
+            },
+            credentials: "include",
+        });
 
         if (response.ok) {
             const json = await response.json().catch(() => ({}));
             return json as T;
         }
 
-        // If a proxy gateway error (502/503/504) occurred on the local proxy, try the direct backend port
-        if ((response.status === 502 || response.status === 503 || response.status === 504) && !url.includes("localhost:3000")) {
-            lastError = `Backend server unreachable (${response.status}: ${response.statusText}). Please ensure backend is running.`;
-            continue;
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+            throw new Error(`Backend server unreachable (${response.status}: ${response.statusText}). Please ensure backend is running.`);
         }
 
-        // Authoritative server response: do NOT try subsequent endpoints and mask error
         const errJson = await response.json().catch(() => null);
         const errMsg =
             errJson?.message ||
@@ -150,13 +132,12 @@ async function apiFetch<T = any>(
                 ? "Backend server is unavailable (502 Bad Gateway). Please ensure the backend server is running."
                 : `Server returned error (${response.status}): ${response.statusText}`);
         throw new Error(errMsg);
+    } catch (netErr: any) {
+        if (options?.signal?.aborted || netErr?.name === "AbortError" || String(netErr?.message || "").toLowerCase().includes("abort")) {
+            throw netErr;
+        }
+        throw netErr;
     }
-
-    if (lastError === "Failed to fetch" || lastError === "Network request failed") {
-        throw new Error("Unable to connect to server. Please ensure the backend server (port 3000) is running.");
-    }
-
-    throw new Error(lastError);
 }
 
 export type ProfileErrorKind =
@@ -231,120 +212,92 @@ export async function fetchPublicProfile(username: string, force = false): Promi
 
     const requestPromise = (async () => {
         const encodedKey = encodeURIComponent(key);
-        const endpoints = import.meta.env.DEV
-            ? [
-                `/api/profile/public/${encodedKey}`,
-                `http://localhost:3000/api/profile/public/${encodedKey}`,
-            ]
-            : [`/api/profile/public/${encodedKey}`];
+        const endpoint = `/api/profile/public/${encodedKey}`;
 
-        let networkErrorCount = 0;
         let lastStatus: number | undefined;
-        let lastErrorMessage = "Unable to fetch profile";
-        let lastErrorDetails = "";
-        let finalEndpoint = endpoints[0];
 
-        for (const url of endpoints) {
-            finalEndpoint = url;
-            try {
-                const response = await fetch(url, {
-                    method: "GET",
-                    headers: getAuthHeaders(),
-                    credentials: "include",
-                });
+        try {
+            const response = await fetch(endpoint, {
+                method: "GET",
+                headers: getAuthHeaders(),
+                credentials: "include",
+            });
 
-                if (response.ok) {
-                    const json = await response.json();
-                    if (json.success && json.profile) {
-                        const profile = json.profile as PublicProfileData;
-                        publicProfileCache.set(key, { data: profile, timestamp: Date.now() });
-                        return profile;
-                    }
+            if (response.ok) {
+                const json = await response.json();
+                if (json.success && json.profile) {
+                    const profile = json.profile as PublicProfileData;
+                    publicProfileCache.set(key, { data: profile, timestamp: Date.now() });
+                    return profile;
                 }
-
-                lastStatus = response.status;
-                const errJson = await response.json().catch(() => null);
-                const serverMsg = errJson?.message || errJson?.error;
-
-                if (response.status === 404) {
-                    throw new ProfileApiError(
-                        "NOT_FOUND",
-                        serverMsg || `Developer profile '@${raw}' does not exist on Orbix.`,
-                        404,
-                        "The username was not found in the Orbix database.",
-                        url
-                    );
-                }
-
-                if (response.status === 403) {
-                    throw new ProfileApiError(
-                        "PRIVATE",
-                        serverMsg || `The profile '@${raw}' is private.`,
-                        403,
-                        "This profile has been configured as private by its owner.",
-                        url
-                    );
-                }
-
-                if (response.status === 429) {
-                    throw new ProfileApiError(
-                        "RATE_LIMITED",
-                        serverMsg || "Too many profile lookup requests. Please wait a moment and try again.",
-                        429,
-                        "Client exceeded rate limit.",
-                        url
-                    );
-                }
-
-                if (response.status >= 500) {
-                    // Gateway errors on proxy (502/503/504) -> try direct port fallback if not already on localhost:3000
-                    if ((response.status === 502 || response.status === 503 || response.status === 504) && !url.includes("localhost:3000")) {
-                        lastErrorMessage = `Server gateway error (${response.status})`;
-                        lastErrorDetails = serverMsg || response.statusText;
-                        continue;
-                    }
-
-                    throw new ProfileApiError(
-                        "SERVER_ERROR",
-                        serverMsg || `Server error (${response.status}): Failed to retrieve public profile.`,
-                        response.status,
-                        serverMsg || `HTTP ${response.status} from ${url}`,
-                        url
-                    );
-                }
-
-                throw new ProfileApiError(
-                    response.status === 400 ? "INVALID_USERNAME" : "UNKNOWN",
-                    serverMsg || `Request failed (${response.status})`,
-                    response.status,
-                    serverMsg || response.statusText,
-                    url
-                );
-            } catch (err: any) {
-                if (err instanceof ProfileApiError) {
-                    throw err;
-                }
-                if (err?.name === "AbortError" || String(err?.message || "").includes("aborted")) {
-                    throw err;
-                }
-                networkErrorCount++;
-                lastErrorMessage = err?.message || "Network request failed";
-                lastErrorDetails = String(err);
             }
-        }
 
-        // If all attempts failed with network errors, classify explicitly as NETWORK_ERROR
-        if (networkErrorCount > 0 && !lastStatus) {
+            lastStatus = response.status;
+            const errJson = await response.json().catch(() => null);
+            const serverMsg = errJson?.message || errJson?.error;
+
+            if (response.status === 404) {
+                throw new ProfileApiError(
+                    "NOT_FOUND",
+                    serverMsg || `Developer profile '@${raw}' does not exist on Orbix.`,
+                    404,
+                    "The username was not found in the Orbix database.",
+                    endpoint
+                );
+            }
+
+            if (response.status === 403) {
+                throw new ProfileApiError(
+                    "PRIVATE",
+                    serverMsg || `The profile '@${raw}' is private.`,
+                    403,
+                    "This profile has been configured as private by its owner.",
+                    endpoint
+                );
+            }
+
+            if (response.status === 429) {
+                throw new ProfileApiError(
+                    "RATE_LIMITED",
+                    serverMsg || "Too many profile lookup requests. Please wait a moment and try again.",
+                    429,
+                    "Client exceeded rate limit.",
+                    endpoint
+                );
+            }
+
+            if (response.status >= 500) {
+                throw new ProfileApiError(
+                    "SERVER_ERROR",
+                    serverMsg || `Server error (${response.status}): Failed to retrieve public profile.`,
+                    response.status,
+                    serverMsg || `HTTP ${response.status} from ${endpoint}`,
+                    endpoint
+                );
+            }
+
+            throw new ProfileApiError(
+                response.status === 400 ? "INVALID_USERNAME" : "UNKNOWN",
+                serverMsg || `Request failed (${response.status})`,
+                response.status,
+                serverMsg || response.statusText,
+                endpoint
+            );
+        } catch (err: any) {
+            if (err instanceof ProfileApiError) {
+                throw err;
+            }
+            if (err?.name === "AbortError" || String(err?.message || "").includes("aborted")) {
+                throw err;
+            }
             throw new ProfileApiError(
                 "NETWORK_ERROR",
                 "Unable to establish a connection to the Orbix server. Please verify your internet connection or check if the backend service is running.",
-                0,
-                lastErrorDetails || lastErrorMessage,
-                finalEndpoint
+                lastStatus || 0,
+                err?.message || String(err),
+                endpoint
             );
         }
-
-        throw new ProfileApiError("UNKNOWN", lastErrorMessage, lastStatus, lastErrorDetails, finalEndpoint);
     })();
 
     inFlightRequests.set(key, requestPromise);
@@ -531,18 +484,45 @@ export async function fetchNotifications(autoMarkRead = false): Promise<{
     };
 }
 
+let inFlightUnreadCountPromise: Promise<number> | null = null;
+let lastUnreadCount = 0;
+let lastUnreadCountTimestamp = 0;
+
 /**
- * Fetch unread notification count
+ * Fetch unread notification count with in-flight deduplication & short-term cache
  */
 export async function fetchUnreadNotificationCount(): Promise<number> {
-    try {
-        const json = await apiFetch<{ success: boolean; unreadCount: number }>(
-            "/api/notifications/unread-count"
-        );
-        return json.unreadCount || 0;
-    } catch {
-        return 0;
+    const now = Date.now();
+    // Return cached count if checked within last 5 seconds to prevent spamming
+    if (now - lastUnreadCountTimestamp < 5000 && inFlightUnreadCountPromise === null) {
+        return lastUnreadCount;
     }
+    if (inFlightUnreadCountPromise) {
+        return inFlightUnreadCountPromise;
+    }
+    inFlightUnreadCountPromise = (async () => {
+        try {
+            const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") || localStorage.getItem("token") : null;
+            const storedUser = typeof window !== "undefined" ? localStorage.getItem("orbix_user") : null;
+            // If completely unauthenticated, skip network request
+            if (!token && !storedUser) {
+                return 0;
+            }
+
+            const json = await apiFetch<{ success: boolean; unreadCount: number }>(
+                "/api/notifications/unread-count"
+            );
+            const count = json?.unreadCount || 0;
+            lastUnreadCount = count;
+            lastUnreadCountTimestamp = Date.now();
+            return count;
+        } catch {
+            return lastUnreadCount;
+        } finally {
+            inFlightUnreadCountPromise = null;
+        }
+    })();
+    return inFlightUnreadCountPromise;
 }
 
 /**
@@ -899,76 +879,60 @@ export async function uploadResume(
     const formData = new FormData();
     formData.append("resume", file);
 
-    const endpoints = import.meta.env.DEV
-        ? [
-            "/api/profile/resume/upload",
-            "http://localhost:3000/api/profile/resume/upload",
-        ]
-        : ["/api/profile/resume/upload"];
+    const url = "/api/profile/resume/upload";
 
-    let lastError = "Failed to upload resume";
+    const result = await new Promise<{ success: boolean; resume: ResumeData; message: string }>(
+        (resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.withCredentials = true;
 
-    for (const url of endpoints) {
-        try {
-            const result = await new Promise<{ success: boolean; resume: ResumeData; message: string }>(
-                (resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.withCredentials = true;
-
-                    xhr.upload.onprogress = (event) => {
-                        if (event.lengthComputable && onProgress) {
-                            const percent = Math.round((event.loaded / event.total) * 100);
-                            onProgress(percent);
-                        }
-                    };
-
-                    xhr.onload = () => {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try {
-                                const parsed = JSON.parse(xhr.responseText);
-                                resolve(parsed);
-                            } catch {
-                                resolve({ success: true, resume: {} as ResumeData, message: "Uploaded" });
-                            }
-                        } else {
-                            try {
-                                const parsed = JSON.parse(xhr.responseText);
-                                reject(new Error(parsed.message || `Upload failed with status ${xhr.status}`));
-                            } catch {
-                                reject(new Error(`Upload failed with status ${xhr.status}`));
-                            }
-                        }
-                    };
-
-                    xhr.onerror = () => {
-                        reject(new Error("Network error during resume upload"));
-                    };
-
-                    xhr.open("POST", url, true);
-                    if (token) {
-                        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-                    }
-                    xhr.send(formData);
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable && onProgress) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    onProgress(percent);
                 }
-            );
+            };
 
-            // Invalidate caches and prime with new data
-            invalidatePublicProfileClientCache();
-            invalidateResumeClientCache();
-            if (result?.resume) {
-                cachedMyResume = {
-                    data: result.resume,
-                    timestamp: Date.now(),
-                };
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const parsed = JSON.parse(xhr.responseText);
+                        resolve(parsed);
+                    } catch {
+                        resolve({ success: true, resume: {} as ResumeData, message: "Uploaded" });
+                    }
+                } else {
+                    try {
+                        const parsed = JSON.parse(xhr.responseText);
+                        reject(new Error(parsed.message || `Upload failed with status ${xhr.status}`));
+                    } catch {
+                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                    }
+                }
+            };
+
+            xhr.onerror = () => {
+                reject(new Error("Network error during resume upload"));
+            };
+
+            xhr.open("POST", url, true);
+            if (token) {
+                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
             }
-            return result;
-        } catch (err: any) {
-            lastError = err?.message || lastError;
-            continue;
+            xhr.send(formData);
         }
-    }
+    );
 
-    throw new Error(lastError);
+    // Invalidate caches and prime with new data
+    invalidatePublicProfileClientCache();
+    invalidateResumeClientCache();
+    if (result?.resume) {
+        cachedMyResume = {
+            data: result.resume,
+            timestamp: Date.now(),
+        };
+    }
+    return result;
 }
 
 /**
@@ -1095,6 +1059,7 @@ export interface ExploreResponse {
     limit: number;
     totalPages: number;
     users: ExploreDeveloper[];
+    availableColleges?: string[];
 }
 
 export interface PrivacyAuditResponse {

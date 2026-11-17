@@ -155,7 +155,7 @@ export interface ComprehensiveScoringResult {
     overallScore: number; // 0 - 100
     scoreGrade: "Top Tier" | "Competitive" | "Strong Foundation" | "Needs Improvement";
     formula: string;
-    scoringVersion: string; // e.g. "v2.0.0"
+    scoringVersion: string; // e.g. "v3.0.0"
     dimensions: Record<ScoringDimensionKey, DimensionScoreResult>;
     totalAssessedWeight: number;
     resumeReadinessScore: number; // 0 - 100

@@ -97,12 +97,7 @@ export default function ForgotPasswordFlow({
      */
     const postWithFallback = async (primaryPath: string, body: any) => {
         const primaryEndpoint = buildApiUrl(primaryPath);
-        const altPath = primaryPath.startsWith("/api/auth/")
-            ? primaryPath.replace("/api/auth/", "/api/")
-            : primaryPath;
-        const endpoints = import.meta.env.DEV
-            ? [primaryEndpoint, `http://localhost:3000${primaryPath}`, buildApiUrl(altPath)]
-            : [primaryEndpoint, buildApiUrl(altPath)];
+        const endpoints = [primaryEndpoint];
 
         let lastResponse: Response | null = null;
         let lastData: any = null;

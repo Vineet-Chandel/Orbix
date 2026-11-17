@@ -715,7 +715,7 @@ export function extractStructuredFacts(
     const quantifiedAchievements = extractQuantifiedAchievements(sections, experience, projects);
 
     return {
-        schemaVersion: "v2.0.0",
+        schemaVersion: "v3.0.0",
         personal,
         education,
         experience,

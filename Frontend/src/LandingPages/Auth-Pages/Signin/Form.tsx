@@ -181,10 +181,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
                 accountType: "personal",
             });
 
-            const primaryEndpoint = buildApiUrl("/api/auth/signin");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signin", "/api/signin"]
-                : [primaryEndpoint, "/api/signin"];
+            const endpoints = [buildApiUrl("/api/auth/signin")];
 
             let response: Response | null = null;
             let resultData: any = null;
@@ -329,10 +326,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
                 accountType: "personal",
             });
 
-            const primaryEndpoint = buildApiUrl("/api/auth/2fa/verify-login");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/2fa/verify-login"]
-                : [primaryEndpoint];
+            const endpoints = [buildApiUrl("/api/auth/2fa/verify-login")];
 
             let response: Response | null = null;
             let resultData: any = null;
@@ -389,10 +383,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
         if (cooldownSeconds > 0 || isResending) return;
         setIsResending(true);
         try {
-            const primaryEndpoint = buildApiUrl("/api/auth/2fa/resend-login-otp");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/2fa/resend-login-otp"]
-                : [primaryEndpoint];
+            const endpoints = [buildApiUrl("/api/auth/2fa/resend-login-otp")];
             let response: Response | null = null;
             let resultData: any = null;
             let lastNetworkError: Error | null = null;

@@ -25,10 +25,14 @@ export const DEMO_USERNAME = "Vineet-Chandel";
 export function isDemoProfileUsername(username?: string | null): boolean {
     if (!username) return false;
     const clean = username.trim().toLowerCase();
+    if (clean === "vineet-chandel" || clean === "demo" || clean === "demo-profile") return true;
+    const collapsed = clean.replace(/[-_.\s]/g, "");
     return (
-        clean === "vineet-chandel" ||
-        clean === "demo" ||
-        clean === "demo-profile"
+        collapsed === "vineetchandel" ||
+        collapsed === "demoprofile" ||
+        collapsed === "demouser" ||
+        collapsed === "demoaccount" ||
+        collapsed === "demo"
     );
 }
 
@@ -938,8 +942,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "LeetCode",
             timestamp: Date.now() - 1000 * 60 * 45,
             solvedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+            exactDate: "14 Nov 2026",
             url: "https://leetcode.com/problems/trapping-rain-water/",
             relativeTime: "45m ago",
+            difficulty: "Hard",
+            topic: "Dynamic Programming",
         },
         {
             id: "rec-2",
@@ -948,8 +955,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "LeetCode",
             timestamp: Date.now() - 1000 * 60 * 60 * 3,
             solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+            exactDate: "14 Nov 2026",
             url: "https://leetcode.com/problems/lru-cache/",
             relativeTime: "3h ago",
+            difficulty: "Medium",
+            topic: "Hash Table",
         },
         {
             id: "rec-3",
@@ -958,8 +968,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "Codeforces",
             timestamp: Date.now() - 1000 * 60 * 60 * 12,
             solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+            exactDate: "14 Nov 2026",
             url: "https://codeforces.com/problemset/problem/1985/C",
             relativeTime: "12h ago",
+            difficulty: "Easy",
+            topic: "Greedy",
         },
         {
             id: "rec-4",
@@ -968,8 +981,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "LeetCode",
             timestamp: Date.now() - 1000 * 60 * 60 * 24,
             solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+            exactDate: "13 Nov 2026",
             url: "https://leetcode.com/problems/word-ladder-ii/",
             relativeTime: "1d ago",
+            difficulty: "Hard",
+            topic: "Graph Theory",
         },
         {
             id: "rec-5",
@@ -978,8 +994,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "CodeChef",
             timestamp: Date.now() - 1000 * 60 * 60 * 36,
             solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
+            exactDate: "13 Nov 2026",
             url: "https://www.codechef.com/problems/MAKE_EQUAL",
             relativeTime: "1d ago",
+            difficulty: "Easy",
+            topic: "Array",
         },
         {
             id: "rec-6",
@@ -988,8 +1007,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "LeetCode",
             timestamp: Date.now() - 1000 * 60 * 60 * 48,
             solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+            exactDate: "12 Nov 2026",
             url: "https://leetcode.com/problems/course-schedule-ii/",
             relativeTime: "2d ago",
+            difficulty: "Medium",
+            topic: "Topological Sort",
         },
         {
             id: "rec-7",
@@ -998,8 +1020,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "LeetCode",
             timestamp: Date.now() - 1000 * 60 * 60 * 72,
             solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
+            exactDate: "11 Nov 2026",
             url: "https://leetcode.com/problems/median-of-two-sorted-arrays/",
             relativeTime: "3d ago",
+            difficulty: "Hard",
+            topic: "Binary Search",
         },
         {
             id: "rec-8",
@@ -1008,8 +1033,11 @@ export const demoPracticeAnalytics: PracticeAnalyticsData = {
             platformName: "Codeforces",
             timestamp: Date.now() - 1000 * 60 * 60 * 96,
             solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 96).toISOString(),
+            exactDate: "10 Nov 2026",
             url: "https://codeforces.com/problemset/problem/1137/B",
             relativeTime: "4d ago",
+            difficulty: "Medium",
+            topic: "Trees",
         },
     ],
     dsaTopics: [

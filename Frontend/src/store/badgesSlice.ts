@@ -94,26 +94,17 @@ export const fetchUnifiedBadges = createAsyncThunk<
         if (isDemoProfileUsername(effectiveUser)) {
             try {
                 const primaryUrl = `/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}`;
-                const endpoints = import.meta.env.DEV
-                    ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-                    : [primaryUrl];
-                for (const url of endpoints) {
-                    try {
-                        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.success && Array.isArray(data.badges) && data.badges.length > 0) {
-                                return {
-                                    username: effectiveUser,
-                                    totalEarned: data.totalEarned || data.badges.length,
-                                    platformCounts: data.platformCounts || {},
-                                    badges: data.badges,
-                                    timestamp: data.timestamp || new Date().toISOString(),
-                                };
-                            }
-                        }
-                    } catch {
-                        // try next
+                const res = await fetch(primaryUrl, { signal: AbortSignal.timeout(3000) });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && Array.isArray(data.badges) && data.badges.length > 0) {
+                        return {
+                            username: effectiveUser,
+                            totalEarned: data.totalEarned || data.badges.length,
+                            platformCounts: data.platformCounts || {},
+                            badges: data.badges,
+                            timestamp: data.timestamp || new Date().toISOString(),
+                        };
                     }
                 }
             } catch {
@@ -139,36 +130,30 @@ export const fetchUnifiedBadges = createAsyncThunk<
         if (token) reqHeaders["Authorization"] = `Bearer ${token}`;
 
         const primaryUrl = `/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}`;
-        const endpoints = import.meta.env.DEV
-            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-            : [primaryUrl];
 
-        let lastError = "Failed to fetch badges";
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    headers: reqHeaders,
-                    signal: AbortSignal.timeout(10000),
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.success) {
-                        return {
-                            username: effectiveUser,
-                            totalEarned: data.totalEarned || (data.badges ? data.badges.length : 0),
-                            platformCounts: data.platformCounts || {},
-                            badges: data.badges || [],
-                            timestamp: data.timestamp || new Date().toISOString(),
-                        };
-                    }
-                    lastError = data.message || lastError;
+        try {
+            const res = await fetch(primaryUrl, {
+                headers: reqHeaders,
+                signal: AbortSignal.timeout(10000),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    return {
+                        username: effectiveUser,
+                        totalEarned: data.totalEarned || (data.badges ? data.badges.length : 0),
+                        platformCounts: data.platformCounts || {},
+                        badges: data.badges || [],
+                        timestamp: data.timestamp || new Date().toISOString(),
+                    };
                 }
-            } catch (err: any) {
-                lastError = err.message || lastError;
+                return rejectWithValue(data.message || "Failed to fetch badges");
             }
+            const errData = await res.json().catch(() => null);
+            return rejectWithValue(errData?.message || `Failed to fetch badges (${res.status})`);
+        } catch (err: any) {
+            return rejectWithValue(err.message || "Failed to fetch badges");
         }
-
-        return rejectWithValue(lastError);
     },
     {
         condition: ({ username, force = false }, { getState }) => {

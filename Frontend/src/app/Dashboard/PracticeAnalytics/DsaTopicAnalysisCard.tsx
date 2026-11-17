@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { ListFilter } from "lucide-react";
 import { type PracticeAnalyticsData } from "../../../store";
 
@@ -51,23 +52,25 @@ export const DsaTopicAnalysisCard: React.FC<DsaTopicAnalysisCardProps> = ({ data
                             const barPercent = Math.max(12, Math.round((item.count / maxCount) * 100));
 
                             return (
-                                <div key={item.topic} className="flex items-center gap-3.5">
-                                    {/* Topic Label */}
-                                    <span className="w-36 sm:w-44 text-xs sm:text-sm font-black text-black text-right truncate flex-shrink-0">
+                                <div key={item.topic} className="flex items-center gap-2.5 sm:gap-3.5">
+                                    {/* Responsive Topic Label: fits down to 280px without squeezing the bar */}
+                                    <span className="w-24 xs:w-32 sm:w-44 text-[11px] sm:text-xs md:text-sm font-black text-black text-right truncate shrink-0">
                                         {item.topic}
                                     </span>
 
                                     {/* Bar Track */}
-                                    <div className="flex-1 h-10 sm:h-11 bg-[#FAF6EE] border-2 border-black rounded-xl overflow-hidden relative flex items-center shadow-[2px_2px_0px_#000]">
-                                        {/* Filled Bar */}
-                                        <div
-                                            className="h-full bg-black rounded-lg flex items-center justify-end px-3.5 transition-all duration-700 select-none shadow-xs"
-                                            style={{ width: `${barPercent}%` }}
+                                    <div className="flex-1 min-w-[90px] h-9 sm:h-11 bg-[#FAF6EE] border-2 border-black rounded-xl overflow-hidden relative flex items-center shadow-[2px_2px_0px_#000]">
+                                        {/* Filled Bar with Smooth Width Transition */}
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${barPercent}%` }}
+                                            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                                            className="h-full bg-black rounded-lg flex items-center justify-end px-2.5 sm:px-3.5 select-none shadow-xs"
                                         >
-                                            <span className="text-xs sm:text-sm font-black text-[#a2ff86] font-mono leading-none tracking-tight">
+                                            <span className="text-[11px] sm:text-xs md:text-sm font-black text-[#a2ff86] font-mono leading-none tracking-tight">
                                                 {item.count.toLocaleString()}
                                             </span>
-                                        </div>
+                                        </motion.div>
                                     </div>
                                 </div>
                             );

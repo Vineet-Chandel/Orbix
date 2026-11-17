@@ -13,6 +13,10 @@ export interface UnifiedSubmissionsData {
     dailyMerged: Record<string, { count: number; platforms: string[] }>;
     connectedPlatformsCount: number;
     timestamp?: string;
+    cooldownRemaining?: number;
+    isCooldownActive?: boolean;
+    cooldownExpiresAt?: number;
+    message?: string;
 }
 
 export interface SubmissionsState {
@@ -125,9 +129,6 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
 
         const isRefreshing = force || hasPortalMismatch;
         const primaryUrl = `/api/portals/submissions/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`;
-        const endpoints = import.meta.env.DEV
-            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
-            : [primaryUrl];
 
         let authToken = "";
         try {
@@ -139,38 +140,38 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-        let lastError = "Failed to fetch unified submissions";
-
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    headers,
-                    credentials: "include",
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && (data.success !== false) && (data.dailyMerged || data.platformBreakdown || data.totalSubmissions !== undefined)) {
-                        return {
-                            username: effectiveUser,
-                            totalSubmissions: data.totalSubmissions || 0,
-                            activeDays: data.activeDays || 0,
-                            dayStreak: data.dayStreak || 0,
-                            maxStreak: data.maxStreak || 0,
-                            platformBreakdown: data.platformBreakdown || {},
-                            dailyMerged: data.dailyMerged || {},
-                            connectedPlatformsCount:
-                                data.connectedPlatformsCount ||
-                                Object.keys(data.platformBreakdown || {}).length,
-                            timestamp: data.timestamp || new Date().toISOString(),
-                        };
-                    }
+        try {
+            const res = await fetch(primaryUrl, {
+                headers,
+                credentials: "include",
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && (data.success !== false) && (data.dailyMerged || data.platformBreakdown || data.totalSubmissions !== undefined)) {
+                    return {
+                        username: effectiveUser,
+                        totalSubmissions: data.totalSubmissions || 0,
+                        activeDays: data.activeDays || 0,
+                        dayStreak: data.dayStreak || 0,
+                        maxStreak: data.maxStreak || 0,
+                        platformBreakdown: data.platformBreakdown || {},
+                        dailyMerged: data.dailyMerged || {},
+                        connectedPlatformsCount:
+                            data.connectedPlatformsCount ||
+                            Object.keys(data.platformBreakdown || {}).length,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        cooldownRemaining: data.cooldownRemaining,
+                        isCooldownActive: data.isCooldownActive,
+                        cooldownExpiresAt: data.cooldownExpiresAt,
+                        message: data.message,
+                    };
                 }
-            } catch (err: any) {
-                lastError = err?.message || lastError;
             }
+            const errData = await res.json().catch(() => null);
+            return rejectWithValue(errData?.message || `Failed to fetch unified submissions (${res.status})`);
+        } catch (err: any) {
+            return rejectWithValue(err?.message || "Failed to fetch unified submissions");
         }
-
-        return rejectWithValue(lastError);
     },
     {
         // Allow fetch if force or portal mismatch detected; prevent infinite duplicate requests
@@ -256,10 +257,8 @@ export const submissionsSlice = createSlice({
                     const prev = state.dataByUser[user];
                     const next = { ...action.payload };
 
-                    // Client-side cache guard:
-                    // If previously stored data had significantly more daily calendar days (e.g. from an earlier successful fetch),
-                    // merge the daily calendar so that a temporary glitch or server timeout never zeroes out historical submissions
-                    if (prev && prev.dailyMerged && Object.keys(prev.dailyMerged).length > Object.keys(next.dailyMerged || {}).length) {
+                    // If force refresh is true, do not merge old degraded/bloated cache - use clean source data!
+                    if (!action.meta.arg.force && prev && prev.dailyMerged && Object.keys(prev.dailyMerged).length > Object.keys(next.dailyMerged || {}).length) {
                         next.dailyMerged = {
                             ...prev.dailyMerged,
                             ...(next.dailyMerged || {}),

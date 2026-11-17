@@ -1,5 +1,5 @@
-import type { ProjectItem } from "../../../types/project";
-import { demoProjects } from "../../../data/demoProfileData";
+import type { ProjectItem } from "../../../../types/project";
+import { demoProjects } from "../../../../data/demoProfileData";
 
 /**
  * Standard Mock Projects for Landing Page Showcase

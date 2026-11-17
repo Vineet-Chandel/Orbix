@@ -217,7 +217,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
     }
 
     return (
-        <div className="w-full rounded-2xl bg-white text-black p-6 sm:p-8 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
+        <div className="w-full rounded-2xl bg-white text-black p-4 sm:p-8 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
             {/* Top Header Row */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                 <div className="flex items-center gap-3.5">
@@ -267,7 +267,10 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             </div>
 
             {/* Platform Filter Chips Row */}
-            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y-2 border-black/10 relative z-10 scrollbar-none">
+            <div
+                style={{ WebkitOverflowScrolling: "touch" }}
+                className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y-2 border-black/10 relative z-10 scrollbar-none"
+            >
                 <button
                     type="button"
                     onClick={() => setSelectedPortal("all")}
@@ -313,7 +316,10 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             </div>
 
             {/* Heatmap Area: Uncovered, Circular Curvy Monochrome Dots with Spaces */}
-            <div className="py-4 relative z-10 overflow-x-auto scrollbar-none">
+            <div
+                style={{ WebkitOverflowScrolling: "touch" }}
+                className="py-4 relative z-10 overflow-x-auto scrollbar-none"
+            >
                 <div className="min-w-[700px] flex flex-col space-y-2">
                     {/* Month Labels Row aligned across columns */}
                     <div

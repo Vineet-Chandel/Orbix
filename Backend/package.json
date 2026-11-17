@@ -8,7 +8,9 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate:institutions": "tsx src/database/run_migration.ts",
-    "seed:institutions": "tsx data/seed_institutions.ts"
+    "seed:institutions": "tsx data/seed_institutions.ts",
+    "db:init-schema": "tsx scripts/apply_production_schema.ts",
+    "db:ingest-colleges": "tsx data/ingest_comprehensive_directory.ts"
   },
   "keywords": [],
   "author": "",

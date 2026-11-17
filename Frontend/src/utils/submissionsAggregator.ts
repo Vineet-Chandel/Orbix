@@ -61,6 +61,22 @@ const BRAND_COLORS: Record<string, string> = {
     spoj: "#1B6AC9",
 };
 
+export const CODING_PRACTICE_PLATFORMS = new Set([
+    "leetcode",
+    "codeforces",
+    "codechef",
+    "geeksforgeeks",
+    "hackerrank",
+    "atcoder",
+    "spoj",
+    "cses",
+    "code360",
+    "codingninjas",
+    "hackerearth",
+    "interviewbit",
+    "topcoder",
+]);
+
 /**
  * Maps count to a 0-4 activity level matching the circular curvy green dots design.
  */
@@ -245,8 +261,8 @@ export function buildWeeklySubmissionColumns(
     dailyMap: Record<string, { count: number; platforms: string[] }>,
     weeksCount = 52
 ): { weeks: DaySubmissionCell[][]; monthNames: string[] } {
-    const totalDays = weeksCount * 7;
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     // 1. Build a normalized map where all keys are canonical YYYY-MM-DD
     const normalizedMap: Record<string, { count: number; platforms: string[] }> = {};
@@ -266,58 +282,67 @@ export function buildWeeklySubmissionColumns(
     }
 
     // 2. Determine anchorDate:
-    // If the latest submission date is in the future (e.g. clock skew)
-    // or if all user submissions are older than the default 52-week window (e.g. past year activity),
-    // anchor the 52 weeks to the latest submission date so the user's active dots are clearly displayed.
+    // If user's latest submission is ahead or in the past, anchor the grid to that reference
+    let anchorDate = today;
     const sortedDates = Object.keys(normalizedMap).sort();
-    let anchorDate = new Date(now);
 
     if (sortedDates.length > 0) {
         const latestDateStr = sortedDates[sortedDates.length - 1];
-        const latestTime = new Date(`${latestDateStr}T12:00:00Z`).getTime();
-        const nowTime = now.getTime();
-        const msInWindow = weeksCount * 7 * 86400000;
-
-        if (latestTime > nowTime) {
-            anchorDate = new Date(latestTime);
-        } else if (nowTime - latestTime > msInWindow) {
-            anchorDate = new Date(latestTime);
+        const [ly, lm, ld] = latestDateStr.split("-").map(Number);
+        if (ly && lm && ld) {
+            const latestTime = new Date(ly, lm - 1, ld);
+            const msInWindow = weeksCount * 7 * 86400000;
+            if (latestTime.getTime() > today.getTime()) {
+                anchorDate = latestTime;
+            } else if (today.getTime() - latestTime.getTime() > msInWindow) {
+                anchorDate = latestTime;
+            }
         }
     }
 
-    const days: DaySubmissionCell[] = [];
+    // Align each column to start on Sunday (Row 0 = Sunday, Row 1 = Monday, ..., Row 6 = Saturday)
+    // Matches the left axis labels: Mon (row 1), Wed (row 3), Fri (row 5)
+    const anchorDayOfWeek = anchorDate.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const currentWeekSunday = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate() - anchorDayOfWeek);
 
-    for (let i = totalDays - 1; i >= 0; i--) {
-        const d = new Date(anchorDate);
-        d.setDate(anchorDate.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0] || "";
-        const localDateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const displayDate = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-        const entry = normalizedMap[dateStr] || normalizedMap[localDateKey];
-        const count = entry ? entry.count : 0;
-        const platforms = entry ? entry.platforms : [];
-
-        days.push({
-            dateStr: localDateKey,
-            displayDate,
-            count,
-            level: getSubmissionLevel(count),
-            platforms,
-        });
-    }
+    // The grid starts (weeksCount - 1) weeks before currentWeekSunday
+    const gridStartSunday = new Date(currentWeekSunday.getFullYear(), currentWeekSunday.getMonth(), currentWeekSunday.getDate() - (weeksCount - 1) * 7);
 
     const weeks: DaySubmissionCell[][] = [];
+
     for (let w = 0; w < weeksCount; w++) {
-        weeks.push(days.slice(w * 7, (w + 1) * 7));
+        const weekDays: DaySubmissionCell[] = [];
+        const weekSunday = new Date(gridStartSunday.getFullYear(), gridStartSunday.getMonth(), gridStartSunday.getDate() + w * 7);
+
+        for (let r = 0; r < 7; r++) {
+            const cellDate = new Date(weekSunday.getFullYear(), weekSunday.getMonth(), weekSunday.getDate() + r);
+            const y = cellDate.getFullYear();
+            const m = String(cellDate.getMonth() + 1).padStart(2, "0");
+            const d = String(cellDate.getDate()).padStart(2, "0");
+            const dateStr = `${y}-${m}-${d}`;
+            const displayDate = cellDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+            const isFuture = cellDate.getTime() > anchorDate.getTime();
+            const entry = !isFuture ? normalizedMap[dateStr] : undefined;
+            const count = entry ? entry.count : 0;
+            const platforms = entry ? entry.platforms : [];
+
+            weekDays.push({
+                dateStr,
+                displayDate,
+                count,
+                level: getSubmissionLevel(count),
+                platforms,
+            });
+        }
+        weeks.push(weekDays);
     }
 
-    // Compute month names spread across the columns anchored to anchorDate
+    // Compute month names spread across columns
     const monthsCount = weeksCount === 52 ? 12 : 4;
     const monthNames: string[] = [];
     for (let m = monthsCount - 1; m >= 0; m--) {
-        const mDate = new Date(anchorDate);
-        mDate.setMonth(anchorDate.getMonth() - m);
+        const mDate = new Date(anchorDate.getFullYear(), anchorDate.getMonth() - m, 1);
         monthNames.push(mDate.toLocaleDateString("en-US", { month: "short" }));
     }
 
@@ -339,8 +364,8 @@ export function aggregateClientPortalsSubmissions(
     for (const [pId, rawProfile] of Object.entries(connectedPortals || {})) {
         if (!rawProfile) continue;
         const lowerId = pId.toLowerCase().trim();
-        // Skip GitHub and system metadata
-        if (lowerId === "github" || lowerId.startsWith("_") || lowerId === "theme") continue;
+        // Strictly target ONLY coding practice platforms (ignore GitHub, blogs, system metadata)
+        if (!CODING_PRACTICE_PLATFORMS.has(lowerId)) continue;
 
         const profile = rawProfile;
         const username = (profile.username || profile.portal_username || "").trim();

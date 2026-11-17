@@ -18,6 +18,7 @@ import {
     invalidatePrivateProfileCache,
     invalidateAllUserCaches,
 } from "../../redis/cache/cache-profile.js";
+import { isDemoProfileHandle } from "../../validators/usernamePolicy.js";
 import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
 import {
     getCachedResumeMetadata,
@@ -292,7 +293,7 @@ export const handleStreamResume = async (
 
         if (usernameParam) {
             const cleanUser = usernameParam.trim().toLowerCase();
-            if (cleanUser === "vineet-chandel" || cleanUser === "demo" || cleanUser === "demo-profile") {
+            if (isDemoProfileHandle(cleanUser)) {
                 const demoUrl =
                     "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
                 return streamPdfWithCache(
@@ -862,7 +863,7 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
 
         // Demo profile support
         const cleanUser = username.trim().toLowerCase();
-        if (cleanUser === "vineet-chandel" || cleanUser === "demo" || cleanUser === "demo-profile") {
+        if (isDemoProfileHandle(cleanUser)) {
             const demoPayload = {
                 success: true,
                 hasResume: true,

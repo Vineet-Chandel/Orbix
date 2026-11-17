@@ -212,7 +212,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
             };
         } else if (newType === "file_upload" && !updated.validation) {
             updated.validation = {
-                allowedFileTypes: ["pdf", "image", "document", "zip"],
+                allowedFileTypes: ["pdf", "png", "jpg"],
                 maxFileSizeMb: 10,
                 maxFiles: 1,
             };
@@ -993,39 +993,86 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
 
                 {/* 6. File Upload */}
                 {question.type === "file_upload" && (
-                    <div className="p-4 rounded-2xl bg-neutral-50 border border-black/20 space-y-4">
-                        <div className="flex items-center gap-2 text-xs font-black text-neutral-800">
-                            <UploadCloud className="w-4 h-4 text-sky-600" />
-                            <span>File Upload Configuration</span>
+                    <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-black/20 dark:border-white/10 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs font-black text-neutral-800 dark:text-neutral-100">
+                                <UploadCloud className="w-4 h-4 text-sky-600" />
+                                <span>File Upload Configuration</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const allIds = ["pdf", "png", "jpg", "docx", "txt", "excel", "zip"];
+                                        onChange({
+                                            ...question,
+                                            validation: {
+                                                ...question.validation,
+                                                allowedFileTypes: allIds,
+                                            },
+                                        });
+                                    }}
+                                    className="text-[11px] font-bold text-sky-700 dark:text-sky-400 hover:underline cursor-pointer"
+                                >
+                                    Select All
+                                </button>
+                                <span className="text-neutral-300 dark:text-neutral-600">•</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onChange({
+                                            ...question,
+                                            validation: {
+                                                ...question.validation,
+                                                allowedFileTypes: [],
+                                            },
+                                        });
+                                    }}
+                                    className="text-[11px] font-bold text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 cursor-pointer"
+                                >
+                                    Clear
+                                </button>
+                            </div>
                         </div>
 
                         {/* Allowed File Types */}
                         <div className="space-y-2">
-                            <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">Allowed File Formats:</span>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                                    Allowed File Formats:
+                                </span>
+                                <span className="text-[10px] text-neutral-500 font-medium">
+                                    Select format restrictions for student submissions
+                                </span>
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                                 {[
-                                    { id: "pdf", label: "PDF Document" },
-                                    { id: "image", label: "Images (JPG, PNG)" },
-                                    { id: "document", label: "Word / DOCX / TXT" },
-                                    { id: "spreadsheet", label: "Excel / Spreadsheet" },
-                                    { id: "zip", label: "ZIP / Tarball Archive" },
+                                    { id: "pdf", label: "PDF Document (.pdf)", legacy: ["pdf"] },
+                                    { id: "png", label: "PNG Image (.png)", legacy: ["image", "png"] },
+                                    { id: "jpg", label: "Image (JPG / JPEG)", legacy: ["image", "jpg", "jpeg"] },
+                                    { id: "docx", label: "Word / DOCX (.doc, .docx)", legacy: ["document", "docs", "docx", "doc"] },
+                                    { id: "txt", label: "Plain Text (.txt)", legacy: ["document", "txt"] },
+                                    { id: "excel", label: "Excel / Spreadsheet (.xlsx, .csv)", legacy: ["spreadsheet", "excel", "xls", "xlsx", "csv"] },
+                                    { id: "zip", label: "ZIP / Tarball Archive (.zip, .tar, .7z)", legacy: ["zip", "archive"] },
                                 ].map((type) => {
                                     const currentAllowed = question.validation?.allowedFileTypes || [];
-                                    const isChecked = currentAllowed.includes(type.id as any);
+                                    const isChecked = currentAllowed.some((t) => type.legacy.includes(t));
 
                                     return (
                                         <NeoCheckbox
                                             key={type.id}
                                             checked={isChecked}
                                             onCheckedChange={(checked) => {
-                                                const updatedTypes = checked
-                                                    ? [...currentAllowed, type.id as any]
-                                                    : currentAllowed.filter((t) => t !== type.id);
+                                                // Remove all legacy aliases for this type
+                                                let updated = currentAllowed.filter((t) => !type.legacy.includes(t));
+                                                if (checked) {
+                                                    updated.push(type.id);
+                                                }
                                                 onChange({
                                                     ...question,
                                                     validation: {
                                                         ...question.validation,
-                                                        allowedFileTypes: updatedTypes,
+                                                        allowedFileTypes: updated,
                                                     },
                                                 });
                                             }}
@@ -1082,8 +1129,24 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                     <option value="2">2 files</option>
                                     <option value="3">3 files</option>
                                     <option value="5">5 files</option>
+                                    <option value="10">10 files</option>
                                 </NeoSelect>
                             </div>
+                        </div>
+
+                        {/* Live Restriction Rule Summary */}
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-black/40 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+                                <span className="font-bold text-black dark:text-white">Active Rule:</span>
+                                <span>
+                                    {(question.validation?.allowedFileTypes?.length ?? 0) === 0
+                                        ? "Accepts all standard document/image formats"
+                                        : `Accepts ${(question.validation?.allowedFileTypes || []).map((t) => t.toUpperCase()).join(", ")}`}
+                                </span>
+                            </div>
+                            <span className="font-bold text-sky-700 dark:text-sky-400">
+                                Up to {question.validation?.maxFiles ?? 1} file(s) • Max {question.validation?.maxFileSizeMb ?? 10} MB each
+                            </span>
                         </div>
                     </div>
                 )}

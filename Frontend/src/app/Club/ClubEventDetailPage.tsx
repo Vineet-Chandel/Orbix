@@ -29,6 +29,7 @@ import {
     Settings,
     Globe2,
     Layers,
+    Users,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -42,6 +43,7 @@ import { useToast } from "../../context/ToastContext";
 import {
     fetchClubEventApplications,
     updateApplicantStatus,
+    batchUpdateApplicantStatus,
     type ClubEventApplicantRow,
     type ClubEventApplicationsResponse,
 } from "../../api/collegeEventsApi";
@@ -386,6 +388,54 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         }
     };
 
+    // Handle Batch Applicant Status Change (Accept All or Reject All)
+    const handleBatchApplicantStatusChange = async (
+        applicants: ClubEventApplicantRow[],
+        nextStatus: "registered" | "rejected",
+        reviewNotes?: string
+    ) => {
+        if (!event || applicants.length === 0) return;
+        try {
+            const applicantIds = applicants.map((a) => a.id);
+            setUpdatingApplicantId("batch");
+            await batchUpdateApplicantStatus(event.id, applicantIds, nextStatus, reviewNotes);
+            const actionWord = nextStatus === "registered" ? "accepted" : "rejected";
+            toast.success(`Successfully ${actionWord} ${applicants.length} applicant(s).`);
+
+            const idSet = new Set(applicantIds);
+            setAppsData((prev) => {
+                if (!prev) return prev;
+                const updatedApps = prev.applications.map((a) =>
+                    idSet.has(a.id)
+                        ? {
+                              ...a,
+                              status: nextStatus,
+                          }
+                        : a
+                );
+                return {
+                    ...prev,
+                    summary: {
+                        ...prev.summary,
+                        total: updatedApps.length,
+                        pending: updatedApps.filter((a) => a.status === "pending").length,
+                        registered: updatedApps.filter((a) => a.status === "registered").length,
+                        attended: updatedApps.filter((a) => a.status === "attended").length,
+                        waitlisted: updatedApps.filter((a) => a.status === "waitlisted").length,
+                        rejected: updatedApps.filter((a) => a.status === "rejected").length,
+                        cancelled: updatedApps.filter((a) => a.status === "cancelled").length,
+                    },
+                    applications: updatedApps,
+                };
+            });
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to batch update applicants.");
+            throw err;
+        } finally {
+            setUpdatingApplicantId(null);
+        }
+    };
+
     // Extract dynamic form question columns from form structure and response answers
     const formQuestions = useMemo<DynamicQuestionMeta[]>(() => {
         const questions: DynamicQuestionMeta[] = [];
@@ -430,14 +480,22 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     if (!seenIds.has(k)) {
                         seenIds.add(k);
                         let cleanLabel = k;
-                        if (cleanLabel.startsWith("q_")) {
+                        if (cleanLabel === "__stagedTeammates") {
+                            cleanLabel = "Teammates & Invites";
+                        } else if (cleanLabel === "__teamName") {
+                            cleanLabel = "Team Name";
+                        } else if (cleanLabel === "__teamCode") {
+                            cleanLabel = "Team Join Code";
+                        } else if (cleanLabel === "__teamAction") {
+                            cleanLabel = "Team Registration Mode";
+                        } else if (cleanLabel.startsWith("q_")) {
                             cleanLabel = cleanLabel.substring(2).replace(/_/g, " ");
                             cleanLabel = cleanLabel.charAt(0).toUpperCase() + cleanLabel.slice(1);
                         }
                         questions.push({
                             id: k,
                             label: cleanLabel,
-                            type: "text",
+                            type: k === "__stagedTeammates" ? "team_members" : "text",
                         });
                     }
                 });
@@ -870,48 +928,69 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             />
                         </div>
 
-                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tight leading-tight">
-                            {event.title}
-                        </h1>
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                            <div className="space-y-2 flex-1 min-w-0">
+                                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tight leading-tight">
+                                    {event.title}
+                                </h1>
 
-                        <p className="text-sm text-neutral-700 font-medium leading-relaxed max-w-4xl">
-                            {event.summary || event.description || "No description provided."}
-                        </p>
+                                <p className="text-sm text-neutral-700 font-medium leading-relaxed max-w-4xl">
+                                    {event.summary || event.description || "No description provided."}
+                                </p>
 
-                        <div className="pt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs sm:text-sm text-neutral-700 font-bold">
-                            <span className="flex items-center gap-1.5 bg-[#FAF6EE] px-3 py-1 rounded-xl border border-black">
-                                <Clock className="w-4 h-4 text-neutral-600" />
-                                {new Date(event.startsAt).toLocaleDateString(undefined, {
-                                    weekday: "short",
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                })}
-                            </span>
+                                <div className="pt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs sm:text-sm text-neutral-700 font-bold">
+                                    <span className="flex items-center gap-1.5 bg-[#FAF6EE] px-3 py-1 rounded-xl border border-black">
+                                        <Clock className="w-4 h-4 text-neutral-600" />
+                                        {new Date(event.startsAt).toLocaleDateString(undefined, {
+                                            weekday: "short",
+                                            day: "numeric",
+                                            month: "short",
+                                            year: "numeric",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                        })}
+                                    </span>
 
-                            <span className="flex items-center gap-1.5 bg-[#FAF6EE] px-3 py-1 rounded-xl border border-black">
-                                <MapPin className="w-4 h-4 text-neutral-600" />
-                                {event.venueOrLocation ||
-                                    (event.locationType === "virtual"
-                                        ? "Virtual (Online)"
-                                        : event.locationType === "hybrid"
-                                        ? "Hybrid"
-                                        : "Campus Hall")}
-                            </span>
+                                    <span className="flex items-center gap-1.5 bg-[#FAF6EE] px-3 py-1 rounded-xl border border-black">
+                                        <MapPin className="w-4 h-4 text-neutral-600" />
+                                        {event.venueOrLocation ||
+                                            (event.locationType === "virtual"
+                                                ? "Virtual (Online)"
+                                                : event.locationType === "hybrid"
+                                                ? "Hybrid"
+                                                : "Campus Hall")}
+                                    </span>
 
-                            {event.registrationUrl && (
-                                <a
-                                    href={event.registrationUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 bg-[#38BDF8]/20 text-sky-950 px-3 py-1 rounded-xl border border-black hover:underline font-black"
-                                >
-                                    <span>External RSVP Form</span>
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                            )}
+                                    {event.registrationUrl && (
+                                        <a
+                                            href={event.registrationUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 bg-[#38BDF8]/20 text-sky-950 px-3 py-1 rounded-xl border border-black hover:underline font-black"
+                                        >
+                                            <span>External RSVP Form</span>
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Team Size Widget (lucide Users icon + Team Size header + Individual / Min-Max Members) */}
+                            <div className="shrink-0 p-3 sm:p-3.5 rounded-2xl bg-white border-2 sm:border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3 self-start">
+                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl border-2 border-black bg-[#FAF6EE] flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                    <Users className="w-5 h-5 text-black stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0 pr-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                        Team Size
+                                    </span>
+                                    <span className="text-xs sm:text-sm font-black text-black block truncate">
+                                        {event.isTeamEvent
+                                            ? `${event.minTeamSize || 2} - ${event.maxTeamSize || 4} Members`
+                                            : "Individual Participation"}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1211,6 +1290,11 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     onSetColumnFilter={setColumnFilter}
                                     onStatusChange={handleApplicantStatusChange}
                                     updatingApplicantId={updatingApplicantId}
+                                    eventId={event?.id}
+                                    isTeamEvent={event?.isTeamEvent}
+                                    minTeamSize={event?.minTeamSize}
+                                    maxTeamSize={event?.maxTeamSize}
+                                    onBatchStatusChange={handleBatchApplicantStatusChange}
                                 />
                             )}
                         </div>

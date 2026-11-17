@@ -78,10 +78,7 @@ export const PortalProfileCard = ({
             setFetchError(null);
             onFetchStateChange?.({ loading: true, error: null, profile: null });
 
-            const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`);
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
-                : [primaryEndpoint];
+            const endpoints = [buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`)];
 
             let data: PortalProfileData | null = null;
             let errorMessage: string | null = null;

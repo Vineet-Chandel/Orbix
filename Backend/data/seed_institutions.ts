@@ -1,10 +1,20 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { query } from "../src/database/client.js";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Robustly load .env from Backend directory or CWD before executing database queries
+const backendEnvPath = path.resolve(__dirname, "../.env");
+if (fs.existsSync(backendEnvPath)) {
+    dotenv.config({ path: backendEnvPath });
+} else {
+    dotenv.config();
+}
+
+import { query } from "../src/database/client.js";
 
 interface RawInstitutionRecord {
     aisheCode: string;

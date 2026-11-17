@@ -1,6 +1,7 @@
-export type ColumnGroup = "action" | "status" | "personal" | "response" | "timestamp";
+export type ColumnGroup = "select" | "action" | "status" | "personal" | "response" | "timestamp";
 
 export type ColumnType =
+    | "select"
     | "action"
     | "status"
     | "text"

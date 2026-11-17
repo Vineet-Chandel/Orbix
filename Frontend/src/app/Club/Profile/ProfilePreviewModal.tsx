@@ -124,12 +124,6 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                         </span>
                                     </div>
                                 )}
-                                <div className="absolute top-3 right-3 flex items-center gap-2">
-                                    <span className="px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-xs border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
-                                        <VerifiedBadge size="xs" />
-                                        <span>Verified on Orbix</span>
-                                    </span>
-                                </div>
                             </div>
 
                             {/* Identity Info */}
@@ -207,7 +201,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                                   className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black text-[11px] font-black text-black flex items-center gap-1.5"
                                               >
                                                   {getPlatformIcon(lnk.platform, "w-3 h-3")}
-                                                  <span>{lnk.label || lnk.platform}</span>
+                                                  <span>{lnk.label || (lnk.platform === "x" ? "X / Twitter" : lnk.platform === "whatsapp" ? "WhatsApp Community" : lnk.platform.charAt(0).toUpperCase() + lnk.platform.slice(1))}</span>
                                               </span>
                                           ))
                                         : club.websiteUrl && (

@@ -123,9 +123,18 @@ export function useEventEngagement(
     const { user, isAuthenticated } = useAppSelector((state) => state.user);
 
     const cleanId = String(eventId || "").trim().toLowerCase();
+    const isTemporaryId = Boolean(cleanId && (cleanId.startsWith("opt-") || cleanId.startsWith("temp-")));
 
     // Stale-While-Revalidate: check in-memory cache, then sessionStorage, then initial props
     const getInitialState = (): { likeCount: number; likedByViewer: boolean; shareCount: number; hasCachedData: boolean } => {
+        if (isTemporaryId) {
+            return {
+                likeCount: options?.initialLikeCount ?? 0,
+                likedByViewer: Boolean(options?.initialLiked),
+                shareCount: options?.initialShareCount ?? 0,
+                hasCachedData: true,
+            };
+        }
         const fromMem = eventEngagementCache.get(cleanId);
         if (fromMem) {
             return { likeCount: fromMem.likeCount, likedByViewer: fromMem.likedByViewer, shareCount: fromMem.shareCount, hasCachedData: true };
@@ -152,8 +161,8 @@ export function useEventEngagement(
     const [likeCount, setLikeCount] = useState<number>(initial.likeCount);
     const [likedByViewer, setLikedByViewer] = useState<boolean>(initial.likedByViewer);
     const [shareCount, setShareCount] = useState<number>(initial.shareCount);
-    // If cached data exists, loading starts as false so counts render instantly with zero layout shift
-    const [loading, setLoading] = useState<boolean>(!initial.hasCachedData);
+    // If cached data exists or it's a temporary optimistic event, loading starts as false
+    const [loading, setLoading] = useState<boolean>(!initial.hasCachedData && !isTemporaryId);
     const [isLiking, setIsLiking] = useState<boolean>(false);
     const [isSharing, setIsSharing] = useState<boolean>(false);
 
@@ -162,7 +171,7 @@ export function useEventEngagement(
 
     // Multi-instance synchronization (cards, modals, headers)
     useEffect(() => {
-        if (!cleanId) return;
+        if (!cleanId || isTemporaryId) return;
         if (!eventStateListeners.has(cleanId)) {
             eventStateListeners.set(cleanId, new Set());
         }
@@ -180,11 +189,14 @@ export function useEventEngagement(
                 eventStateListeners.delete(cleanId);
             }
         };
-    }, [cleanId]);
+    }, [cleanId, isTemporaryId]);
 
-    // Fetch authoritative state from backend
+    // Fetch authoritative state from backend (suppressed for optimistic temporary IDs)
     const fetchEngagement = useCallback(async () => {
-        if (!cleanId) return;
+        if (!cleanId || isTemporaryId) {
+            setLoading(false);
+            return;
+        }
 
         try {
             const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
@@ -232,7 +244,7 @@ export function useEventEngagement(
     // Core Like Mutation Execution
     const executeLikeMutation = useCallback(
         async (shouldLike: boolean) => {
-            if (isLikingRef.current || !cleanId) return;
+            if (isLikingRef.current || !cleanId || isTemporaryId) return;
             isLikingRef.current = true;
             setIsLiking(true);
 
@@ -323,7 +335,7 @@ export function useEventEngagement(
 
     // User-triggered like click
     const toggleLike = useCallback(async () => {
-        if (isLikingRef.current || !cleanId) return;
+        if (isLikingRef.current || !cleanId || isTemporaryId) return;
 
         // Guest user: save intent & redirect to sign in
         if (!isAuthenticated || !user) {
@@ -344,11 +356,11 @@ export function useEventEngagement(
         }
 
         await executeLikeMutation(!likedByViewer);
-    }, [isAuthenticated, user, cleanId, likedByViewer, executeLikeMutation, navigate, toast]);
+    }, [isAuthenticated, user, cleanId, isTemporaryId, likedByViewer, executeLikeMutation, navigate, toast]);
 
     // User-triggered external share click (with cancellation protection & clipboard fallback)
     const shareEvent = useCallback(async (): Promise<boolean> => {
-        if (!cleanId || isSharing) return false;
+        if (!cleanId || isSharing || isTemporaryId) return false;
         setIsSharing(true);
 
         const canonicalUrl = `${window.location.origin}/college-events?event=${encodeURIComponent(cleanId)}`;
@@ -496,17 +508,19 @@ export function useEventEngagement(
             }
 
             // Record link copy separately in background without affecting public share count
-            const idempotencyKey = `copy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-            const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
-            const headers: Record<string, string> = { "Content-Type": "application/json" };
-            if (token) headers["Authorization"] = `Bearer ${token}`;
+            if (!isTemporaryId) {
+                const idempotencyKey = `copy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+                const headers: Record<string, string> = { "Content-Type": "application/json" };
+                if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            fetch(`/api/events/${encodeURIComponent(cleanId)}/shares`, {
-                method: "POST",
-                headers,
-                credentials: "include",
-                body: JSON.stringify({ idempotencyKey, shareType: "copy_link", platform: "clipboard" }),
-            }).catch((err) => console.warn("[useEventEngagement] Failed to record link copy:", err));
+                fetch(`/api/events/${encodeURIComponent(cleanId)}/shares`, {
+                    method: "POST",
+                    headers,
+                    credentials: "include",
+                    body: JSON.stringify({ idempotencyKey, shareType: "copy_link", platform: "clipboard" }),
+                }).catch((err) => console.warn("[useEventEngagement] Failed to record link copy:", err));
+            }
 
             toast.success("Event link copied to clipboard!");
             return true;
@@ -515,7 +529,7 @@ export function useEventEngagement(
             toast.error("Failed to copy event link.");
             return false;
         }
-    }, [cleanId, toast]);
+    }, [cleanId, isTemporaryId, toast]);
 
     // User-triggered internal Orbix share to peer(s)
     const shareEventInternally = useCallback(
@@ -524,6 +538,9 @@ export function useEventEngagement(
             note?: string
         ): Promise<InternalShareResponse> => {
             if (!cleanId) return { success: false, deliveredCount: 0, error: "Missing event identifier" };
+            if (isTemporaryId) {
+                return { success: false, deliveredCount: 0, error: "Event is still saving. Please wait a moment." };
+            }
 
             const targetList = Array.isArray(recipientUserIds)
                 ? recipientUserIds.filter(Boolean)

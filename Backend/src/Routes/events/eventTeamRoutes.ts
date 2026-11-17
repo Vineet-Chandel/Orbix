@@ -11,7 +11,7 @@ export const eventTeamRouter = express.Router();
  */
 eventTeamRouter.post("/events/:eventId/teams", authenticate, async (req: Request, res: Response) => {
     try {
-        const { eventId } = req.params;
+        const eventId = req.params.eventId as string;
         const userId = req.user!.id;
         const { name } = req.body;
 
@@ -36,7 +36,7 @@ eventTeamRouter.post("/events/:eventId/teams", authenticate, async (req: Request
  */
 eventTeamRouter.post("/events/:eventId/teams/join", authenticate, async (req: Request, res: Response) => {
     try {
-        const { eventId } = req.params;
+        const eventId = req.params.eventId as string;
         const userId = req.user!.id;
         const { teamCode } = req.body;
 
@@ -61,7 +61,7 @@ eventTeamRouter.post("/events/:eventId/teams/join", authenticate, async (req: Re
  */
 eventTeamRouter.get("/events/:eventId/my-team", authenticate, async (req: Request, res: Response) => {
     try {
-        const { eventId } = req.params;
+        const eventId = req.params.eventId as string;
         const userId = req.user!.id;
 
         const data = await ClubEventTeamService.getUserTeamForEvent(eventId, userId);
@@ -85,7 +85,7 @@ eventTeamRouter.get("/events/:eventId/my-team", authenticate, async (req: Reques
  */
 eventTeamRouter.get("/events/:eventId/teams/:teamId", authenticate, async (req: Request, res: Response) => {
     try {
-        const { teamId } = req.params;
+        const teamId = req.params.teamId as string;
         const userId = req.user!.id;
 
         const team = await ClubEventTeamService.getTeamDetails(teamId, userId);
@@ -103,12 +103,38 @@ eventTeamRouter.get("/events/:eventId/teams/:teamId", authenticate, async (req: 
 });
 
 /**
+ * GET /api/events/:eventId/search-users
+ * Search users by username during registration (before team is created)
+ */
+eventTeamRouter.get("/events/:eventId/search-users", authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = req.params.eventId as string;
+        const q = String(req.query.q || "");
+        const teamId = String(req.query.teamId || "new");
+        const currentUserId = req.user!.id;
+
+        const users = await ClubEventTeamService.searchUsersForTeam(eventId, teamId, q, currentUserId);
+        return res.json({
+            success: true,
+            users,
+        });
+    } catch (err: any) {
+        console.error("Search users error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to search users.",
+        });
+    }
+});
+
+/**
  * GET /api/events/:eventId/teams/:teamId/search-users
  * Search users by username to invite to this team
  */
 eventTeamRouter.get("/events/:eventId/teams/:teamId/search-users", authenticate, async (req: Request, res: Response) => {
     try {
-        const { eventId, teamId } = req.params;
+        const eventId = req.params.eventId as string;
+        const teamId = req.params.teamId as string;
         const q = String(req.query.q || "");
         const currentUserId = req.user!.id;
 
@@ -132,7 +158,8 @@ eventTeamRouter.get("/events/:eventId/teams/:teamId/search-users", authenticate,
  */
 eventTeamRouter.post("/events/:eventId/teams/:teamId/invites", authenticate, async (req: Request, res: Response) => {
     try {
-        const { eventId, teamId } = req.params;
+        const eventId = req.params.eventId as string;
+        const teamId = req.params.teamId as string;
         const leaderUserId = req.user!.id;
         const { username } = req.body;
 
@@ -147,6 +174,28 @@ eventTeamRouter.post("/events/:eventId/teams/:teamId/invites", authenticate, asy
         return res.status(err.statusCode || 500).json({
             success: false,
             message: err.message || "Failed to send invitation.",
+        });
+    }
+});
+
+/**
+ * DELETE /api/events/:eventId/teams/:teamId/invites/:invitationId
+ * Leader revokes / cancels a pending invitation
+ */
+eventTeamRouter.delete("/events/:eventId/teams/:teamId/invites/:invitationId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = req.params.eventId as string;
+        const teamId = req.params.teamId as string;
+        const invitationId = req.params.invitationId as string;
+        const leaderUserId = req.user!.id;
+
+        const result = await ClubEventTeamService.cancelInvitation(eventId, teamId, leaderUserId, invitationId);
+        return res.json(result);
+    } catch (err: any) {
+        console.error("Cancel invitation error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to revoke invitation.",
         });
     }
 });
@@ -178,7 +227,7 @@ eventTeamRouter.get("/events/invitations/my", authenticate, async (req: Request,
  */
 eventTeamRouter.post("/events/invitations/:invitationId/respond", authenticate, async (req: Request, res: Response) => {
     try {
-        const { invitationId } = req.params;
+        const invitationId = req.params.invitationId as string;
         const userId = req.user!.id;
         const { action } = req.body; // 'accept' | 'decline'
 
@@ -203,7 +252,7 @@ eventTeamRouter.post("/events/invitations/:invitationId/respond", authenticate, 
  */
 eventTeamRouter.post("/events/:eventId/teams/:teamId/leave", authenticate, async (req: Request, res: Response) => {
     try {
-        const { teamId } = req.params;
+        const teamId = req.params.teamId as string;
         const userId = req.user!.id;
 
         const result = await ClubEventTeamService.leaveTeam(teamId, userId);
@@ -223,7 +272,8 @@ eventTeamRouter.post("/events/:eventId/teams/:teamId/leave", authenticate, async
  */
 eventTeamRouter.delete("/events/:eventId/teams/:teamId/members/:targetUserId", authenticate, async (req: Request, res: Response) => {
     try {
-        const { teamId, targetUserId } = req.params;
+        const teamId = req.params.teamId as string;
+        const targetUserId = req.params.targetUserId as string;
         const leaderUserId = req.user!.id;
 
         const result = await ClubEventTeamService.removeMember(teamId, leaderUserId, targetUserId);
@@ -243,7 +293,7 @@ eventTeamRouter.delete("/events/:eventId/teams/:teamId/members/:targetUserId", a
  */
 eventTeamRouter.patch("/events/:eventId/teams/:teamId/rename", authenticate, async (req: Request, res: Response) => {
     try {
-        const { teamId } = req.params;
+        const teamId = req.params.teamId as string;
         const leaderUserId = req.user!.id;
         const { name } = req.body;
 
@@ -264,7 +314,7 @@ eventTeamRouter.patch("/events/:eventId/teams/:teamId/rename", authenticate, asy
  */
 eventTeamRouter.get("/club/events/:eventId/teams", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const { eventId } = req.params;
+        const eventId = req.params.eventId as string;
         const clubId = (req as any).club?.id;
 
         if (!clubId) {

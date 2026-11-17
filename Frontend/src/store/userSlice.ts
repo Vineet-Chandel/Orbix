@@ -124,53 +124,40 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
         }
 
         const fetchPromise = (async () => {
-            const primaryEndpoint = buildApiUrl("/api/profile/me");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/profile/me"]
-                : [primaryEndpoint];
-            let lastError = "Unable to fetch profile";
-
-            for (const url of endpoints) {
-                try {
-                    const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
-                    const headers: Record<string, string> = {
-                        "Content-Type": "application/json",
-                    };
-                    if (token) {
-                        headers["Authorization"] = `Bearer ${token}`;
-                    }
-
-                    const response = await fetch(url, {
-                        method: "GET",
-                        headers,
-                        credentials: "include",
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data?.user) {
-                            const u = data.user;
-                            if (typeof u.links === "string") {
-                                try {
-                                    u.links = JSON.parse(u.links);
-                                } catch {
-                                    u.links = [];
-                                }
-                            }
-                            return u as User;
-                        }
-                    } else if (response.status === 401) {
-                        throw new Error("Unauthorized");
-                    }
-                } catch (err: any) {
-                    if (err.message === "Unauthorized") {
-                        throw err;
-                    }
-                    lastError = err?.message || lastError;
-                }
+            const endpoint = buildApiUrl("/api/profile/me");
+            const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (token) {
+                headers["Authorization"] = `Bearer ${token}`;
             }
 
-            throw new Error(lastError);
+            const response = await fetch(endpoint, {
+                method: "GET",
+                headers,
+                credentials: "include",
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data?.user) {
+                    const u = data.user;
+                    if (typeof u.links === "string") {
+                        try {
+                            u.links = JSON.parse(u.links);
+                        } catch {
+                            u.links = [];
+                        }
+                    }
+                    return u as User;
+                }
+            } else if (response.status === 401) {
+                throw new Error("Unauthorized");
+            }
+
+            const errData = await response.json().catch(() => null);
+            throw new Error(errData?.message || `Failed to fetch profile (${response.status})`);
         })();
 
         inFlightFetchPromise = fetchPromise;

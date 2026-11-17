@@ -37,7 +37,7 @@ export interface FormValidationRules {
     minSelected?: number | undefined;
     maxSelected?: number | undefined;
     exactSelected?: number | undefined;
-    allowedFileTypes?: ("image" | "pdf" | "document" | "spreadsheet" | "zip")[] | undefined;
+    allowedFileTypes?: string[] | undefined;
     maxFileSizeMb?: number | undefined;
     maxFiles?: number | undefined;
     requireResponseEachRow?: boolean | undefined;

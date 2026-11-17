@@ -1,3 +1,5 @@
+import type { ConfiguredStage } from "./TimelineBuilder/types";
+
 /**
  * ORBIX — Create New Club Event: Sequential Step Navigation Guard & Validation
  *
@@ -31,7 +33,7 @@ export interface FormErrors {
 
 export interface WizardNavigationState {
     form: FormValidationState;
-    stages: Array<unknown>;
+    stages: ConfiguredStage[];
     totalQuestions: number;
     isUploadingBanner?: boolean;
 }
@@ -51,6 +53,135 @@ export interface NavigationGuardResult {
 }
 
 export const URL_REGEX = /^(https?:\/\/)([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?(\?.*)?$/i;
+
+/**
+ * Format ISO or date string for user-friendly display in error messages and UI badges
+ */
+export const formatDateTimeDisplay = (isoOrStr?: string | null): string => {
+    if (!isoOrStr) return "";
+    try {
+        const d = new Date(isoOrStr);
+        if (isNaN(d.getTime())) return "";
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const m = months[d.getMonth()];
+        const day = d.getDate();
+        const y = d.getFullYear();
+        const h24 = d.getHours();
+        const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+        const mins = d.getMinutes() < 10 ? `0${d.getMinutes()}` : d.getMinutes();
+        const period = h24 >= 12 ? "PM" : "AM";
+        return `${m} ${day < 10 ? `0${day}` : day}, ${y} · ${h12 < 10 ? `0${h12}` : h12}:${mins} ${period}`;
+    } catch {
+        return "";
+    }
+};
+
+/**
+ * Format Date object to local datetime input string (YYYY-MM-DDTHH:mm), avoiding UTC shift
+ */
+export const formatDateToInput = (d: Date | string | null | undefined): string => {
+    if (!d) return "";
+    const dateObj = typeof d === "string" ? new Date(d) : d;
+    if (isNaN(dateObj.getTime())) return "";
+    const pad = (n: number) => (n < 10 ? `0${n}` : n);
+    return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+};
+
+export interface StageTimingValidation {
+    startsAtError?: string;
+    endsAtError?: string;
+    isOutOfBounds: boolean;
+    hasError: boolean;
+    summaryError?: string;
+}
+
+/**
+ * Validates stage boundaries against main event timeline in real-time.
+ */
+export const validateStageTiming = (
+    stage: {
+        id?: string;
+        name?: string;
+        startsAt?: string;
+        endsAt?: string;
+        stageOrder?: number;
+    },
+    eventStartsAt?: string | null,
+    eventEndsAt?: string | null
+): StageTimingValidation => {
+    let startsAtError: string | undefined;
+    let endsAtError: string | undefined;
+    let summaryError: string | undefined;
+    let isOutOfBounds = false;
+
+    if (!stage.startsAt) {
+        startsAtError = "Round start date and time is required.";
+    }
+    if (!stage.endsAt) {
+        endsAtError = "Round submission deadline is required.";
+    }
+
+    const stageStart = stage.startsAt ? new Date(stage.startsAt).getTime() : NaN;
+    const stageEnd = stage.endsAt ? new Date(stage.endsAt).getTime() : NaN;
+    const eventStart = eventStartsAt ? new Date(eventStartsAt).getTime() : NaN;
+    const eventEnd = eventEndsAt ? new Date(eventEndsAt).getTime() : NaN;
+
+    if (stage.startsAt && isNaN(stageStart)) {
+        startsAtError = "Invalid round start date and time.";
+    }
+    if (stage.endsAt && isNaN(stageEnd)) {
+        endsAtError = "Invalid round submission deadline.";
+    }
+
+    // 1. Check stage startsAt vs event startsAt
+    if (!isNaN(stageStart) && !isNaN(eventStart) && stageStart < eventStart) {
+        const formatted = formatDateTimeDisplay(eventStartsAt);
+        startsAtError = `Round cannot start before event starts (${formatted}).`;
+        isOutOfBounds = true;
+    }
+
+    // 2. Check stage startsAt vs event endsAt
+    if (!isNaN(stageStart) && !isNaN(eventEnd) && stageStart > eventEnd) {
+        const formatted = formatDateTimeDisplay(eventEndsAt);
+        startsAtError = `Round cannot start after event ends (${formatted}).`;
+        isOutOfBounds = true;
+    }
+
+    // 3. Check stage endsAt vs stage startsAt
+    if (!isNaN(stageStart) && !isNaN(stageEnd) && stageEnd < stageStart) {
+        endsAtError = "Submission deadline must be on or after round start time.";
+    }
+
+    // 4. Check stage endsAt vs event startsAt
+    if (!isNaN(stageEnd) && !isNaN(eventStart) && stageEnd < eventStart) {
+        const formatted = formatDateTimeDisplay(eventStartsAt);
+        endsAtError = `Submission deadline cannot be before event starts (${formatted}).`;
+        isOutOfBounds = true;
+    }
+
+    // 5. Check stage endsAt vs event endsAt
+    if (!isNaN(stageEnd) && !isNaN(eventEnd) && stageEnd > eventEnd) {
+        const formatted = formatDateTimeDisplay(eventEndsAt);
+        endsAtError = `Submission deadline cannot be after event ends (${formatted}).`;
+        isOutOfBounds = true;
+    }
+
+    const hasError = Boolean(startsAtError || endsAtError);
+
+    if (isOutOfBounds) {
+        summaryError = "Round timeline falls outside the main event schedule.";
+    } else if (hasError) {
+        summaryError = startsAtError || endsAtError;
+    }
+
+    return {
+        startsAtError,
+        endsAtError,
+        isOutOfBounds,
+        hasError,
+        summaryError,
+    };
+};
 
 /**
  * Validates Step 1: Event Information & Schedule
@@ -135,14 +266,33 @@ export const validateStep1 = (currentForm: FormValidationState): StepValidationR
 
 /**
  * Validates Step 2: Timeline & Stage Architecture
+ * Ensures at least 1 round exists, and all rounds are strictly within the main event timeline boundaries.
  */
-export const validateStep2 = (stages?: Array<unknown> | null): StepValidationResult => {
+export const validateStep2 = (
+    stages?: ConfiguredStage[] | null,
+    eventStartsAt?: string | null,
+    eventEndsAt?: string | null
+): StepValidationResult => {
     if (!stages || stages.length === 0) {
         return {
             isValid: false,
             errorMessage: "Please configure at least 1 round/stage in your timeline.",
         };
     }
+
+    for (let i = 0; i < stages.length; i++) {
+        const stage = stages[i];
+        const val = validateStageTiming(stage, eventStartsAt, eventEndsAt);
+        if (val.hasError) {
+            const stageLabel = stage.name ? `"${stage.name}" (Round ${stage.stageOrder || i + 1})` : `Round ${stage.stageOrder || i + 1}`;
+            const specificError = val.startsAtError || val.endsAtError || val.summaryError;
+            return {
+                isValid: false,
+                errorMessage: `${stageLabel}: ${specificError}`,
+            };
+        }
+    }
+
     return { isValid: true };
 };
 
@@ -175,6 +325,13 @@ export const validateStep4 = (coverImageUrl?: string | null, isUploadingBanner?:
             errorMessage: "Please select or upload a banner for your event.",
         };
     }
+    return { isValid: true };
+};
+
+/**
+ * Validates Step 5: Event Sponsors & Partners (Optional)
+ */
+export const validateStep5 = (_sponsors?: Array<unknown> | null): StepValidationResult => {
     return { isValid: true };
 };
 
@@ -215,13 +372,13 @@ export const evaluateStepNavigation = (
 
     // Forward Step 3+ requires Step 2 valid
     if (targetStep >= 3) {
-        const step2 = validateStep2(state.stages);
+        const step2 = validateStep2(state.stages, state.form.startsAt, state.form.endsAt);
         if (!step2.isValid) {
             return {
                 allowed: false,
                 targetStep,
                 blockingStep: 2,
-                errorMessage: step2.errorMessage || "Please configure at least 1 round/stage in your timeline.",
+                errorMessage: step2.errorMessage || "Please fix timeline stage boundary errors before proceeding.",
             };
         }
     }
@@ -239,7 +396,7 @@ export const evaluateStepNavigation = (
         }
     }
 
-    // Forward Step 5 requires Step 4 valid
+    // Forward Step 5+ requires Step 4 valid
     if (targetStep >= 5) {
         const step4 = validateStep4(state.form.coverImageUrl, state.isUploadingBanner);
         if (!step4.isValid) {
@@ -248,6 +405,19 @@ export const evaluateStepNavigation = (
                 targetStep,
                 blockingStep: 4,
                 errorMessage: step4.errorMessage || "Please select or upload a banner for your event.",
+            };
+        }
+    }
+
+    // Forward Step 6 requires Step 5 valid
+    if (targetStep >= 6) {
+        const step5 = validateStep5();
+        if (!step5.isValid) {
+            return {
+                allowed: false,
+                targetStep,
+                blockingStep: 5,
+                errorMessage: step5.errorMessage || "Please verify your sponsors configuration.",
             };
         }
     }
@@ -263,8 +433,8 @@ export const evaluateStepNavigation = (
  */
 export const getMaxPermittedStep = (state: WizardNavigationState): number => {
     if (!validateStep1(state.form).isValid) return 1;
-    if (!validateStep2(state.stages).isValid) return 2;
+    if (!validateStep2(state.stages, state.form.startsAt, state.form.endsAt).isValid) return 2;
     if (!validateStep3(state.totalQuestions).isValid) return 3;
     if (!validateStep4(state.form.coverImageUrl, state.isUploadingBanner).isValid) return 4;
-    return 5;
+    return 6;
 };

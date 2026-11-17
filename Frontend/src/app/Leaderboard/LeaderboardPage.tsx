@@ -77,18 +77,12 @@ export const LeaderboardPage: React.FC = () => {
         let isMounted = true;
         const fetchParticipating = async () => {
             try {
-                const primaryColleges = buildApiUrl("/api/leaderboard/colleges/participating");
-                const endpoints = import.meta.env.DEV
-                    ? [primaryColleges, "http://localhost:3000/api/leaderboard/colleges/participating"]
-                    : [primaryColleges];
+                const collegesUrl = buildApiUrl("/api/leaderboard/colleges/participating");
                 let res: Response | null = null;
-                for (const url of endpoints) {
-                    try {
-                        res = await fetch(url, { credentials: "include" });
-                        if (res.ok) break;
-                    } catch {
-                        // try fallback
-                    }
+                try {
+                    res = await fetch(collegesUrl, { credentials: "include" });
+                } catch {
+                    // network error
                 }
 
                 if (res && res.ok && isMounted) {
@@ -212,19 +206,12 @@ export const LeaderboardPage: React.FC = () => {
                 endpointPath = `/api/leaderboard/colleges/${encodeURIComponent(selectedCollege.id)}?${queryParams.toString()}`;
             }
 
-            const primaryRankings = buildApiUrl(endpointPath);
-            const endpoints = import.meta.env.DEV
-                ? [primaryRankings, `http://localhost:3000${endpointPath}`]
-                : [primaryRankings];
-
+            const rankingsUrl = buildApiUrl(endpointPath);
             let res: Response | null = null;
-            for (const url of endpoints) {
-                try {
-                    res = await fetch(url, { credentials: "include" });
-                    if (res.ok) break;
-                } catch {
-                    // try fallback
-                }
+            try {
+                res = await fetch(rankingsUrl, { credentials: "include" });
+            } catch {
+                // network error
             }
 
             if (!res || !res.ok) {
@@ -295,9 +282,9 @@ export const LeaderboardPage: React.FC = () => {
                 }
             }
         } catch (err: any) {
-            const errorMsg = err.message || "Failed to fetch leaderboard data";
+            const errorMsg = err.message || "Leaderboard standings are syncing. Please refresh in a moment.";
             toast.error(errorMsg, {
-                title: activeTab === "college" ? "College League Unavailable" : "Leaderboard Unavailable",
+                title: activeTab === "college" ? "Campus Standings" : "Leaderboard Notice",
             });
         } finally {
             setIsLoading(false);
@@ -314,22 +301,16 @@ export const LeaderboardPage: React.FC = () => {
     const handleSyncNow = async () => {
         setIsSyncing(true);
         try {
-            const primarySync = buildApiUrl("/api/leaderboard/sync");
-            const endpoints = import.meta.env.DEV
-                ? [primarySync, "http://localhost:3000/api/leaderboard/sync"]
-                : [primarySync];
+            const syncUrl = buildApiUrl("/api/leaderboard/sync");
             let res: Response | null = null;
-            for (const url of endpoints) {
-                try {
-                    res = await fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                    });
-                    if (res.ok) break;
-                } catch {
-                    // Try fallback
-                }
+            try {
+                res = await fetch(syncUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                });
+            } catch {
+                // network error
             }
 
             if (res && res.ok) {

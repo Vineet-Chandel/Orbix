@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
     Building2,
     GraduationCap,
@@ -17,13 +17,13 @@ import {
     Heart,
     Globe2,
     SlidersHorizontal,
+    Lock,
 } from "lucide-react";
-import { ClubCard } from "../../../components/ClubCard";
-import { ClubDetailModal } from "../../../components/ClubDetailModal";
-import { InviteCampusLeadsModal } from "../../../components/InviteCampusLeadsModal";
-import { CollegeEventDetailModal } from "../../../app/Events/CollegeEventDetailModal";
-import { NeoSelect } from "../../../components/NeoSelect";
-import { IndiaMapBackdrop, CampusPillarsBackdrop } from "../../../components/ScopeBackdrops";
+import { ClubCard } from "../../../../components/ClubCard";
+import { ClubDetailModal } from "../../../../components/ClubDetailModal";
+import { InviteCampusLeadsModal } from "../../../../components/InviteCampusLeadsModal";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { IndiaMapBackdrop, CampusPillarsBackdrop } from "../../../../components/ScopeBackdrops";
 import { MobilePinnedHorizontalCards } from "./MobilePinnedHorizontalCards";
 import {
     MOCK_COLLEGES,
@@ -31,8 +31,8 @@ import {
     MOCK_COLLEGE_EVENTS_DATA,
     type MockCollegeOption,
 } from "./mockClubs";
-import type { CollegeClubItem } from "../../../utils/clubProfileApi";
-import type { CollegeEventItem } from "../../../api/collegeEventsApi";
+import type { CollegeClubItem } from "../../../../utils/clubProfileApi";
+import type { CollegeEventItem } from "../../../../api/collegeEventsApi";
 
 // Helpers for authentic date and time formatting
 const formatEventTime = (startsAt: string, endsAt: string | null) => {
@@ -81,6 +81,7 @@ export const ClubsShowcase: React.FC = () => {
     // =========================================================================
     // CLUBS SECTION STATE & FILTERS (Matches StudentCampusClubsView)
     // =========================================================================
+    const navigate = useNavigate();
     const [clubsList] = useState<CollegeClubItem[]>(MOCK_CLUBS_DATA);
     const [clubSearchQuery, setClubSearchQuery] = useState("");
     const [selectedClubCategory, setSelectedClubCategory] = useState<string>("all");
@@ -93,9 +94,8 @@ export const ClubsShowcase: React.FC = () => {
     // =========================================================================
     const [eventsList, setEventsList] = useState<CollegeEventItem[]>(MOCK_COLLEGE_EVENTS_DATA);
     const [eventSearchQuery, setEventSearchQuery] = useState("");
-    const [eventTimeFilter, setEventTimeFilter] = useState<"live" | "today" | "completed" | "passes" | "all">("live");
+    const [eventTimeFilter, setEventTimeFilter] = useState<"live" | "today" | "closed" | "completed" | "passes" | "all">("live");
     const [selectedEventClubId, setSelectedEventClubId] = useState<string>("all");
-    const [selectedEventForModal, setSelectedEventForModal] = useState<CollegeEventItem | null>(null);
 
     // Modals
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -165,6 +165,56 @@ export const ClubsShowcase: React.FC = () => {
         return clubsList.filter((c) => c.recruitmentStatus === "open").length;
     }, [clubsList]);
 
+    // Helpers for registration deadline and timeline status
+    const checkIsRegistrationClosed = (ev: CollegeEventItem): boolean => {
+        if (ev.status === "completed" || ev.status === "cancelled") return true;
+        if (typeof ev.isRegistrationClosed === "boolean") return ev.isRegistrationClosed;
+        if (ev.registrationDeadline) {
+            const deadlineMs = new Date(ev.registrationDeadline).getTime();
+            if (!isNaN(deadlineMs)) return deadlineMs < Date.now();
+        }
+        if (ev.endsAt) {
+            const endsMs = new Date(ev.endsAt).getTime();
+            if (!isNaN(endsMs)) return endsMs < Date.now();
+        }
+        return false;
+    };
+
+    const checkIsRegistrationUpcoming = (ev: CollegeEventItem): boolean => {
+        if (ev.status === "completed" || ev.status === "cancelled") return false;
+        if (typeof ev.isRegistrationUpcoming === "boolean") return ev.isRegistrationUpcoming;
+        if (ev.registrationStartsAt) {
+            const startsMs = new Date(ev.registrationStartsAt).getTime();
+            if (!isNaN(startsMs)) return startsMs > Date.now();
+        }
+        return false;
+    };
+
+    // Events Subsets and Dynamic Counts
+    const liveEventsCount = useMemo(
+        () => eventsList.filter((e) => e.status !== "completed" && !checkIsRegistrationClosed(e)).length,
+        [eventsList]
+    );
+    const todayEventsCount = useMemo(
+        () => eventsList.filter((e) => {
+            const today = new Date().toDateString();
+            return new Date(e.startsAt).toDateString() === today && e.status !== "completed";
+        }).length,
+        [eventsList]
+    );
+    const closedEventsCount = useMemo(
+        () => eventsList.filter((e) => e.status !== "completed" && checkIsRegistrationClosed(e)).length,
+        [eventsList]
+    );
+    const completedEventsCount = useMemo(
+        () => eventsList.filter((e) => e.status === "completed").length,
+        [eventsList]
+    );
+    const passesCount = useMemo(
+        () => eventsList.filter((e) => e.isRegistered).length,
+        [eventsList]
+    );
+
     // Events Filtering
     const allCampusEvents = useMemo(
         () => eventsList.filter((e) => e.scope !== "PAN_INDIA"),
@@ -200,8 +250,13 @@ export const ClubsShowcase: React.FC = () => {
                 const today = new Date().toDateString();
                 return new Date(e.startsAt).toDateString() === today;
             });
+        } else if (eventTimeFilter === "closed") {
+            list = list.filter((e) => e.status !== "completed" && checkIsRegistrationClosed(e));
         } else if (eventTimeFilter === "passes") {
             list = list.filter((e) => e.isRegistered);
+        } else {
+            // "live" or "all"
+            list = list.filter((e) => e.status !== "completed" && !checkIsRegistrationClosed(e));
         }
 
         return list;
@@ -235,7 +290,7 @@ export const ClubsShowcase: React.FC = () => {
 
     // Quick Apply Interaction
     const handleApplyEvent = (ev: CollegeEventItem) => {
-        setSelectedEventForModal(ev);
+        navigate(`/college-events/${ev.id}${ev.slug ? `/${ev.slug}` : ""}?action=register`);
     };
 
     return (
@@ -476,16 +531,14 @@ export const ClubsShowcase: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setOnlyRecruiting(!onlyRecruiting)}
-                                    className={`px-3 py-2 rounded-xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-all cursor-pointer ${
-                                        onlyRecruiting
-                                            ? "bg-[#a2ff86] text-black"
-                                            : "bg-[#FAF6EE] hover:bg-neutral-100 text-neutral-800"
-                                    }`}
+                                    className={`px-3 py-2 rounded-xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-all cursor-pointer ${onlyRecruiting
+                                        ? "bg-[#a2ff86] text-black"
+                                        : "bg-[#FAF6EE] hover:bg-neutral-100 text-neutral-800"
+                                        }`}
                                 >
                                     <Radio
-                                        className={`w-3 h-3 ${
-                                            onlyRecruiting ? "stroke-[3] text-black animate-pulse" : "text-neutral-600"
-                                        }`}
+                                        className={`w-3 h-3 ${onlyRecruiting ? "stroke-[3] text-black animate-pulse" : "text-neutral-600"
+                                            }`}
                                     />
                                     <span>Recruiting Only</span>
                                 </button>
@@ -516,11 +569,10 @@ export const ClubsShowcase: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setSelectedClubCategory("all")}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                                        selectedClubCategory === "all"
-                                            ? "bg-[#a2ff86] text-black border-black font-black shadow-[1.5px_1.5px_0px_#000]"
-                                            : "bg-[#FAF6EE] text-neutral-700 border-black/30 hover:border-black"
-                                    }`}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${selectedClubCategory === "all"
+                                        ? "bg-[#a2ff86] text-black border-black font-black shadow-[1.5px_1.5px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-neutral-700 border-black/30 hover:border-black"
+                                        }`}
                                 >
                                     All ({clubsList.length})
                                 </button>
@@ -534,11 +586,10 @@ export const ClubsShowcase: React.FC = () => {
                                             key={cat}
                                             type="button"
                                             onClick={() => setSelectedClubCategory(isSelected ? "all" : cat)}
-                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer capitalize ${
-                                                isSelected
-                                                    ? "bg-[#a2ff86] text-black border-black font-black shadow-[1.5px_1.5px_0px_#000]"
-                                                    : "bg-[#FAF6EE] text-neutral-700 border-black/30 hover:border-black"
-                                            }`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer capitalize ${isSelected
+                                                ? "bg-[#a2ff86] text-black border-black font-black shadow-[1.5px_1.5px_0px_#000]"
+                                                : "bg-[#FAF6EE] text-neutral-700 border-black/30 hover:border-black"
+                                                }`}
                                         >
                                             {cat} ({count})
                                         </button>
@@ -656,46 +707,52 @@ export const ClubsShowcase: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setEventTimeFilter("live")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
-                                        eventTimeFilter === "live" || eventTimeFilter === "all"
-                                            ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${eventTimeFilter === "live" || eventTimeFilter === "all"
+                                        ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                        }`}
                                 >
-                                    LIVE & UPCOMING ({eventsList.length})
+                                    LIVE & UPCOMING ({liveEventsCount})
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setEventTimeFilter("today")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
-                                        eventTimeFilter === "today"
-                                            ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${eventTimeFilter === "today"
+                                        ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                        }`}
                                 >
-                                    TODAY (0)
+                                    TODAY ({todayEventsCount})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEventTimeFilter("closed")}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${eventTimeFilter === "closed"
+                                        ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                        }`}
+                                >
+                                    REGISTRATION CLOSED ({closedEventsCount})
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setEventTimeFilter("completed")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
-                                        eventTimeFilter === "completed"
-                                            ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${eventTimeFilter === "completed"
+                                        ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                        }`}
                                 >
-                                    COMPLETED (0)
+                                    COMPLETED ({completedEventsCount})
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setEventTimeFilter("passes")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
-                                        eventTimeFilter === "passes"
-                                            ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
-                                            : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${eventTimeFilter === "passes"
+                                        ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                        }`}
                                 >
-                                    MY PASSES (0)
+                                    MY PASSES ({passesCount})
                                 </button>
                             </div>
 
@@ -737,7 +794,7 @@ export const ClubsShowcase: React.FC = () => {
                             {filteredCampusEvents.map((ev) => (
                                 <div
                                     key={ev.id}
-                                    onClick={() => setSelectedEventForModal(ev)}
+                                    onClick={() => navigate(`/college-events/${ev.id}${ev.slug ? `/${ev.slug}` : ""}`)}
                                     className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group h-full"
                                 >
                                     {/* Architectural Pillars Backdrop */}
@@ -749,128 +806,142 @@ export const ClubsShowcase: React.FC = () => {
 
                                     <div className="relative z-10 flex flex-col justify-between h-full">
                                         <div>
-                                        {/* Cover Banner */}
-                                        <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
-                                            {ev.coverImageUrl ? (
-                                                <img
-                                                    src={ev.coverImageUrl}
-                                                    alt={ev.title}
-                                                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full bg-[#FAF6EE] flex items-center justify-center font-black text-neutral-400 text-sm">
-                                                    {ev.clubName}
-                                                </div>
-                                            )}
-
-                                            {/* Heart Button Overlay */}
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleToggleHeart(ev);
-                                                }}
-                                                className={`absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1.5 text-xs font-black cursor-pointer transition-transform active:scale-95 ${
-                                                    ev.hasLiked
-                                                        ? "bg-rose-100 text-rose-700"
-                                                        : "bg-white/95 text-neutral-800 hover:bg-white"
-                                                }`}
-                                                title={ev.hasLiked ? "Remove heart" : "Appreciate event"}
-                                            >
-                                                <Heart
-                                                    className={`w-3.5 h-3.5 ${
-                                                        ev.hasLiked
-                                                            ? "fill-rose-600 text-rose-600"
-                                                            : "text-black"
-                                                    }`}
-                                                />
-                                                <span>{ev.likesCount}</span>
-                                            </button>
-
-                                            {/* Timeline Status Badge & Scope Indicator */}
-                                            <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
-                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 bg-emerald-300 text-black animate-pulse">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-ping inline-block" />
-                                                    LIVE NOW
-                                                </span>
-
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 bg-sky-200 text-sky-950">
-                                                    <GraduationCap className="w-2.5 h-2.5" />
-                                                    CAMPUS
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Club Info Ribbon */}
-                                        <div className="flex items-center justify-between gap-2 mb-2">
-                                            <div className="flex items-center gap-2 group min-w-0">
-                                                {ev.clubLogoUrl ? (
+                                            {/* Cover Banner */}
+                                            <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
+                                                {ev.coverImageUrl ? (
                                                     <img
-                                                        src={ev.clubLogoUrl}
-                                                        alt={ev.clubName}
-                                                        className="w-5 h-5 rounded-md border border-black object-cover shrink-0"
+                                                        src={ev.coverImageUrl}
+                                                        alt={ev.title}
+                                                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                                     />
                                                 ) : (
-                                                    <div className="w-5 h-5 rounded-md border border-black bg-[#a2ff86] flex items-center justify-center font-black text-[9px] shrink-0">
-                                                        {ev.clubName.slice(0, 2).toUpperCase()}
+                                                    <div className="w-full h-full bg-[#FAF6EE] flex items-center justify-center font-black text-neutral-400 text-sm">
+                                                        {ev.clubName}
                                                     </div>
                                                 )}
-                                                <span className="text-xs font-black text-black group-hover:underline truncate">
-                                                    {ev.clubName}
+
+                                                {/* Heart Button Overlay */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleHeart(ev);
+                                                    }}
+                                                    className={`absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1.5 text-xs font-black cursor-pointer transition-transform active:scale-95 ${ev.hasLiked
+                                                        ? "bg-rose-100 text-rose-700"
+                                                        : "bg-white/95 text-neutral-800 hover:bg-white"
+                                                        }`}
+                                                    title={ev.hasLiked ? "Remove heart" : "Appreciate event"}
+                                                >
+                                                    <Heart
+                                                        className={`w-3.5 h-3.5 ${ev.hasLiked
+                                                            ? "fill-rose-600 text-rose-600"
+                                                            : "text-black"
+                                                            }`}
+                                                    />
+                                                    <span>{ev.likesCount}</span>
+                                                </button>
+
+                                                {/* Timeline Status Badge & Scope Indicator */}
+                                                <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
+                                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 bg-emerald-300 text-black animate-pulse">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-ping inline-block" />
+                                                        LIVE NOW
+                                                    </span>
+
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 bg-sky-200 text-sky-950">
+                                                        <GraduationCap className="w-2.5 h-2.5" />
+                                                        CAMPUS
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Club Info Ribbon */}
+                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                <div className="flex items-center gap-2 group min-w-0">
+                                                    {ev.clubLogoUrl ? (
+                                                        <img
+                                                            src={ev.clubLogoUrl}
+                                                            alt={ev.clubName}
+                                                            className="w-5 h-5 rounded-md border border-black object-cover shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-5 h-5 rounded-md border border-black bg-[#a2ff86] flex items-center justify-center font-black text-[9px] shrink-0">
+                                                            {ev.clubName.slice(0, 2).toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                    <span className="text-xs font-black text-black group-hover:underline truncate">
+                                                        {ev.clubName}
+                                                    </span>
+                                                </div>
+
+                                                <span className="text-[11px] font-bold text-neutral-500 shrink-0">
+                                                    {formatEventDate(ev.startsAt)}
                                                 </span>
                                             </div>
 
-                                            <span className="text-[11px] font-bold text-neutral-500 shrink-0">
-                                                {formatEventDate(ev.startsAt)}
-                                            </span>
-                                        </div>
+                                            {/* Title & Summary */}
+                                            <h4 className="text-base font-black text-neutral-900 line-clamp-1 group-hover:text-black">
+                                                {ev.title}
+                                            </h4>
+                                            <p className="text-xs text-neutral-600 line-clamp-2 mt-1 leading-relaxed">
+                                                {ev.summary || "Join this chapter meetup on campus."}
+                                            </p>
 
-                                        {/* Title & Summary */}
-                                        <h4 className="text-base font-black text-neutral-900 line-clamp-1 group-hover:text-black">
-                                            {ev.title}
-                                        </h4>
-                                        <p className="text-xs text-neutral-600 line-clamp-2 mt-1 leading-relaxed">
-                                            {ev.summary || "Join this chapter meetup on campus."}
-                                        </p>
+                                            {/* Timing and Location */}
+                                            <div className="mt-3.5 space-y-1.5 text-xs text-neutral-600 font-medium">
+                                                <div className="flex items-center gap-1.5 font-bold">
+                                                    <Clock className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                                                    <span>{formatEventTime(ev.startsAt, ev.endsAt)}</span>
+                                                </div>
 
-                                        {/* Timing and Location */}
-                                        <div className="mt-3.5 space-y-1.5 text-xs text-neutral-600 font-medium">
-                                            <div className="flex items-center gap-1.5 font-bold">
-                                                <Clock className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                                                <span>{formatEventTime(ev.startsAt, ev.endsAt)}</span>
-                                            </div>
-
-                                            <div className="flex items-center gap-1.5 font-bold truncate">
-                                                <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                                                <span className="truncate">
-                                                    {ev.venueOrLocation || "Campus Hall"}
-                                                </span>
+                                                <div className="flex items-center gap-1.5 font-bold truncate">
+                                                    <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                                                    <span className="truncate">
+                                                        {ev.venueOrLocation || "Campus Hall"}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Footer Action Bar */}
-                                    <div className="mt-4 pt-3 border-t-2 border-black/10 flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-600">
-                                            <Users className="w-3.5 h-3.5 text-neutral-500" />
-                                            <span>{ev.registrationsCount} registered</span>
-                                        </div>
+                                        {/* Footer Action Bar */}
+                                        <div className="mt-4 pt-3 border-t-2 border-black/10 flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-600">
+                                                <Users className="w-3.5 h-3.5 text-neutral-500" />
+                                                <span>{ev.registrationsCount} registered</span>
+                                            </div>
 
-                                        <div className="flex items-center gap-1.5">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleApplyEvent(ev);
-                                                }}
-                                                className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                            >
-                                                Apply
-                                            </button>
+                                            <div className="flex items-center gap-1.5">
+                                                {ev.isRegistered ? (
+                                                    <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-950 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                                        Pass Synced
+                                                    </span>
+                                                ) : checkIsRegistrationClosed(ev) ? (
+                                                    <span className="px-3 py-1.5 rounded-xl bg-neutral-200 text-neutral-700 border-2 border-neutral-400 text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                                        <Lock className="w-3 h-3 text-neutral-600" />
+                                                        <span>Registration Closed</span>
+                                                    </span>
+                                                ) : checkIsRegistrationUpcoming(ev) ? (
+                                                    <span className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border-2 border-amber-300 text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                                        <Clock className="w-3 h-3 text-amber-700" />
+                                                        <span>Opens Soon</span>
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleApplyEvent(ev);
+                                                        }}
+                                                        className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                                    >
+                                                        Apply
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
                             ))}
                         </MobilePinnedHorizontalCards>
                     </div>
@@ -906,7 +977,7 @@ export const ClubsShowcase: React.FC = () => {
                                 {filteredPanIndiaEvents.map((ev) => (
                                     <div
                                         key={ev.id}
-                                        onClick={() => setSelectedEventForModal(ev)}
+                                        onClick={() => navigate(`/college-events/${ev.id}${ev.slug ? `/${ev.slug}` : ""}`)}
                                         className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:border-[#FF9933] transition-all cursor-pointer group h-full"
                                     >
                                         {/* India Map Backdrop */}
@@ -918,62 +989,78 @@ export const ClubsShowcase: React.FC = () => {
 
                                         <div className="relative z-10 flex flex-col justify-between h-full">
                                             <div>
-                                            <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
-                                                {ev.coverImageUrl && (
-                                                    <img
-                                                        src={ev.coverImageUrl}
-                                                        alt={ev.title}
-                                                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                                                    />
-                                                )}
-                                                <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] bg-[#FF9933] text-black flex items-center gap-1">
-                                                        <Globe2 className="w-2.5 h-2.5" />
-                                                        PAN INDIA
+                                                <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
+                                                    {ev.coverImageUrl && (
+                                                        <img
+                                                            src={ev.coverImageUrl}
+                                                            alt={ev.title}
+                                                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                                                        />
+                                                    )}
+                                                    <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
+                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] bg-[#FF9933] text-black flex items-center gap-1">
+                                                            <Globe2 className="w-2.5 h-2.5" />
+                                                            PAN INDIA
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <h4 className="text-base font-black text-neutral-900 line-clamp-1">
+                                                    {ev.title}
+                                                </h4>
+                                                <p className="text-xs text-neutral-600 line-clamp-2 mt-1 leading-relaxed">
+                                                    {ev.summary}
+                                                </p>
+
+                                                <div className="mt-3.5 space-y-1.5 text-xs text-neutral-600 font-medium">
+                                                    <div className="flex items-center gap-1.5 font-bold">
+                                                        <Clock className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                                                        <span>{formatEventTime(ev.startsAt, ev.endsAt)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 font-bold truncate">
+                                                        <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                                                        <span className="truncate">{ev.venueOrLocation}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 pt-3 border-t-2 border-black/10 flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-600">
+                                                    <Users className="w-3.5 h-3.5 text-neutral-500" />
+                                                    <span>{ev.registrationsCount} registered</span>
+                                                </div>
+
+                                                {ev.isRegistered ? (
+                                                    <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-950 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                                        Pass Synced
                                                     </span>
-                                                </div>
+                                                ) : checkIsRegistrationClosed(ev) ? (
+                                                    <span className="px-3.5 py-1.5 rounded-xl bg-neutral-200 text-neutral-700 border-2 border-neutral-400 text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                                        <Lock className="w-3 h-3 text-neutral-600" />
+                                                        <span>Registration Closed</span>
+                                                    </span>
+                                                ) : checkIsRegistrationUpcoming(ev) ? (
+                                                    <span className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-900 border-2 border-amber-300 text-xs font-black shadow-[1.5px_1.5px_0px_#000] inline-flex items-center gap-1 select-none">
+                                                        <Clock className="w-3 h-3 text-amber-700" />
+                                                        <span>Opens Soon</span>
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleApplyEvent(ev);
+                                                        }}
+                                                        className="px-3.5 py-1.5 rounded-xl bg-[#FF9933] hover:bg-[#ff881a] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                                    >
+                                                        <span>Register & Track</span>
+                                                        <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </button>
+                                                )}
                                             </div>
-
-                                            <h4 className="text-base font-black text-neutral-900 line-clamp-1">
-                                                {ev.title}
-                                            </h4>
-                                            <p className="text-xs text-neutral-600 line-clamp-2 mt-1 leading-relaxed">
-                                                {ev.summary}
-                                            </p>
-
-                                            <div className="mt-3.5 space-y-1.5 text-xs text-neutral-600 font-medium">
-                                                <div className="flex items-center gap-1.5 font-bold">
-                                                    <Clock className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                                                    <span>{formatEventTime(ev.startsAt, ev.endsAt)}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 font-bold truncate">
-                                                    <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                                                    <span className="truncate">{ev.venueOrLocation}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-4 pt-3 border-t-2 border-black/10 flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-600">
-                                                <Users className="w-3.5 h-3.5 text-neutral-500" />
-                                                <span>{ev.registrationsCount} registered</span>
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleApplyEvent(ev);
-                                                }}
-                                                className="px-3.5 py-1.5 rounded-xl bg-[#FF9933] hover:bg-[#ff881a] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                            >
-                                                <span>Register & Track</span>
-                                                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
                             </MobilePinnedHorizontalCards>
                         </div>
                     )}
@@ -1030,17 +1117,6 @@ export const ClubsShowcase: React.FC = () => {
                 club={selectedClubForModal}
                 isOpen={!!selectedClubForModal}
                 onClose={() => setSelectedClubForModal(null)}
-            />
-
-            {/* College Event Detail Modal */}
-            <CollegeEventDetailModal
-                event={selectedEventForModal}
-                isOpen={!!selectedEventForModal}
-                onClose={() => setSelectedEventForModal(null)}
-                onApply={() => {
-                    setSelectedEventForModal(null);
-                }}
-                onToggleHeart={handleToggleHeart}
             />
 
             {/* Invite Campus Leads Modal */}

@@ -17,6 +17,8 @@ import { useAppDispatch, setUser } from "../../../store";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { buildApiUrl } from "../../../api/apiClient";
+import { isDemoProfileUsername } from "../../../data/demoProfileData";
+import { isDemoClubSlug } from "../../../data/demoClubProfileData";
 
 export default function SignupForm() {
     const navigate = useNavigate();
@@ -85,6 +87,10 @@ export default function SignupForm() {
             newErrors.username = "Username is required";
         } else if (!/^[a-z0-9._-]{3,20}$/.test(normalizedUsername)) {
             newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
+        } else if (isDemoProfileUsername(normalizedUsername)) {
+            newErrors.username = "This username is reserved for the Orbix demo profile";
+        } else if (isDemoClubSlug(normalizedUsername)) {
+            newErrors.username = "This handle is reserved for the official demo club showcase";
         }
 
         if (!formData.firstName.trim()) {
@@ -149,10 +155,7 @@ export default function SignupForm() {
         const lastName = formData.lastName.trim();
 
         try {
-            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
-                : [primaryEndpoint, "/api/signup/send-email-otp"];
+            const endpoints = [buildApiUrl("/api/auth/signup/send-email-otp")];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -225,10 +228,7 @@ export default function SignupForm() {
 
         setResendingOtp(true);
         try {
-            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
-                : [primaryEndpoint, "/api/signup/send-email-otp"];
+            const endpoints = [buildApiUrl("/api/auth/signup/send-email-otp")];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -291,10 +291,7 @@ export default function SignupForm() {
 
         try {
             // Step 1: Verify OTP and acquire cryptographic proof token
-            const primaryVerify = buildApiUrl("/api/auth/signup/verify-email-otp");
-            const verifyEndpoints = import.meta.env.DEV
-                ? [primaryVerify, "http://localhost:3000/api/auth/signup/verify-email-otp", "/api/signup/verify-email-otp"]
-                : [primaryVerify, "/api/signup/verify-email-otp"];
+            const verifyEndpoints = [buildApiUrl("/api/auth/signup/verify-email-otp")];
 
             let verifyResponse: Response | null = null;
             let verifyData: any = null;
@@ -338,10 +335,7 @@ export default function SignupForm() {
                 verificationToken,
             };
 
-            const primarySignup = buildApiUrl("/api/auth/signup");
-            const signupEndpoints = import.meta.env.DEV
-                ? [primarySignup, "http://localhost:3000/api/auth/signup"]
-                : [primarySignup];
+            const signupEndpoints = [buildApiUrl("/api/auth/signup")];
 
             let signupResponse: Response | null = null;
             let signupData: any = null;

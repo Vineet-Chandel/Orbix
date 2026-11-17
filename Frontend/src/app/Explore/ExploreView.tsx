@@ -651,17 +651,55 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     );
 
     // -------------------------------------------------------------------------
-    // Colleges Extraction for Quick Filter
+    // Colleges Extraction for Quick Filter (Persistent Master List)
     // -------------------------------------------------------------------------
-    const uniqueColleges = useMemo(() => {
-        const set = new Set<string>();
-        explore.items.forEach((d) => {
-            if (d.college && d.college.trim()) {
-                set.add(d.college.trim());
+    const [allKnownColleges, setAllKnownColleges] = useState<string[]>([]);
+
+    // Merge colleges from backend availableColleges, explore items, and selectedCollege
+    useEffect(() => {
+        setAllKnownColleges((prev) => {
+            const set = new Set(prev);
+            if (Array.isArray(explore.availableColleges)) {
+                explore.availableColleges.forEach((c) => {
+                    if (c && c.trim()) set.add(c.trim());
+                });
             }
+            explore.items.forEach((d) => {
+                if (d.college && d.college.trim()) {
+                    set.add(d.college.trim());
+                }
+            });
+            if (selectedCollege && selectedCollege !== "all" && selectedCollege.trim()) {
+                set.add(selectedCollege.trim());
+            }
+            return Array.from(set).sort((a, b) => a.localeCompare(b));
         });
-        return Array.from(set).slice(0, 12);
-    }, [explore.items]);
+    }, [explore.items, explore.availableColleges, selectedCollege]);
+
+    // Also fetch participating colleges on initial mount as an additional fallback
+    useEffect(() => {
+        let isMounted = true;
+        fetch("/api/leaderboard/colleges/participating")
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (isMounted && data?.success && Array.isArray(data.colleges)) {
+                    setAllKnownColleges((prev) => {
+                        const set = new Set(prev);
+                        data.colleges.forEach((c: any) => {
+                            const name = c.officialName || c.name;
+                            if (name && name.trim()) set.add(name.trim());
+                        });
+                        return Array.from(set).sort((a, b) => a.localeCompare(b));
+                    });
+                }
+            })
+            .catch(() => {
+                // Ignore fallback network error
+            });
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     // -------------------------------------------------------------------------
     // Filtered Connections in Connections Tab
@@ -761,9 +799,9 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                 {/* CASE 1: EMBEDDED PROFILE INSPECTOR MODE (NO REDIRECTION)                 */}
                 {/* ========================================================================= */}
                 {selectedUsername ? (
-                    <div className="space-y-5 animate-in fade-in duration-200">
-                        {/* Top Sticky Inspection Navigation Bar */}
-                        <div className="sticky top-0 z-30 p-3 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="space-y-5 animate-in fade-in duration-200 overflow-hidden">
+                        {/* Top Inspection Navigation Bar */}
+                        <div className="relative z-10 p-3 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden">
                             <div className="flex items-center gap-3 flex-wrap">
                                 <button
                                     type="button"
@@ -922,25 +960,23 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                         </div>
 
                                         {/* Quick College Select */}
-                                        {uniqueColleges.length > 0 && (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-bold text-neutral-600 shrink-0">College:</span>
-                                                <div className="w-56">
-                                                    <NeoSelect
-                                                        value={selectedCollege}
-                                                        onChange={(val) => setSelectedCollege(val)}
-                                                        size="sm"
-                                                        options={[
-                                                            { value: "all", label: "All Colleges" },
-                                                            ...uniqueColleges.map((c) => ({
-                                                                value: c,
-                                                                label: c,
-                                                            })),
-                                                        ]}
-                                                    />
-                                                </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-neutral-600 shrink-0">College:</span>
+                                            <div className="w-56">
+                                                <NeoSelect
+                                                    value={selectedCollege}
+                                                    onChange={(val) => setSelectedCollege(val)}
+                                                    size="sm"
+                                                    options={[
+                                                        { value: "all", label: "All Colleges" },
+                                                        ...allKnownColleges.map((c) => ({
+                                                            value: c,
+                                                            label: c,
+                                                        })),
+                                                    ]}
+                                                />
                                             </div>
-                                        )}
+                                        </div>
 
                                         {/* Sort Dropdown */}
                                         <div className="flex items-center gap-2">

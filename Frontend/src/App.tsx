@@ -1,6 +1,7 @@
 import { useEffect, Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
-import MainLanding from "./LandingPages/Main-Landing-Pages/Landing";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import MainLanding from "./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Landing";
+import ClubLanding from "./LandingPages/Main-Landing-Pages/Club-Account-Landing-Pages/Landing";
 import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import {
@@ -16,6 +17,7 @@ import { lazyWithRetry } from "./utils/lazyWithRetry";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
 import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
 import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
+import { ScrollToTop } from "./components/ScrollToTop";
 
 // Code-split other routes & showcases with resilient retry logic
 const SignInPage = lazyWithRetry(() => import('./LandingPages/Auth-Pages/Signin/Landing'));
@@ -36,9 +38,9 @@ const PublicProfilePage = lazyWithRetry(() => import("./app/Profile/PublicProfil
 const ProfilesOnboardingPage = lazyWithRetry(() => import("./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage"));
 const LeaderboardPage = lazyWithRetry(() => import("./app/Leaderboard/LeaderboardPage"));
 const EventTrackerPage = lazyWithRetry(() => import("./app/Events/EventTrackerPage"));
-const Card = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Card").then(m => ({ default: m.Card })));
-const Platform = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Platform").then(m => ({ default: m.Platform })));
-const Events = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Events").then(m => ({ default: m.Events })));
+const Card = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Card").then(m => ({ default: m.Card })));
+const Platform = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Platform").then(m => ({ default: m.Platform })));
+const Events = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Events").then(m => ({ default: m.Events })));
 const ClubStatusPage = lazyWithRetry(() => import("./app/Club/ClubStatusPage"));
 const ClubReviewerQueuePage = lazyWithRetry(() => import("./app/Club/ClubReviewerQueuePage"));
 const ClubDashboardPage = lazyWithRetry(() => import("./app/Club/ClubDashboardPage"));
@@ -79,6 +81,15 @@ const SingleBlogParamRedirect = () => {
   return <Navigate to={`/blog/aws-sbg-psit/aws-launchpad-2026/${pageId}`} replace />;
 };
 
+const LegacyActivityRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  if (!params.has("tab") && !params.has("segment")) {
+    params.set("tab", "applications");
+  }
+  return <Navigate to={`/activity?${params.toString()}`} replace />;
+};
+
 const App = () => {
   const dispatch = useAppDispatch();
 
@@ -91,6 +102,9 @@ const App = () => {
     <OrbixLoadingProvider>
       <ToastProvider>
         <BrowserRouter>
+          {/* Universal automatic scroll restoration on route navigation */}
+          <ScrollToTop />
+
           {/* Global Network Connectivity Status Banner */}
           <OrbixOfflineBanner />
 
@@ -103,6 +117,7 @@ const App = () => {
               <Routes>
                 {/* Public Landing & Marketing Pages */}
                 <Route path="/" element={<MainLanding />} />
+                <Route path="/clubs" element={<ClubLanding />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/support" element={<SupportPage />} />
@@ -116,7 +131,10 @@ const App = () => {
                 <Route path="/events/guardian-consent" element={<GuardianConsentPage />} />
                 <Route path="/platform" element={<PlatformPage />} />
                 <Route path="/demo" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
+                <Route path="/demo/profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
                 <Route path="/demo-profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
+                <Route path="/demo/club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
+                <Route path="/demo-club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/events" element={<EventTrackerPage />} />
                 <Route path="/events/:eventId/register" element={<PublicEventRegistrationPage />} />
@@ -163,6 +181,11 @@ const App = () => {
                 <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
                 <Route path="/workspace" element={<WorkspaceRedirect />} />
 
+                {/* Legacy Activity, Tracker & Invitation Redirects */}
+                <Route path="/student/activity" element={<LegacyActivityRedirect />} />
+                <Route path="/events/tracker" element={<LegacyActivityRedirect />} />
+                <Route path="/workspace-invite" element={<JoinClubPage />} />
+
                 {/* Club Verification, Dedicated Dashboard & Public Presence */}
                 <Route path="/club/team-workspace/join" element={<JoinClubPage />} />
                 <Route path="/join-club" element={<JoinClubPage />} />
@@ -206,8 +229,9 @@ const App = () => {
                   <Route path="/internal/college-verifications" element={<FounderCollegeVerificationsPage />} />
                   <Route path="/internal/college-verification" element={<Navigate to="/internal/college-verifications" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/clubs" element={<Dashboard />} />
                   <Route path="/college-events" element={<Dashboard />} />
+                  <Route path="/college-events/:eventId" element={<Dashboard />} />
+                  <Route path="/college-events/:eventId/:slug" element={<Dashboard />} />
                   <Route path="/activity" element={<Dashboard />} />
                   <Route path="/applications" element={<Dashboard />} />
                   <Route path="/explore" element={<Dashboard />} />

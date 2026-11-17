@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
     ShieldCheck,
@@ -16,7 +16,6 @@ import {
     FileText,
     Check,
     ChevronDown,
-    Sparkles,
     Shield,
     Info,
     X,
@@ -151,6 +150,7 @@ export default function ClubStatusPage() {
     const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     // Context Page / Drawer Visibility
@@ -181,33 +181,29 @@ export default function ClubStatusPage() {
         return () => clearInterval(timer);
     }, [otpCooldown]);
 
-    // Fetch Status Data from Database
+    // Fetch Status Data from Database dynamically without reloading the page
     const fetchStatus = async (isManualRefresh = false) => {
         if (user?.accountType !== "club") return;
-        if (isManualRefresh) setRefreshing(true);
-        else if (!application) setLoading(true);
-        setError(null);
+        if (isManualRefresh) {
+            setRefreshing(true);
+        } else if (!application && !verifiedClub) {
+            setLoading(true);
+        }
 
         try {
-            const primaryEndpoint = "/api/club/application-status";
-            const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/club/application-status"]
-                : [primaryEndpoint];
+            const endpoint = "/api/club/application-status";
             let res: Response | null = null;
             let data: any = null;
 
-            for (const endpoint of endpoints) {
-                try {
-                    const r = await fetch(endpoint, {
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                    });
-                    res = r;
-                    data = await r.json().catch(() => null);
-                    break;
-                } catch {
-                    continue;
-                }
+            try {
+                const r = await fetch(endpoint, {
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                });
+                res = r;
+                data = await r.json().catch(() => null);
+            } catch {
+                // network error
             }
 
             if (!res || !res.ok) {
@@ -215,7 +211,11 @@ export default function ClubStatusPage() {
                     navigate("/auth/signin?tab=club", { replace: true });
                     return;
                 }
-                throw new Error(data?.message || "Failed to load club application status.");
+                // Only throw if initial load; background polling shouldn't break existing UI
+                if (!application && !verifiedClub) {
+                    throw new Error(data?.message || "Failed to load club application status.");
+                }
+                return;
             }
 
             if (data?.application) {
@@ -232,30 +232,40 @@ export default function ClubStatusPage() {
                 setTimelineEvents(data.timelineEvents);
             }
 
+            setLastSyncedAt(new Date());
+            setError(null);
+
             if (isManualRefresh) {
                 toast.success("Application status refreshed from database.", { title: "Updated" });
             }
         } catch (err: any) {
             console.error("Status fetch error:", err);
-            setError(err.message || "Failed to connect to Orbix verification server.");
+            // Only set full page error if we don't already have an active application displayed
+            if (!application && !verifiedClub) {
+                setError(err.message || "Failed to connect to Orbix verification server.");
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     };
 
+    // Stable ref for background polling without resetting the interval timer
+    const fetchStatusRef = useRef(fetchStatus);
+    fetchStatusRef.current = fetchStatus;
+
     // Initial mount fetch
     useEffect(() => {
         if (user?.accountType !== "club") return;
-        fetchStatus();
+        fetchStatus(false);
     }, [user?.accountType]);
 
-    // Periodic auto-poll every 30 seconds for live database updates
+    // Keep continuous background polling on the server every 10 seconds without full-page reloads
     useEffect(() => {
         if (user?.accountType !== "club") return;
         const timer = setInterval(() => {
-            fetchStatus(false);
-        }, 30000);
+            fetchStatusRef.current(false);
+        }, 10000);
         return () => clearInterval(timer);
     }, [user?.accountType]);
 
@@ -593,69 +603,75 @@ export default function ClubStatusPage() {
             {/* ================================================================= */}
             {/* NEO-BRUTALIST TOP NAVIGATION BAR                                  */}
             {/* ================================================================= */}
-            <header className="w-full bg-white border-b-2 border-black px-4 sm:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 select-none shadow-[0px_2px_0px_#000]">
-                <div className="flex items-center gap-3.5">
-                    <Link
-                        to="/"
-                        className="flex items-center gap-2.5 group hover:opacity-85 transition-opacity"
-                        title="Orbix Home"
-                    >
-                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
-                        <span className="font-black text-xl sm:text-2xl tracking-tight text-black leading-none">
-                            Orbix
-                        </span>
-                    </Link>
+            <header className="w-full bg-white border-b-2 border-black sticky top-0 z-30 select-none shadow-[0px_2px_0px_#000]">
+                <div className="w-full max-w-[1550px] mx-auto px-4 sm:px-6 md:px-8 lg:px-10 py-2.5 sm:py-3.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 shrink-0">
+                        <Link
+                            to="/"
+                            className="flex items-center gap-2 sm:gap-2.5 group hover:opacity-85 transition-opacity shrink-0"
+                            title="Orbix Home"
+                        >
+                            <OrbixLogo className="w-7 h-7 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                            <span className="font-black text-lg sm:text-2xl tracking-tight text-black leading-none">
+                                Orbix
+                            </span>
+                        </Link>
 
-                    <span className="hidden sm:inline-block w-1 h-4 bg-black/20 rounded-full mx-1" />
+                        <span className="hidden md:inline-block w-1 h-4 bg-black/20 rounded-full mx-1" />
 
-                    <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
-                        <ShieldCheck className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                        <span>Club Verification Portal</span>
+                        <div className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                            <ShieldCheck className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                            <span>Club Verification Portal</span>
+                        </div>
                     </div>
-                </div>
 
-                <div className="flex items-center gap-2 sm:gap-3">
-                    {/* View Context Page / Guidelines Drawer Button */}
-                    <button
-                        type="button"
-                        onClick={() => setShowContextDrawer(true)}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white hover:bg-[#FAF6EE] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                        title="View Full Application Context & Guidelines"
-                    >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Context & Guidelines</span>
-                    </button>
+                    <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                        {/* View Context Page / Guidelines Drawer Button */}
+                        <button
+                            type="button"
+                            onClick={() => setShowContextDrawer(true)}
+                            className="inline-flex items-center justify-center gap-1.5 p-2 sm:px-3.5 sm:py-1.5 rounded-full bg-white hover:bg-[#FAF6EE] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                            title="View Full Application Context & Guidelines"
+                            aria-label="Application Context & Guidelines"
+                        >
+                            <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+                            <span className="hidden sm:inline">Context & Guidelines</span>
+                        </button>
 
-                    <button
-                        type="button"
-                        onClick={() => fetchStatus(true)}
-                        disabled={refreshing || loading}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
-                        title="Refresh live status from database"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-                        <span className="hidden sm:inline">Refresh DB</span>
-                    </button>
+                        {/* Refresh live status - icon only (no text) as requested */}
+                        <button
+                            type="button"
+                            onClick={() => fetchStatus(true)}
+                            disabled={refreshing}
+                            className="inline-flex items-center justify-center p-2 rounded-full bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+                            title="Refresh live status from database"
+                            aria-label="Refresh status from database"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                        </button>
 
-                    <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FAF6EE] hover:bg-rose-100 hover:text-rose-900 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                        title="Sign out of club account"
-                    >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Sign out</span>
-                    </button>
+                        {/* Sign out */}
+                        <button
+                            type="button"
+                            onClick={handleLogout}
+                            className="inline-flex items-center justify-center gap-1.5 p-2 sm:px-3.5 sm:py-1.5 rounded-full bg-[#FAF6EE] hover:bg-rose-100 hover:text-rose-900 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                            title="Sign out of club account"
+                            aria-label="Sign out"
+                        >
+                            <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+                            <span className="hidden sm:inline">Sign out</span>
+                        </button>
+                    </div>
                 </div>
             </header>
 
             {/* ================================================================= */}
             {/* MAIN CONTENT CANVAS (SPACIOUS, NEO-BRUTALIST, RESPONSIVE)         */}
             {/* ================================================================= */}
-            <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-12 space-y-8 sm:space-y-10">
+            <main className="flex-1 w-full max-w-[1550px] mx-auto px-4 sm:px-6 md:px-8 lg:px-10 py-6 sm:py-8 space-y-6 sm:space-y-8">
                 {/* Loading State */}
                 {loading && (
-                    <div className="py-20 text-center rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                    <div className="py-20 text-center rounded-2xl sm:rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
                         <OrbixLoader size="md" />
                         <p className="text-xs sm:text-sm font-black text-black">
                             Fetching live club verification state from database...
@@ -665,7 +681,7 @@ export default function ClubStatusPage() {
 
                 {/* Error State */}
                 {!loading && error && (
-                    <div className="p-8 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 text-center max-w-lg mx-auto">
+                    <div className="p-6 sm:p-8 rounded-2xl sm:rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 text-center max-w-lg mx-auto">
                         <div className="w-12 h-12 rounded-2xl bg-rose-100 border-2 border-black shadow-[2px_2px_0px_#000] text-rose-600 flex items-center justify-center mx-auto">
                             <AlertCircle className="w-6 h-6 stroke-[2.5]" />
                         </div>
@@ -684,7 +700,7 @@ export default function ClubStatusPage() {
 
                 {/* Empty State */}
                 {!loading && !error && !application && !verifiedClub && (
-                    <div className="p-10 sm:p-14 text-center rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5 max-w-lg mx-auto">
+                    <div className="p-8 sm:p-14 text-center rounded-2xl sm:rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5 max-w-lg mx-auto">
                         <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] text-black flex items-center justify-center mx-auto">
                             <Building2 className="w-7 h-7" />
                         </div>
@@ -716,23 +732,25 @@ export default function ClubStatusPage() {
 
                 {/* ACTIVE APPLICATION CONTENT */}
                 {!loading && !error && (application || verifiedClub) && (
-                    <div className="space-y-8 sm:space-y-10">
+                    <div className="space-y-6 sm:space-y-8">
                         {/* --------------------------------------------------------- */}
                         {/* 1. CELEBRATION BANNER FOR APPROVED CLUBS                  */}
                         {/* --------------------------------------------------------- */}
                         {(currentStatus === "approved" || verifiedClub) && (
-                            <div className="p-6 sm:p-8 rounded-3xl bg-[#a2ff86] border-2 border-black shadow-[5px_5px_0px_#000] space-y-4">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                                    <div className="space-y-1.5">
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-[#a2ff86] text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000]">
-                                            <Sparkles className="w-3.5 h-3.5" />
-                                            <span>Institutional Verification Approved</span>
-                                        </span>
-                                        <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                            {verifiedClub?.name || application?.club_name} is Verified!
-                                        </h2>
-                                        <p className="text-xs sm:text-sm font-bold text-neutral-800 leading-relaxed max-w-xl">
-                                            Your chapter has received the Orbix Verified Shield. You now have full sovereign access to your dedicated club management dashboard.
+                            <div className="p-5 sm:p-7 md:p-8 rounded-2xl sm:rounded-3xl bg-[#a2ff86] border-2 border-black shadow-[4px_4px_0px_#000] transition-all">
+                                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
+                                    <div className="space-y-1.5 min-w-0">
+                                        <div className="flex items-center gap-2.5 flex-wrap">
+                                            <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-black tracking-tight break-words">
+                                                {verifiedClub?.name || application?.club_name}
+                                            </h2>
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black text-[#a2ff86] text-[11px] sm:text-xs font-black uppercase tracking-wider shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-[#a2ff86]" />
+                                                <span>Verified</span>
+                                            </span>
+                                        </div>
+                                        <p className="text-xs sm:text-sm font-bold text-neutral-900/85 leading-relaxed max-w-2xl">
+                                            Collegiate chapter verified. Dedicated club management dashboard and public campus showcase are active.
                                         </p>
                                     </div>
 
@@ -740,21 +758,21 @@ export default function ClubStatusPage() {
                                         <button
                                             type="button"
                                             onClick={() => navigate("/club/dashboard")}
-                                            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                            className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-black text-[#a2ff86] font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[3px] active:translate-y-[3px] transition-all cursor-pointer"
                                         >
                                             <span>Enter Club Dashboard</span>
                                             <ArrowRight className="w-4 h-4" />
                                         </button>
 
-                                        {verifiedClub?.slug && (
+                                        {((verifiedClub as any)?.clubUsername || verifiedClub?.slug || (application as any)?.club_slug || (application as any)?.slug) && (
                                             <a
-                                                href={`/clubs/${(verifiedClub as any)?.clubUsername || verifiedClub.slug}`}
+                                                href={`/clubs/${(verifiedClub as any)?.clubUsername || verifiedClub?.slug || (application as any)?.club_slug || (application as any)?.slug}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-full bg-white text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#FAF6EE] transition-all"
+                                                className="inline-flex items-center justify-center gap-1.5 px-5 sm:px-6 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-white text-black font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#FAF6EE] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[3px] active:translate-y-[3px] transition-all cursor-pointer"
                                             >
                                                 <span>View Public Profile</span>
-                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                <ExternalLink className="w-4 h-4" />
                                             </a>
                                         )}
                                     </div>
@@ -765,46 +783,46 @@ export default function ClubStatusPage() {
                         {/* --------------------------------------------------------- */}
                         {/* 2. HERO STATUS BANNER (AUTHENTIC ORBIX NEO-BRUTALISM)    */}
                         {/* --------------------------------------------------------- */}
-                        <div className="p-6 sm:p-8 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b-2 border-black/10">
-                                <div className="space-y-2">
+                        <div className="p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] space-y-4 sm:space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 pb-4 sm:pb-5 border-b-2 border-black/10">
+                                <div className="space-y-1.5 sm:space-y-2 min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${statusConfig.badgeClass}`}>
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-black uppercase tracking-wider ${statusConfig.badgeClass}`}>
                                             <span className={`w-2 h-2 rounded-full ${statusConfig.dotClass} animate-pulse`} />
                                             <span>{statusConfig.label}</span>
                                         </span>
                                         {application?.club_category && (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-[#FAF6EE] text-black font-black text-[11px] border-2 border-black shadow-[1.5px_1.5px_0px_#000] uppercase">
+                                            <span className="px-2.5 py-0.5 rounded-full bg-[#FAF6EE] text-black font-black text-[10px] sm:text-[11px] border-2 border-black shadow-[1.5px_1.5px_0px_#000] uppercase">
                                                 {application.club_category}
                                             </span>
                                         )}
                                     </div>
 
-                                    <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight pt-1">
+                                    <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-black tracking-tight pt-1 break-words">
                                         {application?.club_name || verifiedClub?.name}
                                     </h1>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-bold">
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-bold break-words">
                                         {application?.college_name} • {application?.college_city}, {application?.college_state}, {application?.college_country}
                                     </p>
                                 </div>
 
-                                <div className="text-left sm:text-right sm:shrink-0 space-y-1">
-                                    <div className="text-xs font-mono font-bold text-neutral-500">
-                                        ID: {application?.id.slice(0, 8)}...
+                                <div className="text-left sm:text-right sm:shrink-0 space-y-1 pt-1 sm:pt-0">
+                                    <div className="text-[11px] sm:text-xs font-mono font-bold text-neutral-500">
+                                        ID: {application?.id ? `${application.id.slice(0, 8)}...` : "N/A"}
                                     </div>
                                     <div className="text-[10px] font-mono text-neutral-400">
-                                        Last DB Sync: {new Date(application?.updated_at || Date.now()).toLocaleTimeString()}
+                                        Last DB Sync: {lastSyncedAt ? lastSyncedAt.toLocaleTimeString() : new Date(application?.updated_at || Date.now()).toLocaleTimeString()}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Summary description & next steps */}
-                            <div className="space-y-4">
+                            <div className="space-y-3 sm:space-y-4">
                                 <p className="text-xs sm:text-sm text-neutral-800 font-medium leading-relaxed">
                                     {statusConfig.description}
                                 </p>
 
-                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
                                     <span className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
                                         <Info className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                         <span>Next Steps & Expectations</span>
@@ -816,7 +834,7 @@ export default function ClubStatusPage() {
                             </div>
 
                             {/* Security Sovereignty Notice */}
-                            <div className="p-3.5 rounded-2xl bg-[#FFE566]/30 border-2 border-black shadow-[2px_2px_0px_#000] text-xs text-black font-semibold flex items-center gap-2.5">
+                            <div className="p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-[#FFE566]/30 border-2 border-black shadow-[2px_2px_0px_#000] text-xs text-black font-semibold flex items-center gap-2.5">
                                 <Shield className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
                                 <span>
                                     <strong>Account Sovereignty:</strong> Club administrative accounts remain strictly isolated from individual developer profiles, contest histories, and personal resumes.
@@ -827,8 +845,8 @@ export default function ClubStatusPage() {
                         {/* --------------------------------------------------------- */}
                         {/* 3. EMAIL & IDENTITY VERIFICATION HUB (LIVE DB STATUS)    */}
                         {/* --------------------------------------------------------- */}
-                        <div className="p-6 sm:p-8 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
+                        <div className="p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] space-y-4 sm:space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 border-b-2 border-black/10">
                                 <div>
                                     <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
                                         <Mail className="w-4 h-4 text-black stroke-[2.5]" />
@@ -849,26 +867,26 @@ export default function ClubStatusPage() {
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
                                 {/* Account Representative Email Card */}
-                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-3">
+                                <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-3">
                                     <div className="flex items-start justify-between gap-2">
-                                        <div>
+                                        <div className="min-w-0 flex-1">
                                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">
                                                 Account Contact Email
                                             </span>
-                                            <div className="font-mono font-bold text-xs text-black truncate pt-0.5">
+                                            <div className="font-mono font-bold text-xs text-black truncate break-all pt-0.5">
                                                 {application?.contact_email}
                                             </div>
                                         </div>
 
                                         {application?.is_email_verified ? (
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black text-[10px] font-black shadow-[1px_1px_0px_#000] shrink-0">
                                                 <Check className="w-3 h-3 stroke-[3]" />
                                                 <span>Verified</span>
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black border border-black text-[10px] font-black shadow-[1px_1px_0px_#000] shrink-0">
                                                 <Clock className="w-3 h-3" />
                                                 <span>Unverified</span>
                                             </span>
@@ -950,25 +968,25 @@ export default function ClubStatusPage() {
                                 </div>
 
                                 {/* Official College Domain Email Card */}
-                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-2 flex flex-col justify-between">
+                                <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-2 flex flex-col justify-between">
                                     <div>
                                         <div className="flex items-start justify-between gap-2">
-                                            <div>
+                                            <div className="min-w-0 flex-1">
                                                 <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">
                                                     Official College Domain Email
                                                 </span>
-                                                <div className="font-mono font-bold text-xs text-black truncate pt-0.5">
+                                                <div className="font-mono font-bold text-xs text-black truncate break-all pt-0.5">
                                                     {application?.college_official_email || "No institutional email provided"}
                                                 </div>
                                             </div>
 
                                             {application?.college_official_email ? (
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#70d6ff] text-black border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#70d6ff] text-black border border-black text-[10px] font-black shadow-[1px_1px_0px_#000] shrink-0">
                                                     <GraduationCap className="w-3 h-3" />
                                                     <span>Campus Domain</span>
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-neutral-500 border border-black/20 text-[10px] font-bold">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-neutral-500 border border-black/20 text-[10px] font-bold shrink-0">
                                                     Optional
                                                 </span>
                                             )}
@@ -989,19 +1007,28 @@ export default function ClubStatusPage() {
                         </div>
 
                         {/* --------------------------------------------------------- */}
-                        {/* 4. THE WELL-DEFINED TIMELINE (LIVE DB BOUND)              */}
+                        {/* 4. THE WELL-DEFINED TIMELINE (LIVE DB BOUND & ANIMATED)   */}
                         {/* --------------------------------------------------------- */}
-                        <div className="p-6 sm:p-8 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-8">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b-2 border-black/10">
-                                <div>
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#FAF6EE] text-black text-xs font-black border border-black mb-1 shadow-[1px_1px_0px_#000]">
-                                        <Clock className="w-3 h-3 text-black" />
+                        <div className="p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] space-y-6 sm:space-y-8">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 sm:pb-5 border-b-2 border-black/10">
+                                <div className="space-y-1">
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] text-black text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                        <motion.span
+                                            animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
+                                            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                            className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"
+                                        />
                                         <span>Live Database Reactive Timeline</span>
+                                        {lastSyncedAt && (
+                                            <span className="text-[10px] font-mono text-neutral-500 font-bold ml-1 hidden xs:inline sm:inline">
+                                                • Synced {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            </span>
+                                        )}
                                     </div>
                                     <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
                                         Club Verification Timeline
                                     </h2>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium mt-0.5">
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
                                         Directly linked to database fields: college contact, club existence, and representative authority.
                                     </p>
                                 </div>
@@ -1010,67 +1037,102 @@ export default function ClubStatusPage() {
                                     to="/docs/club-verification-protocol"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white hover:bg-[#FAF6EE] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] transition-colors self-start sm:self-auto cursor-pointer"
+                                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white hover:bg-[#FAF6EE] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] transition-colors self-start sm:self-auto cursor-pointer"
                                 >
                                     <span>5-Stage Protocol Specs</span>
-                                    <ExternalLink className="w-3.5 h-3.5 text-black" />
+                                    <ExternalLink className="w-3.5 h-3.5 text-black shrink-0" />
                                 </Link>
                             </div>
 
-                            {/* Sequential Vertical Step Timeline */}
-                            <div className="relative pl-6 sm:pl-8 space-y-6 sm:space-y-8">
-                                {/* Vertical Connector Line */}
-                                <div className="absolute left-[17px] sm:left-[21px] top-3 bottom-4 w-[3px] bg-black -z-0" />
-
-                                {resolvedStages.map((stage) => {
+                            {/* Sequential Vertical Step Timeline (Fully Responsive & Smoothly Animated) */}
+                            <div className="space-y-0">
+                                {resolvedStages.map((stage, idx) => {
                                     const isCompleted = stage.status === "completed";
                                     const isInProgress = stage.status === "in_progress";
                                     const isActionRequired = stage.status === "action_required";
                                     const isRejected = stage.status === "rejected";
                                     const isUpcoming = stage.status === "upcoming";
+                                    const isLast = idx === resolvedStages.length - 1;
 
                                     return (
-                                        <div key={stage.key} className="relative z-10 flex items-start gap-4 sm:gap-6 group">
-                                            {/* Step Circle Indicator */}
-                                            <div className="relative -ml-[25px] sm:-ml-[29px] mt-0.5 shrink-0">
-                                                {isCompleted && (
-                                                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#a2ff86] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                                        <Check className="w-4 h-4 stroke-[3]" />
-                                                    </div>
-                                                )}
-                                                {isInProgress && (
-                                                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black text-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                                        <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] animate-ping" />
-                                                    </div>
-                                                )}
-                                                {isActionRequired && (
-                                                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FFE566] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                                        <AlertCircle className="w-4 h-4 stroke-[2.5]" />
-                                                    </div>
-                                                )}
-                                                {isRejected && (
-                                                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#ff70a6] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                                        <XCircle className="w-4 h-4 stroke-[2.5]" />
-                                                    </div>
-                                                )}
-                                                {isUpcoming && (
-                                                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FAF6EE] text-neutral-500 border-2 border-black/40 flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                                                        <span className="text-[11px] font-black font-mono">{stage.stepNum}</span>
+                                        <div key={stage.key} className="flex items-start gap-3 sm:gap-4.5">
+                                            {/* Left Column: Indicator Node + Progressive Connector Line */}
+                                            <div className="flex flex-col items-center shrink-0 self-stretch">
+                                                <div className="relative shrink-0 mt-0.5">
+                                                    {isCompleted && (
+                                                        <motion.div
+                                                            initial={{ scale: 0.8 }}
+                                                            animate={{ scale: 1 }}
+                                                            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                                                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#a2ff86] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]"
+                                                        >
+                                                            <Check className="w-4 h-4 stroke-[3]" />
+                                                        </motion.div>
+                                                    )}
+                                                    {isInProgress && (
+                                                        <motion.div
+                                                            animate={{ scale: [1, 1.05, 1] }}
+                                                            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black text-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] relative"
+                                                        >
+                                                            <motion.span
+                                                                animate={{ scale: [1, 1.6, 1], opacity: [0.7, 0, 0.7] }}
+                                                                transition={{ repeat: Infinity, duration: 2, ease: "easeOut" }}
+                                                                className="absolute inset-0 rounded-full border-2 border-[#a2ff86]"
+                                                            />
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86]" />
+                                                        </motion.div>
+                                                    )}
+                                                    {isActionRequired && (
+                                                        <motion.div
+                                                            animate={{ rotate: [-2, 2, -2] }}
+                                                            transition={{ repeat: Infinity, duration: 1.5 }}
+                                                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FFE566] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]"
+                                                        >
+                                                            <AlertCircle className="w-4 h-4 stroke-[2.5]" />
+                                                        </motion.div>
+                                                    )}
+                                                    {isRejected && (
+                                                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#ff70a6] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                                            <XCircle className="w-4 h-4 stroke-[2.5]" />
+                                                        </div>
+                                                    )}
+                                                    {isUpcoming && (
+                                                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FAF6EE] text-neutral-500 border-2 border-black/40 flex items-center justify-center shadow-[1px_1px_0px_#000]">
+                                                            <span className="text-[11px] font-black font-mono">{stage.stepNum}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {!isLast && (
+                                                    <div className="w-[3px] flex-1 min-h-[36px] sm:min-h-[44px] bg-black/15 relative my-1 rounded-full overflow-hidden">
+                                                        <motion.div
+                                                            className="w-full bg-black rounded-full"
+                                                            initial={false}
+                                                            animate={{
+                                                                height: isCompleted ? "100%" : isInProgress ? "55%" : "0%",
+                                                            }}
+                                                            transition={{ duration: 0.7, ease: "easeOut" }}
+                                                        />
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Stage Content Card */}
-                                            <div className={`flex-1 p-5 sm:p-6 rounded-2xl border-2 border-black transition-all ${
-                                                isInProgress
-                                                    ? "bg-[#FAF6EE] shadow-[3px_3px_0px_#000]"
-                                                    : isActionRequired
-                                                    ? "bg-[#FFE566]/20 shadow-[3px_3px_0px_#000]"
-                                                    : isCompleted
-                                                    ? "bg-white shadow-[2px_2px_0px_#000]"
-                                                    : "bg-white/60 opacity-80 shadow-[1px_1px_0px_#000]"
-                                            }`}>
-                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
+                                            <motion.div
+                                                layout
+                                                transition={{ layout: { duration: 0.3 } }}
+                                                className={`flex-1 min-w-0 p-3.5 sm:p-5 md:p-6 rounded-xl sm:rounded-2xl border-2 border-black transition-all mb-4 sm:mb-6 ${
+                                                    isInProgress
+                                                        ? "bg-[#FAF6EE] shadow-[3px_3px_0px_#000] ring-1 ring-black/10"
+                                                        : isActionRequired
+                                                        ? "bg-[#FFE566]/20 shadow-[3px_3px_0px_#000]"
+                                                        : isCompleted
+                                                        ? "bg-white shadow-[2px_2px_0px_#000]"
+                                                        : "bg-white/60 opacity-80 shadow-[1px_1px_0px_#000]"
+                                                }`}
+                                            >
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 pb-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-mono text-xs font-black text-neutral-500">
                                                             Stage {stage.stepNum}
@@ -1088,9 +1150,14 @@ export default function ClubStatusPage() {
                                                             </span>
                                                         )}
                                                         {isInProgress && (
-                                                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#70d6ff] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                                                Active
-                                                            </span>
+                                                            <motion.span
+                                                                animate={{ opacity: [1, 0.75, 1] }}
+                                                                transition={{ repeat: Infinity, duration: 1.6 }}
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#70d6ff] text-black border border-black shadow-[1px_1px_0px_#000]"
+                                                            >
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                                                                <span>Active</span>
+                                                            </motion.span>
                                                         )}
                                                         {isActionRequired && (
                                                             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
@@ -1111,10 +1178,10 @@ export default function ClubStatusPage() {
                                                     </div>
                                                 </div>
 
-                                                <h3 className="text-sm sm:text-base font-black text-black">
+                                                <h3 className="text-sm sm:text-base font-black text-black break-words">
                                                     {stage.title}
                                                 </h3>
-                                                <p className="text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed mt-1">
+                                                <p className="text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed mt-1 break-words">
                                                     {stage.message}
                                                 </p>
 
@@ -1173,7 +1240,7 @@ export default function ClubStatusPage() {
                                                                                 >
                                                                                     <div>
                                                                                         <div className="flex items-center justify-between gap-2">
-                                                                                            <div className="flex items-center gap-2 truncate">
+                                                                                            <div className="flex items-center gap-2 min-w-0">
                                                                                                 <div className="w-6 h-6 rounded-lg bg-black text-white flex items-center justify-center shrink-0">
                                                                                                     <TpIcon className="w-3.5 h-3.5" />
                                                                                                 </div>
@@ -1215,7 +1282,7 @@ export default function ClubStatusPage() {
                                                                                         >
                                                                                             <div className="font-black text-black">{tp.title}</div>
                                                                                             <p>{tp.summary}</p>
-                                                                                            <div className="font-mono text-[10px] text-black bg-white p-2 rounded-lg border border-black shadow-[1px_1px_0px_#000] break-words">
+                                                                                            <div className="font-mono text-[10px] text-black bg-white p-2 rounded-lg border border-black shadow-[1px_1px_0px_#000] break-words break-all sm:break-words">
                                                                                                 <strong>DB Evidence:</strong> {tp.dbEvidence}
                                                                                             </div>
                                                                                         </motion.div>
@@ -1232,12 +1299,12 @@ export default function ClubStatusPage() {
 
                                                 {/* Action Required Banner if present */}
                                                 {stage.actionRequired && (
-                                                    <div className="mt-3 p-3.5 bg-[#FFE566] border-2 border-black rounded-xl text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-2">
+                                                    <div className="mt-3 p-3 sm:p-3.5 bg-[#FFE566] border-2 border-black rounded-xl text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-2">
                                                         <AlertCircle className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
-                                                        <span>{stage.actionRequired}</span>
+                                                        <span className="break-words">{stage.actionRequired}</span>
                                                     </div>
                                                 )}
-                                            </div>
+                                            </motion.div>
                                         </div>
                                     );
                                 })}
@@ -1247,7 +1314,7 @@ export default function ClubStatusPage() {
                         {/* --------------------------------------------------------- */}
                         {/* 5. BOTTOM APPLICATION CONTEXT ACCESS BAR                  */}
                         {/* --------------------------------------------------------- */}
-                        <div className="p-6 sm:p-7 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="p-4 sm:p-6 md:p-7 rounded-2xl sm:rounded-3xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                             <div className="space-y-1">
                                 <h4 className="text-sm font-black text-black">
                                     Need to review the full submitted application record or institutional guidelines?
@@ -1260,7 +1327,7 @@ export default function ClubStatusPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowContextDrawer(true)}
-                                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer shrink-0"
+                                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer shrink-0 w-full sm:w-auto"
                             >
                                 <FileText className="w-3.5 h-3.5" />
                                 <span>Open Application Context</span>
@@ -1294,7 +1361,7 @@ export default function ClubStatusPage() {
                             className="fixed top-0 right-0 bottom-0 w-full max-w-2xl bg-[#FAF6EE] z-50 border-l-2 border-black shadow-[-6px_0px_0px_#000] flex flex-col overflow-hidden"
                         >
                             {/* Drawer Header */}
-                            <div className="px-6 sm:px-8 py-5 border-b-2 border-black flex items-center justify-between bg-white select-none shrink-0">
+                            <div className="px-4 sm:px-8 py-3.5 sm:py-5 border-b-2 border-black flex items-center justify-between bg-white select-none shrink-0">
                                 <div className="space-y-0.5">
                                     <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF6EE] text-black border border-black text-[11px] font-black shadow-[1px_1px_0px_#000]">
                                         <FileText className="w-3 h-3 text-black" />
@@ -1316,7 +1383,7 @@ export default function ClubStatusPage() {
                             </div>
 
                             {/* Drawer Scrollable Body */}
-                            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8">
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
                                 {/* Section A: Organization & Institution Record */}
                                 <div className="space-y-3">
                                     <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">

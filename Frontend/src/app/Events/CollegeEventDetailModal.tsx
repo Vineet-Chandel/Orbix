@@ -20,6 +20,7 @@ import {
     Globe2,
     GraduationCap,
     Lock,
+    Sparkles,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
@@ -73,6 +74,33 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
         new Date(event.startsAt).getTime() <= Date.now() &&
         (event.endsAt ? new Date(event.endsAt).getTime() >= Date.now() : true);
 
+    const checkIsRegistrationClosed = (): boolean => {
+        if (isCompleted || event.status === "cancelled") return true;
+        if (typeof event.isRegistrationClosed === "boolean") return event.isRegistrationClosed;
+        if (event.registrationDeadline) {
+            const deadlineMs = new Date(event.registrationDeadline).getTime();
+            if (!isNaN(deadlineMs)) return deadlineMs < Date.now();
+        }
+        if (event.endsAt) {
+            const endsMs = new Date(event.endsAt).getTime();
+            if (!isNaN(endsMs)) return endsMs < Date.now();
+        }
+        return false;
+    };
+
+    const checkIsRegistrationUpcoming = (): boolean => {
+        if (isCompleted || event.status === "cancelled") return false;
+        if (typeof event.isRegistrationUpcoming === "boolean") return event.isRegistrationUpcoming;
+        if (event.registrationStartsAt) {
+            const startsMs = new Date(event.registrationStartsAt).getTime();
+            if (!isNaN(startsMs)) return startsMs > Date.now();
+        }
+        return false;
+    };
+
+    const isRegClosed = checkIsRegistrationClosed();
+    const isRegUpcoming = checkIsRegistrationUpcoming();
+
     const handleCopyTicket = () => {
         if (!event.ticketCode) return;
         navigator.clipboard.writeText(event.ticketCode);
@@ -85,7 +113,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
 
     return createPortal(
         <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
-            <div className="relative w-full max-w-5xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
+            <div className="relative w-[92vw] sm:w-[90vw] max-w-[90vw] 2xl:max-w-[1500px] bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
@@ -276,6 +304,34 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                 </div>
                             </div>
 
+                            {/* Team Size & Registration Statistics (Unstop Style) */}
+                            <div className="p-4 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-11 h-11 rounded-2xl border-2 border-black bg-[#FAF6EE] flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <Users className="w-5 h-5 text-black" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                            Team Size
+                                        </span>
+                                        <span className="text-sm font-black text-black block truncate">
+                                            {event.isTeamEvent
+                                                ? `${event.minTeamSize || 2} - ${event.maxTeamSize || 4} Members`
+                                                : "Individual Participation"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="text-right shrink-0 pl-3 border-l-2 border-black/10">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                        Registered
+                                    </span>
+                                    <span className="text-sm font-black text-emerald-700">
+                                        {event.registrationsCount || 0}
+                                    </span>
+                                </div>
+                            </div>
+
                             {/* 3. Registration & Action Card */}
                             <div className="p-4 sm:p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
                                 <div className="flex items-center justify-between pb-2 border-b-2 border-black/10">
@@ -292,7 +348,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                     <div className="p-3 rounded-xl bg-[#a2ff86]/25 border-l-4 border-emerald-600 space-y-1">
                                         <div className="flex items-center gap-1.5 font-black text-black text-xs">
                                             <Users className="w-4 h-4 text-emerald-800 shrink-0" />
-                                            <span>Team Registration Event ({event.minTeamSize || 1} to {event.maxTeamSize || 4} Members)</span>
+                                            <span>Team Registration Event ({event.minTeamSize || 2} to {event.maxTeamSize || 4} Members)</span>
                                         </div>
                                         <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
                                             Register as a Team Leader to invite members via @username, or join an existing squad with their 6-character team code before the event starts.
@@ -383,6 +439,30 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                     <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-300 text-center text-xs font-bold text-neutral-600">
                                         This event session has concluded.
                                     </div>
+                                ) : isRegClosed ? (
+                                    <div className="p-3.5 rounded-xl bg-neutral-100 border-2 border-neutral-400 space-y-1.5 text-center">
+                                        <div className="flex items-center justify-center gap-1.5 text-neutral-900 font-black text-xs uppercase tracking-wider">
+                                            <Lock className="w-3.5 h-3.5 text-neutral-600" />
+                                            <span>Registration Concluded</span>
+                                        </div>
+                                        <p className="text-[11px] font-bold text-neutral-600 leading-relaxed">
+                                            {event.registrationDeadline 
+                                                ? `The registration window for this event closed on ${new Date(event.registrationDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}. Applications are no longer accepted.`
+                                                : "The registration window for this event has closed. Applications are no longer accepted."}
+                                        </p>
+                                    </div>
+                                ) : isRegUpcoming ? (
+                                    <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-1.5 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-amber-950 font-black text-xs uppercase tracking-wider">
+                                            <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                            <span>Registration Opens Soon</span>
+                                        </div>
+                                        <p className="text-[11px] font-bold text-amber-800 leading-relaxed">
+                                            {event.registrationStartsAt
+                                                ? `Registration opens on ${new Date(event.registrationStartsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}.`
+                                                : "Registration for this event has not started yet."}
+                                        </p>
+                                    </div>
                                 ) : (
                                     <button
                                         type="button"
@@ -448,6 +528,96 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                             </div>
                         </div>
                     </div>
+
+                    {/* Event Sponsors & Partners Section (Smart visibility: entirely vanishes if 0 sponsors) */}
+                    {event.sponsors && event.sponsors.length > 0 && (
+                        <div className="p-5 sm:p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex items-center justify-between border-b-2 border-black/10 pb-3">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-black" />
+                                    <h2 className="font-black text-base sm:text-lg text-black tracking-tight">
+                                        Event Partners & Sponsors
+                                    </h2>
+                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                        {event.sponsors.length}
+                                    </span>
+                                </div>
+                                <span className="text-[11px] font-bold text-neutral-500 hidden sm:inline">
+                                    Click any partner card to visit their official website
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                                {event.sponsors.map((sponsor, index) => {
+                                    const sponsorImage = sponsor.logoUrl || sponsor.imageUrl || "";
+                                    const rawLink = sponsor.websiteUrl || sponsor.link || "";
+                                    const hasLink = Boolean(rawLink && rawLink.trim());
+                                    const redirectUrl = hasLink
+                                        ? /^https?:\/\//i.test(rawLink.trim())
+                                            ? rawLink.trim()
+                                            : `https://${rawLink.trim()}`
+                                        : undefined;
+
+                                    const CardContent = (
+                                        <div
+                                            className={`p-3 sm:p-4 rounded-xl border-2 border-black bg-[#FAF6EE] flex flex-col items-center text-center justify-between gap-2.5 h-full transition-all group ${
+                                                hasLink
+                                                    ? "hover:-translate-y-1 hover:shadow-[4px_4px_0px_#000] hover:bg-white cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                                    : "shadow-[2px_2px_0px_#000]"
+                                            }`}
+                                        >
+                                            {/* Image container */}
+                                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl border-2 border-black bg-white overflow-hidden flex items-center justify-center p-1.5 shadow-[2px_2px_0px_#000] shrink-0 group-hover:scale-105 transition-transform">
+                                                {sponsorImage ? (
+                                                    <img
+                                                        src={sponsorImage}
+                                                        alt={sponsor.name}
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                ) : (
+                                                    <Building2 className="w-8 h-8 text-neutral-400" />
+                                                )}
+                                            </div>
+
+                                            {/* Text block */}
+                                            <div className="space-y-1 w-full min-w-0">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <h4 className="font-black text-xs sm:text-sm text-black truncate leading-tight group-hover:text-indigo-600 transition-colors">
+                                                        {sponsor.name || "Sponsor Partner"}
+                                                    </h4>
+                                                    {hasLink && (
+                                                        <ExternalLink className="w-3 h-3 text-neutral-500 opacity-60 group-hover:opacity-100 group-hover:text-indigo-600 shrink-0" />
+                                                    )}
+                                                </div>
+                                                {sponsor.description && (
+                                                    <p className="text-[10px] sm:text-[11px] font-medium text-neutral-600 line-clamp-2 leading-snug">
+                                                        {sponsor.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+
+                                    return hasLink ? (
+                                        <a
+                                            key={sponsor.id || `sp_pub_${index}`}
+                                            href={redirectUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block h-full"
+                                            title={`Visit ${sponsor.name || "sponsor"} (${redirectUrl})`}
+                                        >
+                                            {CardContent}
+                                        </a>
+                                    ) : (
+                                        <div key={sponsor.id || `sp_pub_${index}`} className="block h-full">
+                                            {CardContent}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>,

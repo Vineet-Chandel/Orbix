@@ -21,14 +21,14 @@ import {
     Pin,
     Check,
 } from "lucide-react";
-import { ProjectCard } from "../../../components/projects/ProjectCard";
-import { ProjectDetailModal } from "../../../components/projects/ProjectDetailModal";
+import { ProjectCard } from "../../../../components/projects/ProjectCard";
+import { ProjectDetailModal } from "../../../../components/projects/ProjectDetailModal";
 import {
     MOCK_PROJECTS_DATA,
     EXTRACTION_SIMULATION_STAGES,
     PROJECT_CATEGORIES,
 } from "./mockProjects";
-import type { ProjectItem } from "../../../types/project";
+import type { ProjectItem } from "../../../../types/project";
 
 const GithubIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -271,11 +271,10 @@ export const ProjectsShowcase: React.FC = () => {
                                     key={stage.id}
                                     type="button"
                                     onClick={() => handleSelectStage(idx)}
-                                    className={`relative text-left p-3.5 rounded-2xl border-2 border-black transition-all overflow-hidden cursor-pointer ${
-                                        isActive
-                                            ? "bg-[#FAF6EE] shadow-[3px_3px_0px_#000] -translate-y-0.5"
-                                            : "bg-white hover:bg-neutral-50 shadow-[1px_1px_0px_#000] opacity-80 hover:opacity-100"
-                                    }`}
+                                    className={`relative text-left p-3.5 rounded-2xl border-2 border-black transition-all overflow-hidden cursor-pointer ${isActive
+                                        ? "bg-[#FAF6EE] shadow-[3px_3px_0px_#000] -translate-y-0.5"
+                                        : "bg-white hover:bg-neutral-50 shadow-[1px_1px_0px_#000] opacity-80 hover:opacity-100"
+                                        }`}
                                 >
                                     {/* Progress fill bar on active stage */}
                                     {isActive && isAutoPlaying && (
@@ -286,9 +285,8 @@ export const ProjectsShowcase: React.FC = () => {
                                     )}
 
                                     <div className="flex items-center justify-between mb-1.5">
-                                        <span className={`w-6 h-6 rounded-lg border border-black flex items-center justify-center font-mono font-black text-xs ${
-                                            isActive ? "bg-black text-[#a2ff86]" : "bg-neutral-100 text-neutral-500"
-                                        }`}>
+                                        <span className={`w-6 h-6 rounded-lg border border-black flex items-center justify-center font-mono font-black text-xs ${isActive ? "bg-black text-[#a2ff86]" : "bg-neutral-100 text-neutral-500"
+                                            }`}>
                                             {stage.stepNumber}
                                         </span>
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border border-black/30 ${stage.badgeColor} text-black`}>
@@ -642,9 +640,8 @@ export const ProjectsShowcase: React.FC = () => {
                                 {EXTRACTION_SIMULATION_STAGES.map((_, i) => (
                                     <span
                                         key={i}
-                                        className={`w-2 h-2 rounded-full border border-black transition-all ${
-                                            activeStageIndex === i ? "bg-black scale-125" : "bg-neutral-300"
-                                        }`}
+                                        className={`w-2 h-2 rounded-full border border-black transition-all ${activeStageIndex === i ? "bg-black scale-125" : "bg-neutral-300"
+                                            }`}
                                     />
                                 ))}
                             </div>
@@ -700,11 +697,10 @@ export const ProjectsShowcase: React.FC = () => {
                                         key={cat.id}
                                         type="button"
                                         onClick={() => setSelectedCategory(cat.id)}
-                                        className={`px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
-                                            isSelected
-                                                ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                : "bg-[#FAF6EE] text-neutral-800 hover:bg-neutral-100"
-                                        }`}
+                                        className={`px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all whitespace-nowrap cursor-pointer ${isSelected
+                                            ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                            : "bg-[#FAF6EE] text-neutral-800 hover:bg-neutral-100"
+                                            }`}
                                     >
                                         {cat.label} ({cat.count})
                                     </button>

@@ -108,7 +108,7 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
     // -------------------------------------------------------------------------
     const simResults = useMemo(() => {
         // Dimension 1: Impact & Quantified Achievements (Weight: 25%)
-        let d1MetricsScore = 10;
+        let d1MetricsScore = 0;
         if (quantifiedMetricsCount >= 6) d1MetricsScore = 100;
         else if (quantifiedMetricsCount >= 4) d1MetricsScore = 85;
         else if (quantifiedMetricsCount >= 2) d1MetricsScore = 65;
@@ -118,22 +118,22 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
         const d1Contribution = (d1Score * 0.25);
 
         // Dimension 2: Technical Depth & Evidence (Weight: 20%)
-        let d2ArchScore = 25;
+        let d2ArchScore = 0;
         if (architecturalSignalsCount >= 5) d2ArchScore = 100;
         else if (architecturalSignalsCount >= 3) d2ArchScore = 80;
-        else if (architecturalSignalsCount >= 1) d2ArchScore = 60;
+        else if (architecturalSignalsCount >= 1) d2ArchScore = 55;
 
         const d2Score = Math.min(100, Math.round(technicalStackDepth * 0.55 + d2ArchScore * 0.45));
         const d2Contribution = (d2Score * 0.20);
 
         // Dimension 3: Target Role Alignment (Weight: 20%)
-        const headlineScore = headlinePresent ? 100 : 35;
+        const headlineScore = headlinePresent ? 100 : 0;
         const d3Score = Math.min(100, Math.round(headlineScore * 0.4 + modernToolingCurrency * 0.6));
         const d3Contribution = (d3Score * 0.20);
 
         // Dimension 4: ATS Structure & Parseability (Weight: 10%)
         const sectionScore = Math.round((atsCoreSectionsDetected / 4) * 100);
-        const textScore = selectableTextValid ? 100 : 20;
+        const textScore = selectableTextValid ? 100 : 0;
         const d4Score = Math.min(100, Math.round(sectionScore * 0.6 + textScore * 0.4));
         const d4Contribution = (d4Score * 0.10);
 
@@ -142,19 +142,23 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
         const d5Contribution = (d5Score * 0.10);
 
         // Dimension 6: Verified Profiles & Evidence (Weight: 10%)
-        let d6Score = 20;
+        let d6Score = 0;
         if (hasGithubVerified && hasLinkedinOrPortfolio) d6Score = 100;
-        else if (hasGithubVerified) d6Score = 80;
+        else if (hasGithubVerified) d6Score = 75;
         else if (hasLinkedinOrPortfolio) d6Score = 60;
         const d6Contribution = (d6Score * 0.10);
 
         // Dimension 7: Contact & Completeness (Weight: 5%)
-        const d7Score = contactComplete ? 100 : 40;
+        // If contactComplete is false, contact info is unassessable and dynamically removed from the denominator
+        const d7Assessed = contactComplete;
+        const d7Score = d7Assessed ? 100 : 0;
         const d7Contribution = (d7Score * 0.05);
 
-        const totalScore = Math.round(
-            d1Contribution + d2Contribution + d3Contribution + d4Contribution + d5Contribution + d6Contribution + d7Contribution
-        );
+        // Dynamic denominator normalization across assessed dimensions
+        const totalAssessedWeight = 0.25 + 0.20 + 0.20 + 0.10 + 0.10 + 0.10 + (d7Assessed ? 0.05 : 0);
+        const weightedSum = d1Contribution + d2Contribution + d3Contribution + d4Contribution + d5Contribution + d6Contribution + (d7Assessed ? d7Contribution : 0);
+
+        const totalScore = totalAssessedWeight > 0 ? Math.round(weightedSum / totalAssessedWeight) : 0;
 
         let grade: "Top Tier" | "Competitive" | "Strong Foundation" | "Needs Improvement" = "Needs Improvement";
         if (totalScore >= 88) grade = "Top Tier";

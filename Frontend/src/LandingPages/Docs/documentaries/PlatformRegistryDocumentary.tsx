@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { Platform } from "../../Main-Landing-Pages/Personal-Account-Landing-Pages/Platform";
 
 export interface PlatformDetail {
     id: string;
@@ -729,11 +730,10 @@ export const PlatformRegistryDocumentary: React.FC = () => {
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
-                                className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow-[2px_2px_0px_#000] ${
-                                    selectedCategory === cat
-                                        ? "bg-black text-[#a2ff86] translate-x-[1px] translate-y-[1px] shadow-none"
-                                        : "bg-white text-black hover:bg-neutral-100"
-                                }`}
+                                className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow-[2px_2px_0px_#000] ${selectedCategory === cat
+                                    ? "bg-black text-[#a2ff86] translate-x-[1px] translate-y-[1px] shadow-none"
+                                    : "bg-white text-black hover:bg-neutral-100"
+                                    }`}
                             >
                                 {cat}
                             </button>
@@ -749,11 +749,10 @@ export const PlatformRegistryDocumentary: React.FC = () => {
                             <button
                                 key={p.id}
                                 onClick={() => setSelectedPlatformId(p.id)}
-                                className={`p-3 rounded-2xl border-2 border-black text-center flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
-                                    isSelected
-                                        ? "bg-[#FFE566] shadow-[4px_4px_0px_#000] -translate-y-1"
-                                        : "bg-white hover:bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
-                                }`}
+                                className={`p-3 rounded-2xl border-2 border-black text-center flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${isSelected
+                                    ? "bg-[#FFE566] shadow-[4px_4px_0px_#000] -translate-y-1"
+                                    : "bg-white hover:bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
+                                    }`}
                             >
                                 <div className="p-2 rounded-xl bg-white border border-black shadow-[1px_1px_0px_#000]">
                                     {getPortalIcon(p.id, "w-6 h-6")}
@@ -933,9 +932,8 @@ export const PlatformRegistryDocumentary: React.FC = () => {
                                     <tr
                                         key={p.id}
                                         onClick={() => setSelectedPlatformId(p.id)}
-                                        className={`transition-colors cursor-pointer ${
-                                            p.id === activePlatform.id ? "bg-[#FFE566]/30 font-bold" : idx % 2 === 0 ? "bg-white hover:bg-[#FAF6EE]" : "bg-[#FAF6EE]/50 hover:bg-[#FAF6EE]"
-                                        }`}
+                                        className={`transition-colors cursor-pointer ${p.id === activePlatform.id ? "bg-[#FFE566]/30 font-bold" : idx % 2 === 0 ? "bg-white hover:bg-[#FAF6EE]" : "bg-[#FAF6EE]/50 hover:bg-[#FAF6EE]"
+                                            }`}
                                     >
                                         <td className="p-3 pl-4 font-black text-black flex items-center gap-2">
                                             {getPortalIcon(p.id, "w-4 h-4 shrink-0")}
@@ -1077,6 +1075,14 @@ export const PlatformRegistryDocumentary: React.FC = () => {
                     </div>
                 </div>
             </section>
+
+            {/* ========================================================================= */}
+            {/* INTERACTIVE CELESTIAL PLATFORM ORBIT                                      */}
+            {/* ========================================================================= */}
+            <Platform
+                showHeading={false}
+                className="rounded-3xl border-2 sm:border-[3px] border-black shadow-[6px_6px_0px_#000]"
+            />
 
             {/* ========================================================================= */}
             {/* CALL TO ACTION                                                            */}

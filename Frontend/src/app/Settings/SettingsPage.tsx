@@ -134,19 +134,12 @@ export default function SettingsPage() {
     const handleConfirmLogout = async () => {
         setIsLoggingOut(true);
         try {
-            const primarySignout = buildApiUrl("/api/auth/signout");
-            const endpoints = import.meta.env.DEV
-                ? [primarySignout, "/api/auth/logout", "http://localhost:3000/api/auth/signout"]
-                : [primarySignout, "/api/auth/logout"];
-            await Promise.allSettled(
-                endpoints.map((url) =>
-                    fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                    })
-                )
-            );
+            const signoutUrl = buildApiUrl("/api/auth/signout");
+            await fetch(signoutUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
         } catch {
             // ignore network failure on logout
         } finally {
