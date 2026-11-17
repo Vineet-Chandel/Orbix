@@ -1,7 +1,7 @@
 import { Link, Navigate, Outlet, useOutletContext } from "react-router-dom";
 import { Building2, Lock, ArrowRight } from "lucide-react";
 import { useAppSelector } from "./store";
-import { OrbixLoader } from "./components/ui/loader";
+import { OrbixInitialLoader } from "./components/ui/loader";
 
 const ProtectedRoute = () => {
     const { user, loading } = useAppSelector((state) => state.user);
@@ -9,9 +9,10 @@ const ProtectedRoute = () => {
 
     if (loading && !user) {
         return (
-            <div className="min-h-screen bg-black flex items-center justify-center text-white">
-                <OrbixLoader size="lg" />
-            </div>
+            <OrbixInitialLoader
+                message="Verifying Session..."
+                subMessage="Connecting to your personal developer workspace"
+            />
         );
     }
 
@@ -36,9 +37,10 @@ export const ClubProtectedRoute = () => {
 
     if (loading && !user) {
         return (
-            <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center text-black">
-                <OrbixLoader size="lg" />
-            </div>
+            <OrbixInitialLoader
+                message="Verifying Club Session..."
+                subMessage="Connecting to club management workspace"
+            />
         );
     }
 

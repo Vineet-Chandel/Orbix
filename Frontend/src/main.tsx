@@ -4,11 +4,14 @@ import { Provider } from 'react-redux'
 import { store } from './store'
 import './index.css'
 import App from './App.tsx'
+import { OrbixErrorBoundary } from './components/ui/error/OrbixErrorBoundary'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Provider store={store}>
-      <App />
-    </Provider>
+    <OrbixErrorBoundary level="app">
+      <Provider store={store}>
+        <App />
+      </Provider>
+    </OrbixErrorBoundary>
   </StrictMode>,
 )

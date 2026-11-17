@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
     Settings,
-    Menu,
     ArrowLeft,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile, clearUser } from "../../store";
@@ -241,10 +240,14 @@ export default function SettingsPage() {
                                     <button
                                         type="button"
                                         onClick={() => setIsMobileSidebarOpen(true)}
-                                        className="lg:hidden mt-0.5 p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer shrink-0"
+                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
                                         aria-label="Open sidebar"
                                     >
-                                        <Menu className="w-5 h-5 stroke-[2.5]" />
+                                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <line x1="3" y1="12" x2="21" y2="12" />
+                                            <line x1="3" y1="6" x2="21" y2="6" />
+                                            <line x1="3" y1="18" x2="21" y2="18" />
+                                        </svg>
                                     </button>
                                     <div className="space-y-1">
                                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-black font-black text-xs shadow-[2px_2px_0px_#000] uppercase tracking-wider">

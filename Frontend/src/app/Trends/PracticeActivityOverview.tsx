@@ -481,7 +481,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
             </div>
 
             {/* ROW 3: Problems Solved Stacked Bar Chart */}
-            <div className="rounded-2xl bg-white border-2 border-black p-6 sm:p-7 shadow-[4px_4px_0px_#000] space-y-6">
+            <div className="rounded-2xl bg-white border-2 border-black p-4 sm:p-6 lg:p-7 shadow-[4px_4px_0px_#000] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full">
                 {/* Header with Switcher */}
                 <div className="flex items-center justify-between pb-3 border-b-2 border-black/10 flex-wrap gap-3">
                     <div className="flex items-center gap-3">
@@ -498,7 +498,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                         <button
                             type="button"
                             onClick={() => setChartMode("weeks")}
-                            className={`px-3.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                            className={`px-3 sm:px-3.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                                 chartMode === "weeks"
                                     ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
                                     : "text-neutral-700 hover:text-black border-2 border-transparent"
@@ -509,7 +509,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                         <button
                             type="button"
                             onClick={() => setChartMode("months")}
-                            className={`px-3.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                            className={`px-3 sm:px-3.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                                 chartMode === "months"
                                     ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
                                     : "text-neutral-700 hover:text-black border-2 border-transparent"
@@ -521,13 +521,22 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* The Stacked Bar Chart Container */}
-                <div className="w-full pt-4 pb-2 relative">
-                    <div className="w-full h-52 sm:h-60 flex items-end justify-between gap-1 sm:gap-2 px-1 relative">
+                <div className="w-full pt-3 sm:pt-4 pb-1 sm:pb-2 relative min-w-0 overflow-x-auto scrollbar-none">
+                    <div className="w-full h-40 sm:h-52 md:h-60 flex items-end justify-between gap-0.5 sm:gap-1.5 md:gap-2 px-1 relative min-w-0">
                         {activeChartData.map((bucket, idx) => {
                             const isZero = bucket.total === 0;
-                            // In Weeks mode, show dates every 2 weeks to match the screenshot
-                            const shouldShowLabel =
-                                chartMode === "months" ? true : idx % 2 === 0 || idx === activeChartData.length - 1;
+                            const isLast = idx === activeChartData.length - 1;
+                            const isFirst = idx === 0;
+
+                            // On desktop, show dates every 2 weeks + last week to match the desktop reference
+                            const shouldShowDesktop =
+                                chartMode === "months" ? true : idx % 2 === 0 || isLast;
+
+                            // On mobile, show fewer ticks (every 6 weeks + last week) to prevent overlapping
+                            const shouldShowMobile =
+                                chartMode === "months"
+                                    ? true
+                                    : isLast || (idx % 6 === 0 && idx < activeChartData.length - 3);
 
                             const heightPercent = Math.min(100, Math.max(isZero ? 0 : 8, (bucket.total / maxChartValue) * 100));
 
@@ -543,13 +552,13 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                             return (
                                 <div
                                     key={bucket.key}
-                                    className="flex-1 flex flex-col items-center justify-end h-full group relative cursor-pointer"
+                                    className="flex-1 min-w-0 flex flex-col items-center justify-end h-full group relative cursor-pointer"
                                     onMouseEnter={() => setHoveredBucket(bucket)}
                                     onMouseLeave={() => setHoveredBucket(null)}
                                 >
                                     {/* Number above the bar */}
                                     {!isZero && (
-                                        <span className="text-[10px] sm:text-[11px] font-black text-black font-mono mb-1 select-none">
+                                        <span className="text-[8px] sm:text-[10px] md:text-[11px] font-black text-black font-mono mb-1 select-none whitespace-nowrap">
                                             {bucket.total}
                                         </span>
                                     )}
@@ -557,7 +566,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                     {/* Stacked Bar Container */}
                                     <div
                                         style={{ height: `${heightPercent}%` }}
-                                        className={`w-full max-w-[20px] sm:max-w-[26px] rounded-t-md border-2 border-black overflow-hidden flex flex-col-reverse shadow-[1px_1px_0px_#000] transition-all duration-200 ${
+                                        className={`w-full max-w-[12px] sm:max-w-[20px] md:max-w-[26px] rounded-t-[3px] sm:rounded-t-md border sm:border-2 border-black overflow-hidden flex flex-col-reverse shadow-[1px_1px_0px_#000] transition-all duration-200 ${
                                             isHovered ? "ring-2 ring-black scale-105" : ""
                                         }`}
                                     >
@@ -596,9 +605,21 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                     </div>
 
                                     {/* Date tick label */}
-                                    <div className="h-6 flex items-center justify-center mt-2">
-                                        {shouldShowLabel && (
-                                            <span className="text-[9px] sm:text-[10px] text-neutral-800 whitespace-nowrap font-black font-mono">
+                                    <div
+                                        className={`h-6 flex items-center mt-2 w-full min-w-0 ${
+                                            isFirst
+                                                ? "justify-start sm:justify-center"
+                                                : isLast
+                                                ? "justify-end sm:justify-center"
+                                                : "justify-center"
+                                        }`}
+                                    >
+                                        {shouldShowDesktop && (
+                                            <span
+                                                className={`${
+                                                    shouldShowMobile ? "inline" : "hidden sm:inline"
+                                                } text-[8px] sm:text-[9px] md:text-[10px] text-neutral-800 whitespace-nowrap font-black font-mono`}
+                                            >
                                                 {bucket.label}
                                             </span>
                                         )}

@@ -25,9 +25,9 @@ export const Footer: React.FC = () => {
                     <div className="absolute -right-20 -top-24 w-72 h-72 rounded-full border border-dashed border-black/15 pointer-events-none" />
 
                     {/* Orbix Brand Logo Badge */}
-                    <div className="absolute right-4 sm:right-8 md:right-12 lg:right-16 top-4 sm:top-6 md:top-1/2 md:-translate-y-1/2 z-10">
+                    <div className="relative md:absolute md:right-12 lg:right-16 md:top-1/2 md:-translate-y-1/2 z-10 mb-6 md:mb-0">
                         <div
-                            className="w-20 h-20 sm:w-28 sm:h-28 md:w-36 md:h-36 lg:w-44 lg:h-44 rounded-full border-[3px] border-black bg-white p-3.5 sm:p-5 md:p-7 shadow-[5px_5px_0px_#000] flex items-center justify-center hover:scale-105 hover:rotate-6 transition-all duration-300 cursor-pointer"
+                            className="w-16 h-16 sm:w-20 sm:h-20 md:w-36 md:h-36 lg:w-44 lg:h-44 rounded-full border-[3px] border-black bg-white p-3 sm:p-4 md:p-7 shadow-[4px_4px_0px_#000] md:shadow-[5px_5px_0px_#000] flex items-center justify-center hover:scale-105 hover:rotate-6 transition-all duration-300 cursor-pointer"
                             title="Orbix"
                         >
                             <OrbixLogo className="w-full h-full text-black" />

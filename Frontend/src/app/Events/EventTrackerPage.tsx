@@ -489,10 +489,10 @@ export const EventTrackerPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setIsMobileSidebarOpen(true)}
-                                    className="lg:hidden p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex-shrink-0"
+                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer flex-shrink-0"
                                     aria-label="Open sidebar"
                                 >
-                                    <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <line x1="3" y1="12" x2="21" y2="12" />
                                         <line x1="3" y1="6" x2="21" y2="6" />
                                         <line x1="3" y1="18" x2="21" y2="18" />

@@ -574,5 +574,41 @@ html.dark body:has(.blog-container) {
   }
 }
 
+/* ==========================================================================
+   STICKY / FIXED MOBILE SIDEBAR TOGGLE
+   Anchors ONLY the top-left mobile sidebar hamburger toggle button at the
+   top-left of the mobile viewport across all pages and views while scrolling
+   vertically. Strictly isolates positioning to the button alone.
+   Preserves layout spacing so sibling header content never shifts or overlaps.
+   Guarantees opaque background, consistent Neo-Brutalist styling, and safe-area insets.
+   ========================================================================== */
+@media (max-width: 1023px) {
+  button[aria-label="Open sidebar"] {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 0px) + 1.625rem) !important;
+    left: calc(env(safe-area-inset-left, 0px) + 1.625rem) !important;
+    z-index: 40 !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 2px 2px 0px #000000 !important;
+    opacity: 1 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  button[aria-label="Open sidebar"] + * {
+    margin-left: 3rem !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  button[aria-label="Open sidebar"] {
+    top: calc(env(safe-area-inset-top, 0px) + 2.375rem) !important;
+    left: calc(env(safe-area-inset-left, 0px) + 2.375rem) !important;
+  }
+}
+
 
 
