@@ -20,6 +20,7 @@ import { InviteCampusLeadsModal } from "../../../components/InviteCampusLeadsMod
 import { NeoSelect } from "../../../components/NeoSelect";
 import { useAppSelector } from "../../../store";
 import { SectionBottomIllustration } from "../../common/SectionBottomIllustration";
+import { OrbixLoader } from "../../../components/ui/loader";
 
 interface StudentCampusClubsViewProps {
     onOpenMobileSidebar?: () => void;
@@ -327,24 +328,11 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
 
                 {/* State: Loading Skeletons */}
                 {loading && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {[1, 2, 3].map((n) => (
-                            <div
-                                key={n}
-                                className="bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden animate-pulse h-80 flex flex-col justify-between"
-                            >
-                                <div className="h-28 bg-neutral-200" />
-                                <div className="p-4 space-y-3 flex-1">
-                                    <div className="w-14 h-14 rounded-xl bg-neutral-300 -mt-10" />
-                                    <div className="h-4 bg-neutral-200 rounded w-3/4" />
-                                    <div className="h-3 bg-neutral-200 rounded w-1/2" />
-                                    <div className="h-10 bg-neutral-100 rounded w-full mt-2" />
-                                </div>
-                                <div className="p-4 border-t border-neutral-100">
-                                    <div className="h-8 bg-neutral-200 rounded-xl" />
-                                </div>
-                            </div>
-                        ))}
+                    <div className="py-20 flex flex-col items-center justify-center gap-4 text-center">
+                        <OrbixLoader size="lg" />
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Discovering campus communities & verified chapters...
+                        </span>
                     </div>
                 )}
 

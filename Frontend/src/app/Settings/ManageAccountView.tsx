@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch } from "../../store";
+import { OrbixLoader } from "../../components/ui/loader";
 import { updateUserProfile, setEmailVerified } from "../../store/userSlice";
 import OtpSegmentedInput from "../../LandingPages/Auth-Pages/OtpSegmentedInput";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
@@ -723,8 +724,8 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
 
     if (isLoading) {
         return (
-            <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-3">
-                <div className="w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                <OrbixLoader size="lg" />
                 <p className="text-xs font-black uppercase tracking-wider text-neutral-600">
                     Loading Account Management...
                 </p>

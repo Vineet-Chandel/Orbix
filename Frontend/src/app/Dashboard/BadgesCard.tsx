@@ -55,22 +55,25 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
 }) => {
     const authUser = useAppSelector((state) => state.user.user);
     const effectiveUser = (username || authUser?.username || "").trim();
+    const isDemo = isDemoProfileUsername(effectiveUser);
     const dispatch = useAppDispatch();
 
-    const remoteData = useAppSelector((state) => (effectiveUser ? state.badges.dataByUser[effectiveUser] : undefined));
-    const isLoading = useAppSelector((state) => (effectiveUser ? state.badges.loadingByUser[effectiveUser] || false : false));
+    const reduxRemoteData = useAppSelector((state) => (effectiveUser ? state.badges.dataByUser[effectiveUser] : undefined));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.badges.loadingByUser[effectiveUser] || false : false));
+
+    const remoteData = isDemo ? demoBadgesData : reduxRemoteData;
+    const isLoading = isDemo ? false : reduxLoading;
+
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
     const [hoveredBadge, setHoveredBadge] = useState<UnifiedBadgeRecord | null>(null);
 
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || isDemo) return;
         if (!remoteData && !isLoading) {
             dispatch(fetchUnifiedBadges({ username: effectiveUser }));
         }
-    }, [effectiveUser, remoteData, isLoading, dispatch]);
-
-    const isDemo = isDemoProfileUsername(effectiveUser);
+    }, [effectiveUser, remoteData, isLoading, dispatch, isDemo]);
 
     const badges = useMemo(() => {
         if (remoteData?.badges && remoteData.badges.length > 0) {

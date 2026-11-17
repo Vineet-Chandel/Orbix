@@ -22,6 +22,7 @@ import {
     type DaySubmissionCell,
     type PlatformSubmissionStat,
 } from "../../utils/submissionsAggregator";
+import { isDemoProfileUsername, demoUnifiedSubmissions } from "../../data/demoProfileData";
 
 interface CodingSubmissionsTableProps {
     connectedPortals: Record<string, any>;
@@ -36,9 +37,13 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     const [hoveredCell, setHoveredCell] = useState<DaySubmissionCell | null>(null);
 
     const effectiveUser = (username || "").trim();
+    const isDemo = isDemoProfileUsername(effectiveUser);
     const dispatch = useAppDispatch();
-    const remoteData = useAppSelector((state) => state.submissions.dataByUser[effectiveUser]);
-    const isLoading = useAppSelector((state) => state.submissions.loadingByUser[effectiveUser]);
+    const reduxRemoteData = useAppSelector((state) => (effectiveUser ? state.submissions.dataByUser[effectiveUser] : undefined));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.submissions.loadingByUser[effectiveUser] : false));
+
+    const remoteData = isDemo ? demoUnifiedSubmissions : reduxRemoteData;
+    const isLoading = isDemo ? false : reduxLoading;
 
     const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
 
@@ -79,7 +84,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     };
 
     const handleSyncClick = () => {
-        if (cooldownSeconds > 0 || isLoading || !effectiveUser) return;
+        if (isDemo || cooldownSeconds > 0 || isLoading || !effectiveUser) return;
         dispatch(invalidateSubmissions(effectiveUser));
         dispatch(fetchUnifiedSubmissions({ username: effectiveUser, force: true, portals: connectedPortals }));
     };
@@ -124,7 +129,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     const prevFingerprintRef = React.useRef<string | null>(null);
 
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || isDemo) return;
 
         if (prevFingerprintRef.current === null) {
             prevFingerprintRef.current = portalsFingerprint;
@@ -135,7 +140,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             dispatch(invalidateSubmissions(effectiveUser));
             dispatch(fetchUnifiedSubmissions({ username: effectiveUser, force: true, portals: connectedPortals }));
         }
-    }, [effectiveUser, portalsFingerprint, connectedPortals, dispatch]);
+    }, [effectiveUser, portalsFingerprint, connectedPortals, dispatch, isDemo]);
 
     // Compute instant fallback client aggregation
     const clientAgg = useMemo(() => {

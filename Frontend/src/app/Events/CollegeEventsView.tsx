@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
     Clock,
+    Calendar,
     MapPin,
     Search,
     ExternalLink,
@@ -901,13 +902,13 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
             <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                 {/* Header Banner */}
                 <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="space-y-1.5">
-                        {onOpenMobileSidebar && (
-                            <div className="flex items-center gap-2">
+                    <div className="space-y-1.5 min-w-0">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            {onOpenMobileSidebar && (
                                 <button
                                     type="button"
                                     onClick={onOpenMobileSidebar}
-                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
                                     aria-label="Open sidebar"
                                 >
                                     <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -916,11 +917,14 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                         <line x1="3" y1="18" x2="21" y2="18" />
                                     </svg>
                                 </button>
+                            )}
+                            <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                <Calendar className="w-5 h-5 text-black stroke-[2.5]" />
                             </div>
-                        )}
-                        <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-black tracking-tight">
-                            College & National Events Hub
-                        </h1>
+                            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-black tracking-tight truncate">
+                                College & National Events Hub
+                            </h1>
+                        </div>
                         <div className="flex items-center gap-2 flex-wrap text-xs font-bold text-neutral-600">
                             <span className="inline-flex items-center gap-1.5">
                                 <Building2 className="w-4 h-4 text-neutral-500 shrink-0" />

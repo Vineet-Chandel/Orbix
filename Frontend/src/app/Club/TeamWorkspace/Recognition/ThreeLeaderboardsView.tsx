@@ -28,6 +28,7 @@ import type {
     DepartmentLeaderboardEntry,
     WorkspaceDepartment,
 } from "../../../../types/workspace";
+import { OrbixLoader } from "../../../../components/ui/loader";
 import { MemberRecognitionProfileModal } from "./MemberRecognitionProfileModal";
 
 interface ThreeLeaderboardsViewProps {
@@ -348,8 +349,8 @@ export const ThreeLeaderboardsView: React.FC<ThreeLeaderboardsViewProps> = ({
 
             {/* 3. Leaderboard Contents */}
             {loading ? (
-                <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-2xl">
-                    <RefreshCw className="w-6 h-6 animate-spin text-amber-400 mx-auto mb-2" />
+                <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-3">
+                    <OrbixLoader size="sm" color="#fbbf24" />
                     <p className="text-xs text-slate-400">Loading rankings...</p>
                 </div>
             ) : (

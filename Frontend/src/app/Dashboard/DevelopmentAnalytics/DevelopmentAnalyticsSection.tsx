@@ -6,6 +6,7 @@ import {
 } from "../../../store/developmentAnalyticsSlice";
 import { LanguagesCard } from "./LanguagesCard";
 import { DevelopmentHighlightsCard } from "./DevelopmentHighlightsCard";
+import { isDemoProfileUsername, demoDevelopmentAnalytics } from "../../../data/demoProfileData";
 
 interface DevelopmentAnalyticsSectionProps {
     connectedPortals?: Record<string, any>;
@@ -18,6 +19,7 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
 }) => {
     const authUser = useAppSelector((state) => state.user.user);
     const effectiveUser = (username || authUser?.username || "").trim();
+    const isDemo = isDemoProfileUsername(effectiveUser);
     const dispatch = useAppDispatch();
 
     const gh = connectedPortals?.github || connectedPortals?.GitHub || connectedPortals?.Github;
@@ -41,15 +43,17 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
         return "";
     }, [gh, effectiveUser, authUser]);
 
-    const data = useAppSelector((state) => (effectiveUser ? state.developmentAnalytics.dataByUser[effectiveUser] : undefined));
-    const isLoading = useAppSelector(
+    const reduxData = useAppSelector((state) => (effectiveUser ? state.developmentAnalytics.dataByUser[effectiveUser] : undefined));
+    const reduxLoading = useAppSelector(
         (state) => (effectiveUser ? state.developmentAnalytics.loadingByUser[effectiveUser] || false : false)
     );
+    const data = isDemo ? demoDevelopmentAnalytics : reduxData;
+    const isLoading = isDemo ? false : reduxLoading;
 
     const prevHandleRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || isDemo) return;
 
         if (prevHandleRef.current === null) {
             prevHandleRef.current = githubHandle;
@@ -72,7 +76,7 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
                 })
             );
         }
-    }, [effectiveUser, githubHandle, connectedPortals, dispatch]);
+    }, [effectiveUser, githubHandle, connectedPortals, dispatch, isDemo]);
 
     return (
         <section

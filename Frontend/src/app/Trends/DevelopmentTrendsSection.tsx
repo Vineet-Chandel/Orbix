@@ -73,15 +73,15 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
     const repos = data?.topRepositories || [];
 
     return (
-        <div className="space-y-6">
+        <div className="w-full space-y-6">
             {/* Top Section Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/10">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/10 w-full min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] shrink-0">
                         <Rocket className="w-5 h-5 text-black stroke-[2.5]" />
                     </div>
-                    <div>
-                        <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                    <div className="min-w-0">
+                        <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight truncate">
                             Development & Engineering Trends
                         </h2>
                         <p className="text-xs sm:text-sm font-bold text-neutral-600 mt-0.5">
@@ -90,14 +90,14 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+                <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap max-w-full">
                     {/* GitHub Handle Pill */}
                     {data?.githubHandle && (
                         <a
                             href={`https://github.com/${data.githubHandle}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#FFE566] border-2 border-black text-xs font-black text-black transition-all shadow-[2px_2px_0px_#000]"
+                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#FFE566] border-2 border-black text-xs font-black text-black transition-all shadow-[2px_2px_0px_#000] shrink-0"
                         >
                             <GitBranch className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>@{data.githubHandle}</span>
@@ -110,7 +110,7 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                         type="button"
                         onClick={handleRefresh}
                         disabled={isLoading}
-                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all cursor-pointer disabled:opacity-50 active:translate-x-0.5 active:translate-y-0.5"
+                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all cursor-pointer disabled:opacity-50 active:translate-x-0.5 active:translate-y-0.5 shrink-0"
                         title="Sync real-time GitHub metrics"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 stroke-[2.5] ${isLoading ? "animate-spin text-[#a2ff86]" : ""}`} />
@@ -120,8 +120,8 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
             </div>
 
             {/* Development Metrics Overview */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full min-w-0">
+                <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                     <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                         Total Contributions
                     </span>
@@ -129,11 +129,11 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                         <span className="text-2xl sm:text-3xl font-black text-black font-mono">
                             {data?.contributions !== undefined ? data.contributions.toLocaleString() : "—"}
                         </span>
-                        <span className="text-xs text-neutral-600 font-bold">commits & PRs</span>
+                        <span className="text-xs text-neutral-600 font-bold truncate">commits & PRs</span>
                     </div>
                 </div>
 
-                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                     <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                         Public Repositories
                     </span>
@@ -141,11 +141,11 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                         <span className="text-2xl sm:text-3xl font-black text-black font-mono">
                             {data?.repos !== undefined ? data.repos : "—"}
                         </span>
-                        <span className="text-xs text-neutral-600 font-bold">active projects</span>
+                        <span className="text-xs text-neutral-600 font-bold truncate">active projects</span>
                     </div>
                 </div>
 
-                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                     <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                         Stars Earned
                     </span>
@@ -153,11 +153,11 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                         <span className="text-2xl sm:text-3xl font-black text-black font-mono">
                             {data?.stars !== undefined ? data.stars : "—"}
                         </span>
-                        <span className="text-xs text-neutral-600 font-bold">stargazers</span>
+                        <span className="text-xs text-neutral-600 font-bold truncate">stargazers</span>
                     </div>
                 </div>
 
-                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                     <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                         Followers
                     </span>
@@ -230,23 +230,23 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
 
             {/* Language Breakdown */}
             {languages.length > 0 && (
-                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                <div className="p-4 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 w-full min-w-0 overflow-hidden">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2.5">
-                            <div className="p-1.5 rounded-lg bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="p-1.5 rounded-lg bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] shrink-0">
                                 <Code2 className="w-4 h-4 text-black stroke-[2.5]" />
                             </div>
-                            <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
+                            <h3 className="text-base sm:text-lg font-black text-black tracking-tight truncate">
                                 Language Distribution & Codebase Breakdown
                             </h3>
                         </div>
-                        <span className="text-xs text-black font-mono font-black bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000]">
+                        <span className="text-xs text-black font-mono font-black bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000] shrink-0">
                             by source size
                         </span>
                     </div>
 
                     {/* Multi-segment progress bar */}
-                    <div className="w-full h-4 rounded-lg bg-[#FAF6EE] border-2 border-black flex overflow-hidden p-0.5 gap-0.5 shadow-[2px_2px_0px_#000]">
+                    <div className="w-full h-4 rounded-lg bg-[#FAF6EE] border-2 border-black flex overflow-hidden p-0.5 gap-0.5 shadow-[2px_2px_0px_#000] min-w-0">
                         {languages.map((l, idx) => (
                             <div
                                 key={idx}
@@ -261,22 +261,22 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                     </div>
 
                     {/* Language chips */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 sm:gap-3 pt-2 w-full min-w-0">
                         {languages.map((l, idx) => (
                             <div
                                 key={idx}
-                                className="p-3 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col justify-between"
+                                className="p-2.5 sm:p-3 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col justify-between w-full min-w-0"
                             >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                                     <span
-                                        className="w-3 h-3 rounded-full flex-shrink-0 border border-black"
+                                        className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 border border-black"
                                         style={{ backgroundColor: l.color || "#737373" }}
                                     />
                                     <span className="text-xs font-black text-black truncate">{l.name}</span>
                                 </div>
                                 <div className="mt-2 flex items-baseline justify-between text-xs text-black font-mono font-black">
                                     <span>{l.percentage}%</span>
-                                    <span className="text-[10px] text-neutral-600 font-bold">{l.formattedSize || `${Math.round(l.bytes / 1024)} KB`}</span>
+                                    <span className="text-[10px] text-neutral-600 font-bold truncate">{l.formattedSize || `${Math.round(l.bytes / 1024)} KB`}</span>
                                 </div>
                             </div>
                         ))}
@@ -286,34 +286,34 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
 
             {/* Top Repositories Grid */}
             {repos.length > 0 && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                <div className="space-y-4 w-full min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                         <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
                             Key Open-Source Repositories
                         </h3>
-                        <span className="text-xs font-mono font-black bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000]">
+                        <span className="text-xs font-mono font-black bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000] shrink-0">
                             {repos.length} highlighted
                         </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full min-w-0">
                         {repos.map((repo, idx) => (
                             <div
                                 key={idx}
-                                className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all flex flex-col justify-between space-y-3"
+                                className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all flex flex-col justify-between space-y-3 w-full min-w-0 overflow-hidden"
                             >
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
+                                <div className="space-y-2 min-w-0">
+                                    <div className="flex items-center justify-between gap-2 min-w-0">
                                         <a
                                             href={repo.url}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-sm font-black text-black hover:text-neutral-700 transition-colors inline-flex items-center gap-1.5"
+                                            className="text-sm font-black text-black hover:text-neutral-700 transition-colors inline-flex items-center gap-1.5 min-w-0 max-w-[70%]"
                                         >
-                                            <span>{repo.name}</span>
-                                            <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span className="truncate">{repo.name}</span>
+                                            <ExternalLink className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
                                         </a>
-                                        <span className="inline-flex items-center gap-1 text-xs font-mono font-black text-black bg-[#FFE566] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
+                                        <span className="inline-flex items-center gap-1 text-xs font-mono font-black text-black bg-[#FFE566] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000] shrink-0">
                                             <Star className="w-3 h-3 fill-black text-black" />
                                             <span>{repo.stars}</span>
                                         </span>
@@ -324,14 +324,14 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                                 </div>
 
                                 <div className="pt-2 flex items-center justify-between text-xs text-neutral-700 border-t-2 border-black/10">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
                                         <span
-                                            className="w-2.5 h-2.5 rounded-full border border-black"
+                                            className="w-2.5 h-2.5 rounded-full border border-black shrink-0"
                                             style={{ backgroundColor: repo.languageColor || "#737373" }}
                                         />
-                                        <span className="font-black text-black">{repo.language}</span>
+                                        <span className="font-black text-black truncate">{repo.language}</span>
                                     </div>
-                                    <span className="text-neutral-600 text-xs font-mono font-black">{repo.forks} forks</span>
+                                    <span className="text-neutral-600 text-xs font-mono font-black shrink-0">{repo.forks} forks</span>
                                 </div>
                             </div>
                         ))}

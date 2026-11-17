@@ -9,6 +9,9 @@ import {
     BookOpen,
     Globe2,
     GraduationCap,
+    ArrowRight,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 import {
     fetchClubCredibility,
@@ -35,6 +38,33 @@ export const ClubCredibilityWorkspace: React.FC = () => {
     const [appealTarget, setAppealTarget] = useState<CredibilityLedgerEntry | null>(null);
     const [appealReason, setAppealReason] = useState("");
     const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+
+    // Full Ledger Screen Modal State
+    const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+    const [modalPage, setModalPage] = useState(1);
+    const [modalEntries, setModalEntries] = useState<CredibilityLedgerEntry[]>([]);
+    const [modalTotal, setModalTotal] = useState(0);
+    const [isModalLoading, setIsModalLoading] = useState(false);
+
+    const loadModalPage = async (targetPage = 1) => {
+        try {
+            setIsModalLoading(true);
+            const data = await fetchClubCredibilityHistory(targetPage, 20);
+            setModalEntries(data.history);
+            setModalTotal(data.total);
+            setModalPage(targetPage);
+        } catch (err: any) {
+            console.error("Failed to load full ledger history:", err);
+            toast.error("Failed to load credibility ledger entries.");
+        } finally {
+            setIsModalLoading(false);
+        }
+    };
+
+    const handleOpenLedgerModal = () => {
+        setIsLedgerModalOpen(true);
+        loadModalPage(1);
+    };
 
     const loadData = async (targetPage = 1) => {
         try {
@@ -96,12 +126,110 @@ export const ClubCredibilityWorkspace: React.FC = () => {
             toast.success("Credibility appeal submitted to platform moderators for review.");
             setAppealTarget(null);
             await loadData(page);
+            if (isLedgerModalOpen) {
+                await loadModalPage(modalPage);
+            }
         } catch (err: any) {
             toast.error(err.response?.data?.message || "Failed to submit appeal.");
         } finally {
             setIsSubmittingAppeal(false);
         }
     };
+
+    const renderLedgerCard = (entry: CredibilityLedgerEntry) => (
+        <div
+            key={entry.id}
+            className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] dark:bg-[#1a1a1a] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
+            <div className="space-y-1.5 max-w-2xl">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-white">
+                        {entry.sourceAction.replace(/_/g, " ")}
+                    </span>
+                    {entry.eventScope && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black bg-white text-black inline-flex items-center gap-1">
+                            {entry.eventScope === "PAN_INDIA" ? (
+                                <>
+                                    <Globe2 className="w-2.5 h-2.5" />
+                                    <span>Pan-India</span>
+                                </>
+                            ) : (
+                                <>
+                                    <GraduationCap className="w-2.5 h-2.5" />
+                                    <span>Campus</span>
+                                </>
+                            )}
+                        </span>
+                    )}
+                    {entry.status === "reversed" && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-300">
+                            Reversed via Appeal
+                        </span>
+                    )}
+                    <span className="text-[11px] font-bold text-neutral-500">
+                        {new Date(entry.createdAt).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                        })}
+                    </span>
+                </div>
+
+                <h4 className="text-sm sm:text-base font-black text-black dark:text-white">
+                    {entry.eventTitle ? `Event: ${entry.eventTitle}` : entry.reasonCode}
+                </h4>
+
+                <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    {entry.explanation}
+                </p>
+            </div>
+
+            {/* Score Transition Box & Action */}
+            <div className="flex items-center gap-4 shrink-0">
+                <div className="p-3 rounded-xl bg-white dark:bg-[#121212] border-2 border-black shadow-[2px_2px_0px_#000] text-right space-y-0.5">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                        Score Impact
+                    </div>
+                    <div className="flex items-center justify-end gap-1.5 font-black text-sm">
+                        <span className="text-neutral-500">{Math.round(entry.scoreBefore)}</span>
+                        <span
+                            className={`px-1.5 py-0.5 rounded text-xs font-black ${
+                                entry.scoreDelta > 0
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : entry.scoreDelta < 0
+                                    ? "bg-rose-100 text-rose-800"
+                                    : "bg-neutral-100 text-neutral-600"
+                            }`}
+                        >
+                            {entry.scoreDelta > 0 ? `+${entry.scoreDelta}` : entry.scoreDelta}
+                        </span>
+                        <span className="text-black dark:text-white font-black">
+                            {Math.round(entry.scoreAfter)}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Appeal Button for negative deductions */}
+                {entry.scoreDelta < 0 && entry.status === "confirmed" && !entry.hasAppeal && (
+                    <button
+                        type="button"
+                        onClick={() => handleOpenAppeal(entry)}
+                        className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                    >
+                        Appeal
+                    </button>
+                )}
+
+                {entry.hasAppeal && (
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black">
+                        Appeal {entry.latestAppealStatus?.replace(/_/g, " ")}
+                    </span>
+                )}
+            </div>
+        </div>
+    );
 
     if (loading && !snapshot) {
         return (
@@ -368,104 +496,136 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-3">
-                        {history.map((entry) => (
-                            <div
-                                key={entry.id}
-                                className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] dark:bg-[#1a1a1a] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4"
-                            >
-                                <div className="space-y-1.5 max-w-2xl">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-white">
-                                            {entry.sourceAction.replace(/_/g, " ")}
-                                        </span>
-                                        {entry.eventScope && (
-                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black bg-white text-black inline-flex items-center gap-1">
-                                                {entry.eventScope === "PAN_INDIA" ? (
-                                                    <>
-                                                        <Globe2 className="w-2.5 h-2.5" />
-                                                        <span>Pan-India</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <GraduationCap className="w-2.5 h-2.5" />
-                                                        <span>Campus</span>
-                                                    </>
-                                                )}
-                                            </span>
-                                        )}
-                                        {entry.status === "reversed" && (
-                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-300">
-                                                Reversed via Appeal
-                                            </span>
-                                        )}
-                                        <span className="text-[11px] font-bold text-neutral-500">
-                                            {new Date(entry.createdAt).toLocaleDateString("en-IN", {
-                                                day: "numeric",
-                                                month: "short",
-                                                year: "numeric",
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            })}
-                                        </span>
-                                    </div>
+                    <div className="relative">
+                        {/* Display latest 3-4 entries on dashboard */}
+                        <div className="space-y-3">
+                            {history.slice(0, 4).map((entry) => renderLedgerCard(entry))}
+                        </div>
 
-                                    <h4 className="text-sm sm:text-base font-black text-black dark:text-white">
-                                        {entry.eventTitle ? `Event: ${entry.eventTitle}` : entry.reasonCode}
-                                    </h4>
+                        {/* Bottom Shader & View More CTA */}
+                        {totalHistoryCount > 4 && (
+                            <div className="relative pt-6 -mt-14 pointer-events-none">
+                                {/* Gradient Shader Overlay */}
+                                <div className="h-32 bg-gradient-to-t from-white dark:from-[#141414] via-white/95 dark:via-[#141414]/95 to-transparent" />
 
-                                    <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                                        {entry.explanation}
-                                    </p>
-                                </div>
-
-                                {/* Score Transition Box & Action */}
-                                <div className="flex items-center gap-4 shrink-0">
-                                    <div className="p-3 rounded-xl bg-white dark:bg-[#121212] border-2 border-black shadow-[2px_2px_0px_#000] text-right space-y-0.5">
-                                        <div className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                            Score Impact
-                                        </div>
-                                        <div className="flex items-center justify-end gap-1.5 font-black text-sm">
-                                            <span className="text-neutral-500">{Math.round(entry.scoreBefore)}</span>
-                                            <span
-                                                className={`px-1.5 py-0.5 rounded text-xs font-black ${
-                                                    entry.scoreDelta > 0
-                                                        ? "bg-emerald-100 text-emerald-800"
-                                                        : entry.scoreDelta < 0
-                                                        ? "bg-rose-100 text-rose-800"
-                                                        : "bg-neutral-100 text-neutral-600"
-                                                }`}
-                                            >
-                                                {entry.scoreDelta > 0 ? `+${entry.scoreDelta}` : entry.scoreDelta}
-                                            </span>
-                                            <span className="text-black dark:text-white font-black">
-                                                {Math.round(entry.scoreAfter)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Appeal Button for negative deductions */}
-                                    {entry.scoreDelta < 0 && entry.status === "confirmed" && !entry.hasAppeal && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleOpenAppeal(entry)}
-                                            className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                        >
-                                            Appeal
-                                        </button>
-                                    )}
-
-                                    {entry.hasAppeal && (
-                                        <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black">
-                                            Appeal {entry.latestAppealStatus?.replace(/_/g, " ")}
-                                        </span>
-                                    )}
+                                {/* View More Button */}
+                                <div className="absolute inset-x-0 bottom-2 flex flex-col items-center justify-center gap-1.5 pointer-events-auto">
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenLedgerModal}
+                                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-[#FFE566] hover:bg-[#ebce48] text-black border-2 border-black font-black text-xs sm:text-sm shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 cursor-pointer transition-all"
+                                    >
+                                        <span>View More ({totalHistoryCount} entries)</span>
+                                        <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                                    </button>
+                                    <span className="text-[11px] font-bold text-neutral-500">
+                                        Showing latest 4 of {totalHistoryCount} ledger records
+                                    </span>
                                 </div>
                             </div>
-                        ))}
+                        )}
                     </div>
                 )}
             </div>
+
+            {/* Full Credibility Ledger Screen Modal */}
+            {isLedgerModalOpen && (
+                <div
+                    onClick={() => setIsLedgerModalOpen(false)}
+                    className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm select-none animate-in fade-in duration-200"
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-5xl max-h-[90vh] bg-white dark:bg-[#141414] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+                    >
+                        {/* Modal Header */}
+                        <div className="p-5 sm:p-6 border-b-2 border-black/10 dark:border-white/10 bg-[#FAF6EE] dark:bg-[#1a1a1a] flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-2xl bg-black text-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <FileText className="w-5 h-5 stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-lg sm:text-xl font-black text-black dark:text-white tracking-tight">
+                                            Credibility History Ledger
+                                        </h3>
+                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                            {modalTotal || totalHistoryCount} Total Entries
+                                        </span>
+                                    </div>
+                                    <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 mt-0.5">
+                                        Full immutable audit trail of all verified event completions, cancellations, and credential actions.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsLedgerModalOpen(false)}
+                                className="p-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                title="Close modal"
+                                aria-label="Close"
+                            >
+                                <X className="w-5 h-5 stroke-[2.5]" />
+                            </button>
+                        </div>
+
+                        {/* Modal Scrollable Body */}
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
+                            {isModalLoading ? (
+                                <div className="py-20 flex flex-col items-center justify-center gap-3">
+                                    <OrbixLoader size="md" variant="centered" color="#000" />
+                                    <span className="text-xs font-black uppercase tracking-wider text-neutral-500">
+                                        Loading Ledger History...
+                                    </span>
+                                </div>
+                            ) : (modalEntries.length > 0 ? modalEntries : history).length === 0 ? (
+                                <div className="p-12 text-center rounded-2xl border-2 border-dashed border-black/20 space-y-2">
+                                    <CheckCircle2 className="w-10 h-10 text-neutral-400 mx-auto" />
+                                    <h4 className="text-sm font-black text-black dark:text-white">No Ledger Entries</h4>
+                                </div>
+                            ) : (
+                                (modalEntries.length > 0 ? modalEntries : history).map((entry) => renderLedgerCard(entry))
+                            )}
+                        </div>
+
+                        {/* Modal Sticky Pagination Footer */}
+                        {Math.ceil((modalTotal || totalHistoryCount) / 20) > 1 && (
+                            <div className="p-4 sm:p-5 border-t-2 border-black/10 dark:border-white/10 bg-[#FAF6EE] dark:bg-[#1a1a1a] flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">
+                                    Showing {(modalPage - 1) * 20 + 1} – {Math.min(modalPage * 20, modalTotal || totalHistoryCount)} of {modalTotal || totalHistoryCount} entries
+                                </span>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={modalPage <= 1 || isModalLoading}
+                                        onClick={() => loadModalPage(modalPage - 1)}
+                                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                    >
+                                        <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                                        <span>Previous</span>
+                                    </button>
+
+                                    <span className="px-3 py-1.5 rounded-xl bg-black text-[#FFE566] border border-black font-mono font-black text-xs">
+                                        {modalPage} / {Math.ceil((modalTotal || totalHistoryCount) / 20)}
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        disabled={modalPage >= Math.ceil((modalTotal || totalHistoryCount) / 20) || isModalLoading}
+                                        onClick={() => loadModalPage(modalPage + 1)}
+                                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                    >
+                                        <span>Next</span>
+                                        <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Appeal Modal */}
             {appealTarget && (

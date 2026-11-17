@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
 import { Terminal, ArrowRight, Layers, ShieldCheck, Flame } from 'lucide-react';
-import { OrbixLogo } from '../../components/OrbixLogo';
 import { BlogLikeButton } from './components/ui/BlogLikeButton';
 
 const CHAPTERS = [
@@ -49,14 +48,9 @@ export default function BlogCollectionPage() {
             <NavBar activeTab="blogs" />
 
             {/* Main Container */}
-            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32">
+            <main className=" mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32">
                 {/* Header Badge & Title */}
                 <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
-                    <div className="inline-flex items-center justify-center gap-2.5 text-black font-black text-lg sm:text-xl tracking-tight select-none">
-                        <OrbixLogo className="w-6 h-6 sm:w-7 sm:h-7 text-black flex-shrink-0" />
-                        <span>Orbix Publications & Workshop Guides</span>
-                    </div>
-
                     <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-black leading-[1.08]">
                         Featured Cloud Publication
                     </h1>

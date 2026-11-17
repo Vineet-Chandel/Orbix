@@ -25,6 +25,7 @@ import {
     logClubAccessEvent,
     type ClubAccessItem,
 } from "../../../api/sessionActivityApi";
+import { OrbixLoader } from "../../../components/ui/loader";
 
 interface ClubYourActivityViewProps {
     club: {
@@ -328,8 +329,9 @@ export const ClubYourActivityView: React.FC<ClubYourActivityViewProps> = ({ club
                 </div>
 
                 {isLoading ? (
-                    <div className="p-8 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] text-center font-bold text-xs text-neutral-600">
-                        Loading access logs...
+                    <div className="p-12 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] text-center flex flex-col items-center justify-center gap-3 font-bold text-xs text-neutral-600">
+                        <OrbixLoader size="sm" />
+                        <span>Loading access logs...</span>
                     </div>
                 ) : filteredActivities.length === 0 ? (
                     <div className="p-8 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] text-center space-y-2">

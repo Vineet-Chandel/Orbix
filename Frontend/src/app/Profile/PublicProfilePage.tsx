@@ -1831,10 +1831,12 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                     transition={{ duration: 0.25, ease: "easeOut" }}
                                     className="w-full space-y-6"
                                 >
-                                    <CodingSubmissionsTable
-                                        connectedPortals={connectedPortals}
-                                        username={profile.username}
-                                    />
+                                    <div style={{ contentVisibility: "auto", containIntrinsicSize: "320px" }}>
+                                        <CodingSubmissionsTable
+                                            connectedPortals={connectedPortals}
+                                            username={profile.username}
+                                        />
+                                    </div>
                                     <div style={{ contentVisibility: "auto", containIntrinsicSize: "800px" }}>
                                         <PracticeAnalyticsSection
                                             connectedPortals={connectedPortals}
@@ -1937,117 +1939,122 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 )}
             </main>
 
-            {/* Project Architecture Deep-Dive Modal */}
-            <ProjectDetailModal
-                isOpen={Boolean(viewingProject)}
-                onClose={() => setViewingProject(null)}
-                project={viewingProject}
-            />
+            {/* Heavy Modals: Only rendered when viewing the full profile page, completely omitted in embedded hero showcase */}
+            {!isEmbedded && (
+                <>
+                    {/* Project Architecture Deep-Dive Modal */}
+                    <ProjectDetailModal
+                        isOpen={Boolean(viewingProject)}
+                        onClose={() => setViewingProject(null)}
+                        project={viewingProject}
+                    />
 
-            {/* Hire Me Recruiter Modal (Exact Match to User Reference Screenshot) */}
-            <HireMeModal
-                isOpen={isHireModalOpen}
-                onClose={() => setIsHireModalOpen(false)}
-                username={profile.username}
-                firstName={profile.firstName}
-                displayName={profile.displayName}
-            />
+                    {/* Hire Me Recruiter Modal (Exact Match to User Reference Screenshot) */}
+                    <HireMeModal
+                        isOpen={isHireModalOpen}
+                        onClose={() => setIsHireModalOpen(false)}
+                        username={profile.username}
+                        firstName={profile.firstName}
+                        displayName={profile.displayName}
+                    />
 
-            {/* Get The Card Modal: LinkedIn Card & Instagram Story with Flip and Both-Sides Download */}
-            <GetTheCardModal
-                isOpen={isCardModalOpen}
-                onClose={() => setIsCardModalOpen(false)}
-                user={{
-                    ...profile,
-                    photoUrl: avatarSrc,
-                }}
-                stats={stats}
-                coderType={coderType}
-                showcasedPlatformsLinkedIn={showcasedPlatforms}
-                showcasedPlatformsStory={showcasedPlatformsStory}
-                allConnectedPlatforms={allConnectedPlatforms}
-                githubStats={githubStats}
-                connectedPortals={connectedPortals}
-                showcasedContests={showcasedContests}
-                publicProfileUrl={profilePageUrl}
-            />
+                    {/* Get The Card Modal: LinkedIn Card & Instagram Story with Flip and Both-Sides Download */}
+                    <GetTheCardModal
+                        isOpen={isCardModalOpen}
+                        onClose={() => setIsCardModalOpen(false)}
+                        user={{
+                            ...profile,
+                            photoUrl: avatarSrc,
+                        }}
+                        stats={stats}
+                        coderType={coderType}
+                        showcasedPlatformsLinkedIn={showcasedPlatforms}
+                        showcasedPlatformsStory={showcasedPlatformsStory}
+                        allConnectedPlatforms={allConnectedPlatforms}
+                        githubStats={githubStats}
+                        connectedPortals={connectedPortals}
+                        showcasedContests={showcasedContests}
+                        publicProfileUrl={profilePageUrl}
+                    />
 
-            {/* Confirmation Modal for Blocking User */}
-            <ConfirmationModal
-                isOpen={isBlockModalOpen}
-                title={`Block @${profile.username}?`}
-                message={`Blocking @${profile.username} will end any connection, cancel pending requests, and prevent them from viewing your profile or sending notifications.`}
-                confirmLabel="Block User"
-                variant="danger"
-                onConfirm={handleBlockUser}
-                onCancel={() => setIsBlockModalOpen(false)}
-            />
+                    {/* Confirmation Modal for Blocking User */}
+                    <ConfirmationModal
+                        isOpen={isBlockModalOpen}
+                        title={`Block @${profile.username}?`}
+                        message={`Blocking @${profile.username} will end any connection, cancel pending requests, and prevent them from viewing your profile or sending notifications.`}
+                        confirmLabel="Block User"
+                        variant="danger"
+                        onConfirm={handleBlockUser}
+                        onCancel={() => setIsBlockModalOpen(false)}
+                    />
 
-            {/* Interactive PDF Resume Modal */}
-            {isResumePreviewOpen && profile.resumeUrl && typeof document !== "undefined" && createPortal(
-                <div
-                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
-                    onClick={handleResumePreviewBackdropClick}
-                >
-                    <div
-                        className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black bg-white">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black text-black flex items-center justify-center flex-shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <FileText className="w-4 h-4 stroke-[2.5]" />
+                    {/* Interactive PDF Resume Modal */}
+                    {isResumePreviewOpen && profile.resumeUrl && typeof document !== "undefined" && createPortal(
+                        <div
+                            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                            onClick={handleResumePreviewBackdropClick}
+                        >
+                            <div
+                                className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black bg-white">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black text-black flex items-center justify-center flex-shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                                            <FileText className="w-4 h-4 stroke-[2.5]" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="text-sm font-black text-black truncate max-w-sm">
+                                                {profile.resumeFilename || `${profile.displayName} - Resume.pdf`}
+                                            </h3>
+                                            <p className="text-[11px] text-neutral-600 font-mono font-bold">
+                                                Cloudinary Verified PDF
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={profile.resumeUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-2 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                                            title="Open PDF in new tab"
+                                        >
+                                            <ExternalLink className="w-4 h-4 stroke-[2.5]" />
+                                        </a>
+                                        <a
+                                            href={profile.resumeUrl}
+                                            download={profile.resumeFilename || "resume.pdf"}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                                            title="Download resume"
+                                        >
+                                            <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Download</span>
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsResumePreviewOpen(false)}
+                                            className="p-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                            title="Close preview"
+                                        >
+                                            <X className="w-4 h-4 stroke-[2.5]" />
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="min-w-0">
-                                    <h3 className="text-sm font-black text-black truncate max-w-sm">
-                                        {profile.resumeFilename || `${profile.displayName} - Resume.pdf`}
-                                    </h3>
-                                    <p className="text-[11px] text-neutral-600 font-mono font-bold">
-                                        Cloudinary Verified PDF
-                                    </p>
+
+                                <div className="flex-1 w-full bg-white relative overflow-hidden flex items-center justify-center">
+                                    <iframe
+                                        src={`${profile.resumeUrl}#toolbar=1&navpanes=0`}
+                                        title="Resume PDF Preview"
+                                        className="w-full h-full border-0"
+                                    />
                                 </div>
                             </div>
-
-                            <div className="flex items-center gap-2">
-                                <a
-                                    href={profile.resumeUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-2 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all"
-                                    title="Open PDF in new tab"
-                                >
-                                    <ExternalLink className="w-4 h-4 stroke-[2.5]" />
-                                </a>
-                                <a
-                                    href={profile.resumeUrl}
-                                    download={profile.resumeFilename || "resume.pdf"}
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all"
-                                    title="Download resume"
-                                >
-                                    <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    <span>Download</span>
-                                </a>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsResumePreviewOpen(false)}
-                                    className="p-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                                    title="Close preview"
-                                >
-                                    <X className="w-4 h-4 stroke-[2.5]" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 w-full bg-white relative overflow-hidden flex items-center justify-center">
-                            <iframe
-                                src={`${profile.resumeUrl}#toolbar=1&navpanes=0`}
-                                title="Resume PDF Preview"
-                                className="w-full h-full border-0"
-                            />
-                        </div>
-                    </div>
-                </div>,
-                document.body
+                        </div>,
+                        document.body
+                    )}
+                </>
             )}
         </div>
     );

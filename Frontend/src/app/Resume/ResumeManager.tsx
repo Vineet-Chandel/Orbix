@@ -33,6 +33,7 @@ import {
     type GeminiAnalysisReport,
 } from "../../utils/resumeIntelligenceApi";
 import { ResumeAnalyzerView } from "./Intelligence/ResumeAnalyzerView";
+import { OrbixLoader } from "../../components/ui/loader";
 import { ResumeUploadModal } from "./Intelligence/ResumeUploadModal";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
@@ -259,35 +260,36 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                     {/* PAGE HEADER: Product Title, Value Promise & Top Action Buttons */}
                     {/* ========================================================================= */}
                     <div className="mb-6 pb-5 border-b-2 border-black/55 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                            {onOpenMobileSidebar && (
-                                <button
-                                    type="button"
-                                    onClick={onOpenMobileSidebar}
-                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
-                                    aria-label="Open sidebar"
-                                >
-                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <line x1="3" y1="12" x2="21" y2="12" />
-                                        <line x1="3" y1="6" x2="21" y2="6" />
-                                        <line x1="3" y1="18" x2="21" y2="18" />
-                                    </svg>
-                                </button>
-                            )}
-                            <div>
-                                <div className="flex items-center gap-2.5 flex-wrap">
-                                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-black">
-                                        Resume Intelligence
-                                    </h1>
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-[#a2ff86] text-black border-2 border-black shadow-[1px_1px_0px_#000]">
-                                        <ShieldCheck className="w-3.5 h-3.5" />
-                                        Verified System
-                                    </span>
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-wrap">
+                                {onOpenMobileSidebar && (
+                                    <button
+                                        type="button"
+                                        onClick={onOpenMobileSidebar}
+                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                                        aria-label="Open sidebar"
+                                    >
+                                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <line x1="3" y1="12" x2="21" y2="12" />
+                                            <line x1="3" y1="6" x2="21" y2="6" />
+                                            <line x1="3" y1="18" x2="21" y2="18" />
+                                        </svg>
+                                    </button>
+                                )}
+                                <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                    <FileText className="w-5 h-5 text-black stroke-[2.5]" />
                                 </div>
-                                <p className="mt-1.5 text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
-                                    Upload your resume for deep recruiter evaluation. Your resume is automatically linked to your public developer profile.
-                                </p>
+                                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-black truncate">
+                                    Resume Intelligence
+                                </h1>
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-[#a2ff86] text-black border-2 border-black shadow-[1px_1px_0px_#000] shrink-0">
+                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                    <span>Verified System</span>
+                                </span>
                             </div>
+                            <p className="text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
+                                Upload your resume for deep recruiter evaluation. Your resume is automatically linked to your public developer profile.
+                            </p>
                         </div>
 
                         {/* Top Header Actions */}
@@ -308,12 +310,11 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                     {/* CURRENT PROFILE RESUME STATUS CARD */}
                     {/* ========================================================================= */}
                     {isLoadingInitial ? (
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] animate-pulse flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-neutral-200" />
-                            <div className="space-y-2 flex-1">
-                                <div className="h-4 w-48 bg-neutral-200 rounded" />
-                                <div className="h-3 w-32 bg-neutral-100 rounded" />
-                            </div>
+                        <div className="p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col items-center justify-center gap-3">
+                            <OrbixLoader size="md" />
+                            <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                                Retrieving verified resume records...
+                            </span>
                         </div>
                     ) : resumeData?.hasResume ? (
                         <div className="mb-6 p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-4">

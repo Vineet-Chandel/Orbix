@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, ArrowRight } from "lucide-react";
 import { OrbixLogo } from "../../OrbixLogo";
-import { OrbixLoaderIcon } from "./OrbixLoaderIcon";
+import { OrbixLoader } from "./OrbixLoader";
 
 export interface OrbixInitialLoaderProps {
     message?: string;
@@ -84,10 +84,11 @@ export const OrbixInitialLoader: React.FC<OrbixInitialLoaderProps> = ({
                     </div>
                 </div>
 
-                {/* Central Continuous Morphing Hourglass Loader (Centered, without card container) */}
+                {/* Central Continuous Morphing Hourglass Loader (Global OrbixLoader) */}
                 <div className="flex flex-col items-center space-y-3 pt-2">
-                    <OrbixLoaderIcon
+                    <OrbixLoader
                         size={56}
+                        variant="minimal"
                         speed="normal"
                         color="#000000"
                         accentColor="#a2ff86"

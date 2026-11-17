@@ -84,6 +84,8 @@ export const Sidebar = ({
     const [openSection, setOpenSection] = useState<CollapsibleSection | null>(() => {
         if (
             location.pathname.startsWith("/events") ||
+            location.pathname.startsWith("/college-clubs") ||
+            location.pathname.startsWith("/campus-clubs") ||
             location.pathname.startsWith("/clubs") ||
             location.pathname.startsWith("/college-events") ||
             location.pathname.startsWith("/applications") ||
@@ -139,6 +141,8 @@ export const Sidebar = ({
             activeTab === "applications" ||
             activeTab === "activity" ||
             location.pathname.startsWith("/events") ||
+            location.pathname.startsWith("/college-clubs") ||
+            location.pathname.startsWith("/campus-clubs") ||
             location.pathname.startsWith("/clubs") ||
             location.pathname.startsWith("/college-events") ||
             location.pathname.startsWith("/applications") ||
@@ -369,7 +373,7 @@ export const Sidebar = ({
                     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
             ),
-            path: "/clubs",
+            path: "/college-clubs",
             isComingSoon: false,
         },
         {
@@ -842,7 +846,7 @@ export const Sidebar = ({
                                                 </p>
                                                 <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                                                     <Link
-                                                        to="/clubs"
+                                                        to="/college-clubs"
                                                         className="inline-flex items-center justify-center gap-1 px-2 py-2 text-[10px] font-black bg-[#FFE566] hover:bg-[#fedb30] text-black border-2 border-black rounded-xl shadow-neo-xs transition cursor-pointer"
                                                     >
                                                         <Compass className="w-3.5 h-3.5 text-black" />
@@ -861,7 +865,7 @@ export const Sidebar = ({
                                         ) : (
                                             <div className="flex flex-col items-center gap-1.5 py-1">
                                                 <Link
-                                                    to="/clubs"
+                                                    to="/college-clubs"
                                                     className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#FFE566] hover:bg-[#fedb30] text-black border-2 border-black shadow-neo-xs transition-all mx-auto"
                                                     title="Explore Club"
                                                 >

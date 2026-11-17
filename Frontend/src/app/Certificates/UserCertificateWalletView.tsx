@@ -230,13 +230,13 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
             {/* Wallet Header & Title */}
             {!compact && (
                 <div className="pb-6 border-b-3 border-black flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-3">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                             {onOpenMobileSidebar && (
                                 <button
                                     type="button"
                                     onClick={onOpenMobileSidebar}
-                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
                                     aria-label="Open sidebar"
                                 >
                                     <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -246,16 +246,14 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                                     </svg>
                                 </button>
                             )}
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-10 h-10 rounded-xl bg-black text-[#FFE566] flex items-center justify-center font-black border-2 border-black shadow-[2px_2px_0px_#000]">
-                                    <Award className="w-5 h-5" />
-                                </div>
-                                <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                    Certificate Wallet
-                                </h1>
+                            <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                <Award className="w-5 h-5 text-black stroke-[2.5]" />
                             </div>
+                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
+                                Certificate Wallet
+                            </h1>
                         </div>
-                        <p className="text-xs sm:text-sm font-semibold text-neutral-600 pl-0 sm:pl-12">
+                        <p className="text-xs sm:text-sm font-semibold text-neutral-600 leading-relaxed max-w-2xl">
                             Your immutable, cryptographically verifiable campus achievements, merit awards, and team honors.
                         </p>
                     </div>

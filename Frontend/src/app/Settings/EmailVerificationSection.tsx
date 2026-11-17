@@ -18,6 +18,7 @@ import {
     sendVerificationOtp,
     verifyEmailOtp,
 } from "../../api/verificationApi";
+import { OrbixLoaderIcon } from "../../components/ui/loader";
 
 interface EmailVerificationSectionProps {
     user: any;
@@ -251,7 +252,7 @@ export const EmailVerificationSection: React.FC<EmailVerificationSectionProps> =
                 <div className="shrink-0">
                     {isLoadingStatus ? (
                         <div className="px-3.5 py-1.5 rounded-xl bg-neutral-100 border-2 border-black text-xs font-bold flex items-center gap-2">
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <OrbixLoaderIcon size="xs" color="#000" />
                             <span>Checking...</span>
                         </div>
                     ) : isEmailVerified ? (

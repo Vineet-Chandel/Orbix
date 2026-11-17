@@ -36,6 +36,7 @@ import type {
 import { FileUploadZone } from "../Files/FileUploadZone";
 import { AttachmentList } from "../Files/AttachmentList";
 import { ConfirmationModal } from "../../../../components/ConfirmationModal";
+import { OrbixLoader } from "../../../../components/ui/loader";
 
 interface ChannelViewProps {
     channel: WorkspaceChannel;
@@ -762,8 +763,9 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                 </div>
 
                 {loading ? (
-                    <div className="flex items-center justify-center py-12 text-neutral-500 font-bold text-xs">
-                        Loading messages...
+                    <div className="flex flex-col items-center justify-center py-16 gap-3 text-neutral-500 font-bold text-xs">
+                        <OrbixLoader size="sm" />
+                        <span>Loading messages...</span>
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="text-center py-12 text-neutral-500 font-bold text-xs">

@@ -4,7 +4,6 @@ import {
     FolderKanban,
     Sparkles,
     AlertCircle,
-    RefreshCw,
     Info,
     Zap,
     BookOpen,
@@ -45,7 +44,6 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
     const toast = useToast();
 
     const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
     const [projects, setProjects] = useState<ProjectItem[]>([]);
     const [count, setCount] = useState(0);
     const [maxCapacity, setMaxCapacity] = useState(4);
@@ -63,7 +61,6 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
     // Fetch projects
     const loadProjects = useCallback(async (quiet = false) => {
         if (!quiet) setIsLoading(true);
-        else setIsRefreshing(true);
         setErrorMessage(null);
 
         try {
@@ -77,7 +74,6 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
             setErrorMessage(err.message || "Failed to load projects showcase.");
         } finally {
             setIsLoading(false);
-            setIsRefreshing(false);
         }
     }, []);
 
@@ -152,10 +148,10 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
         >
             <div className="p-4 sm:p-6 lg:p-8 space-y-6">
                 {/* Header Card */}
-                <div className="rounded-3xl bg-white border-[3px] border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000] space-y-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 pb-6 border-b-2 border-black">
+                <div className="rounded-3xl bg-white border-[3px] border-black p-4 sm:p-6 lg:p-8 shadow-[6px_6px_0px_#000] space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-2 border-black">
                         <div className="space-y-1.5 flex-1 min-w-0">
-                            <div className="flex items-start sm:items-center gap-2.5">
+                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                                 {onOpenMobileSidebar && (
                                     <button
                                         type="button"
@@ -170,34 +166,20 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
                                         </svg>
                                     </button>
                                 )}
-                                <div className="flex items-start sm:items-center justify-between sm:justify-start gap-3 sm:gap-2.5 min-w-0 flex-1">
-                                    <h1 className="text-xl sm:text-3xl font-black text-black tracking-tight sm:order-2">
-                                        Project Showcase & Repositories
-                                    </h1>
-                                    <span className="p-2 rounded-xl bg-black text-[#a2ff86] border border-black shadow-[2px_2px_0px_#000] shrink-0 sm:order-1">
-                                        <FolderKanban className="w-5 h-5" />
-                                    </span>
+                                <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                    <FolderKanban className="w-5 h-5 text-black stroke-[2.5]" />
                                 </div>
+                                <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
+                                    Projects
+                                </h1>
                             </div>
                             <p className="text-xs sm:text-sm text-neutral-600 font-bold max-w-2xl leading-relaxed">
                                 Curate your top 4 flagship engineering architectures. Showcase verifiable GitHub intelligence, systems writeups, and live production deployments to recruiters and peer engineers.
                             </p>
                         </div>
 
-                        {/* Top Actions: Capacity Badge & New Project Button */}
-                        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
-                            <button
-                                type="button"
-                                onClick={() => loadProjects(true)}
-                                disabled={isRefreshing || isLoading}
-                                className="p-2.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition-all cursor-pointer"
-                                title="Refresh Projects"
-                                aria-label="Refresh project list"
-                            >
-                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                            </button>
-
-                            {/* + New Project Button (Disabled when 4/4 capacity reached) */}
+                        {/* Top Actions: New Project Button */}
+                        <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto">
                             <div className="relative group">
                                 <button
                                     type="button"
@@ -212,7 +194,7 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
                                             : "bg-black text-[#a2ff86] hover:bg-neutral-900 active:translate-y-0.5 cursor-pointer"
                                     }`}
                                 >
-                                    <Plus className="w-4 h-4" />
+                                    <Plus className="w-4 h-4 stroke-[2.5]" />
                                     <span>New Project</span>
                                 </button>
 

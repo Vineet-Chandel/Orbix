@@ -2,8 +2,8 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Flame, Award, Building2 } from "lucide-react";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
-import type { LeaderboardEntry } from "./types";
-import { OrbixSkeleton } from "../../components/ui/loader";
+import { type LeaderboardEntry, parseLeaderboardRatings } from "./types";
+import { OrbixSkeleton, OrbixLoader } from "../../components/ui/loader";
 
 interface LeaderboardTableProps {
     entries: LeaderboardEntry[];
@@ -26,9 +26,12 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
         return (
             <div className="w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-6 space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                    <span className="text-xs font-black uppercase tracking-wider text-neutral-700">
-                        Loading {scope === "college" ? "College League" : "Global"} Standings...
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <OrbixLoader size="xs" variant="inline" />
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-700">
+                            Loading {scope === "college" ? "College League" : "Global"} Standings...
+                        </span>
+                    </div>
                     <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black animate-pulse" />
                 </div>
                 <OrbixSkeleton variant="table-row" count={5} />
@@ -79,7 +82,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                             const isCurrentUser = Boolean(
                                 currentUsername && entry.username.toLowerCase() === currentUsername.toLowerCase()
                             );
-                            const ratings = entry.platformRatings || {};
+                            const ratings = parseLeaderboardRatings(entry.platformRatings, entry.scoreBreakdown);
                             const college = entry.college || "—";
                             const displayRank = scope === "college" && entry.collegeRank ? entry.collegeRank : entry.rank;
 
@@ -225,26 +228,32 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
                                     {/* Platform Ratings Chips */}
                                     <td className="py-3 px-4 hidden lg:table-cell">
-                                        <div className="flex items-center gap-1 flex-wrap">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
                                             {ratings.codeforces && (
                                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
                                                     <span className="text-neutral-500">CF</span>
-                                                    <span style={{ color: ratings.codeforces.color || "#000" }}>{ratings.codeforces.rating}</span>
+                                                    <span style={{ color: ratings.codeforces.color || "#E02424" }}>{ratings.codeforces.rating}</span>
                                                 </span>
                                             )}
                                             {ratings.leetcode && (
                                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
                                                     <span className="text-neutral-500">LC</span>
-                                                    <span className="text-amber-600">{ratings.leetcode.rating}</span>
+                                                    <span style={{ color: ratings.leetcode.color || "#D97706" }}>{ratings.leetcode.rating}</span>
                                                 </span>
                                             )}
                                             {ratings.codechef && (
                                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
                                                     <span className="text-neutral-500">CC</span>
-                                                    <span>{ratings.codechef.rating}</span>
+                                                    <span style={{ color: ratings.codechef.color || "#854D0E" }}>{ratings.codechef.rating}</span>
                                                 </span>
                                             )}
-                                            {Object.keys(ratings).length === 0 && (
+                                            {ratings.atcoder && (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                                    <span className="text-neutral-500">AC</span>
+                                                    <span style={{ color: ratings.atcoder.color || "#0284C7" }}>{ratings.atcoder.rating}</span>
+                                                </span>
+                                            )}
+                                            {!ratings.codeforces && !ratings.leetcode && !ratings.codechef && !ratings.atcoder && (
                                                 <span className="text-neutral-400 font-mono text-xs">—</span>
                                             )}
                                         </div>

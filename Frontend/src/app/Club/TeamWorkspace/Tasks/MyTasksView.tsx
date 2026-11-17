@@ -9,7 +9,6 @@ import {
     Shield,
     Calendar,
     CheckSquare,
-    Loader2,
     RefreshCw,
     FolderKanban,
     Lock,
@@ -25,6 +24,7 @@ import type {
 } from "../../../../types/workspace";
 import { TaskDetailModal } from "./TaskDetailModal";
 import { useToast } from "../../../../context/ToastContext";
+import { OrbixLoader } from "../../../../components/ui/loader";
 
 interface MyTasksViewProps {
     clubId: string;
@@ -157,8 +157,8 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
             {/* Task Cards Content */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 {loading ? (
-                    <div className="p-12 flex items-center justify-center text-neutral-500 gap-2">
-                        <Loader2 className="w-6 h-6 animate-spin text-black" />
+                    <div className="p-12 flex flex-col items-center justify-center text-neutral-500 gap-3">
+                        <OrbixLoader size="md" />
                         <span className="text-sm font-bold">Loading tasks...</span>
                     </div>
                 ) : tasks.length === 0 ? (

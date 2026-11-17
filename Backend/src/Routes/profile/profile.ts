@@ -1335,6 +1335,7 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
             sortBy = "score",
             page = "1",
             limit = "24",
+            excludeUsername = "",
         } = req.query;
 
         const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
@@ -1381,6 +1382,12 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
             whereClauses.push(`LOWER(u.username) != $${queryParams.length}`);
         }
 
+        // Exclude specific user (e.g. candidate currently being inspected in profile mode)
+        if (excludeUsername && typeof excludeUsername === "string" && excludeUsername.trim()) {
+            queryParams.push(excludeUsername.trim().toLowerCase());
+            whereClauses.push(`LOWER(u.username) != $${queryParams.length}`);
+        }
+
         if (search && typeof search === "string" && search.trim()) {
             const term = `%${search.trim().toLowerCase()}%`;
             queryParams.push(term);
@@ -1419,8 +1426,8 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
             orderByClause = "u.total_contests DESC NULLS LAST, u.orbix_score DESC NULLS LAST";
         } else if (sortBy === "streak") {
             orderByClause = "u.streak DESC NULLS LAST, u.orbix_score DESC NULLS LAST";
-        } else if (sortBy === "recent") {
-            orderByClause = "u.created_at DESC NULLS LAST";
+        } else if (sortBy === "recent" || sortBy === "recent_active") {
+            orderByClause = "COALESCE((SELECT MAX(last_active_at) FROM user_sessions WHERE user_id = u.id), u.updated_at, u.created_at) DESC NULLS LAST";
         } else if (sortBy === "name") {
             orderByClause = "COALESCE(u.firstname, u.username) ASC";
         }

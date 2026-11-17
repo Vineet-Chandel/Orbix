@@ -5,6 +5,87 @@ export interface PlatformRatingInfo {
     badge?: string;
 }
 
+export function parseLeaderboardRatings(
+    raw: any,
+    scoreBreakdown?: any
+): Record<string, PlatformRatingInfo> {
+    let r = raw;
+    if (typeof r === "string") {
+        try {
+            r = JSON.parse(r);
+            if (typeof r === "string") {
+                r = JSON.parse(r);
+            }
+        } catch {
+            r = {};
+        }
+    }
+
+    const extract = (val: any): PlatformRatingInfo | null => {
+        if (!val) return null;
+        if (typeof val === "number" && val > 0) {
+            return { rating: Math.round(val) };
+        }
+        if (typeof val === "object" && typeof val.rating === "number" && val.rating > 0) {
+            return {
+                rating: Math.round(val.rating),
+                tier: val.tier,
+                color: val.color,
+                badge: val.badge || val.tier,
+            };
+        }
+        if (typeof val === "string" && !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0) {
+            return { rating: parseInt(val, 10) };
+        }
+        return null;
+    };
+
+    const res: Record<string, PlatformRatingInfo> = {};
+
+    if (r && typeof r === "object") {
+        const cf = extract(r.codeforces || r.cf);
+        if (cf) res.codeforces = { ...cf, color: cf.color || "#E02424" };
+
+        const lc = extract(r.leetcode || r.lc);
+        if (lc) res.leetcode = { ...lc, color: lc.color || "#D97706" };
+
+        const cc = extract(r.codechef || r.cc);
+        if (cc) res.codechef = { ...cc, color: cc.color || "#854D0E" };
+
+        const ac = extract(r.atcoder || r.ac);
+        if (ac) res.atcoder = { ...ac, color: ac.color || "#0284C7" };
+
+        const tc = extract(r.topcoder || r.tc);
+        if (tc) res.topcoder = { ...tc, color: tc.color || "#0284C7" };
+    }
+
+    // Fallback: If no ratings were parsed, check scoreBreakdown.ratings
+    if (Object.keys(res).length === 0 && scoreBreakdown) {
+        let sb = scoreBreakdown;
+        if (typeof sb === "string") {
+            try { sb = JSON.parse(sb); } catch { sb = null; }
+        }
+        if (sb && typeof sb === "object" && sb.ratings) {
+            const cf = extract(sb.ratings.codeforces);
+            if (cf) res.codeforces = { ...cf, color: cf.color || "#E02424" };
+
+            const lc = extract(sb.ratings.leetcode);
+            if (lc) res.leetcode = { ...lc, color: lc.color || "#D97706" };
+
+            const cc = extract(sb.ratings.codechef);
+            if (cc) res.codechef = { ...cc, color: cc.color || "#854D0E" };
+
+            const ac = extract(sb.ratings.atcoder);
+            if (ac) res.atcoder = { ...ac, color: ac.color || "#0284C7" };
+
+            const tc = extract(sb.ratings.topcoder);
+            if (tc) res.topcoder = { ...tc, color: tc.color || "#0284C7" };
+        }
+    }
+
+    return res;
+}
+
 export interface LeaderboardEntry {
     rank: number;
     collegeRank?: number | null;

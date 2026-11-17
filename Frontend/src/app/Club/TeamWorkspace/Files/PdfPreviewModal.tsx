@@ -13,6 +13,7 @@ import {
 import workspaceApi from "../../../../api/workspaceApi";
 import type { WorkspaceFile } from "../../../../types/workspace";
 import { useToast } from "../../../../context/ToastContext";
+import { OrbixLoader } from "../../../../components/ui/loader";
 
 interface PdfPreviewModalProps {
     file: WorkspaceFile;
@@ -198,7 +199,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                 <div className="flex-1 bg-zinc-950/80 p-4 overflow-auto flex items-center justify-center relative">
                     {loading ? (
                         <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+                            <OrbixLoader size="md" color="#c084fc" />
                             <span className="text-sm">Authorizing PDF stream...</span>
                         </div>
                     ) : error ? (

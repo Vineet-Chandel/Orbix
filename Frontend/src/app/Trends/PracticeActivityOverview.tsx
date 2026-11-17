@@ -255,11 +255,11 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
     }, [activeChartData]);
 
     return (
-        <div className="space-y-6 text-neutral-900 font-sans select-none">
+        <div className="w-full space-y-6 text-neutral-900 font-sans select-none">
             {/* ROW 1: Top 3 Solved Metric Cards (Last 7 days, Last 30 days, Last 12 months) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
                 {/* Last 7 days */}
-                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
+                <div className="w-full min-w-0 rounded-2xl bg-white border-2 border-black p-4 sm:p-5 lg:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
                             Last 7 days
@@ -277,7 +277,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* Last 30 days */}
-                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
+                <div className="w-full min-w-0 rounded-2xl bg-white border-2 border-black p-4 sm:p-5 lg:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
                             Last 30 days
@@ -295,7 +295,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* Last 12 months */}
-                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
+                <div className="w-full min-w-0 rounded-2xl bg-white border-2 border-black p-4 sm:p-5 lg:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
                             Last 12 months
@@ -314,21 +314,21 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
             </div>
 
             {/* ROW 2: Month So Far Card (<Month> <Year> so far) */}
-            <div className="rounded-2xl bg-white border-2 border-black p-6 sm:p-7 shadow-[4px_4px_0px_#000] space-y-6">
+            <div className="w-full max-w-full min-w-0 rounded-2xl bg-white border-2 border-black p-4 sm:p-6 lg:p-7 shadow-[4px_4px_0px_#000] space-y-5 sm:space-y-6 overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center gap-3 pb-2 border-b-2 border-black/10">
                     <div className="p-1.5 rounded-lg bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
                         <FileText className="w-4 h-4 text-black stroke-[2.5]" />
                     </div>
-                    <h3 className="text-lg sm:text-xl font-black text-black tracking-tight">
+                    <h3 className="text-lg sm:text-xl font-black text-black tracking-tight truncate">
                         {trends.monthSoFar.monthName}
                     </h3>
                 </div>
 
                 {/* 4 Sub-stat Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full min-w-0">
                     {/* Problems solved */}
-                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                    <div className="w-full min-w-0 rounded-xl bg-[#FAF6EE] border-2 border-black p-3.5 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
                             Problems solved
                         </span>
@@ -337,7 +337,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                         </div>
                         <div className="pt-1">
                             <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] max-w-full truncate ${
                                     trends.monthSoFar.problemsSolvedDelta.includes("more")
                                         ? "bg-[#a2ff86] text-black"
                                         : trends.monthSoFar.problemsSolvedDelta.includes("less")
@@ -351,7 +351,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                     </div>
 
                     {/* Active days */}
-                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                    <div className="w-full min-w-0 rounded-xl bg-[#FAF6EE] border-2 border-black p-3.5 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
                             Active days
                         </span>
@@ -360,7 +360,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                         </div>
                         <div className="pt-1">
                             <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] max-w-full truncate ${
                                     trends.monthSoFar.activeDaysDelta.includes("more")
                                         ? "bg-[#a2ff86] text-black"
                                         : trends.monthSoFar.activeDaysDelta.includes("less")
@@ -374,7 +374,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                     </div>
 
                     {/* Hard problems */}
-                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                    <div className="w-full min-w-0 rounded-xl bg-[#FAF6EE] border-2 border-black p-3.5 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
                             Hard problems
                         </span>
@@ -383,7 +383,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                         </div>
                         <div className="pt-1">
                             <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] max-w-full truncate ${
                                     trends.monthSoFar.hardProblemsDelta.includes("more")
                                         ? "bg-[#a2ff86] text-black"
                                         : trends.monthSoFar.hardProblemsDelta.includes("less")
@@ -397,7 +397,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                     </div>
 
                     {/* Contests */}
-                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                    <div className="w-full min-w-0 rounded-xl bg-[#FAF6EE] border-2 border-black p-3.5 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
                             Contests
                         </span>
@@ -406,7 +406,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                         </div>
                         <div className="pt-1">
                             <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] max-w-full truncate ${
                                     trends.monthSoFar.contestsDelta.includes("more")
                                         ? "bg-[#a2ff86] text-black"
                                         : trends.monthSoFar.contestsDelta.includes("less")
@@ -421,14 +421,14 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* Details Breakdown Row (2 columns) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-3 border-t-2 border-black/10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-3 border-t-2 border-black/10 w-full min-w-0">
                     {/* Left Column: Best day & Rating changes */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 min-w-0">
                         <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
                             <span className="text-xs font-black uppercase tracking-wider text-neutral-600 block">
                                 Best day
                             </span>
-                            <span className="text-sm font-black text-black mt-1 block">
+                            <span className="text-sm font-black text-black mt-1 block break-words">
                                 {trends.monthSoFar.bestDay.text}
                             </span>
                         </div>
@@ -436,19 +436,19 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                             <span className="text-xs font-black uppercase tracking-wider text-neutral-600 block">
                                 Rating changes
                             </span>
-                            <span className="text-sm font-black text-black mt-1 block">
+                            <span className="text-sm font-black text-black mt-1 block break-words">
                                 {trends.monthSoFar.ratingChanges}
                             </span>
                         </div>
                     </div>
 
                     {/* Right Column: Where you solved & Topics practiced most */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 min-w-0">
                         <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
                             <span className="text-xs font-black uppercase tracking-wider text-neutral-600 block">
                                 Where you solved
                             </span>
-                            <span className="text-sm font-black text-black mt-1 block">
+                            <span className="text-sm font-black text-black mt-1 block break-words">
                                 {trends.monthSoFar.whereYouSolved}
                             </span>
                         </div>
@@ -461,10 +461,10 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                     trends.monthSoFar.topicsPracticedMost.map((item, idx) => (
                                         <span
                                             key={idx}
-                                            className="rounded-lg bg-white border-2 border-black px-3 py-1 text-xs text-black font-black inline-flex items-center gap-2 shadow-[2px_2px_0px_#000] hover:bg-[#FFE566] transition-all cursor-default"
+                                            className="rounded-lg bg-white border-2 border-black px-2.5 sm:px-3 py-1 text-xs text-black font-black inline-flex items-center gap-1.5 sm:gap-2 shadow-[2px_2px_0px_#000] hover:bg-[#FFE566] transition-all cursor-default max-w-full"
                                         >
-                                            <span>{item.topic}</span>
-                                            <span className="px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black font-mono text-[11px] font-black">
+                                            <span className="truncate max-w-[140px] sm:max-w-none">{item.topic}</span>
+                                            <span className="px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black font-mono text-[11px] font-black shrink-0">
                                                 {item.count}
                                             </span>
                                         </span>
@@ -481,7 +481,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
             </div>
 
             {/* ROW 3: Problems Solved Stacked Bar Chart */}
-            <div className="rounded-2xl bg-white border-2 border-black p-4 sm:p-6 lg:p-7 shadow-[4px_4px_0px_#000] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full">
+            <div className="rounded-2xl bg-white border-2 border-black p-4 sm:p-6 lg:p-7 shadow-[4px_4px_0px_#000] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full overflow-hidden">
                 {/* Header with Switcher */}
                 <div className="flex items-center justify-between pb-3 border-b-2 border-black/10 flex-wrap gap-3">
                     <div className="flex items-center gap-3">
@@ -521,8 +521,8 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* The Stacked Bar Chart Container */}
-                <div className="w-full pt-3 sm:pt-4 pb-1 sm:pb-2 relative min-w-0 overflow-x-auto scrollbar-none">
-                    <div className="w-full h-40 sm:h-52 md:h-60 flex items-end justify-between gap-0.5 sm:gap-1.5 md:gap-2 px-1 relative min-w-0">
+                <div className="w-full max-w-full pt-3 sm:pt-4 pb-1 sm:pb-2 relative min-w-0 overflow-x-auto scrollbar-none">
+                    <div className="min-w-[480px] sm:min-w-full h-40 sm:h-52 md:h-60 flex items-end justify-between gap-1 sm:gap-1.5 md:gap-2 px-1 relative">
                         {activeChartData.map((bucket, idx) => {
                             const isZero = bucket.total === 0;
                             const isLast = idx === activeChartData.length - 1;
@@ -627,7 +627,15 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
 
                                     {/* Hover Tooltip */}
                                     {isHovered && !isZero && (
-                                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 p-3 rounded-xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-xs whitespace-nowrap pointer-events-none">
+                                        <div
+                                            className={`absolute bottom-full mb-3 z-30 p-3 rounded-xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-xs whitespace-nowrap pointer-events-none ${
+                                                isFirst
+                                                    ? "left-0 translate-x-0"
+                                                    : isLast
+                                                    ? "right-0 translate-x-0"
+                                                    : "left-1/2 -translate-x-1/2"
+                                            }`}
+                                        >
                                             <div className="font-black text-black mb-1.5 pb-1 border-b border-black/15">
                                                 {bucket.label}
                                             </div>
@@ -658,7 +666,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* Legend at bottom-left matching Neo-Brutalism */}
-                <div className="flex items-center gap-3 text-xs font-black text-black pt-2 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-3 text-xs font-black text-black pt-2 flex-wrap w-full min-w-0">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
                         <span className="w-2.5 h-2.5 rounded-sm bg-[#d4d4d4] border border-black" />
                         <span>Easy</span>

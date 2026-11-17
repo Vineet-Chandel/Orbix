@@ -1050,6 +1050,7 @@ export interface ExploreQueryParams {
     sortBy?: "score" | "solved" | "contests" | "streak" | "recent" | "name";
     page?: number;
     limit?: number;
+    excludeUsername?: string;
 }
 
 export interface ExploreResponse {
@@ -1092,6 +1093,7 @@ export async function fetchExploreProfiles(params: ExploreQueryParams = {}): Pro
     if (params.sortBy) query.set("sortBy", params.sortBy);
     if (params.page) query.set("page", String(params.page));
     if (params.limit) query.set("limit", String(params.limit));
+    if (params.excludeUsername) query.set("excludeUsername", params.excludeUsername);
 
     const qs = query.toString();
     const path = `/api/profile/explore${qs ? `?${qs}` : ""}`;

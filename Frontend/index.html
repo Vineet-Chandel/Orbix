@@ -18,7 +18,7 @@
 
 <body>
   <div id="root">
-    <div style="position:fixed;inset:0;background-color:#FAF6EE;background-image:radial-gradient(#d3cbbe 1.2px,transparent 1.2px);background-size:18px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Poppins',-apple-system,BlinkMacSystemFont,sans-serif;user-select:none;padding:24px;box-sizing:border-box;">
+    <div id="orbix-preloader-root" style="position:fixed;inset:0;background-color:#FAF6EE;background-image:radial-gradient(#d3cbbe 1.2px,transparent 1.2px);background-size:18px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Poppins',-apple-system,BlinkMacSystemFont,sans-serif;user-select:none;padding:24px;box-sizing:border-box;">
       <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:32px;max-width:400px;width:100%;">
         <!-- Enlarged Orbix Branding Group -->
         <div style="display:flex;flex-direction:column;align-items:center;">
@@ -33,25 +33,161 @@
           <div style="font-size:13px;font-weight:700;color:#525252;letter-spacing:0.5px;margin-top:6px;">Empowering Dev Workflows</div>
         </div>
 
-        <!-- Central Hourglass Loading Indicator (No card container) -->
+        <!-- Central Continuous Morphing Hourglass Loader (Global OrbixLoader identity) -->
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
-          <svg width="56" height="56" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation:orbixHourglassSpin 2.4s ease-in-out infinite;transform-origin:32px 32px;" aria-hidden="true">
+          <svg width="56" height="56" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="user-select:none;flex-shrink:0;" aria-hidden="true">
+            <defs>
+              <clipPath id="orbix-preloader-clip">
+                <path id="orbix-clip-path" d="M 21.5 14.5 C 25 14.5, 39 14.5, 42.5 14.5 C 44.5 14.5, 45.5 16, 44 18 C 40 23.5, 34.5 28.5, 34 32 C 34.5 35.5, 40 40.5, 44 46 C 45.5 48, 44.5 49.5, 42.5 49.5 C 39 49.5, 25 49.5, 21.5 49.5 C 19.5 49.5, 18.5 48, 20 46 C 24 40.5, 29.5 35.5, 30 32 C 29.5 28.5, 24 23.5, 20 18 C 18.5 16, 19.5 14.5, 21.5 14.5 Z"></path>
+              </clipPath>
+              <filter id="orbix-preloader-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="1.5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Centered Scale Wrapper -->
             <g transform="translate(32 32) scale(1.18) translate(-32 -32)">
-              <path d="M 20 12 C 24 12, 40 12, 44 12 C 47 12, 48 14, 46 17 C 42 23, 36 28, 35 32 C 36 36, 42 41, 46 47 C 48 50, 47 52, 44 52 C 40 52, 24 52, 20 52 C 17 52, 16 50, 18 47 C 22 41, 28 36, 29 32 C 28 28, 22 23, 18 17 C 16 14, 17 12, 20 12 Z" stroke="#000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M 23 18 L 41 18 L 34 29 L 30 29 Z" fill="#000" opacity="0.85"/>
-              <path d="M 22 49 Q 32 40 42 49 Z" fill="#000" opacity="0.9"/>
-              <circle cx="32" cy="32" r="2" fill="#a2ff86"/>
+              <!-- Rotating Container -->
+              <g id="orbix-spin-group">
+                <!-- Liquid & Particles Layer clipped inside the glass chamber -->
+                <g clip-path="url(#orbix-preloader-clip)">
+                  <!-- 1. Upper Chamber Draining Fluid -->
+                  <path id="orbix-upper-fluid" fill="#000000" opacity="0.95" d="M 21.5 16 C 25 15, 39 15, 42.5 16 L 34.5 30 L 29.5 30 Z"></path>
+                  <!-- 2. Lower Chamber Accumulating Mound -->
+                  <path id="orbix-lower-mound" fill="#000000" opacity="0.9" d="M 22 49 Q 32 48.5 42 49 L 43 50 L 21 50 Z"></path>
+                  <!-- 3. Central Pouring Fluid Stream -->
+                  <line id="orbix-stream-line" x1="32" y1="30.5" x2="32" y2="46" stroke="#000000" stroke-width="2.8" stroke-linecap="round" stroke-dasharray="4 3" opacity="1"></line>
+                  <!-- 4. Fine Mist/Splash Particles in Lower Chamber -->
+                  <circle id="orbix-splash-dot" cx="32" cy="43" r="1.6" fill="#000000" opacity="0.8"></circle>
+                </g>
+
+                <!-- OUTER SHAPE MORPHING OUTLINE (Hourglass <-> Bowtie) -->
+                <path id="orbix-outline-path" stroke="#000000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M 20 12 C 24 12, 40 12, 44 12 C 47 12, 48 14, 46 17 C 42 23, 36 28, 35 32 C 36 36, 42 41, 46 47 C 48 50, 47 52, 44 52 C 40 52, 24 52, 20 52 C 17 52, 16 50, 18 47 C 22 41, 28 36, 29 32 C 28 28, 22 23, 18 17 C 16 14, 17 12, 20 12 Z"></path>
+
+                <!-- RESTRAINED SUBTLE ACCENT PINCH HIGHLIGHT -->
+                <circle id="orbix-center-dot" cx="32" cy="32" r="1.8" fill="#a2ff86" filter="url(#orbix-preloader-glow)" opacity="0.9"></circle>
+              </g>
             </g>
           </svg>
         </div>
       </div>
     </div>
-    <style>
-      @keyframes orbixHourglassSpin {
-        0%, 48% { transform: rotate(0deg); }
-        75%, 100% { transform: rotate(180deg); }
-      }
-    </style>
+    <script>
+      (function() {
+        var pHourglass = [20,12, 24,12,40,12,44,12, 47,12,48,14,46,17, 42,23,36,28,35,32, 36,36,42,41,46,47, 48,50,47,52,44,52, 40,52,24,52,20,52, 17,52,16,50,18,47, 22,41,28,36,29,32, 28,28,22,23,18,17, 16,14,17,12,20,12];
+        var pBowtie = [20,15, 24,14,40,14,44,15, 49,16,52,22,49,27, 44,30,36,30,35,32, 36,34,44,34,49,37, 52,42,49,48,44,49, 40,50,24,50,20,49, 15,48,12,42,15,37, 20,34,28,34,29,32, 28,30,20,30,15,27, 12,22,15,16,20,15];
+
+        var clipH = [21.5,14.5, 25,14.5,39,14.5,42.5,14.5, 44.5,14.5,45.5,16,44,18, 40,23.5,34.5,28.5,34,32, 34.5,35.5,40,40.5,44,46, 45.5,48,44.5,49.5,42.5,49.5, 39,49.5,25,49.5,21.5,49.5, 19.5,49.5,18.5,48,20,46, 24,40.5,29.5,35.5,30,32, 29.5,28.5,24,23.5,20,18, 18.5,16,19.5,14.5,21.5,14.5];
+        var clipB = [21.5,17, 25,16,39,16,42.5,17, 46.5,18,49,22.5,46.5,26.5, 42,29.5,35,29.5,34,32, 35,34.5,42,34.5,46.5,37.5, 49,41.5,46.5,46,42.5,47, 39,48,25,48,21.5,47, 17.5,46,15,41.5,17.5,37.5, 22,34.5,29,34.5,30,32, 29,29.5,22,29.5,17.5,26.5, 15,22.5,17.5,18,21.5,17];
+
+        function toPath(nums) {
+          var s = "M " + nums[0].toFixed(2) + " " + nums[1].toFixed(2);
+          for (var i = 2; i < nums.length; i += 6) {
+            s += " C " + nums[i].toFixed(2) + " " + nums[i+1].toFixed(2) + ", " +
+                 nums[i+2].toFixed(2) + " " + nums[i+3].toFixed(2) + ", " +
+                 nums[i+4].toFixed(2) + " " + nums[i+5].toFixed(2);
+          }
+          return s + " Z";
+        }
+
+        function lerp(a, b, t) {
+          var out = new Array(a.length);
+          for (var i = 0; i < a.length; i++) {
+            out[i] = a[i] + (b[i] - a[i]) * t;
+          }
+          return out;
+        }
+
+        function easeInOut(t) {
+          return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        }
+
+        var startTime = performance.now();
+        var spinGroup = document.getElementById("orbix-spin-group");
+        var outlinePath = document.getElementById("orbix-outline-path");
+        var clipPath = document.getElementById("orbix-clip-path");
+        var streamLine = document.getElementById("orbix-stream-line");
+        var splashDot = document.getElementById("orbix-splash-dot");
+        var centerDot = document.getElementById("orbix-center-dot");
+        var upperFluid = document.getElementById("orbix-upper-fluid");
+        var lowerMound = document.getElementById("orbix-lower-mound");
+
+        function tick(now) {
+          if (!document.getElementById("orbix-preloader-root")) return;
+
+          var elapsed = (now - startTime) % 2400;
+          var frac = elapsed / 2400;
+
+          var rot = 0;
+          var morphT = 0;
+
+          if (frac <= 0.48) {
+            rot = 0;
+            morphT = 0;
+          } else if (frac <= 0.75) {
+            var p = (frac - 0.48) / (0.75 - 0.48);
+            var ep = easeInOut(p);
+            rot = ep * 90;
+            morphT = ep;
+          } else if (frac <= 0.98) {
+            var p = (frac - 0.75) / (0.98 - 0.75);
+            var ep = easeInOut(p);
+            rot = 90 + ep * 90;
+            morphT = 1 - ep;
+          } else {
+            rot = 180;
+            morphT = 0;
+          }
+
+          if (spinGroup) {
+            spinGroup.setAttribute("transform", "rotate(" + rot.toFixed(2) + " 32 32)");
+          }
+          if (outlinePath) {
+            outlinePath.setAttribute("d", toPath(lerp(pHourglass, pBowtie, morphT)));
+          }
+          if (clipPath) {
+            clipPath.setAttribute("d", toPath(lerp(clipH, clipB, morphT)));
+          }
+
+          // Draining fluid animation during 0..0.48
+          if (frac <= 0.48) {
+            var s = frac / 0.48;
+            if (streamLine) {
+              streamLine.style.opacity = "1";
+              streamLine.style.strokeDashoffset = "" + (-s * 24);
+            }
+            if (upperFluid) {
+              upperFluid.style.opacity = "" + (0.95 - s * 0.95);
+              var uy = 16 + s * 12;
+              upperFluid.setAttribute("d", "M " + (21.5 + s * 8) + " " + uy + " L " + (42.5 - s * 8) + " " + uy + " L 33 30.5 L 31 30.5 Z");
+            }
+            if (lowerMound) {
+              lowerMound.style.opacity = "0.95";
+              var my = 49 - s * 8.5;
+              lowerMound.setAttribute("d", "M 21 49 Q 32 " + my + " 43 49 L 43 50 L 21 50 Z");
+            }
+            if (splashDot) {
+              splashDot.style.opacity = "" + (s < 0.4 ? 0.8 : 0);
+            }
+          } else {
+            if (streamLine) streamLine.style.opacity = "0";
+            if (upperFluid) upperFluid.style.opacity = "0";
+            if (lowerMound) lowerMound.style.opacity = "0";
+            if (splashDot) splashDot.style.opacity = "0";
+          }
+
+          if (centerDot) {
+            var dotScale = 0.85 + 0.35 * Math.sin(frac * Math.PI * 2);
+            centerDot.setAttribute("r", "" + (1.8 * dotScale).toFixed(2));
+          }
+
+          requestAnimationFrame(tick);
+        }
+
+        requestAnimationFrame(tick);
+      })();
+    </script>
   </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>

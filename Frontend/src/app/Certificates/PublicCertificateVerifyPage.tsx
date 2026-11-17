@@ -18,6 +18,7 @@ import {
     verifyCertificatePublic,
     type PublicVerificationResult,
 } from "../../api/certificateStudioApi";
+import { OrbixLoader } from "../../components/ui/loader";
 
 export const PublicCertificateVerifyPage: React.FC = () => {
     const { credentialCode } = useParams<{ credentialCode: string }>();
@@ -170,7 +171,7 @@ export const PublicCertificateVerifyPage: React.FC = () => {
                 {/* Loading State */}
                 {loading && (
                     <div className="p-12 rounded-2xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] text-center space-y-4">
-                        <div className="w-12 h-12 border-4 border-black border-t-[#a2ff86] rounded-full animate-spin mx-auto" />
+                        <OrbixLoader size="lg" />
                         <div>
                             <h3 className="text-lg font-black text-black">
                                 Verifying Cryptographic Seal...

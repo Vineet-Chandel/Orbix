@@ -6,7 +6,6 @@ import {
     Trash2,
     CheckCircle2,
     AlertCircle,
-    Loader2,
     Clock,
     AlertTriangle,
     Lock,
@@ -48,6 +47,7 @@ import {
 import { ExtractionScorecardView } from "../../components/projects/ExtractionScorecardView";
 import { InitialReviewScreen } from "../../components/projects/InitialReviewScreen";
 import { MediaUploadDropzone } from "../../components/projects/MediaUploadDropzone";
+import { OrbixLoaderIcon } from "../../components/ui/loader";
 import { TechnologyStackEditor } from "../../components/projects/TechnologyStackEditor";
 import { ProjectSyncDiffModal } from "../../components/projects/ProjectSyncDiffModal";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -1296,8 +1296,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                     {/* STAGE 2: Analyzing (Animated 6-Step Visualizer) */}
                     {lifecycleStage === "analyzing" && (
                         <div className="py-8 space-y-6 text-center">
-                            <div className="w-16 h-16 bg-[#a2ff86] border-2 border-black rounded-full flex items-center justify-center mx-auto shadow-[4px_4px_0px_#000] animate-bounce">
-                                <Loader2 className="w-8 h-8 text-black animate-spin" />
+                            <div className="w-16 h-16 bg-[#a2ff86] border-2 border-black rounded-full flex items-center justify-center mx-auto shadow-[4px_4px_0px_#000]">
+                                <OrbixLoaderIcon size="md" color="#000" />
                             </div>
 
                             <div>
@@ -1325,7 +1325,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                                             {isDone ? (
                                                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                                             ) : isCurrent ? (
-                                                <Loader2 className="w-4 h-4 text-black animate-spin shrink-0 mt-0.5" />
+                                                <OrbixLoaderIcon size="xs" color="#000" className="shrink-0 mt-0.5" />
                                             ) : (
                                                 <Clock className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
                                             )}
@@ -1383,7 +1383,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                                             className="w-full py-2.5 px-4 bg-[#a2ff86] hover:bg-[#8ee673] disabled:opacity-50 text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center gap-2 transition-all"
                                         >
                                             {isConnectingGithub ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <OrbixLoaderIcon size="xs" color="#000" />
                                             ) : (
                                                 <Shield className="w-4 h-4" />
                                             )}

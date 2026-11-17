@@ -27,6 +27,7 @@ import { CodeChefRatingLadder } from "../../components/CodeChefRatingLadder";
 import { AtCoderBadge } from "../../components/AtCoderBadge";
 import { AtCoderRatingLadder } from "../../components/AtCoderRatingLadder";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { isDemoProfileUsername, demoContestsData } from "../../data/demoProfileData";
 
 interface ContestPerformanceSectionProps {
     connectedPortals: Record<string, any>;
@@ -53,11 +54,15 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
     username = "",
 }) => {
     const effectiveUser = (username || "").trim();
+    const isDemo = isDemoProfileUsername(effectiveUser);
     const dispatch = useAppDispatch();
 
     // Redux store state
-    const contestData = useAppSelector((state) => state.contests.dataByUser[effectiveUser]);
-    const isLoading = useAppSelector((state) => state.contests.loadingByUser[effectiveUser]);
+    const reduxData = useAppSelector((state) => (effectiveUser ? state.contests.dataByUser[effectiveUser] : undefined));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.contests.loadingByUser[effectiveUser] : false));
+
+    const contestData = isDemo ? demoContestsData : reduxData;
+    const isLoading = isDemo ? false : reduxLoading;
 
     // Active platform selection
     const [selectedPortal, setSelectedPortal] = useState<string>("codeforces");
@@ -102,7 +107,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Initial and dynamic sync whenever connected portals change
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || isDemo) return;
         const isInitial = prevFingerprintRef.current === null;
         const hasChanged = prevFingerprintRef.current !== portalsFingerprint;
         prevFingerprintRef.current = portalsFingerprint;
@@ -112,7 +117,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
             portals: connectedPortals,
             force: !isInitial && hasChanged
         }));
-    }, [effectiveUser, dispatch, connectedPortals, portalsFingerprint]);
+    }, [effectiveUser, dispatch, connectedPortals, portalsFingerprint, isDemo]);
 
     // Discover eligible platforms dynamically - ONLY those where contest data can be extracted AND user is connected
     const platformsList: PlatformContestAnalytics[] = useMemo(() => {
@@ -428,6 +433,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Force re-sync handler
     const handleRefresh = () => {
+        if (isDemo) return;
         if (effectiveUser) {
             dispatch(fetchContestPerformance({ username: effectiveUser, force: true, portals: connectedPortals }));
         }

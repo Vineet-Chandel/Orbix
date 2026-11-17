@@ -100,7 +100,7 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
                 </p>
                 <div className="flex items-center gap-3 mt-6 flex-wrap justify-center">
                     <button
-                        onClick={() => navigate("/clubs")}
+                        onClick={() => navigate("/college-clubs")}
                         className="px-5 py-2.5 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs sm:text-sm border-2 border-black rounded-xl shadow-neo-sm transition-all flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         <Compass className="w-4 h-4 text-black" />

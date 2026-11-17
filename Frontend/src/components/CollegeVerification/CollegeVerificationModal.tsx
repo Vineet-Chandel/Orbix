@@ -25,6 +25,7 @@ import { ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT } from "../../utils/collegeVer
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { updateProfile, type InstitutionItem } from "../../utils/profileApi";
 import { CollegeAutocomplete } from "../CollegeAutocomplete";
+import { OrbixLoader } from "../ui/loader";
 
 function phoneMatchesCanonical(input: string, canonical: string | null): boolean {
     if (!input || !canonical) return false;
@@ -640,8 +641,8 @@ export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> =
                 {/* Wizard Body (Scrollable) */}
                 <div className="overflow-y-auto pr-1 space-y-4 flex-1">
                     {isLoadingStatus ? (
-                        <div className="py-16 text-center space-y-3">
-                            <div className="w-8 h-8 border-3 border-black border-t-transparent rounded-full animate-spin mx-auto" />
+                        <div className="py-16 text-center space-y-4">
+                            <OrbixLoader size="md" />
                             <p className="text-xs font-black uppercase tracking-wider text-neutral-600">
                                 Checking verification records...
                             </p>

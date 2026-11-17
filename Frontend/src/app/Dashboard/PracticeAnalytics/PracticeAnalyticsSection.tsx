@@ -5,6 +5,7 @@ import { RecentlySolvedCard } from "./RecentlySolvedCard";
 import { DsaTopicAnalysisCard } from "./DsaTopicAnalysisCard";
 import { TopicStrengthCard } from "./TopicStrengthCard";
 import { BadgesCard } from "../BadgesCard";
+import { isDemoProfileUsername, demoPracticeAnalytics } from "../../../data/demoProfileData";
 
 interface PracticeAnalyticsSectionProps {
     connectedPortals?: Record<string, any>;
@@ -17,17 +18,21 @@ export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> =
 }) => {
     const authUser = useAppSelector((state) => state.user.user);
     const effectiveUser = (username || authUser?.username || "").trim();
+    const isDemo = isDemoProfileUsername(effectiveUser);
     const dispatch = useAppDispatch();
 
-    const data = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.dataByUser[effectiveUser] : undefined));
-    const isLoading = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.loadingByUser[effectiveUser] || false : false));
+    const reduxData = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.dataByUser[effectiveUser] : undefined));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.loadingByUser[effectiveUser] || false : false));
+
+    const data = isDemo ? demoPracticeAnalytics : reduxData;
+    const isLoading = isDemo ? false : reduxLoading;
 
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || isDemo) return;
         if (!data && !isLoading) {
             dispatch(fetchPracticeAnalytics({ username: effectiveUser, portals: connectedPortals }));
         }
-    }, [effectiveUser, connectedPortals, data, isLoading, dispatch]);
+    }, [effectiveUser, connectedPortals, data, isLoading, dispatch, isDemo]);
 
     return (
         <section

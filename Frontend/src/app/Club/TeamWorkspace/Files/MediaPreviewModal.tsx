@@ -1,9 +1,10 @@
 // Frontend/src/app/Club/TeamWorkspace/Files/MediaPreviewModal.tsx
 import React, { useState, useEffect } from "react";
-import { X, Download, Loader2, Image as ImageIcon, Video } from "lucide-react";
+import { X, Download, Image as ImageIcon, Video } from "lucide-react";
 import workspaceApi from "../../../../api/workspaceApi";
 import type { WorkspaceFile } from "../../../../types/workspace";
 import { useToast } from "../../../../context/ToastContext";
+import { OrbixLoader } from "../../../../components/ui/loader";
 
 interface MediaPreviewModalProps {
     file: WorkspaceFile;
@@ -111,7 +112,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
                 <div className="relative w-full max-h-[80vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black border border-zinc-800">
                     {loading ? (
                         <div className="py-20 flex flex-col items-center gap-3 text-zinc-400">
-                            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+                            <OrbixLoader size="md" color="#c084fc" />
                             <span className="text-sm">Authorizing media playback...</span>
                         </div>
                     ) : error ? (

@@ -54,6 +54,104 @@ export interface CollegeMetadataDTO {
 }
 
 /**
+ * Safely parses and normalizes platform ratings from JSON, string, or fallback score breakdown.
+ * Ensures consistent structure: { codeforces: { rating, tier, color }, leetcode: { rating, badge, color }, ... }
+ */
+export function parseRatingsSafe(
+    raw: any,
+    scoreBreakdown?: any
+): Record<string, { rating: number; tier?: string; color?: string; badge?: string }> {
+    let result: Record<string, any> = {};
+    if (raw) {
+        if (typeof raw === "string") {
+            try {
+                let parsed = JSON.parse(raw);
+                if (typeof parsed === "string") {
+                    parsed = JSON.parse(parsed);
+                }
+                if (parsed && typeof parsed === "object") {
+                    result = parsed;
+                }
+            } catch {
+                result = {};
+            }
+        } else if (typeof raw === "object") {
+            result = { ...raw };
+        }
+    }
+
+    // Normalize any platforms where value might be just a raw number or nested object
+    const normalized: Record<string, { rating: number; tier?: string; color?: string; badge?: string }> = {};
+    for (const [key, val] of Object.entries(result)) {
+        if (!val) continue;
+        const pKey = key.toLowerCase();
+        let rNum: number | null = null;
+        let color = typeof val === "object" ? val.color : undefined;
+        let tier = typeof val === "object" ? (val.tier || val.badge) : undefined;
+
+        if (typeof val === "number" && val > 0) {
+            rNum = Math.round(val);
+        } else if (typeof val === "object" && typeof val.rating === "number" && val.rating > 0) {
+            rNum = Math.round(val.rating);
+        } else if (typeof val === "string" && !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0) {
+            rNum = parseInt(val, 10);
+        }
+
+        if (rNum && rNum > 0) {
+            if (pKey === "codeforces" || pKey === "cf") {
+                const t = getCodeforcesTier(rNum);
+                normalized.codeforces = { rating: rNum, tier: tier || t.name, color: color || t.color };
+            } else if (pKey === "leetcode" || pKey === "lc") {
+                const t = getLeetCodeTier(rNum, tier);
+                normalized.leetcode = { rating: rNum, badge: tier || t.name, color: color || t.color };
+            } else if (pKey === "codechef" || pKey === "cc") {
+                const t = getCodeChefTier(rNum);
+                normalized.codechef = { rating: rNum, tier: tier || t.name, color: color || t.color };
+            } else if (pKey === "atcoder" || pKey === "ac") {
+                const t = getAtCoderTier(rNum);
+                normalized.atcoder = { rating: rNum, tier: tier || t.name, color: color || t.color };
+            } else if (pKey === "topcoder" || pKey === "tc") {
+                normalized.topcoder = { rating: rNum, color: color || "#00aaff" };
+            } else {
+                normalized[pKey] = { rating: rNum, tier, color };
+            }
+        }
+    }
+
+    // Fallback: If normalized has no ratings, check scoreBreakdown.ratings
+    if (Object.keys(normalized).length === 0 && scoreBreakdown) {
+        let sb = scoreBreakdown;
+        if (typeof sb === "string") {
+            try { sb = JSON.parse(sb); } catch { sb = null; }
+        }
+        if (sb && typeof sb === "object" && sb.ratings) {
+            const r = sb.ratings;
+            if (r.codeforces?.rating && r.codeforces.rating > 0) {
+                const t = getCodeforcesTier(r.codeforces.rating);
+                normalized.codeforces = { rating: r.codeforces.rating, tier: t.name, color: t.color };
+            }
+            if (r.leetcode?.rating && r.leetcode.rating > 0) {
+                const t = getLeetCodeTier(r.leetcode.rating);
+                normalized.leetcode = { rating: r.leetcode.rating, badge: t.name, color: t.color };
+            }
+            if (r.codechef?.rating && r.codechef.rating > 0) {
+                const t = getCodeChefTier(r.codechef.rating);
+                normalized.codechef = { rating: r.codechef.rating, tier: t.name, color: t.color };
+            }
+            if (r.atcoder?.rating && r.atcoder.rating > 0) {
+                const t = getAtCoderTier(r.atcoder.rating);
+                normalized.atcoder = { rating: r.atcoder.rating, tier: t.name, color: t.color };
+            }
+            if (r.topcoder?.rating && r.topcoder.rating > 0) {
+                normalized.topcoder = { rating: r.topcoder.rating, color: "#00aaff" };
+            }
+        }
+    }
+
+    return normalized;
+}
+
+/**
  * Recalculates and updates the leaderboard projection for a single user,
  * keeping both Global and College League projections synchronized.
  */
@@ -61,12 +159,12 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
     const cleanUser = (username || "").trim();
     if (!cleanUser) return null;
 
-    // 1. Fetch user record including college_id
+    // 1. Fetch user record including college_id (case-insensitive + id fallback)
     const userRes = await query(
-        `SELECT id, username, firstname, lastname, avatar_url, photo_url, college, college_id, is_email_verified, is_verified_coder, is_public,
+        `SELECT id, username, email, firstname, lastname, avatar_url, photo_url, college, college_id, is_email_verified, is_verified_coder, is_public,
                 orbix_score, orbix_score_breakdown, total_solved, total_contests, streak, platform_ratings
          FROM users
-         WHERE username = $1
+         WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) OR id::text = $1
          LIMIT 1;`,
         [cleanUser]
     );
@@ -111,12 +209,13 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         await query("UPDATE users SET college = $1, college_id = $2 WHERE id = $3;", [college, collegeId, userId]).catch(() => null);
     }
 
-    // 2. Fetch all linked portals for this user
+    // 2. Fetch all linked portals for this user (robust matching by username, email, or user_id)
     const linksRes = await query(
         `SELECT portal, portal_username, display_name, avatar_url, stats, snapshot, verified, last_sync_status
          FROM user_links
-         WHERE (username = $1 OR user_id = $2) AND (is_public IS NULL OR is_public = true);`,
-        [cleanUser, userId]
+         WHERE (LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2) OR user_id = $3)
+           AND (is_public IS NULL OR is_public = true);`,
+        [cleanUser, u.email || cleanUser, userId]
     );
 
     // If user has no user_links entries but already has a precomputed orbix_score > 0 in users table, preserve it
@@ -126,7 +225,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         const finalSolved = Number(u.total_solved || 0);
         const finalContests = Number(u.total_contests || 0);
         const streak = Number(u.streak || 0);
-        const platRatings = u.platform_ratings || {};
+        const platRatings = parseRatingsSafe(u.platform_ratings, scoreBreakdown);
 
         const upsertRes = await query(
             `INSERT INTO leaderboard_entries (
@@ -183,7 +282,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
             scoreBreakdown: row.score_breakdown,
             totalSolved: row.total_solved,
             totalContests: row.total_contests,
-            platformRatings: row.platform_ratings,
+            platformRatings: parseRatingsSafe(row.platform_ratings, row.score_breakdown),
             streak: row.streak,
             updatedAt: row.updated_at,
         };
@@ -196,9 +295,38 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
     let totalContestsAcc = 0;
 
     for (const link of linksRes.rows) {
-        const portal = link.portal.toLowerCase().trim();
-        const snap = link.snapshot && typeof link.snapshot === "object" ? link.snapshot : {};
-        const stats = Array.isArray(link.stats) ? link.stats : [];
+        const portal = (link.portal || "").toLowerCase().trim();
+        let snap = link.snapshot;
+        if (typeof snap === "string") {
+            try { snap = JSON.parse(snap); } catch { snap = {}; }
+        }
+        if (!snap || typeof snap !== "object") snap = {};
+
+        let stats = link.stats;
+        if (typeof stats === "string") {
+            try { stats = JSON.parse(stats); } catch { stats = []; }
+        }
+        if (!Array.isArray(stats)) stats = [];
+
+        // If snapshot and stats are empty but portal_username is present, attempt live fetch
+        if (Object.keys(snap).length === 0 && stats.length === 0 && link.portal_username) {
+            try {
+                const { verifyAndFetchPortal } = await import("../portals/portals.js");
+                const liveData = await verifyAndFetchPortal(portal, link.portal_username);
+                if (liveData && liveData.success) {
+                    snap = liveData;
+                    stats = liveData.stats || [];
+                    query(
+                        `UPDATE user_links
+                         SET snapshot = $1::jsonb, stats = $2::jsonb, verified = true, updated_at = CURRENT_TIMESTAMP
+                         WHERE (LOWER(username) = LOWER($3) OR user_id = $4) AND LOWER(portal) = LOWER($5);`,
+                        [JSON.stringify(liveData), JSON.stringify(stats), cleanUser, userId, portal]
+                    ).catch(() => null);
+                }
+            } catch {
+                // Ignore live fetch error
+            }
+        }
 
         portalsMap[portal] = {
             ...snap,
@@ -208,12 +336,24 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
             verified: link.verified !== false,
         };
 
-        let rVal = snap.rating || snap.contestRating || snap.currentRating;
-        if (typeof rVal !== "number" || rVal <= 0) {
+        let rVal: number | null = null;
+        if (typeof snap.rating === "number" && snap.rating > 0) {
+            rVal = snap.rating;
+        } else if (typeof snap.contestRating === "number" && snap.contestRating > 0) {
+            rVal = Math.round(snap.contestRating);
+        } else if (typeof snap.currentRating === "number" && snap.currentRating > 0) {
+            rVal = snap.currentRating;
+        } else if (typeof snap.rating === "string" && !isNaN(parseInt(snap.rating, 10)) && parseInt(snap.rating, 10) > 0) {
+            rVal = parseInt(snap.rating, 10);
+        }
+
+        if (!rVal || rVal <= 0) {
             for (const s of stats) {
-                const lbl = (s.label || "").toLowerCase();
+                if (!s) continue;
+                const lbl = String(s.label || "").toLowerCase();
                 if (lbl === "rating" || lbl.includes("rating")) {
-                    const m = (s.value || "").match(/(\d+)/);
+                    const strVal = String(s.value || "");
+                    const m = strVal.match(/(\d+)/);
                     if (m && m[1]) {
                         rVal = parseInt(m[1], 10);
                         break;
@@ -223,19 +363,19 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         }
 
         if (typeof rVal === "number" && rVal > 0) {
-            if (portal === "codeforces") {
+            if (portal === "codeforces" || portal === "cf") {
                 const tier = getCodeforcesTier(rVal);
                 platformRatings.codeforces = { rating: rVal, tier: tier.name, color: tier.color };
-            } else if (portal === "leetcode") {
+            } else if (portal === "leetcode" || portal === "lc") {
                 const tier = getLeetCodeTier(rVal, snap.badge || snap.officialBadge);
                 platformRatings.leetcode = { rating: rVal, badge: tier.name, color: tier.color };
-            } else if (portal === "codechef") {
+            } else if (portal === "codechef" || portal === "cc") {
                 const tier = getCodeChefTier(rVal);
                 platformRatings.codechef = { rating: rVal, tier: tier.name, color: tier.color };
-            } else if (portal === "atcoder") {
+            } else if (portal === "atcoder" || portal === "ac") {
                 const tier = getAtCoderTier(rVal);
                 platformRatings.atcoder = { rating: rVal, tier: tier.name, color: tier.color };
-            } else if (portal === "topcoder") {
+            } else if (portal === "topcoder" || portal === "tc") {
                 platformRatings.topcoder = { rating: rVal, color: "#00aaff" };
             }
         }
@@ -245,10 +385,11 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
             totalSolvedAcc += solved;
         } else {
             for (const s of stats) {
-                const lbl = (s.label || "").toLowerCase();
+                if (!s) continue;
+                const lbl = String(s.label || "").toLowerCase();
                 if (lbl.includes("solved") || lbl.includes("problems")) {
-                    const m = (s.value || "").match(/(\d+)/);
-                    if (m) totalSolvedAcc += parseInt(m[1], 10);
+                    const m = String(s.value || "").match(/(\d+)/);
+                    if (m && m[1]) totalSolvedAcc += parseInt(m[1], 10);
                 }
             }
         }
@@ -257,9 +398,10 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
             totalContestsAcc += snap.ratedContestsCount;
         } else {
             for (const s of stats) {
-                const lbl = (s.label || "").toLowerCase();
+                if (!s) continue;
+                const lbl = String(s.label || "").toLowerCase();
                 if (lbl === "contests" || lbl.includes("contest")) {
-                    const m = (s.value || "").match(/(\d+)/);
+                    const m = String(s.value || "").match(/(\d+)/);
                     if (m && m[1]) totalContestsAcc += parseInt(m[1], 10);
                 }
             }
@@ -271,11 +413,16 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
     let maxStreak = Number(u.streak || 0);
 
     for (const link of linksRes.rows) {
-        const stats = Array.isArray(link.stats) ? link.stats : [];
+        let stats = link.stats;
+        if (typeof stats === "string") {
+            try { stats = JSON.parse(stats); } catch { stats = []; }
+        }
+        if (!Array.isArray(stats)) stats = [];
         for (const s of stats) {
-            const lbl = (s.label || "").toLowerCase();
-            const m = (s.value || "").match(/(\d+)/);
-            const count = m ? parseInt(m[1], 10) : 0;
+            if (!s) continue;
+            const lbl = String(s.label || "").toLowerCase();
+            const m = String(s.value || "").match(/(\d+)/);
+            const count = m && m[1] ? parseInt(m[1], 10) : 0;
             if (lbl.includes("activedays") || lbl.includes("active days")) {
                 if (count > maxActiveDays) maxActiveDays = count;
             }
@@ -290,6 +437,30 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         activeDays: maxActiveDays,
         currentStreak: maxStreak,
     });
+
+    // Fallback: If platformRatings has no ratings extracted yet, check scoreResult.breakdown.ratings
+    if (Object.keys(platformRatings).length === 0 && scoreResult.breakdown?.ratings) {
+        const sbRatings = scoreResult.breakdown.ratings;
+        if (sbRatings.codeforces?.rating && sbRatings.codeforces.rating > 0) {
+            const tier = getCodeforcesTier(sbRatings.codeforces.rating);
+            platformRatings.codeforces = { rating: sbRatings.codeforces.rating, tier: tier.name, color: tier.color };
+        }
+        if (sbRatings.leetcode?.rating && sbRatings.leetcode.rating > 0) {
+            const tier = getLeetCodeTier(sbRatings.leetcode.rating);
+            platformRatings.leetcode = { rating: sbRatings.leetcode.rating, badge: tier.name, color: tier.color };
+        }
+        if (sbRatings.codechef?.rating && sbRatings.codechef.rating > 0) {
+            const tier = getCodeChefTier(sbRatings.codechef.rating);
+            platformRatings.codechef = { rating: sbRatings.codechef.rating, tier: tier.name, color: tier.color };
+        }
+        if (sbRatings.atcoder?.rating && sbRatings.atcoder.rating > 0) {
+            const tier = getAtCoderTier(sbRatings.atcoder.rating);
+            platformRatings.atcoder = { rating: sbRatings.atcoder.rating, tier: tier.name, color: tier.color };
+        }
+        if (sbRatings.topcoder?.rating && sbRatings.topcoder.rating > 0) {
+            platformRatings.topcoder = { rating: sbRatings.topcoder.rating, color: "#00aaff" };
+        }
+    }
 
     const score = scoreResult.totalScore;
     const scoreBreakdown = scoreResult.breakdown;
@@ -379,7 +550,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         scoreBreakdown: row.score_breakdown,
         totalSolved: row.total_solved,
         totalContests: row.total_contests,
-        platformRatings: row.platform_ratings,
+        platformRatings: parseRatingsSafe(row.platform_ratings, row.score_breakdown),
         streak: row.streak,
         updatedAt: row.updated_at,
     };
@@ -497,7 +668,7 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
             scoreBreakdown: r.score_breakdown || {},
             totalSolved: parseInt(r.total_solved, 10),
             totalContests: parseInt(r.total_contests, 10),
-            platformRatings: r.platform_ratings || {},
+            platformRatings: parseRatingsSafe(r.platform_ratings, r.score_breakdown),
             streak: parseInt(r.streak, 10),
             updatedAt: r.updated_at,
         };
@@ -880,7 +1051,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
 
         // If no coders exist in this college yet, return clean empty payload immediately
         if (totalCoders === 0) {
-            const emptyPayload: CollegeLeaderboardResponse = {
+            const emptyPayload = {
                 success: true,
                 college: {
                     id: collegeMeta.id,
@@ -941,7 +1112,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
             scoreBreakdown: r.score_breakdown || {},
             totalSolved: parseInt(r.total_solved, 10),
             totalContests: parseInt(r.total_contests, 10),
-            platformRatings: r.platform_ratings || {},
+            platformRatings: parseRatingsSafe(r.platform_ratings, r.score_breakdown),
             streak: parseInt(r.streak, 10),
             updatedAt: r.updated_at,
         }));
@@ -998,7 +1169,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
             scoreBreakdown: r.score_breakdown || {},
             totalSolved: parseInt(r.total_solved, 10),
             totalContests: parseInt(r.total_contests, 10),
-            platformRatings: r.platform_ratings || {},
+            platformRatings: parseRatingsSafe(r.platform_ratings, r.score_breakdown),
             streak: parseInt(r.streak, 10),
             updatedAt: r.updated_at,
         }));
@@ -1155,7 +1326,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
             scoreBreakdown: r.score_breakdown || {},
             totalSolved: parseInt(r.total_solved, 10),
             totalContests: parseInt(r.total_contests, 10),
-            platformRatings: r.platform_ratings || {},
+            platformRatings: parseRatingsSafe(r.platform_ratings, r.score_breakdown),
             streak: parseInt(r.streak, 10),
             updatedAt: r.updated_at,
         }));
@@ -1214,7 +1385,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
             scoreBreakdown: r.score_breakdown || {},
             totalSolved: parseInt(r.total_solved, 10),
             totalContests: parseInt(r.total_contests, 10),
-            platformRatings: r.platform_ratings || {},
+            platformRatings: parseRatingsSafe(r.platform_ratings, r.score_breakdown),
             streak: parseInt(r.streak, 10),
             updatedAt: r.updated_at,
         }));

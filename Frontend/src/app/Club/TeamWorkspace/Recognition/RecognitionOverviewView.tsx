@@ -28,6 +28,7 @@ import { AwardOrbitsModal } from "./AwardOrbitsModal";
 import { AwardHistoryView } from "./AwardHistoryView";
 import { AwardBudgetsView } from "./AwardBudgetsView";
 import { RecognitionPolicyView } from "./RecognitionPolicyView";
+import { OrbixLoader } from "../../../../components/ui/loader";
 import { AwardAnalyticsView } from "./AwardAnalyticsView";
 import { DepartmentRecognitionView } from "./DepartmentRecognitionView";
 import { ThreeLeaderboardsView } from "./ThreeLeaderboardsView";
@@ -111,8 +112,9 @@ export const RecognitionOverviewView: React.FC<RecognitionOverviewViewProps> = (
 
     if (loading) {
         return (
-            <div className="p-12 text-center text-xs font-bold text-neutral-500">
-                Loading Orbix Recognition system...
+            <div className="p-16 text-center flex flex-col items-center justify-center gap-3 text-xs font-bold text-neutral-500">
+                <OrbixLoader size="md" />
+                <span>Loading Orbix Recognition system...</span>
             </div>
         );
     }

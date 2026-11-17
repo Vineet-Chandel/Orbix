@@ -201,13 +201,13 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                 : "—";
 
     return (
-        <div className="w-full rounded-2xl bg-white border-2 border-black p-5 sm:p-6 text-black font-sans select-none flex flex-col justify-between shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all relative overflow-hidden group">
+        <div className="w-full max-w-full min-w-0 rounded-2xl bg-white border-2 border-black p-4 sm:p-6 text-black font-sans select-none flex flex-col justify-between shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all relative overflow-hidden group">
             {/* Top Card Header */}
-            <div>
-                <div className="flex items-center justify-between gap-3 pb-3">
+            <div className="w-full min-w-0">
+                <div className="flex items-center justify-between gap-3 pb-3 w-full min-w-0">
                     {/* Platform Logo + Name */}
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center flex-shrink-0 text-black">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0 text-black">
                             {getPortalIcon(platform.portal, "w-5 h-5")}
                         </div>
                         <div className="min-w-0 flex items-center gap-2">
@@ -219,7 +219,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     href={platform.profileUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="p-1 rounded-md border border-black bg-white hover:bg-[#FFE566] text-black shadow-[1px_1px_0px_#000] transition-colors"
+                                    className="p-1 rounded-md border border-black bg-white hover:bg-[#FFE566] text-black shadow-[1px_1px_0px_#000] transition-colors shrink-0"
                                     title={`View ${platform.portalUsername} on ${platform.portalName}`}
                                 >
                                     <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -229,7 +229,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     </div>
 
                     {/* Total Contests Count (e.g. "2 contests") */}
-                    <div className="flex-shrink-0 bg-[#FAF6EE] border-2 border-black px-3 py-1 rounded-lg shadow-[2px_2px_0px_#000]">
+                    <div className="shrink-0 bg-[#FAF6EE] border-2 border-black px-2.5 sm:px-3 py-1 rounded-lg shadow-[2px_2px_0px_#000]">
                         <span className="text-xs font-black text-black">
                             {platform.ratedContestsCount} {platform.ratedContestsCount === 1 ? "contest" : "contests"}
                         </span>
@@ -237,7 +237,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                 </div>
 
                 {/* Subheader: Now | Best | Last 90 days */}
-                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-bold text-neutral-600 pb-3 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-bold text-neutral-600 pb-3 flex-wrap w-full min-w-0">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
                         Now <strong className="text-black font-black font-mono ml-0.5">{currentRating !== null && currentRating !== undefined ? currentRating : "—"}</strong>
                     </span>
@@ -261,9 +261,9 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                 </div>
 
                 {/* Active / Hover Contest Row */}
-                <div className="flex items-baseline justify-between gap-3 pb-3 border-b-2 border-black/10 min-h-[40px]">
+                <div className="flex items-baseline justify-between gap-3 pb-3 border-b-2 border-black/10 min-h-[40px] flex-wrap sm:flex-nowrap w-full min-w-0">
                     {/* Left: Rating value */}
-                    <div className="flex items-baseline gap-2 flex-shrink-0">
+                    <div className="flex items-baseline gap-2 shrink-0">
                         <span className="text-xs font-black uppercase tracking-wider text-neutral-500">Rating</span>
                         <span className="text-2xl sm:text-3xl font-black text-black tracking-tight font-mono">
                             {activePoint ? activePoint.rating : currentRating ?? "—"}
@@ -272,12 +272,12 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
 
                     {/* Right: Date and Contest Name */}
                     {activePoint ? (
-                        <div className="flex items-center gap-2 text-right min-w-0 truncate">
-                            <span className="text-xs font-mono font-black text-neutral-600 flex-shrink-0">
+                        <div className="flex items-center gap-2 text-right min-w-0 truncate max-w-full">
+                            <span className="text-xs font-mono font-black text-neutral-600 shrink-0">
                                 {formatDate(activePoint.date || activePoint.timestamp)}
                             </span>
                             <span
-                                className="text-xs sm:text-sm font-black text-black truncate max-w-[160px] sm:max-w-xs px-2.5 py-0.5 rounded-md bg-[#FFE566] border border-black shadow-[1px_1px_0px_#000]"
+                                className="text-xs sm:text-sm font-black text-black truncate max-w-[130px] sm:max-w-[200px] md:max-w-xs px-2.5 py-0.5 rounded-md bg-[#FFE566] border border-black shadow-[1px_1px_0px_#000]"
                                 title={activePoint.contestName}
                             >
                                 {activePoint.contestName}
@@ -292,12 +292,12 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
             </div>
 
             {/* Sparkline / Area Curve Chart */}
-            <div className="w-full pt-4 relative">
+            <div className="w-full max-w-full min-w-0 pt-4 relative overflow-hidden">
                 {chartData && hasHistory ? (
-                    <div className="w-full relative">
+                    <div className="w-full max-w-full min-w-0 relative overflow-hidden">
                         <svg
                             viewBox={`0 0 ${chartData.svgWidth} ${chartData.svgHeight}`}
-                            className="w-full h-auto overflow-visible select-none cursor-crosshair"
+                            className="w-full h-auto overflow-hidden select-none cursor-crosshair block"
                             onMouseMove={handleMouseMove}
                             onMouseLeave={handleMouseLeave}
                         >

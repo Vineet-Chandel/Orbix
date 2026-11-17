@@ -90,6 +90,17 @@ const LegacyActivityRedirect = () => {
   return <Navigate to={`/activity?${params.toString()}`} replace />;
 };
 
+const AuthenticatedClubRedirect = () => {
+  const { user } = useAppSelector((state) => state.user);
+  if (user) {
+    if (user.accountType === "club") {
+      return <Navigate to="/club/dashboard" replace />;
+    }
+    return <Navigate to="/college-clubs" replace />;
+  }
+  return <ClubLanding />;
+};
+
 const App = () => {
   const dispatch = useAppDispatch();
 
@@ -117,7 +128,7 @@ const App = () => {
               <Routes>
                 {/* Public Landing & Marketing Pages */}
                 <Route path="/" element={<MainLanding />} />
-                <Route path="/clubs" element={<ClubLanding />} />
+                <Route path="/clubs" element={<AuthenticatedClubRedirect />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/support" element={<SupportPage />} />
@@ -229,6 +240,8 @@ const App = () => {
                   <Route path="/internal/college-verifications" element={<FounderCollegeVerificationsPage />} />
                   <Route path="/internal/college-verification" element={<Navigate to="/internal/college-verifications" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/college-clubs" element={<Dashboard />} />
+                  <Route path="/campus-clubs" element={<Dashboard />} />
                   <Route path="/college-events" element={<Dashboard />} />
                   <Route path="/college-events/:eventId" element={<Dashboard />} />
                   <Route path="/college-events/:eventId/:slug" element={<Dashboard />} />

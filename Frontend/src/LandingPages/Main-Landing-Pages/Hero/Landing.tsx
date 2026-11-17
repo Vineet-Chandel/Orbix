@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useScroll } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
 import PublicClubProfilePage from '../../../app/Club/PublicClubProfilePage';
@@ -1041,42 +1041,6 @@ const Landing = ({ mode }: HeroProps) => {
     const trackRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    const [maxScroll, setMaxScroll] = useState(2500);
-
-    // Measure height difference dynamically so the entire PublicProfilePage scrolls flush to bottom
-    useEffect(() => {
-        const updateHeight = () => {
-            if (contentRef.current && viewportRef.current) {
-                const ch = contentRef.current.scrollHeight;
-                const vh = viewportRef.current.clientHeight;
-                if (ch > 0 && vh > 0) {
-                    const calculated = Math.max(0, ch - vh + 60);
-                    setMaxScroll((prev) => (Math.abs(prev - calculated) > 5 ? calculated : prev));
-                }
-            }
-        };
-
-        updateHeight();
-        const t1 = setTimeout(updateHeight, 300);
-        const t2 = setTimeout(updateHeight, 800);
-        const t3 = setTimeout(updateHeight, 1600);
-
-        const ro = new ResizeObserver(() => {
-            updateHeight();
-        });
-
-        if (contentRef.current) ro.observe(contentRef.current);
-        if (viewportRef.current) ro.observe(viewportRef.current);
-
-        window.addEventListener('resize', updateHeight, { passive: true });
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-            clearTimeout(t3);
-            ro.disconnect();
-            window.removeEventListener('resize', updateHeight);
-        };
-    }, []);
 
     // Scroll progress across the pinning track
     const { scrollYProgress } = useScroll({
@@ -1084,8 +1048,66 @@ const Landing = ({ mode }: HeroProps) => {
         offset: ["start start", "end end"],
     });
 
-    // Content smoothly scrolls up while box is pinned, resting comfortably at bottom before box unpins
-    const contentY = useTransform(scrollYProgress, [0.02, 0.88], [0, -maxScroll], { clamp: true });
+    // High-performance scroll sync: drives viewportRef.scrollTop smoothly via requestAnimationFrame
+    // Eliminates massive 3,500px GPU texture layer allocation and compositor tile evictions.
+    useEffect(() => {
+        let rafId: number | null = null;
+
+        const syncScroll = (progressVal: number) => {
+            if (rafId !== null) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                const el = viewportRef.current;
+                if (!el) return;
+                // Map [0.02, 0.88] to [0, 1] clamped
+                const progress = Math.min(Math.max((progressVal - 0.02) / (0.88 - 0.02), 0), 1);
+                const max = el.scrollHeight - el.clientHeight;
+                if (max > 0) {
+                    el.scrollTop = progress * max;
+                }
+            });
+        };
+
+        const unsubscribe = scrollYProgress.on("change", (latest) => {
+            syncScroll(latest);
+        });
+
+        // Initialize immediately
+        syncScroll(scrollYProgress.get());
+
+        const handleResize = () => {
+            syncScroll(scrollYProgress.get());
+        };
+        window.addEventListener("resize", handleResize, { passive: true });
+
+        // Observe content size changes (e.g. font load / image load) to maintain correct scroll position
+        const ro = new ResizeObserver(() => {
+            syncScroll(scrollYProgress.get());
+        });
+        if (contentRef.current) ro.observe(contentRef.current);
+
+        return () => {
+            unsubscribe();
+            window.removeEventListener("resize", handleResize);
+            ro.disconnect();
+            if (rafId !== null) cancelAnimationFrame(rafId);
+        };
+    }, [scrollYProgress]);
+
+    // Forward mouse wheel events over the mock browser directly to the window,
+    // ensuring the user never gets "trapped" in an inner scroll container and page scroll remains 100% fluid.
+    useEffect(() => {
+        const el = viewportRef.current;
+        if (!el) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.deltaY !== 0) {
+                window.scrollBy({ top: e.deltaY });
+            }
+        };
+
+        el.addEventListener("wheel", handleWheel, { passive: true });
+        return () => el.removeEventListener("wheel", handleWheel);
+    }, []);
 
     return (
         <div className="relative w-full flex flex-col items-center bg-[#FAF6EE] text-neutral-900 select-none">
@@ -1126,19 +1148,26 @@ const Landing = ({ mode }: HeroProps) => {
                                 </div>
                             </div>
 
-                            {/* Viewport Window with Overflow Hidden */}
-                            <div ref={viewportRef} className="relative w-full flex-1 overflow-hidden">
-                                <motion.div
+                            {/* Viewport Window with Native Composited Scrolling */}
+                            <div
+                                ref={viewportRef}
+                                className="relative w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain select-auto"
+                                style={{
+                                    scrollbarWidth: 'none',
+                                    msOverflowStyle: 'none',
+                                    WebkitOverflowScrolling: 'touch',
+                                }}
+                            >
+                                <div
                                     ref={contentRef}
-                                    style={{ y: contentY }}
-                                    className="embedded-showcase-container w-full will-change-transform transform-gpu"
+                                    className="embedded-showcase-container w-full"
                                 >
                                     {mode === 'club' ? (
                                         <PublicClubProfilePage overrideSlug={DEMO_CLUB_SLUG} isEmbedded={true} />
                                     ) : (
                                         <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
                                     )}
-                                </motion.div>
+                                </div>
                             </div>
                         </div>
                     </div>

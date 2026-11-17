@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Code2, GitBranch, GraduationCap } from "lucide-react";
+import { Code2, GitBranch, GraduationCap, Sparkles } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
 import { NotificationBell } from "../../components/NotificationBell";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
@@ -31,7 +31,7 @@ export default function Dashboard() {
 
     // Determine initial active tab based on pathname
     const getTabFromPath = (path: string): SidebarTab => {
-        if (path === "/clubs" || path.startsWith("/clubs")) return "clubs";
+        if (path.includes("/college-clubs") || path.includes("/campus-clubs") || path === "/clubs" || path.startsWith("/clubs")) return "clubs";
         if (path.includes("/college-events") || path.includes("/college-event")) return "college-events";
         if (path.includes("/activity") || path.includes("/applications") || path.includes("/application")) return "activity";
         if (path.includes("/wallet") || path.includes("/certificates") || path.includes("/certificate")) return "wallet";
@@ -136,14 +136,14 @@ export default function Dashboard() {
     }).format(new Date());
 
     return (
-        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
+        <div className="flex h-screen w-full max-w-full min-w-0 bg-white text-neutral-900 overflow-hidden font-sans">
             {/* Left Sidebar (Neo-Brutalist floating sidebar) */}
             <Sidebar
                 activeTab={activeTab}
                 onTabChange={(tab) => {
                     setActiveTab(tab);
                     if (tab === "dashboard") navigate("/dashboard");
-                    if (tab === "clubs") navigate("/clubs");
+                    if (tab === "clubs") navigate("/college-clubs");
                     if (tab === "college-events") navigate("/college-events");
                     if (tab === "activity" || tab === "applications") navigate("/activity");
                     if (tab === "explore") navigate("/explore");
@@ -163,7 +163,7 @@ export default function Dashboard() {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden min-w-0 w-full max-w-full p-2 sm:p-3 lg:p-3">
                 {activeTab === "college-events" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <CollegeEventsView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
@@ -231,11 +231,11 @@ export default function Dashboard() {
                             <div className="pb-5 border-b-2 border-black/55 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 {/* Left: Mobile Toggle & Welcome Greeting */}
                                 <div className="space-y-1">
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                                         <button
                                             type="button"
                                             onClick={() => setIsMobileSidebarOpen(true)}
-                                            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
                                             aria-label="Open sidebar"
                                         >
                                             <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -244,7 +244,10 @@ export default function Dashboard() {
                                                 <line x1="3" y1="18" x2="21" y2="18" />
                                             </svg>
                                         </button>
-                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                        <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                            <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
+                                        </div>
+                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
                                             Welcome, {displayName}!
                                         </h1>
                                     </div>

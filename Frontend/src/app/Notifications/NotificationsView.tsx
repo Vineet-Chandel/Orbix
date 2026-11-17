@@ -771,20 +771,25 @@ export const NotificationsView: React.FC = () => {
         <div className="flex-1 flex flex-col min-w-0 space-y-5 select-none">
             {/* Top Workspace Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
-                <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight flex items-center gap-3">
-                        <span>Inbox</span>
-                        <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-md bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
-                            {totalCount}
-                        </span>
-                        {unreadCount > 0 && (
-                            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-                                <span>{unreadCount} Unread</span>
+                <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                            <Inbox className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight flex items-center gap-2.5 truncate">
+                            <span>Inbox</span>
+                            <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-md bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] shrink-0">
+                                {totalCount}
                             </span>
-                        )}
-                    </h2>
-                    <p className="text-xs sm:text-sm text-neutral-600 font-medium mt-1">
+                            {unreadCount > 0 && (
+                                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 shrink-0">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                    <span>{unreadCount} Unread</span>
+                                </span>
+                            )}
+                        </h2>
+                    </div>
+                    <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed max-w-2xl">
                         Connection requests, security alerts, developer interactions, and direct opportunities
                     </p>
                 </div>

@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Crown, Flame, CheckCircle2, Building2 } from "lucide-react";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
-import type { LeaderboardEntry } from "./types";
+import { type LeaderboardEntry, parseLeaderboardRatings } from "./types";
 
 interface LeaderboardPodiumProps {
     podium: LeaderboardEntry[];
@@ -94,7 +94,7 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
         .join("")
         .toUpperCase();
 
-    const ratings = entry.platformRatings || {};
+    const ratings = parseLeaderboardRatings(entry.platformRatings, entry.scoreBreakdown);
     const college = entry.college || "—";
     const displayRank = scope === "college" && entry.collegeRank ? entry.collegeRank : entry.rank;
 
@@ -212,24 +212,30 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
                 </div>
 
                 {/* Platform Rating Chips */}
-                {Object.keys(ratings).length > 0 && (
+                {(ratings.codeforces || ratings.leetcode || ratings.codechef || ratings.atcoder) && (
                     <div className="flex items-center justify-center gap-2 flex-wrap pt-0.5">
                         {ratings.codeforces && (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
                                 <span className="text-neutral-500 font-bold">CF</span>
-                                <span style={{ color: ratings.codeforces.color || "#000" }}>{ratings.codeforces.rating}</span>
+                                <span style={{ color: ratings.codeforces.color || "#E02424" }}>{ratings.codeforces.rating}</span>
                             </span>
                         )}
                         {ratings.leetcode && (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
                                 <span className="text-neutral-500 font-bold">LC</span>
-                                <span className="text-amber-600">{ratings.leetcode.rating}</span>
+                                <span style={{ color: ratings.leetcode.color || "#D97706" }}>{ratings.leetcode.rating}</span>
                             </span>
                         )}
                         {ratings.codechef && (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
                                 <span className="text-neutral-500 font-bold">CC</span>
-                                <span>{ratings.codechef.rating}</span>
+                                <span style={{ color: ratings.codechef.color || "#854D0E" }}>{ratings.codechef.rating}</span>
+                            </span>
+                        )}
+                        {ratings.atcoder && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                <span className="text-neutral-500 font-bold">AC</span>
+                                <span style={{ color: ratings.atcoder.color || "#0284C7" }}>{ratings.atcoder.rating}</span>
                             </span>
                         )}
                     </div>

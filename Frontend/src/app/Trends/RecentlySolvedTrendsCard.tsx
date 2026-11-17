@@ -128,15 +128,15 @@ export const RecentlySolvedTrendsCard: React.FC<RecentlySolvedTrendsCardProps> =
     return (
         <section
             aria-labelledby="recently-solved-trends-heading"
-            className="w-full rounded-2xl bg-white border-2 border-black text-neutral-900 p-6 sm:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans space-y-6"
+            className="w-full max-w-full min-w-0 rounded-2xl bg-white border-2 border-black text-neutral-900 p-4 sm:p-6 lg:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans space-y-6"
         >
             {/* Header Section */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b-2 border-black/15">
-                <div className="flex items-start sm:items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b-2 border-black/15 w-full min-w-0">
+                <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] shrink-0">
                         <ListOrdered className="w-5 h-5 text-black stroke-[2.5]" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                             <h2
                                 id="recently-solved-trends-heading"
@@ -157,15 +157,15 @@ export const RecentlySolvedTrendsCard: React.FC<RecentlySolvedTrendsCardProps> =
 
                 {/* Filter Controls (Difficulty & Platform) */}
                 {rawList.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
+                    <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto max-w-full min-w-0">
                         {/* Difficulty Filter Pills */}
-                        <div className="inline-flex items-center p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                        <div className="inline-flex items-center p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] max-w-full overflow-x-auto scrollbar-none">
                             {(["All", "Easy", "Medium", "Hard"] as const).map((diff) => (
                                 <button
                                     key={diff}
                                     type="button"
                                     onClick={() => setDifficultyFilter(diff)}
-                                    className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                    className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shrink-0 ${
                                         difficultyFilter === diff
                                             ? "bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]"
                                             : "text-neutral-700 hover:text-black hover:bg-white/80"
@@ -178,11 +178,11 @@ export const RecentlySolvedTrendsCard: React.FC<RecentlySolvedTrendsCardProps> =
 
                         {/* Optional Platform Filter Pills (if > 1 platform connected) */}
                         {availablePlatforms.length > 1 && (
-                            <div className="inline-flex items-center p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <div className="inline-flex items-center p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] max-w-full overflow-x-auto scrollbar-none">
                                 <button
                                     type="button"
                                     onClick={() => setSelectedPortal("All")}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shrink-0 ${
                                         selectedPortal === "All"
                                             ? "bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]"
                                             : "text-neutral-700 hover:text-black"
@@ -195,7 +195,7 @@ export const RecentlySolvedTrendsCard: React.FC<RecentlySolvedTrendsCardProps> =
                                         key={portal}
                                         type="button"
                                         onClick={() => setSelectedPortal(portal)}
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer capitalize ${
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer capitalize shrink-0 ${
                                             selectedPortal === portal
                                                 ? "bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]"
                                                 : "text-neutral-700 hover:text-black"
@@ -257,27 +257,27 @@ export const RecentlySolvedTrendsCard: React.FC<RecentlySolvedTrendsCardProps> =
                             <div
                                 key={item.id}
                                 onClick={() => handleOpenProblem(item.url)}
-                                className="group p-3 sm:p-3.5 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black/15 hover:border-black transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-[1px_1px_0px_#000] hover:shadow-[3px_3px_0px_#000]"
+                                className="group p-3 sm:p-3.5 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black/15 hover:border-black transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-[1px_1px_0px_#000] hover:shadow-[3px_3px_0px_#000] w-full min-w-0"
                                 title={`Open ${item.title} on ${item.platformName}`}
                             >
                                 {/* Left Section: Platform Icon + Problem Title */}
-                                <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 max-w-full">
                                     <div
-                                        className="w-8 h-8 rounded-lg bg-white border-2 border-black shadow-[1px_1px_0px_#000] p-1.5 flex items-center justify-center flex-shrink-0"
+                                        className="w-8 h-8 rounded-lg bg-white border-2 border-black shadow-[1px_1px_0px_#000] p-1.5 flex items-center justify-center shrink-0"
                                         title={item.platformName}
                                     >
                                         {getPortalIcon(item.portal, "w-full h-full object-contain")}
                                     </div>
-                                    <div className="min-w-0 flex items-center gap-1.5">
-                                        <span className="text-sm sm:text-base font-black text-black group-hover:underline transition-colors truncate max-w-[220px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px]">
+                                    <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                                        <span className="text-sm sm:text-base font-black text-black group-hover:underline transition-colors truncate">
                                             {item.title}
                                         </span>
-                                        <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover:text-black opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                        <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover:text-black opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                                     </div>
                                 </div>
 
                                 {/* Right Section: Dynamic Tags (Difficulty, Topic, Exact Date, Relative Time) */}
-                                <div className="flex items-center gap-2 flex-wrap self-start md:self-auto pl-11 md:pl-0">
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap self-start md:self-auto pl-10 sm:pl-11 md:pl-0 max-w-full min-w-0">
                                     {/* 1. Category / Difficulty Badge */}
                                     {getDifficultyBadge(item.difficulty)}
 

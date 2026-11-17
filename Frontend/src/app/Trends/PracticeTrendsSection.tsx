@@ -94,7 +94,7 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
     }, [platforms]);
 
     return (
-        <div className="space-y-8">
+        <div className="w-full space-y-6 sm:space-y-8">
             {/* Top Practice Activity Overview Block */}
             <PracticeActivityOverview
                 connectedPortals={connectedPortals}
@@ -108,14 +108,14 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
             />
 
             {/* Rating history Section */}
-            <div className="space-y-6 pt-6 border-t-2 border-black/10">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/10">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
+            <div className="space-y-6 pt-6 border-t-2 border-black/10 w-full min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/10 w-full min-w-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] shrink-0">
                             <TrendingUp className="w-5 h-5 text-black stroke-[2.5]" />
                         </div>
-                        <div>
-                            <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                        <div className="min-w-0">
+                            <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight truncate">
                                 Rating history
                             </h2>
                             <p className="text-xs sm:text-sm font-bold text-neutral-600 mt-0.5">
@@ -124,7 +124,7 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+                    <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap max-w-full">
                         {/* Live platform count badge */}
                         <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black">
                             <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black animate-pulse" />
@@ -136,7 +136,7 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
                             type="button"
                             onClick={handleRefresh}
                             disabled={isLoading}
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all cursor-pointer disabled:opacity-50 active:translate-x-0.5 active:translate-y-0.5"
+                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all cursor-pointer disabled:opacity-50 active:translate-x-0.5 active:translate-y-0.5 shrink-0"
                             title="Sync real-time contest performance"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 stroke-[2.5] ${isLoading ? "animate-spin text-[#a2ff86]" : ""}`} />
@@ -147,8 +147,8 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
 
                 {/* Quick summary stats bar */}
                 {platforms.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full min-w-0">
+                        <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                             <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                                 Total Contests
                             </span>
@@ -158,7 +158,7 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                        <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                             <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                                 Peak Competitive Rating
                             </span>
@@ -174,7 +174,7 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                        <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                             <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                                 Active Platforms
                             </span>
@@ -184,12 +184,12 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                        <div className="w-full min-w-0 p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
                             <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
                                 Data Source
                             </span>
                             <div className="mt-1 flex items-baseline gap-2">
-                                <span className="text-xs font-black text-black bg-[#a2ff86] px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000] font-mono">
+                                <span className="text-xs font-black text-black bg-[#a2ff86] px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000] font-mono truncate max-w-full">
                                     Official APIs Verified
                                 </span>
                             </div>
@@ -199,7 +199,7 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
 
                 {/* Platform Rating History Cards Grid (2-column on desktop) */}
                 {platforms.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full min-w-0">
                         {platforms.map((platform) => (
                             <PlatformRatingHistoryCard key={platform.portal} platform={platform} />
                         ))}

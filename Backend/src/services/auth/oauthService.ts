@@ -558,11 +558,15 @@ export class OAuthService {
 
         // Seed initial leaderboard entry
         try {
+            const initialDisplayName = `${createdUser.firstName || ""} ${createdUser.lastName || ""}`.trim() || createdUser.username;
             await query(
-                `INSERT INTO leaderboard_entries (user_id, username, is_verified, orbix_score)
-                 VALUES ($1, $2, true, 0)
-                 ON CONFLICT (user_id) DO UPDATE SET is_verified = true;`,
-                [createdUser.id, createdUser.username]
+                `INSERT INTO leaderboard_entries (user_id, username, display_name, is_verified, score, platform_ratings)
+                 VALUES ($1, $2, $3, true, 0, '{}'::jsonb)
+                 ON CONFLICT (user_id) DO UPDATE SET
+                     username = EXCLUDED.username,
+                     display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), leaderboard_entries.display_name),
+                     is_verified = true;`,
+                [createdUser.id, createdUser.username, initialDisplayName]
             );
         } catch {
             // Non-blocking

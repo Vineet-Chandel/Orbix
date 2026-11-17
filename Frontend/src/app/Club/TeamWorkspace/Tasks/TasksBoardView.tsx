@@ -8,7 +8,6 @@ import {
     CheckSquare,
     Calendar,
     Lock,
-    Loader2,
     RefreshCw,
     Shield,
     UserCheck,
@@ -36,6 +35,7 @@ import { TaskDetailModal } from "./TaskDetailModal";
 import { useToast } from "../../../../context/ToastContext";
 import { NeoSelect } from "../../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../../components/NeoCheckbox";
+import { OrbixLoader } from "../../../../components/ui/loader";
 
 interface TasksBoardViewProps {
     clubId: string;
@@ -589,8 +589,8 @@ export const TasksBoardView: React.FC<TasksBoardViewProps> = ({
 
             {/* Board Area */}
             {loading ? (
-                <div className="flex-1 flex items-center justify-center text-neutral-500 gap-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-black" />
+                <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 gap-3 py-16">
+                    <OrbixLoader size="md" />
                     <span className="text-sm font-bold">Loading tasks...</span>
                 </div>
             ) : viewMode === "kanban" ? (

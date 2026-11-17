@@ -4,7 +4,6 @@ import {
     Compass,
     Search,
     ShieldCheck,
-    FileText,
     Trophy,
     GraduationCap,
     MapPin,
@@ -28,6 +27,7 @@ import {
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import { type ExploreDeveloper } from "../../utils/profileApi";
 import PublicProfilePage from "../Profile/PublicProfilePage";
+import { RecentDevelopersCarousel } from "./RecentDevelopersCarousel";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -104,10 +104,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
     const [selectedCollege, setSelectedCollege] = useState("all");
-    const [filterOpenToWork, setFilterOpenToWork] = useState(false);
-    const [filterVerifiedOnly, setFilterVerifiedOnly] = useState(false);
-    const [filterHasResume, setFilterHasResume] = useState(false);
-    const [filterHighScore, setFilterHighScore] = useState(false);
     const [sortBy, setSortBy] = useState<"score" | "solved" | "contests" | "streak" | "recent" | "name">("score");
 
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -180,15 +176,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
             });
         }
 
-        if (filterHasResume) {
-            list = list.filter((u) => u.hasResume);
-        }
-        if (filterHighScore) {
-            list = list.filter((u) => (u.orbixScore || 0) >= 1000);
-        }
-
         return list;
-    }, [explore.items, user, filterHasResume, filterHighScore]);
+    }, [explore.items, user]);
 
     // -------------------------------------------------------------------------
     // Fetch Explore Page
@@ -214,8 +203,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                     fetchExploreDevelopersThunk({
                         search: debouncedSearchQuery.trim() || undefined,
                         college: selectedCollege !== "all" ? selectedCollege : undefined,
-                        openToWork: filterOpenToWork ? true : undefined,
-                        verifiedOnly: filterVerifiedOnly ? true : undefined,
                         sortBy,
                         page: pageToFetch,
                         limit: PAGE_SIZE,
@@ -235,8 +222,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
             dispatch,
             debouncedSearchQuery,
             selectedCollege,
-            filterOpenToWork,
-            filterVerifiedOnly,
             sortBy,
         ]
     );
@@ -255,10 +240,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
         activeTab,
         debouncedSearchQuery,
         selectedCollege,
-        filterOpenToWork,
-        filterVerifiedOnly,
-        filterHasResume,
-        filterHighScore,
         sortBy,
         fetchPage,
     ]);
@@ -858,6 +839,16 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                 isEmbedded={true}
                             />
                         </div>
+
+                        {/* Recent Developers 2-Card Auto-Moving Carousel (Explore exclusive) */}
+                        <RecentDevelopersCarousel
+                            currentUsername={selectedUsername}
+                            onSelectCandidate={(username) => setSelectedUsername(username)}
+                            onConnect={handleConnect}
+                            actionInProgressId={actionInProgressId}
+                            renderCardActionMenu={renderCardActionMenu}
+                            fallbackDevelopers={filteredDevelopers}
+                        />
                     </div>
                 ) : (
                     /* ========================================================================= */
@@ -998,83 +989,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Filter Chips */}
-                                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs font-black">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFilterOpenToWork(false);
-                                                setFilterVerifiedOnly(false);
-                                                setFilterHasResume(false);
-                                                setFilterHighScore(false);
-                                                setSelectedCollege("all");
-                                            }}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black transition-all cursor-pointer shrink-0 ${
-                                                !filterOpenToWork &&
-                                                !filterVerifiedOnly &&
-                                                !filterHasResume &&
-                                                !filterHighScore &&
-                                                selectedCollege === "all"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                    : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
-                                            }`}
-                                        >
-                                            All ({explore.total})
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setFilterOpenToWork((prev) => !prev)}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                                                filterOpenToWork
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                    : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
-                                            }`}
-                                        >
-                                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                                            <span>Open to Work</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setFilterVerifiedOnly((prev) => !prev)}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                                                filterVerifiedOnly
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                    : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
-                                            }`}
-                                        >
-                                            <ShieldCheck className="w-3.5 h-3.5" />
-                                            <span>Verified Only</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setFilterHasResume((prev) => !prev)}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                                                filterHasResume
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                    : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
-                                            }`}
-                                        >
-                                            <FileText className="w-3.5 h-3.5" />
-                                            <span>Has Resume</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setFilterHighScore((prev) => !prev)}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                                                filterHighScore
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                    : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
-                                            }`}
-                                        >
-                                            <Trophy className="w-3.5 h-3.5" />
-                                            <span>1,000+ Score</span>
-                                        </button>
-                                    </div>
                                 </div>
 
                                 {/* Developers Cards Grid */}
@@ -1117,7 +1031,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                         </div>
                                         <h3 className="text-base font-black text-black">No Developers Available</h3>
                                         <p className="text-xs font-bold text-neutral-600 max-w-sm mx-auto">
-                                            {searchQuery || selectedCollege !== "all" || filterOpenToWork || filterVerifiedOnly
+                                            {searchQuery || selectedCollege !== "all"
                                                 ? "Try clearing some filters or searching for another university or handle."
                                                 : "All public developers are either already in your connections or pending requests!"}
                                         </p>
@@ -1148,11 +1062,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                         onError={(e) => {
                                                                             (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                                                         }}
-                                                                        className="w-12 h-12 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000]"
+                                                                        className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000]"
                                                                     />
                                                                     {candidate.isOpenToWork && (
                                                                         <span
-                                                                            className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-black"
+                                                                            className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-black"
                                                                             title="Open to Work"
                                                                         />
                                                                     )}
@@ -1408,7 +1322,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                     onError={(e) => {
                                                                         (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                                                     }}
-                                                                    className="w-12 h-12 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
+                                                                    className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000] shrink-0"
                                                                 />
                                                                 <div className="min-w-0">
                                                                     <div className="flex items-center gap-1.5">
@@ -1618,7 +1532,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                             onError={(e) => {
                                                                                 (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                                                             }}
-                                                                            className="w-12 h-12 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
+                                                                            className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000] shrink-0"
                                                                         />
                                                                         <div className="min-w-0">
                                                                             <div className="flex items-center gap-1.5">
@@ -1764,7 +1678,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                             onError={(e) => {
                                                                                 (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                                                             }}
-                                                                            className="w-12 h-12 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
+                                                                            className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000] shrink-0"
                                                                         />
                                                                         <div className="min-w-0">
                                                                             <div className="flex items-center gap-1.5">

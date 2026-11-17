@@ -19,13 +19,13 @@ import {
     Compass,
     Radio,
     Award,
-    Loader2,
 } from "lucide-react";
 import type { CollegeClubItem, ClubCoordinator } from "../utils/clubProfileApi";
 import { getPlatformIcon } from "../utils/platformLinks";
 import { useToast } from "../context/ToastContext";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 import { VerifiedBadge } from "./VerifiedBadge";
+import { OrbixLoader } from "./ui/loader";
 
 interface ClubDetailModalProps {
     club: CollegeClubItem | null;
@@ -319,7 +319,7 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
 
                                     {loadingCoordinators ? (
                                         <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
-                                            <Loader2 className="w-6 h-6 animate-spin text-black" />
+                                            <OrbixLoader size="sm" />
                                             <span className="text-xs font-bold text-neutral-500">
                                                 Loading coordinators...
                                             </span>

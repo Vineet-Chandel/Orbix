@@ -41,6 +41,7 @@ import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 import { NeoSelect } from "../../../../components/NeoSelect";
 import { NeoDateTimePicker } from "../../../../components/NeoDateTimePicker";
 import { ConfirmationModal } from "../../../../components/ConfirmationModal";
+import { OrbixLoader } from "../../../../components/ui/loader";
 
 interface TaskDetailModalProps {
     isOpen: boolean;
@@ -558,8 +559,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                 {/* Content Layout */}
                 {loading ? (
-                    <div className="p-12 flex items-center justify-center text-neutral-500 gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-black" />
+                    <div className="p-16 flex flex-col items-center justify-center text-neutral-500 gap-3">
+                        <OrbixLoader size="sm" />
                         <span className="text-sm font-bold">Loading task details...</span>
                     </div>
                 ) : task ? (

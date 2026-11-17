@@ -19,6 +19,7 @@ import {
     buildWeeklySubmissionColumns,
     type DaySubmissionCell,
 } from "../../utils/submissionsAggregator";
+import { isDemoProfileUsername, demoDevelopmentData, demoDevelopmentAnalytics } from "../../data/demoProfileData";
 
 interface DevelopmentContributionsTableProps {
     connectedPortals: Record<string, any>;
@@ -33,8 +34,11 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
     const [hoveredCell, setHoveredCell] = useState<DaySubmissionCell | null>(null);
 
     const effectiveUser = (username || "").trim();
+    const isDemo = isDemoProfileUsername(effectiveUser);
     const dispatch = useAppDispatch();
-    const remoteData = useAppSelector((state) => state.development.dataByUser[effectiveUser]);
+
+    const reduxRemoteData = useAppSelector((state) => state.development.dataByUser[effectiveUser]);
+    const remoteData = isDemo ? demoDevelopmentData : reduxRemoteData;
 
     const weeksCount = 52; // Full 1 Year activity heatmap
 
@@ -66,16 +70,18 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
     }, [gh, user?.platforms, user?.github]);
     const githubHandle = rawGhHandle.toLowerCase();
 
-    const analyticsData = useAppSelector((state) => state.developmentAnalytics.dataByUser[effectiveUser]);
-    const isAnalyticsLoading = useAppSelector(
+    const reduxAnalyticsData = useAppSelector((state) => state.developmentAnalytics.dataByUser[effectiveUser]);
+    const reduxAnalyticsLoading = useAppSelector(
         (state) => state.developmentAnalytics.loadingByUser[effectiveUser] || false
     );
+    const analyticsData = isDemo ? demoDevelopmentAnalytics : reduxAnalyticsData;
+    const isAnalyticsLoading = isDemo ? false : reduxAnalyticsLoading;
 
     const prevGhRef = React.useRef<string | null>(null);
 
     // Fetch unified development contributions dynamically when github connection changes
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || isDemo) return;
         if (prevGhRef.current === null) {
             prevGhRef.current = githubHandle;
             dispatch(fetchUnifiedDevelopment({ username: effectiveUser, portals: connectedPortals }));
@@ -84,11 +90,11 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             dispatch(clearDevelopmentCache(effectiveUser));
             dispatch(fetchUnifiedDevelopment({ username: effectiveUser, force: true, portals: connectedPortals }));
         }
-    }, [effectiveUser, githubHandle, connectedPortals, dispatch]);
+    }, [effectiveUser, githubHandle, connectedPortals, dispatch, isDemo]);
 
     // Fetch development analytics if not loaded yet
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || isDemo) return;
         if (!analyticsData && !isAnalyticsLoading) {
             dispatch(
                 fetchDevelopmentAnalytics({
@@ -98,7 +104,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                 })
             );
         }
-    }, [effectiveUser, rawGhHandle, connectedPortals, analyticsData, isAnalyticsLoading, dispatch]);
+    }, [effectiveUser, rawGhHandle, connectedPortals, analyticsData, isAnalyticsLoading, dispatch, isDemo]);
 
     // Compute fallback client development aggregation
     const clientAgg = useMemo(() => {
