@@ -254,6 +254,22 @@ export const clubEventTeamApi = {
     },
 
     /**
+     * Transfer leadership to another confirmed member (Leader only)
+     */
+    async transferLeadership(eventId: string, teamId: string, newLeaderUserId: string): Promise<{ success: boolean; message: string; team?: EventTeamDetails }> {
+        const res = await fetch(buildApiUrl(`/events/${eventId}/teams/${teamId}/transfer-leader`), {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ newLeaderUserId }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to transfer leadership.");
+        }
+        return data;
+    },
+
+    /**
      * Organizer endpoint: Get all teams and members for an event
      */
     async getClubEventTeams(eventId: string): Promise<{ success: boolean; teams: EventTeamDetails[] }> {

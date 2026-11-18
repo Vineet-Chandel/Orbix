@@ -16,6 +16,9 @@ import {
     Lock,
     Clock,
     RefreshCw,
+    Eye,
+    CheckCircle2,
+    XCircle,
 } from "lucide-react";
 import {
     clubEventTeamApi,
@@ -25,6 +28,7 @@ import {
 } from "../../api/clubEventTeamApi";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLoader } from "../../components/ui/loader";
+import { useAppSelector } from "../../store";
 
 export interface EventTeamManagementModalProps {
     isOpen: boolean;
@@ -35,6 +39,10 @@ export interface EventTeamManagementModalProps {
     eventStartsAt?: string;
     onTeamUpdated?: () => void;
     onTeamLeft?: () => void;
+    isInviteePreview?: boolean;
+    invitationId?: string;
+    onAcceptInvite?: () => void;
+    onDeclineInvite?: () => void;
 }
 
 export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> = ({
@@ -46,8 +54,13 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
     eventStartsAt: _eventStartsAt,
     onTeamUpdated,
     onTeamLeft,
+    isInviteePreview = false,
+    invitationId: _invitationId,
+    onAcceptInvite,
+    onDeclineInvite,
 }) => {
     const toast = useToast();
+    const { user } = useAppSelector((state) => state.user);
     const [team, setTeam] = useState<EventTeamDetails | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [copiedCode, setCopiedCode] = useState<boolean>(false);
@@ -69,9 +82,26 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
     const [memberToRemove, setMemberToRemove] = useState<EventTeamMember | null>(null);
     const [isRemovingMember, setIsRemovingMember] = useState<boolean>(false);
 
+    // Transfer leadership state
+    const [memberToTransfer, setMemberToTransfer] = useState<EventTeamMember | null>(null);
+    const [isTransferringLeader, setIsTransferringLeader] = useState<boolean>(false);
+
     // Leave team warning modal
     const [showLeaveWarning, setShowLeaveWarning] = useState<boolean>(false);
     const [isLeavingTeam, setIsLeavingTeam] = useState<boolean>(false);
+
+    // Robust multi-vector leader verification matching backend permission checks
+    const isLeader = Boolean(
+        team?.isLeader ||
+        (user?.id && team?.leaderId && String(user.id) === String(team.leaderId)) ||
+        (user?.id && team?.members?.some((m) => m.role === "leader" && String(m.userId) === String(user.id)))
+    );
+
+    const isMember = Boolean(
+        team?.members?.some(
+            (m) => user?.id && (String(m.userId) === String(user.id) || String(m.id) === String(user.id))
+        )
+    );
 
     const loadTeamDetails = async () => {
         try {
@@ -95,7 +125,7 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
 
     // Handle search debounce
     useEffect(() => {
-        if (!team?.isLeader || !searchQuery.trim() || searchQuery.trim().length < 2) {
+        if (!isLeader || !searchQuery.trim() || searchQuery.trim().length < 2) {
             setSearchResults([]);
             return;
         }
@@ -121,7 +151,7 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                 clearTimeout(searchDebounceRef.current);
             }
         };
-    }, [searchQuery, eventId, teamId, team?.isLeader]);
+    }, [searchQuery, eventId, teamId, isLeader]);
 
     const handleCopyCode = async () => {
         if (!team?.code) return;
@@ -176,6 +206,14 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
     const handleRevokeInvite = async (invitationId: string, inviteeUsername: string) => {
         try {
             setRevokingInviteId(invitationId);
+            // Optimistically remove from state so the leader sees it disappear immediately
+            setTeam((prev) => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    pendingInvitations: (prev.pendingInvitations || []).filter((i) => i.id !== invitationId),
+                };
+            });
             const res = await clubEventTeamApi.cancelInvitation(eventId, teamId, invitationId);
             toast.success(res.message || `Invitation to @${inviteeUsername} has been revoked.`, {
                 title: "Invite Revoked",
@@ -184,8 +222,27 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
             onTeamUpdated?.();
         } catch (err: any) {
             toast.error(err.message || "Failed to revoke invitation.", { title: "Error" });
+            await loadTeamDetails();
         } finally {
             setRevokingInviteId(null);
+        }
+    };
+
+    const handleConfirmTransferLeader = async () => {
+        if (!memberToTransfer) return;
+        try {
+            setIsTransferringLeader(true);
+            const res = await clubEventTeamApi.transferLeadership(eventId, teamId, memberToTransfer.userId);
+            toast.success(res.message || `Leadership successfully transferred to ${memberToTransfer.name}!`, {
+                title: "Leader Promoted",
+            });
+            setMemberToTransfer(null);
+            await loadTeamDetails();
+            onTeamUpdated?.();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to transfer leadership.", { title: "Error" });
+        } finally {
+            setIsTransferringLeader(false);
         }
     };
 
@@ -248,10 +305,10 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                         </div>
                         <div className="min-w-0">
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block truncate">
-                                {eventTitle || team?.eventTitle || "Event Team Management"}
+                                {isInviteePreview ? `Squad Preview • ${eventTitle || team?.eventTitle || "Event"}` : (eventTitle || team?.eventTitle || "Event Team Management")}
                             </span>
                             <div className="flex items-center gap-2">
-                                {isEditingName && team?.isLeader && !isLocked ? (
+                                {isEditingName && isLeader && !isLocked ? (
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="text"
@@ -285,7 +342,7 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                                         <h3 className="text-base sm:text-lg font-black text-black truncate">
                                             {team?.name || "Loading Team..."}
                                         </h3>
-                                        {team?.isLeader && !isLocked && (
+                                        {isLeader && !isLocked && (
                                             <button
                                                 type="button"
                                                 onClick={() => setIsEditingName(true)}
@@ -327,6 +384,21 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                         <Lock className="w-4 h-4 text-amber-800 shrink-0" />
                         <span>
                             {team?.lockReason || "The registration round has ended and the timeline has advanced. Team roster is permanently locked. No modifications, member additions, or departures are permitted."}
+                        </span>
+                    </div>
+                )}
+
+                {/* Preview Banner for Invited Users */}
+                {(!isMember || isInviteePreview) && !isLeader && (
+                    <div className="bg-sky-100 border-b-2 border-black px-4 py-3 flex items-center justify-between gap-3 text-xs font-black text-sky-950">
+                        <div className="flex items-center gap-2">
+                            <Eye className="w-4 h-4 text-sky-800 shrink-0" />
+                            <span>
+                                Squad Invitation Preview • You were invited to join this team by <strong className="text-black font-black">{team?.leaderName || `@${team?.leaderUsername}`}</strong>. Inspect the roster and capacity details before accepting.
+                            </span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-white border border-black text-[10px] font-black shrink-0 shadow-[1px_1px_0px_#000]">
+                            Preview Mode
                         </span>
                     </div>
                 )}
@@ -431,7 +503,7 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                             </div>
 
                             {/* Leader Action: Invite Teammates by @username */}
-                            {team.isLeader && !isLocked && (
+                            {isLeader && !isLocked && (
                                 <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-2">
@@ -599,15 +671,27 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
 
                                                 {/* Action buttons */}
                                                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                                                    {team.isLeader && !isThisMemberLeader && !isLocked && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setMemberToRemove(member)}
-                                                            className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border-2 border-rose-600 text-[11px] font-black text-rose-700 shadow-[1.5px_1.5px_0px_#e11d48] cursor-pointer flex items-center gap-1 transition-all"
-                                                        >
-                                                            <UserMinus className="w-3.5 h-3.5" />
-                                                            <span>Remove</span>
-                                                        </button>
+                                                    {isLeader && !isThisMemberLeader && !isLocked && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setMemberToTransfer(member)}
+                                                                className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 border-2 border-black text-[11px] font-black text-amber-950 shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1 transition-all"
+                                                                title="Transfer squad leadership to this member"
+                                                            >
+                                                                <Crown className="w-3.5 h-3.5 text-amber-800" />
+                                                                <span>Make Leader</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setMemberToRemove(member)}
+                                                                className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border-2 border-rose-600 text-[11px] font-black text-rose-700 shadow-[1.5px_1.5px_0px_#e11d48] cursor-pointer flex items-center gap-1 transition-all"
+                                                                title="Remove member from squad"
+                                                            >
+                                                                <UserMinus className="w-3.5 h-3.5" />
+                                                                <span>Remove</span>
+                                                            </button>
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
@@ -676,15 +760,16 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                                                 </div>
 
                                                 {/* Leader action: Revoke invite */}
-                                                {team.isLeader && !isLocked && (
+                                                {isLeader && !isLocked && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRevokeInvite(inv.id, inv.inviteeUsername || "user")}
                                                         disabled={revokingInviteId === inv.id}
-                                                        className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50 border-2 border-rose-600 text-[11px] font-black text-rose-700 shadow-[1.5px_1.5px_0px_#e11d48] cursor-pointer flex items-center gap-1 transition-all shrink-0 self-end sm:self-center disabled:opacity-50"
+                                                        className="px-3 py-1.5 rounded-xl bg-[#fee2e2] hover:bg-[#fecaca] active:translate-x-0.5 active:translate-y-0.5 text-rose-950 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-all shrink-0 self-end sm:self-center disabled:opacity-50"
+                                                        title="Revoke and cancel this invitation"
                                                     >
-                                                        <X className="w-3.5 h-3.5" />
-                                                        <span>{revokingInviteId === inv.id ? "Revoking..." : "Revoke"}</span>
+                                                        <X className="w-3.5 h-3.5 stroke-[3]" />
+                                                        <span>{revokingInviteId === inv.id ? "Revoking..." : "Revoke Invite"}</span>
                                                     </button>
                                                 )}
                                             </div>
@@ -696,10 +781,10 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                     ) : null}
                 </div>
 
-                {/* Footer with Leave Button & Close */}
-                <div className="p-4 sm:p-5 bg-white border-t-3 border-black flex items-center justify-between gap-3">
+                {/* Footer with Leave Button / Accept & Decline / Close */}
+                <div className="p-4 sm:p-5 bg-white border-t-3 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        {!isLocked && (
+                        {!isLocked && isMember && (
                             <button
                                 type="button"
                                 onClick={() => setShowLeaveWarning(true)}
@@ -709,17 +794,82 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                                 <span>Leave Team</span>
                             </button>
                         )}
+                        {(!isMember || isInviteePreview) && (onAcceptInvite || onDeclineInvite) && (
+                            <div className="flex items-center gap-2">
+                                {onDeclineInvite && (
+                                    <button
+                                        type="button"
+                                        onClick={onDeclineInvite}
+                                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black text-neutral-800 shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-all"
+                                    >
+                                        <XCircle className="w-4 h-4 text-neutral-600" />
+                                        <span>Decline</span>
+                                    </button>
+                                )}
+                                {onAcceptInvite && (
+                                    <button
+                                        type="button"
+                                        onClick={onAcceptInvite}
+                                        className="px-4 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#86ef6c] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-all"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        <span>Accept & Join Team</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-5 py-2 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                        className="px-5 py-2 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer self-end sm:self-auto"
                     >
-                        Done
+                        {(!isMember || isInviteePreview) ? "Close Preview" : "Done"}
                     </button>
                 </div>
             </div>
+
+            {/* Transfer Leadership Confirmation Modal */}
+            {memberToTransfer && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+                    <div className="w-full max-w-md bg-white border-3 border-black shadow-[6px_6px_0px_#000] rounded-3xl p-6 space-y-4 animate-in fade-in zoom-in-95">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-amber-300 border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center text-black">
+                                <Crown className="w-5 h-5 stroke-[2.5]" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm sm:text-base font-black text-black">Transfer Team Leadership?</h4>
+                                <p className="text-xs text-neutral-600 font-bold">Standard Squad Promotion</p>
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-neutral-700 font-medium bg-[#FAF6EE] p-3 rounded-xl border border-black/20 leading-relaxed">
+                            Are you sure you want to promote <span className="font-bold text-black">{memberToTransfer.name}</span> (@{memberToTransfer.username}) to <span className="font-bold text-black">Team Leader</span>? You will remain on the squad as an active member, and they will receive full squad management powers (inviting, revoking, and finalizing).
+                        </p>
+
+                        <div className="flex items-center justify-end gap-2.5 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setMemberToTransfer(null)}
+                                disabled={isTransferringLeader}
+                                className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmTransferLeader}
+                                disabled={isTransferringLeader}
+                                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5"
+                            >
+                                <Crown className="w-3.5 h-3.5" />
+                                <span>{isTransferringLeader ? "Transferring..." : "Confirm & Transfer"}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Remove Member Confirmation Modal */}
             {memberToRemove && (

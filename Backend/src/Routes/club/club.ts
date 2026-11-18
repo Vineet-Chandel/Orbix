@@ -37,6 +37,7 @@ import clubCertificateRouter from "./clubCertificateRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
 import { notifyClubAndCollegeUsers, notifyEventCancelledToAllApplicants } from "../../services/club/clubEventNotificationService.js";
 import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
+import { ClubEventTeamService } from "../../services/club/clubEventTeamService.js";
 import { sendGuardianConsentEmail, OnboardingEmailService } from "../../services/email/resendService.js";
 import { ClubCredibilityService } from "../../services/club/clubCredibilityService.js";
 import { ClubCredibilityEngine } from "../../scoring/clubCredibilityEngine.js";
@@ -3371,12 +3372,31 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likesCount",
                 (SELECT COUNT(*)::int FROM club_event_shares WHERE event_id = e.id AND share_type IN ('internal', 'external') AND (account_type IS NULL OR account_type != 'club')) AS "sharesCount",
                 CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $2::uuid) ELSE false END AS "hasLiked",
-                CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended')) ELSE false END AS "isRegistered",
-                CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status = 'pending') ELSE false END AS "isPending",
-                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
-                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
-                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_id FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamId",
-                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT team_role FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "teamRole",
+                CASE WHEN $2::uuid IS NOT NULL THEN (
+                    EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended'))
+                    OR EXISTS(SELECT 1 FROM club_event_team_members WHERE event_id = e.id AND user_id = $2::uuid)
+                ) ELSE false END AS "isRegistered",
+                CASE WHEN $2::uuid IS NOT NULL THEN (
+                    EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status = 'pending')
+                    AND NOT EXISTS(SELECT 1 FROM club_event_team_members WHERE event_id = e.id AND user_id = $2::uuid)
+                ) ELSE false END AS "isPending",
+                CASE WHEN $2::uuid IS NOT NULL THEN COALESCE(
+                    (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid ORDER BY registered_at DESC LIMIT 1),
+                    (SELECT lr.status FROM club_event_team_members tm JOIN club_event_teams t ON t.id = tm.team_id LEFT JOIN club_event_registrations lr ON lr.event_id = tm.event_id AND lr.user_id = t.leader_id WHERE tm.event_id = e.id AND tm.user_id = $2::uuid LIMIT 1),
+                    CASE WHEN EXISTS(SELECT 1 FROM club_event_team_members WHERE event_id = e.id AND user_id = $2::uuid) THEN 'registered' ELSE NULL END
+                ) ELSE NULL END AS "registrationStatus",
+                CASE WHEN $2::uuid IS NOT NULL THEN COALESCE(
+                    (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1),
+                    (SELECT 'TKT-' || UPPER(SUBSTRING(REPLACE(t.code, '-', ''), 1, 6)) || '-' || UPPER(SUBSTRING(REPLACE(tm.user_id::text, '-', ''), 1, 4)) FROM club_event_team_members tm JOIN club_event_teams t ON t.id = tm.team_id WHERE tm.event_id = e.id AND tm.user_id = $2::uuid LIMIT 1)
+                ) ELSE NULL END AS "ticketCode",
+                CASE WHEN $2::uuid IS NOT NULL THEN COALESCE(
+                    (SELECT team_id FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1),
+                    (SELECT team_id FROM club_event_team_members WHERE event_id = e.id AND user_id = $2::uuid LIMIT 1)
+                ) ELSE NULL END AS "teamId",
+                CASE WHEN $2::uuid IS NOT NULL THEN COALESCE(
+                    (SELECT team_role FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status NOT IN ('cancelled', 'rejected') ORDER BY registered_at DESC LIMIT 1),
+                    (SELECT role FROM club_event_team_members WHERE event_id = e.id AND user_id = $2::uuid LIMIT 1)
+                ) ELSE NULL END AS "teamRole",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount",
                 (SELECT s.starts_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationStartsAt",
@@ -3621,7 +3641,14 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                     registration: existingReg.rows[0],
                 });
             }
-            if (existingReg.rows[0].status === "cancelled" || existingReg.rows[0].status === "rejected") {
+            if (existingReg.rows[0].status === "cancelled") {
+                return res.status(403).json({
+                    success: false,
+                    code: "APPLICATION_WITHDRAWN",
+                    message: "You have previously withdrawn your application for this event. Re-application for this session is restricted.",
+                });
+            }
+            if (existingReg.rows[0].status === "rejected") {
                 // Reactivate application into pending review
                 const reactivated = await query(
                     `UPDATE club_event_registrations
@@ -3883,6 +3910,131 @@ clubRouter.post("/events/:eventId/cancel", authenticate, async (req: Request, re
         }
         const userId = req.user!.id;
 
+        // Check if user is in a team for this event
+        const memberTeamRes = await query(
+            `SELECT tm.team_id AS "teamId", tm.role, t.name AS "teamName", t.leader_id AS "leaderId"
+             FROM club_event_team_members tm
+             JOIN club_event_teams t ON t.id = tm.team_id
+             WHERE tm.event_id = $1 AND tm.user_id = $2 LIMIT 1;`,
+            [eventId, userId]
+        );
+
+        if (memberTeamRes.rows[0]) {
+            const teamInfo = memberTeamRes.rows[0];
+            const isLeader = teamInfo.role === "leader" || teamInfo.leaderId === userId;
+
+            if (isLeader) {
+                // Team Leader Withdrawal: The entire squad's applications are withdrawn automatically!
+                const teammatesRes = await query(
+                    `SELECT user_id FROM club_event_team_members WHERE team_id = $1;`,
+                    [teamInfo.teamId]
+                );
+                const teammateUserIds: string[] = teammatesRes.rows.map((r: any) => r.user_id);
+                if (!teammateUserIds.includes(userId)) {
+                    teammateUserIds.push(userId);
+                }
+
+                // 1. Cancel registrations for all members in this team
+                await query(
+                    `UPDATE club_event_registrations
+                     SET status = 'cancelled', updated_at = NOW()
+                     WHERE event_id = $1 
+                       AND (team_id = $2 OR user_id = ANY($3::uuid[]))
+                       AND status != 'cancelled';`,
+                    [eventId, teamInfo.teamId, teammateUserIds]
+                );
+
+                // Ensure every teammate has a cancelled registration entry
+                for (const tmUserId of teammateUserIds) {
+                    const rCheck = await query(
+                        `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
+                        [eventId, tmUserId]
+                    );
+                    if (!rCheck.rows[0]) {
+                        await query(
+                            `INSERT INTO club_event_registrations (
+                                event_id, club_id, user_id, status, registered_at, created_at, updated_at
+                             ) VALUES ($1, (SELECT club_id FROM club_events WHERE id = $1), $2, 'cancelled', NOW(), NOW(), NOW());`,
+                            [eventId, tmUserId]
+                        );
+                    }
+                }
+
+                // 2. Mark team as cancelled
+                await query(
+                    `UPDATE club_event_teams 
+                     SET status = 'cancelled', updated_at = NOW() 
+                     WHERE id = $1;`,
+                    [teamInfo.teamId]
+                );
+
+                // 3. Remove team members roster
+                await query(
+                    `DELETE FROM club_event_team_members WHERE team_id = $1;`,
+                    [teamInfo.teamId]
+                );
+
+                // 4. Cancel pending invites
+                await query(
+                    `UPDATE club_event_team_invitations 
+                     SET status = 'cancelled', responded_at = NOW() 
+                     WHERE team_id = $1 AND status = 'pending';`,
+                    [teamInfo.teamId]
+                );
+
+                return res.json({
+                    success: true,
+                    message: `Team "${teamInfo.teamName}" and all member applications have been withdrawn successfully.`,
+                    withdrawnSquad: true,
+                    affectedCount: teammateUserIds.length,
+                });
+            } else {
+                // Regular Team Member Withdrawal: ONLY this member's application is withdrawn!
+                // 1. Mark this user's registration as cancelled
+                await query(
+                    `UPDATE club_event_registrations
+                     SET status = 'cancelled', team_id = NULL, team_role = NULL, updated_at = NOW()
+                     WHERE event_id = $1 AND user_id = $2 AND status != 'cancelled';`,
+                    [eventId, userId]
+                );
+
+                // 2. Remove member from club_event_team_members
+                await query(
+                    `DELETE FROM club_event_team_members WHERE event_id = $1 AND user_id = $2;`,
+                    [eventId, userId]
+                );
+
+                // 3. Check remaining members count in team
+                const remCountRes = await query(
+                    `SELECT COUNT(*)::int AS count FROM club_event_team_members WHERE team_id = $1;`,
+                    [teamInfo.teamId]
+                );
+                const remCount = remCountRes.rows[0]?.count || 0;
+
+                const evRes = await query(
+                    `SELECT COALESCE(min_team_size, 2) AS "minTeamSize" FROM club_events WHERE id = $1;`,
+                    [eventId]
+                );
+                const minTeamSize = evRes.rows[0]?.minTeamSize || 2;
+
+                // If below minTeamSize, set team status to 'forming' (incomplete team)
+                if (remCount < minTeamSize) {
+                    await query(
+                        `UPDATE club_event_teams SET status = 'forming', updated_at = NOW() WHERE id = $1;`,
+                        [teamInfo.teamId]
+                    );
+                }
+
+                return res.json({
+                    success: true,
+                    message: `Your registration has been withdrawn. You have been removed from team "${teamInfo.teamName}".`,
+                    withdrawnSquad: false,
+                    isTeamIncomplete: remCount < minTeamSize,
+                });
+            }
+        }
+
+        // Individual registration withdrawal
         const updateRes = await query(
             `UPDATE club_event_registrations
              SET status = 'cancelled', updated_at = NOW()
@@ -3909,6 +4061,37 @@ clubRouter.post("/events/:eventId/cancel", authenticate, async (req: Request, re
 clubRouter.get("/user/applications", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
+
+        // Auto-heal / sync missing registrations for active team members
+        await query(
+            `INSERT INTO club_event_registrations (
+                event_id, club_id, user_id, status, applicant_name, applicant_email,
+                team_id, team_role, ticket_code, registered_at, created_at, updated_at
+            )
+            SELECT 
+                tm.event_id, 
+                t.club_id, 
+                tm.user_id, 
+                COALESCE(lr.status, 'registered'),
+                COALESCE(TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username),
+                u.email,
+                tm.team_id,
+                tm.role,
+                'TKT-' || UPPER(SUBSTRING(REPLACE(t.code, '-', ''), 1, 6)) || '-' || UPPER(SUBSTRING(REPLACE(tm.user_id::text, '-', ''), 1, 4)),
+                tm.joined_at,
+                tm.joined_at,
+                NOW()
+            FROM club_event_team_members tm
+            JOIN club_event_teams t ON t.id = tm.team_id
+            JOIN users u ON u.id = tm.user_id
+            LEFT JOIN club_event_registrations lr ON lr.event_id = tm.event_id AND lr.user_id = t.leader_id
+            WHERE tm.user_id = $1
+              AND NOT EXISTS (
+                  SELECT 1 FROM club_event_registrations r 
+                  WHERE r.event_id = tm.event_id AND r.user_id = tm.user_id
+              );`,
+            [userId]
+        );
 
         const appsRes = await query(
             `SELECT
@@ -3949,7 +4132,7 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
                     CASE WHEN e.status IN ('completed', 'cancelled') OR (e.ends_at IS NOT NULL AND NOW() > e.ends_at) THEN true ELSE false END
                 ) AS "isRegistrationClosed",
                 COALESCE(r.team_id, (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1)) AS "teamId",
-                COALESCE(r.team_role, (SELECT tm.role FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1), 'leader') AS "teamRole",
+                COALESCE(r.team_role, (SELECT tm.role FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1), 'member') AS "teamRole",
                 COALESCE(t.name, (SELECT t2.name FROM club_event_teams t2 WHERE t2.id = (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1))) AS "teamName",
                 COALESCE(t.code, (SELECT t2.code FROM club_event_teams t2 WHERE t2.id = (SELECT tm.team_id FROM club_event_team_members tm WHERE tm.event_id = r.event_id AND tm.user_id = r.user_id LIMIT 1))) AS "teamCode",
                 COALESCE(

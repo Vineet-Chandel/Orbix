@@ -24,6 +24,8 @@ import {
     Menu,
     FileText,
     Ticket,
+    Ban,
+    AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
@@ -67,6 +69,7 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
     const [copiedCode, setCopiedCode] = useState(false);
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
     const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+    const [isWithdrawnModalOpen, setIsWithdrawnModalOpen] = useState(false);
     const [restrictedEvent, setRestrictedEvent] = useState<CollegeEventItem | null>(null);
 
     // Fetch event if not provided initially or if targetEventId changes
@@ -136,6 +139,11 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
 
     const handleInitiateApply = () => {
         if (!event) return;
+
+        if (event.registrationStatus === "cancelled") {
+            setIsWithdrawnModalOpen(true);
+            return;
+        }
 
         if (!user) {
             const redirectUrl = `/college-events/${event.id}${event.slug ? `/${event.slug}` : ""}`;
@@ -588,7 +596,9 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                                             className="w-full py-2 px-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                         >
                                             <Users className="w-3.5 h-3.5" />
-                                            <span>Manage Team Roster & Invites</span>
+                                            <span>
+                                                {event.teamRole === "leader" ? "Manage Team Roster & Invites" : "Manage Team Roster / Leave Team"}
+                                            </span>
                                         </button>
                                     </div>
                                 )}
@@ -669,6 +679,33 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                                     >
                                         <FileText className="w-3.5 h-3.5 text-amber-950" />
                                         <span>View Application Pass in Activity</span>
+                                    </Link>
+                                </div>
+                            </div>
+                        ) : event.registrationStatus === "cancelled" ? (
+                            <div className="p-3.5 rounded-xl bg-neutral-100 border-2 border-neutral-700 space-y-2.5 text-center">
+                                <div className="flex items-center justify-center gap-2 text-neutral-900 font-black text-xs uppercase tracking-wider">
+                                    <Ban className="w-4 h-4 text-neutral-700" />
+                                    <span>Application Withdrawn</span>
+                                </div>
+                                <p className="text-[11px] font-bold text-neutral-600 leading-relaxed">
+                                    You previously withdrew your application for this event. As per event rules, re-application for this session is restricted.
+                                </p>
+                                <div className="pt-1 flex flex-col gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsWithdrawnModalOpen(true)}
+                                        className="w-full py-2 px-3 rounded-xl bg-white hover:bg-neutral-50 text-neutral-900 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                    >
+                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                                        <span>View Withdrawal Notice</span>
+                                    </button>
+                                    <Link
+                                        to="/activity?tab=applications"
+                                        className="w-full py-2 px-3 rounded-xl bg-[#FFE566] hover:bg-[#FDD835] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                    >
+                                        <FileText className="w-3.5 h-3.5" />
+                                        <span>View In Activity</span>
                                     </Link>
                                 </div>
                             </div>
@@ -915,6 +952,80 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                 eventCollegeName={restrictedEvent?.collegeName || "the host institution"}
                 userCollegeName={user?.college?.officialName || (typeof user?.college === "string" ? user.college : "Your Institution")}
             />
+
+            {/* Application Withdrawn Policy Modal */}
+            {isWithdrawnModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150">
+                    <div className="relative w-full max-w-lg bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-3 border-black shadow-[8px_8px_0px_#000] rounded-3xl p-6 sm:p-7 space-y-5">
+                        <button
+                            type="button"
+                            onClick={() => setIsWithdrawnModalOpen(false)}
+                            className="absolute -top-3 -right-3 p-2 rounded-xl bg-white border-2 border-black hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 z-30"
+                            title="Close"
+                        >
+                            <Ban className="w-4 h-4 stroke-[2.5]" />
+                        </button>
+
+                        <div className="flex items-center justify-between pb-3 border-b-2 border-black">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-white border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <Ban className="w-5 h-5 text-rose-400 stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <span className="font-black text-sm uppercase tracking-tight text-black block">Application Withdrawn</span>
+                                    <span className="text-[10px] font-bold text-neutral-500 block">Registration Policy Enforcement</span>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-neutral-200 text-neutral-800 border border-black shadow-[1px_1px_0px_#000]">
+                                Withdrawn
+                            </span>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-amber-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-black text-amber-950 uppercase tracking-wide">
+                                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 stroke-[2.5]" />
+                                <span>Re-Registration Restricted</span>
+                            </div>
+                            <p className="text-xs font-medium text-neutral-800 leading-relaxed">
+                                Our system recorded that your application for{" "}
+                                <strong className="text-black font-black">"{event.title}"</strong> was voluntarily withdrawn.
+                            </p>
+                            <p className="text-[11px] text-neutral-600 leading-relaxed font-semibold">
+                                To ensure fairness and seat allocation integrity for all participants, organizers do not permit re-applying or joining new squads after an application has been withdrawn in the same event cycle.
+                            </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-white border-2 border-black space-y-1.5 text-xs font-bold text-neutral-700">
+                            <div className="flex justify-between items-center text-neutral-500 text-[10px] uppercase font-mono">
+                                <span>Event:</span>
+                                <span className="text-black font-black">{event.title}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-neutral-500 text-[10px] uppercase font-mono">
+                                <span>Organized By:</span>
+                                <span className="text-black font-black">{event.clubName}</span>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+                            <Link
+                                to="/activity?tab=applications"
+                                onClick={() => setIsWithdrawnModalOpen(false)}
+                                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#FDD835] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                            >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>View In Activity</span>
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={() => setIsWithdrawnModalOpen(false)}
+                                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                            >
+                                Understood
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

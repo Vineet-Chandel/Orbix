@@ -34,6 +34,8 @@ import {
     Lightbulb,
     ClipboardList,
     Users,
+    Ban,
+    AlertTriangle,
 } from "lucide-react";
 import { clubEventTeamApi } from "../../../api/clubEventTeamApi";
 import {
@@ -893,6 +895,66 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     };
 
     // -------------------------------------------------------------------------
+    // RENDER: WITHDRAWN SCREEN
+    // -------------------------------------------------------------------------
+    if (
+        (submittedRegistration && submittedRegistration.status === "cancelled") ||
+        (userResponse && userResponse.status === "cancelled") ||
+        (event && event.registrationStatus === "cancelled") ||
+        (isClosed && closedReason?.includes("withdrawn"))
+    ) {
+        return (
+            <div
+                id="application-withdrawn-card"
+                className="w-full max-w-xl mx-auto rounded-3xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 text-left space-y-4 animate-in fade-in duration-200"
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center text-white border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <Ban className="w-5 h-5 text-rose-400 stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-1.5 leading-none">
+                                <span className="font-black text-sm sm:text-base text-black tracking-tight uppercase">ORBIX</span>
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-neutral-200 text-neutral-800 border border-black shadow-[1px_1px_0px_#000]">
+                                    Withdrawn
+                                </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-neutral-500 block leading-tight mt-1">
+                                Collegiate Ecosystem • Official Status Record
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-amber-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-amber-950 uppercase tracking-wide">
+                        <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 stroke-[2.5]" />
+                        <span>Application Previously Withdrawn</span>
+                    </div>
+                    <p className="text-xs font-medium text-neutral-800 leading-relaxed">
+                        Your application for <strong className="text-black font-black">"{event?.title || form?.title}"</strong> has been withdrawn.
+                    </p>
+                    <p className="text-[11px] text-neutral-600 leading-relaxed font-semibold">
+                        To preserve competition integrity and fair slot allocation, withdrawn applicants or squad members cannot submit new applications or switch teams for this event session.
+                    </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2.5">
+                    <Link
+                        to="/activity?tab=applications"
+                        className="px-4 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#FDD835] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                    >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>View In Activity</span>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // RENDER: SUCCESS SCREEN (4.5 Registration Success Screen)
     // -------------------------------------------------------------------------
     if (submittedRegistration) {
@@ -1362,22 +1424,61 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     // -------------------------------------------------------------------------
     if (isClosed && !isPreview) {
         return (
-            <div className="max-w-xl mx-auto rounded-3xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-xl p-8 text-center space-y-4 animate-in fade-in">
-                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center">
-                    <AlertCircle className="w-7 h-7 stroke-[2.5]" />
+            <div className="w-full max-w-lg mx-auto bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-3 border-black shadow-[8px_8px_0px_#000] rounded-3xl p-6 sm:p-7 space-y-5 text-left text-black animate-in fade-in duration-200">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-[#FFE566] flex items-center justify-center text-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <AlertCircle className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <span className="font-black text-sm uppercase tracking-tight text-black block">Registration Closed</span>
+                            <span className="text-[10px] font-bold text-neutral-500 block uppercase tracking-wider">Event Registration Window</span>
+                        </div>
+                    </div>
+                    <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-neutral-200 text-neutral-800 border-2 border-black shadow-[1px_1px_0px_#000]">
+                        Concluded
+                    </span>
                 </div>
-                <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Registration Closed</h3>
-                <p className="text-xs sm:text-sm text-neutral-500 font-normal whitespace-pre-line leading-relaxed">
-                    {closedReason || form.settings?.closedMessage || "Registrations are currently closed for this event."}
-                </p>
+
+                {/* Notice Block */}
+                <div className="p-4 rounded-2xl bg-amber-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-amber-950 uppercase tracking-wide">
+                        <Clock className="w-4 h-4 text-amber-700 shrink-0 stroke-[2.5]" />
+                        <span>Deadline Reached</span>
+                    </div>
+                    <p className="text-xs font-semibold text-neutral-800 leading-relaxed whitespace-pre-line">
+                        {closedReason || form.settings?.closedMessage || "The registration window for this event has concluded. Applications are no longer accepted."}
+                    </p>
+                </div>
+
+                {/* Event Info Snapshot if available */}
+                {event && (
+                    <div className="p-3.5 rounded-xl bg-white border-2 border-black space-y-1.5 text-xs font-bold text-neutral-700">
+                        <div className="flex justify-between items-center text-neutral-500 text-[10px] uppercase font-mono">
+                            <span>Event:</span>
+                            <span className="text-black font-black">{event.title}</span>
+                        </div>
+                        {event.clubName && (
+                            <div className="flex justify-between items-center text-neutral-500 text-[10px] uppercase font-mono">
+                                <span>Organized By:</span>
+                                <span className="text-black font-black">{event.clubName}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Action */}
                 {onCancel && (
-                    <button
-                        type="button"
-                        onClick={onCancel}
-                        className="px-5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 font-semibold text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 shadow-sm cursor-pointer transition-colors"
-                    >
-                        Back
-                    </button>
+                    <div className="pt-2 flex items-center justify-end">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-6 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                        >
+                            Back
+                        </button>
+                    </div>
                 )}
             </div>
         );
