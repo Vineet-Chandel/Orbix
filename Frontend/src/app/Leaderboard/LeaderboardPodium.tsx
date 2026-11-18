@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Crown, Flame, CheckCircle2, Building2 } from "lucide-react";
 import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
-import { type LeaderboardEntry, parseLeaderboardRatings } from "./types";
+import { type LeaderboardEntry } from "./types";
 
 interface LeaderboardPodiumProps {
     podium: LeaderboardEntry[];
@@ -21,26 +21,24 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium, sc
 
     return (
         <div className="w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-end max-w-6xl mx-auto pt-2">
-                {/* 2nd Place (Left on Desktop) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-end max-w-6xl mx-auto pt-7">
+                {/* 2nd Place (Left on Desktop, 2nd on Mobile) */}
                 {second && (
                     <PodiumCard
                         entry={second}
                         position={2}
-                        label="2nd"
-                        accentBg="bg-white"
+                        accentBg="bg-[#E2E8F0]"
                         shadowClass="shadow-[5px_5px_0px_#000]"
-                        heightClass="md:min-h-[470px]"
+                        heightClass="md:min-h-[460px]"
                         scope={scope}
                     />
                 )}
 
-                {/* 1st Place (Center, Elevated) */}
+                {/* 1st Place (Center, Elevated on Desktop, 1st on Mobile) */}
                 {first && (
                     <PodiumCard
                         entry={first}
                         position={1}
-                        label="1st"
                         accentBg="bg-[#FFE566]"
                         shadowClass="shadow-[7px_7px_0px_#000]"
                         heightClass="md:min-h-[515px]"
@@ -49,15 +47,14 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium, sc
                     />
                 )}
 
-                {/* 3rd Place (Right on Desktop) */}
+                {/* 3rd Place (Right on Desktop, 3rd on Mobile) */}
                 {third && (
                     <PodiumCard
                         entry={third}
                         position={3}
-                        label="3rd"
-                        accentBg="bg-white"
+                        accentBg="bg-[#E5B88C]"
                         shadowClass="shadow-[5px_5px_0px_#000]"
-                        heightClass="md:min-h-[470px]"
+                        heightClass="md:min-h-[460px]"
                         scope={scope}
                     />
                 )}
@@ -69,7 +66,6 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium, sc
 interface PodiumCardProps {
     entry: LeaderboardEntry;
     position: number;
-    label: string;
     accentBg: string;
     shadowClass: string;
     heightClass: string;
@@ -79,13 +75,12 @@ interface PodiumCardProps {
 
 const PodiumCard: React.FC<PodiumCardProps> = ({
     entry,
-    position: _position,
-    label,
-    accentBg: _accentBg,
+    position,
+    accentBg,
     shadowClass,
     heightClass,
     isFirst = false,
-    scope = "global",
+    scope: _scope = "global",
 }) => {
     const initials = (entry.displayName || entry.username)
         .split(" ")
@@ -94,151 +89,180 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
         .join("")
         .toUpperCase();
 
-    const ratings = parseLeaderboardRatings(entry.platformRatings, entry.scoreBreakdown);
     const college = entry.college || "—";
-    const displayRank = scope === "college" && entry.collegeRank ? entry.collegeRank : entry.rank;
 
     return (
         <div
-            className={`w-full rounded-2xl border-2 border-black ${shadowClass} p-6 sm:p-7 flex flex-col justify-between relative transition-all duration-200 hover:-translate-y-1 ${
-                isFirst ? "bg-[#FFE566]" : "bg-white"
-            } ${heightClass}`}
+            className={`w-full rounded-2xl border-2 border-black bg-white ${shadowClass} flex flex-col justify-between relative transition-all duration-200 hover:-translate-y-1 ${heightClass} ${
+                isFirst ? "order-1 md:order-2" : position === 2 ? "order-2 md:order-1" : "order-3 md:order-3"
+            }`}
         >
-            {/* Top Badge Strip: Position Badge & Streak */}
-            <div className="flex items-center justify-between gap-2 mb-2">
-                <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border-2 border-black text-xs font-black uppercase shadow-[1px_1px_0px_#000] ${
-                        isFirst ? "bg-black text-[#FFE566]" : "bg-[#FAF6EE] text-black"
-                    }`}
-                >
-                    {isFirst && <Crown className="w-3.5 h-3.5 fill-[#FFE566]" />}
-                    <span>#{displayRank} · {label} Place</span>
-                </span>
+            {/* 1st Place: Prominent Centered Crown perched on the top edge */}
+            {isFirst && (
+                <div className="absolute -top-5 sm:-top-5.5 left-1/2 -translate-x-1/2 z-20">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                        <Crown className="w-5 h-5 sm:w-6 sm:h-6 text-black stroke-[2.4]" />
+                    </div>
+                </div>
+            )}
 
-                {entry.streak > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border-2 border-black text-black text-[11px] font-mono font-black shadow-[1px_1px_0px_#000]">
-                        <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                        <span>{entry.streak}d</span>
-                    </span>
-                )}
-            </div>
-
-            {/* Middle Section: Avatar, Name, Handle & College */}
-            <div className="flex flex-col items-center text-center space-y-3.5 my-3">
-                <div className="relative">
-                    {entry.avatarUrl ? (
-                        <EnlargeableAvatar
-                            src={entry.avatarUrl}
-                            alt={entry.displayName}
-                            displayName={entry.displayName}
-                            username={entry.username}
-                            className={`rounded-2xl object-cover border-2 border-black shadow-[3px_3px_0px_#000] ${
-                                isFirst
-                                    ? "w-20 h-20 sm:w-22 sm:h-22 ring-2 ring-black"
-                                    : "w-18 h-18 sm:w-20 sm:h-20"
-                            }`}
-                        />
-                    ) : (
+            {/* Main Card Content */}
+            <div className={`p-5 sm:p-6 flex flex-col justify-between flex-1 ${isFirst ? "pt-7 sm:pt-8" : "pt-6 sm:pt-7"}`}>
+                {/* Avatar Section with Double Ring */}
+                <div className="flex flex-col items-center text-center space-y-3">
+                    <div className="relative">
                         <div
-                            className={`rounded-2xl bg-[#a2ff86] border-2 border-black flex items-center justify-center font-black text-xl text-black shadow-[3px_3px_0px_#000] ${
-                                isFirst ? "w-20 h-20 sm:w-22 sm:h-22" : "w-18 h-18 sm:w-20 sm:h-20"
+                            className={`p-1 rounded-full border-2 border-black shadow-[3px_3px_0px_#000] ${
+                                isFirst
+                                    ? "bg-[#FFE566]"
+                                    : position === 2
+                                    ? "bg-[#E2E8F0]"
+                                    : "bg-[#E5B88C]"
                             }`}
                         >
-                            {initials}
+                            {entry.avatarUrl ? (
+                                <EnlargeableAvatar
+                                    src={entry.avatarUrl}
+                                    alt={entry.displayName}
+                                    displayName={entry.displayName}
+                                    username={entry.username}
+                                    className={`block rounded-full object-cover border-2 border-black ${
+                                        isFirst
+                                            ? "w-20 h-20 sm:w-22 sm:h-22"
+                                            : "w-18 h-18 sm:w-20 sm:h-20"
+                                    }`}
+                                />
+                            ) : (
+                                <div
+                                    className={`rounded-full bg-[#a2ff86] border-2 border-black flex items-center justify-center font-black text-xl text-black ${
+                                        isFirst
+                                            ? "w-20 h-20 sm:w-22 sm:h-22"
+                                            : "w-18 h-18 sm:w-20 sm:h-20"
+                                    }`}
+                                >
+                                    {initials}
+                                </div>
+                            )}
                         </div>
-                    )}
-                    {entry.isVerified && (
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-black border-2 border-white flex items-center justify-center text-white shadow-xs">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-[#a2ff86]" />
-                        </div>
-                    )}
-                </div>
+                    </div>
 
-                <div className="space-y-1 w-full px-1">
-                    <Link
-                        to={`/profile/u/${encodeURIComponent(entry.username)}`}
-                        className="text-base sm:text-lg font-black text-black hover:underline tracking-tight block truncate"
-                        title={entry.displayName}
-                    >
-                        {entry.displayName}
-                    </Link>
-                    <p className="text-xs font-mono font-bold text-neutral-600 truncate">
-                        @{entry.username}
-                    </p>
-                    {college && college !== "—" && (
-                        <div className="pt-1 flex justify-center">
-                            <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/[0.04] border border-black/10 text-[11px] font-semibold text-neutral-700 max-w-full"
-                                title={college}
+                    {/* User Identity: Name, Verified Badge, Handle & College */}
+                    <div className="space-y-1 w-full px-1">
+                        <div className="flex items-center justify-center gap-1.5 min-w-0">
+                            <Link
+                                to={`/profile/u/${encodeURIComponent(entry.username)}`}
+                                className="text-base sm:text-lg font-black text-black hover:underline tracking-tight truncate max-w-[190px] sm:max-w-[220px]"
+                                title={entry.displayName}
                             >
-                                <Building2 className="w-3.5 h-3.5 stroke-[2.2] flex-shrink-0 text-neutral-600" />
-                                <span className="truncate max-w-[230px]">{college}</span>
-                            </span>
+                                {entry.displayName}
+                            </Link>
+                            {entry.isVerified && (
+                                <span title="Verified Coder" className="inline-flex items-center">
+                                    <CheckCircle2
+                                        className="w-4 h-4 text-sky-500 fill-sky-500/20 shrink-0"
+                                        strokeWidth={2.5}
+                                    />
+                                </span>
+                            )}
                         </div>
-                    )}
+                        <p className="text-xs font-mono font-bold text-neutral-500 truncate">
+                            @{entry.username}
+                        </p>
+                        {college && college !== "—" && (
+                            <div className="pt-0.5 flex justify-center">
+                                <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#FAF6EE] border border-black/15 text-[11px] font-semibold text-neutral-700 max-w-full"
+                                    title={college}
+                                >
+                                    <Building2 className="w-3 h-3 text-neutral-500 shrink-0" />
+                                    <span className="truncate max-w-[180px] sm:max-w-[210px]">{college}</span>
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
 
-            {/* Bottom Metrics: Big Orbix Score + Solved & Rating Chips */}
-            <div className="space-y-4 pt-4 border-t-2 border-black/10 mt-auto">
-                <div className="text-center">
-                    <span className="text-3xl sm:text-4xl font-mono font-black text-black block tracking-tight leading-none mb-1">
-                        {entry.score.toLocaleString()}
-                    </span>
-                    <span className="text-[10px] font-black uppercase text-neutral-600 tracking-wider">
+                {/* Score Section */}
+                <div className="text-center my-3 sm:my-4">
+                    <div className="flex items-baseline justify-center gap-1.5">
+                        <span className="text-3xl sm:text-4xl font-mono font-black text-black tracking-tight leading-none">
+                            {entry.score.toLocaleString()}
+                        </span>
+                        <span className="text-xs font-black uppercase text-neutral-500 tracking-wider">
+                            points
+                        </span>
+                    </div>
+                    <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block mt-1">
                         Orbix Score
                     </span>
                 </div>
 
-                {/* Sub-metrics: Solved & Contests */}
-                <div className="grid grid-cols-2 gap-2.5 text-center">
-                    <div className={`py-2 px-2.5 rounded-xl border-2 border-black/15 shadow-[1px_1px_0px_#000] ${isFirst ? "bg-white/90" : "bg-[#FAF6EE]"}`}>
-                        <span className="text-xs sm:text-sm font-mono font-black text-black block">
-                            {entry.totalSolved.toLocaleString()}
-                        </span>
-                        <span className="text-[9px] font-black uppercase text-neutral-600 block tracking-wide">
+                {/* 3-Column Stats: Solved | Contests | Streak */}
+                <div className="w-full bg-[#FAF6EE] rounded-xl border-2 border-black/15 shadow-[1px_1px_0px_#000] grid grid-cols-3 divide-x-2 divide-black/10 text-center py-2.5 px-1 mt-auto">
+                    {/* Solved */}
+                    <div className="flex flex-col items-center justify-center px-1">
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase text-neutral-500 block tracking-wider mb-0.5">
                             Solved
                         </span>
+                        <span className="text-xs sm:text-sm font-mono font-black text-black">
+                            {entry.totalSolved.toLocaleString()}
+                        </span>
                     </div>
-                    <div className={`py-2 px-2.5 rounded-xl border-2 border-black/15 shadow-[1px_1px_0px_#000] ${isFirst ? "bg-white/90" : "bg-[#FAF6EE]"}`}>
-                        <span className="text-xs sm:text-sm font-mono font-black text-black block">
+
+                    {/* Contests */}
+                    <div className="flex flex-col items-center justify-center px-1">
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase text-neutral-500 block tracking-wider mb-0.5">
+                            Contests
+                        </span>
+                        <span className="text-xs sm:text-sm font-mono font-black text-black">
                             {entry.totalContests}
                         </span>
-                        <span className="text-[9px] font-black uppercase text-neutral-600 block tracking-wide">
-                            Contests
+                    </div>
+
+                    {/* Streak (Matching below rating chart) */}
+                    <div className="flex flex-col items-center justify-center px-1">
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase text-neutral-500 block tracking-wider mb-0.5">
+                            Streak
+                        </span>
+                        <span className="text-xs sm:text-sm font-mono font-black text-black inline-flex items-center justify-center gap-1">
+                            {entry.streak > 0 ? (
+                                <>
+                                    <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                                    <span>{entry.streak}d</span>
+                                </>
+                            ) : (
+                                <span className="text-neutral-400 font-mono">—</span>
+                            )}
                         </span>
                     </div>
                 </div>
+            </div>
 
-                {/* Platform Rating Chips */}
-                {(ratings.codeforces || ratings.leetcode || ratings.codechef || ratings.atcoder) && (
-                    <div className="flex items-center justify-center gap-2 flex-wrap pt-0.5">
-                        {ratings.codeforces && (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
-                                <span className="text-neutral-500 font-bold">CF</span>
-                                <span style={{ color: ratings.codeforces.color || "#E02424" }}>{ratings.codeforces.rating}</span>
-                            </span>
-                        )}
-                        {ratings.leetcode && (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
-                                <span className="text-neutral-500 font-bold">LC</span>
-                                <span style={{ color: ratings.leetcode.color || "#D97706" }}>{ratings.leetcode.rating}</span>
-                            </span>
-                        )}
-                        {ratings.codechef && (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
-                                <span className="text-neutral-500 font-bold">CC</span>
-                                <span style={{ color: ratings.codechef.color || "#854D0E" }}>{ratings.codechef.rating}</span>
-                            </span>
-                        )}
-                        {ratings.atcoder && (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border-2 border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
-                                <span className="text-neutral-500 font-bold">AC</span>
-                                <span style={{ color: ratings.atcoder.color || "#0284C7" }}>{ratings.atcoder.rating}</span>
-                            </span>
-                        )}
-                    </div>
-                )}
+            {/* Bottom Pedestal Banner: 1st / 2nd / 3rd */}
+            <div
+                className={`w-full text-center border-t-2 border-black ${accentBg} rounded-b-[14px] ${
+                    isFirst ? "py-3.5 sm:py-4" : position === 2 ? "py-3 sm:py-3.5" : "py-2.5 sm:py-3"
+                }`}
+            >
+                <span
+                    className={`font-black text-black font-mono tracking-tight ${
+                        isFirst ? "text-xl sm:text-2xl" : "text-lg sm:text-xl"
+                    }`}
+                >
+                    {position === 1 ? (
+                        <>
+                            1<sup className="text-xs sm:text-sm font-black">st</sup>
+                        </>
+                    ) : position === 2 ? (
+                        <>
+                            2<sup className="text-xs sm:text-sm font-black">nd</sup>
+                        </>
+                    ) : (
+                        <>
+                            3<sup className="text-xs sm:text-sm font-black">rd</sup>
+                        </>
+                    )}
+                </span>
             </div>
         </div>
     );

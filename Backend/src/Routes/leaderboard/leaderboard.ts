@@ -585,7 +585,16 @@ async function getCollegesRepresentedCount(): Promise<number> {
  * Helper to fetch a single user's global and college rank positions
  */
 async function getUserRank(username: string, collegeIdContext?: string | null): Promise<any | null> {
+    const cleanUser = (username || "").trim();
+    if (!cleanUser) return null;
+
+    const cacheContext = collegeIdContext || "global";
     try {
+        const cachedRank = await cacheLeaderboard.getUserRank(cleanUser, cacheContext);
+        if (cachedRank) {
+            return cachedRank;
+        }
+
         let rankRes = await query(
             `SELECT 
                 le.user_id, le.username, COALESCE(le.display_name, le.username) AS display_name, COALESCE(le.avatar_url, '') AS avatar_url, le.college, le.college_id, le.is_verified,
@@ -652,7 +661,7 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
             }
         }
 
-        return {
+        const result = {
             rank: parseInt(r.rank, 10),
             collegeRank,
             userId: r.user_id,
@@ -672,6 +681,9 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
             streak: parseInt(r.streak, 10),
             updatedAt: r.updated_at,
         };
+
+        await cacheLeaderboard.setUserRank(cleanUser, cacheContext, result);
+        return result;
     } catch {
         return null;
     }
@@ -933,6 +945,7 @@ leaderboardRouter.get("/algorithm", async (_req: Request, res: Response) => {
  */
 leaderboardRouter.get(["/colleges/participating", "/colleges/represented"], async (req: Request, res: Response) => {
     try {
+        res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
         const cached = await cacheLeaderboard.getParticipatingColleges();
         if (cached) {
             return res.status(200).json({ ...cached, cached: true });
@@ -1021,12 +1034,22 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
 
         const collegeMeta = instRes.rows[0];
 
+        res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=45");
+
         // 2. Check Redis cache (cache-aside)
         if (!search) {
             const cached = await cacheLeaderboard.getCollegePage(rawCollegeId, period, filter, page, limit);
             if (cached) {
                 if (targetUser) {
-                    cached.currentUser = await getUserRank(targetUser, rawCollegeId);
+                    const uLower = targetUser.toLowerCase();
+                    const found =
+                        cached.podium?.find((p: any) => p.username?.toLowerCase() === uLower) ||
+                        cached.entries?.find((e: any) => e.username?.toLowerCase() === uLower);
+                    if (found) {
+                        cached.currentUser = found;
+                    } else {
+                        cached.currentUser = await getUserRank(targetUser, rawCollegeId);
+                    }
                 } else {
                     cached.currentUser = null;
                 }
@@ -1177,7 +1200,15 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
         // 6. Current User Rank within this College
         let currentUser: any = null;
         if (targetUser) {
-            currentUser = await getUserRank(targetUser, rawCollegeId);
+            const uLower = targetUser.toLowerCase();
+            const found =
+                podium.find((p) => p.username?.toLowerCase() === uLower) ||
+                entries.find((e) => e.username?.toLowerCase() === uLower);
+            if (found) {
+                currentUser = found;
+            } else {
+                currentUser = await getUserRank(targetUser, rawCollegeId);
+            }
         }
 
         // 7. Represented colleges count across the whole platform
@@ -1235,12 +1266,22 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
 
         const targetUser = String(req.query.user || req.query.username || req.user?.username || "").trim();
 
+        res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=45");
+
         // 1. Check Redis cache
         if (!search) {
             const cached = await cacheLeaderboard.getGlobalPage(period, filter, page, limit);
             if (cached) {
                 if (targetUser) {
-                    cached.currentUser = await getUserRank(targetUser);
+                    const uLower = targetUser.toLowerCase();
+                    const found =
+                        cached.podium?.find((p: any) => p.username?.toLowerCase() === uLower) ||
+                        cached.entries?.find((e: any) => e.username?.toLowerCase() === uLower);
+                    if (found) {
+                        cached.currentUser = found;
+                    } else {
+                        cached.currentUser = await getUserRank(targetUser);
+                    }
                 } else {
                     cached.currentUser = null;
                 }
@@ -1393,7 +1434,15 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
         // 6. Current User Rank
         let currentUser: any = null;
         if (targetUser) {
-            currentUser = await getUserRank(targetUser);
+            const uLower = targetUser.toLowerCase();
+            const found =
+                podium.find((p) => p.username?.toLowerCase() === uLower) ||
+                entries.find((e) => e.username?.toLowerCase() === uLower);
+            if (found) {
+                currentUser = found;
+            } else {
+                currentUser = await getUserRank(targetUser);
+            }
         }
 
         const responsePayload = {

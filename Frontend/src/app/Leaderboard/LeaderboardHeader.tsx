@@ -1,18 +1,18 @@
 import React from "react";
-import { RefreshCw, Search, ShieldCheck, Users, Building2, Globe, Cpu } from "lucide-react";
+import { RefreshCw, Search, Building2, Globe, Cpu } from "lucide-react";
 import type { LeaderboardMetadata } from "./types";
 
 interface LeaderboardHeaderProps {
     metadata?: LeaderboardMetadata | null;
     activeTab: "global" | "college";
     onTabChange: (tab: "global" | "college") => void;
-    collegesRepresentedCount: number;
+    collegesRepresentedCount?: number;
     searchQuery: string;
     onSearchChange: (q: string) => void;
-    filter: "all" | "verified";
-    onFilterChange: (f: "all" | "verified") => void;
-    period: string;
-    onPeriodChange: (p: string) => void;
+    filter?: "all" | "verified";
+    onFilterChange?: (f: "all" | "verified") => void;
+    period?: string;
+    onPeriodChange?: (p: string) => void;
     onSyncNow: () => void;
     isSyncing: boolean;
     onOpenMobileSidebar?: () => void;
@@ -21,27 +21,22 @@ interface LeaderboardHeaderProps {
 }
 
 export const LeaderboardHeader: React.FC<LeaderboardHeaderProps> = ({
-    metadata,
+    metadata: _metadata,
     activeTab,
     onTabChange,
-    collegesRepresentedCount,
+    collegesRepresentedCount: _collegesRepresentedCount,
     searchQuery,
     onSearchChange,
-    filter,
-    onFilterChange,
+    filter: _filter,
+    onFilterChange: _onFilterChange,
     period: _period,
     onPeriodChange: _onPeriodChange,
     onSyncNow,
     isSyncing,
     onOpenMobileSidebar,
-    onCounterClick,
+    onCounterClick: _onCounterClick,
     onOpenAlgorithm,
 }) => {
-    const totalCoders = metadata?.totalCoders ?? 0;
-    const formattedLastUpdated = metadata?.lastUpdated
-        ? new Date(metadata.lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        : "Just now";
-
     return (
         <div className="space-y-6">
             {/* Top Bar: Title, Badges & Actions */}
@@ -101,13 +96,26 @@ export const LeaderboardHeader: React.FC<LeaderboardHeaderProps> = ({
                 </div>
             </div>
 
-            {/* Primary Navigation Tabs: Global Leaderboard vs College League */}
+            {/* Search Box on Left, Global Leaderboard / College League Toggle on Right (Flex Between) */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="inline-flex items-center p-1.5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] self-start">
+                {/* Search Box */}
+                <div className="relative flex-1 max-w-md sm:max-w-lg">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500 stroke-[2.5] pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        placeholder={activeTab === "global" ? "Search coder, handle, or college..." : "Search coder in this college..."}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-xs sm:text-sm font-bold text-black placeholder:text-neutral-500 focus:outline-none transition-all"
+                    />
+                </div>
+
+                {/* Primary Navigation Tabs Toggle: Global Leaderboard vs College League */}
+                <div className="inline-flex items-center p-1.5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] shrink-0 self-start sm:self-auto">
                     <button
                         type="button"
                         onClick={() => onTabChange("global")}
-                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                        className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                             activeTab === "global"
                                 ? "bg-black text-white shadow-[2px_2px_0px_#000]"
                                 : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE]"
@@ -120,7 +128,7 @@ export const LeaderboardHeader: React.FC<LeaderboardHeaderProps> = ({
                     <button
                         type="button"
                         onClick={() => onTabChange("college")}
-                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                        className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                             activeTab === "college"
                                 ? "bg-black text-white shadow-[2px_2px_0px_#000]"
                                 : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE]"
@@ -129,73 +137,6 @@ export const LeaderboardHeader: React.FC<LeaderboardHeaderProps> = ({
                         <Building2 className="w-4 h-4 stroke-[2.5]" />
                         <span>College League</span>
                     </button>
-                </div>
-
-                {/* Participating Colleges Counter Badge */}
-                <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        onClick={onCounterClick || (() => onTabChange("college"))}
-                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-xs font-black text-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                        title="Click to explore participating colleges"
-                    >
-                        <Building2 className="w-4 h-4 stroke-[2.5] text-black" />
-                        <span className="uppercase tracking-tight">Colleges Represented</span>
-                        <span className="px-2 py-0.5 rounded-md bg-[#a2ff86] border border-black font-mono font-black text-black text-xs shadow-[1px_1px_0px_#000]">
-                            {String(collegesRepresentedCount).padStart(2, "0")}
-                        </span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Filter and Search Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
-                {/* Search Box */}
-                <div className="relative flex-1 max-w-md">
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500 stroke-[2.5] pointer-events-none" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        placeholder={activeTab === "global" ? "Search coder, handle, or college..." : "Search coder in this college..."}
-                        className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:outline-none focus:bg-white transition-colors"
-                    />
-                </div>
-
-                {/* Filter and Metadata Pills */}
-                <div className="flex items-center gap-3 flex-wrap">
-                    <div className="inline-flex items-center p-1 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-black shadow-[1px_1px_0px_#000]">
-                        <button
-                            type="button"
-                            onClick={() => onFilterChange("all")}
-                            className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                                filter === "all"
-                                    ? "bg-black text-white shadow-[1px_1px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black"
-                            }`}
-                        >
-                            All Coders
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onFilterChange("verified")}
-                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                                filter === "verified"
-                                    ? "bg-black text-white shadow-[1px_1px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black"
-                            }`}
-                        >
-                            <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Verified</span>
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-600">
-                        <Users className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>{totalCoders} {totalCoders === 1 ? "Coder" : "Coders"}</span>
-                        <span>•</span>
-                        <span>Updated {formattedLastUpdated}</span>
-                    </div>
                 </div>
             </div>
         </div>

@@ -11,6 +11,7 @@ import eventsReducer from "./eventsSlice";
 import networkReducer from "./networkSlice";
 import clubReducer from "./clubSlice";
 import clubEventsReducer from "./clubEventsSlice";
+import leaderboardReducer from "./leaderboardSlice";
 
 export const store = configureStore({
     reducer: {
@@ -25,6 +26,7 @@ export const store = configureStore({
         network: networkReducer,
         club: clubReducer,
         clubEvents: clubEventsReducer,
+        leaderboard: leaderboardReducer,
     },
 });
 
@@ -45,3 +47,4 @@ export * from "./eventsSlice";
 export * from "./networkSlice";
 export * from "./clubSlice";
 export * from "./clubEventsSlice";
+export * from "./leaderboardSlice";

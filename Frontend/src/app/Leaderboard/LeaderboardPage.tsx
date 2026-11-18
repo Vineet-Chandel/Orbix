@@ -1,5 +1,19 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useAppSelector } from "../../store";
+import React, { useState, useEffect, useMemo } from "react";
+import { useAppDispatch, useAppSelector } from "../../store";
+import {
+    setActiveTab,
+    setSelectedCollege,
+    setPage,
+    setSearchQuery,
+    setDebouncedSearch,
+    setFilter,
+    fetchGlobalLeaderboard,
+    fetchCollegeLeaderboard,
+    fetchParticipatingColleges,
+    syncLeaderboardNow,
+    getGlobalCacheKey,
+    getCollegeCacheKey,
+} from "../../store/leaderboardSlice";
 import { useToast } from "../../context/ToastContext";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { LeaderboardHeader } from "./LeaderboardHeader";
@@ -8,20 +22,15 @@ import { LeaderboardPodium } from "./LeaderboardPodium";
 import { LeaderboardTable } from "./LeaderboardTable";
 import { LeaderboardPagination } from "./LeaderboardPagination";
 import { AlgorithmModal } from "./AlgorithmModal";
-import type {
-    LeaderboardEntry,
-    LeaderboardMetadata,
-    LeaderboardResponse,
-    CollegeLeaderboardResponse,
-    ParticipatingCollege,
-} from "./types";
+import type { ParticipatingCollege } from "./types";
 import { Trophy, Sparkles, ArrowUpRight, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
-import { buildApiUrl } from "../../api/apiClient";
 
 export const LeaderboardPage: React.FC = () => {
     const toast = useToast();
+    const dispatch = useAppDispatch();
+
     const { user } = useAppSelector((state) => state.user);
     const storedUsername = useMemo(() => {
         try {
@@ -33,297 +42,192 @@ export const LeaderboardPage: React.FC = () => {
     }, []);
     const currentUsername = user?.username || storedUsername || null;
 
-    // Mobile Sidebar
+    // Mobile Sidebar & Algorithm Modal (Local UI state)
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-    // Active Navigation Tab: "global" | "college"
-    const [activeTab, setActiveTab] = useState<"global" | "college">("global");
     const [isAlgorithmModalOpen, setIsAlgorithmModalOpen] = useState<boolean>(false);
 
-    // Participating Colleges State
-    const [participatingColleges, setParticipatingColleges] = useState<ParticipatingCollege[]>([]);
-    const [collegesRepresentedCount, setCollegesRepresentedCount] = useState<number>(0);
-    const [selectedCollege, setSelectedCollege] = useState<ParticipatingCollege | null>(null);
-
-    // Pagination & Filters State
-    const [page, setPage] = useState<number>(1);
-    const [limit] = useState<number>(20);
-    const [period, setPeriod] = useState<string>("all_time");
-    const [filter, setFilter] = useState<"all" | "verified">("all");
-    const [searchQuery, setSearchQuery] = useState<string>("");
-    const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-
-    // Leaderboard Data State
-    const [podium, setPodium] = useState<LeaderboardEntry[]>([]);
-    const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-    const [metadata, setMetadata] = useState<LeaderboardMetadata | null>(null);
-    const [currentUserRank, setCurrentUserRank] = useState<LeaderboardEntry | null>(null);
-    const [selectedCollegeMeta, setSelectedCollegeMeta] = useState<{
-        id: string;
-        name: string;
-        code?: string | null;
-        city?: string | null;
-        country?: string | null;
-        totalStudents?: number;
-    } | null>(null);
-
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [isSyncing, setIsSyncing] = useState<boolean>(false);
+    // Redux Leaderboard State & Caching
+    const {
+        activeTab,
+        selectedCollege,
+        page,
+        limit,
+        period,
+        filter,
+        searchQuery,
+        debouncedSearch,
+        globalCache,
+        collegeCache,
+        participatingColleges,
+        collegesRepresentedCount,
+        isGlobalLoading,
+        isCollegeLoading,
+        isSyncing,
+    } = useAppSelector((state) => state.leaderboard);
 
     // -------------------------------------------------------------------------
-    // 1. Initial Load: Fetch Participating Colleges & Auto-Detect User College
+    // 1. Instant Cache Resolution for Active Tab & View
+    // -------------------------------------------------------------------------
+    const globalKey = useMemo(
+        () => getGlobalCacheKey(page, limit, period, filter, debouncedSearch, currentUsername),
+        [page, limit, period, filter, debouncedSearch, currentUsername]
+    );
+
+    const collegeKey = useMemo(
+        () =>
+            selectedCollege?.id
+                ? getCollegeCacheKey(selectedCollege.id, page, limit, period, filter, debouncedSearch, currentUsername)
+                : "",
+        [selectedCollege?.id, page, limit, period, filter, debouncedSearch, currentUsername]
+    );
+
+    // When toggling tabs, activeData is read synchronously from Redux cache with 0ms latency
+    const activeData = activeTab === "global" ? globalCache[globalKey] : (collegeKey ? collegeCache[collegeKey] : null);
+
+    const podium = activeData?.podium || [];
+    const entries = activeData?.entries || [];
+    const metadata = activeData?.metadata || null;
+    const currentUserRank = activeData?.currentUser || null;
+    const selectedCollegeMeta = activeData?.collegeMeta || null;
+
+    // Non-blocking loading: Only show skeleton if we have NO cached data to display
+    const isLoading = activeTab === "global"
+        ? isGlobalLoading && !activeData
+        : isCollegeLoading && !activeData;
+
+    // -------------------------------------------------------------------------
+    // 2. Initial Load: Fetch Participating Colleges & Auto-Detect User College
     // -------------------------------------------------------------------------
     useEffect(() => {
-        let isMounted = true;
-        const fetchParticipating = async () => {
-            try {
-                const collegesUrl = buildApiUrl("/api/leaderboard/colleges/participating");
-                let res: Response | null = null;
-                try {
-                    res = await fetch(collegesUrl, { credentials: "include" });
-                } catch {
-                    // network error
-                }
+        dispatch(fetchParticipatingColleges());
+    }, [dispatch]);
 
-                if (res && res.ok && isMounted) {
-                    const data = await res.json();
-                    if (data.success && Array.isArray(data.colleges)) {
-                        setParticipatingColleges(data.colleges);
-                        setCollegesRepresentedCount(data.count ?? data.colleges.length);
+    useEffect(() => {
+        if (selectedCollege) return;
+        const userCollegeId = user?.collegeId || user?.college?.id;
+        if (!userCollegeId && !user?.college) return;
 
-                        // Auto-detect user's assigned college ONLY if user actually has one
-                        const userCollegeId = user?.collegeId || user?.college?.id;
-                        let matchedCollege: ParticipatingCollege | null = null;
-
-                        if (userCollegeId) {
-                            matchedCollege = data.colleges.find((c: ParticipatingCollege) => c.id === userCollegeId) || null;
-                        }
-                        // Also try matching by name if ID was mismatched
-                        if (!matchedCollege && (user?.college || (user as any)?.collegeName)) {
-                            const targetName = typeof user?.college === "string" ? user.college : (user?.college?.officialName || (user as any)?.collegeName);
-                            if (targetName) {
-                                matchedCollege = data.colleges.find((c: ParticipatingCollege) =>
-                                    (c.officialName && c.officialName.toLowerCase() === String(targetName).toLowerCase()) ||
-                                    (c.name && c.name.toLowerCase() === String(targetName).toLowerCase())
-                                ) || null;
-                            }
-                        }
-                        if (!matchedCollege && userCollegeId && user?.college) {
-                            matchedCollege = {
-                                id: userCollegeId,
-                                name: typeof user.college === "string" ? user.college : (user.college.officialName || "My College"),
-                                officialName: typeof user.college === "string" ? user.college : (user.college.officialName || "My College"),
-                                city: typeof user.college === "object" ? user.college.city ?? null : null,
-                                studentCount: 1,
-                            };
-                        }
-
-                        // NOTE: If the user does not have a college assigned, DO NOT force
-                        // them to default to any college. Keep selectedCollege as null.
-                        setSelectedCollege(matchedCollege);
-                    }
-                }
-            } catch (err) {
-                console.warn("Could not load participating colleges:", err);
+        let matchedCollege: ParticipatingCollege | null = null;
+        if (userCollegeId && participatingColleges.length > 0) {
+            matchedCollege = participatingColleges.find((c) => c.id === userCollegeId) || null;
+        }
+        if (!matchedCollege && (user?.college || (user as any)?.collegeName) && participatingColleges.length > 0) {
+            const targetName = typeof user?.college === "string" ? user.college : (user?.college?.officialName || (user as any)?.collegeName);
+            if (targetName) {
+                matchedCollege = participatingColleges.find((c) =>
+                    (c.officialName && c.officialName.toLowerCase() === String(targetName).toLowerCase()) ||
+                    (c.name && c.name.toLowerCase() === String(targetName).toLowerCase())
+                ) || null;
             }
-        };
-
-        fetchParticipating();
-        return () => {
-            isMounted = false;
-        };
-    }, [user?.collegeId, user?.college]);
+        }
+        if (!matchedCollege && userCollegeId && user?.college) {
+            matchedCollege = {
+                id: userCollegeId,
+                name: typeof user.college === "string" ? user.college : (user.college.officialName || "My College"),
+                officialName: typeof user.college === "string" ? user.college : (user.college.officialName || "My College"),
+                city: typeof user.college === "object" ? user.college.city ?? null : null,
+                studentCount: 1,
+            };
+        }
+        if (matchedCollege) {
+            dispatch(setSelectedCollege(matchedCollege));
+        }
+    }, [user?.collegeId, user?.college, participatingColleges, selectedCollege, dispatch]);
 
     // -------------------------------------------------------------------------
-    // 2. Debounce Search Input
+    // 3. Debounce Search Input
     // -------------------------------------------------------------------------
     useEffect(() => {
         const timer = setTimeout(() => {
-            setDebouncedSearch(searchQuery);
-            setPage(1); // Reset to page 1 on search change
+            dispatch(setDebouncedSearch(searchQuery));
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, dispatch]);
 
     // -------------------------------------------------------------------------
-    // 3. Tab & Filter Handlers
+    // 4. Fetch Leaderboard via Redux (Cached & Stale-While-Revalidate)
+    // -------------------------------------------------------------------------
+    useEffect(() => {
+        if (activeTab === "global") {
+            dispatch(
+                fetchGlobalLeaderboard({
+                    page,
+                    limit,
+                    period,
+                    filter,
+                    search: debouncedSearch,
+                    user: currentUsername,
+                })
+            );
+        } else if (activeTab === "college" && selectedCollege?.id) {
+            dispatch(
+                fetchCollegeLeaderboard({
+                    collegeId: selectedCollege.id,
+                    page,
+                    limit,
+                    period,
+                    filter,
+                    search: debouncedSearch,
+                    user: currentUsername,
+                })
+            );
+        }
+    }, [activeTab, selectedCollege?.id, page, limit, period, filter, debouncedSearch, currentUsername, dispatch]);
+
+    // -------------------------------------------------------------------------
+    // 5. Navigation & Filter Handlers
     // -------------------------------------------------------------------------
     const handleTabChange = (tab: "global" | "college") => {
-        setActiveTab(tab);
-        setPage(1);
-        setSearchQuery("");
-        setDebouncedSearch("");
+        dispatch(setActiveTab(tab));
     };
 
     const handleSelectCollege = (college: ParticipatingCollege) => {
-        setSelectedCollege(college);
-        setPage(1);
-        setSearchQuery("");
-        setDebouncedSearch("");
+        dispatch(setSelectedCollege(college));
     };
 
     const handleFilterChange = (newFilter: "all" | "verified") => {
-        setFilter(newFilter);
-        setPage(1);
+        dispatch(setFilter(newFilter));
+    };
+
+    const handlePageChange = (newPage: number) => {
+        dispatch(setPage(newPage));
     };
 
     // -------------------------------------------------------------------------
-    // 4. Fetch Leaderboard (Global or College League)
-    // -------------------------------------------------------------------------
-    const fetchLeaderboard = useCallback(async () => {
-        setIsLoading(true);
-
-        try {
-            const queryParams = new URLSearchParams({
-                page: String(page),
-                limit: String(limit),
-                period,
-            });
-
-            if (filter === "verified" && activeTab === "global") {
-                queryParams.set("filter", "verified");
-            }
-            if (debouncedSearch) {
-                queryParams.set("search", debouncedSearch);
-            }
-            if (currentUsername) {
-                queryParams.set("user", currentUsername);
-            }
-
-            let endpointPath = "";
-            if (activeTab === "global") {
-                endpointPath = `/api/leaderboard/global?${queryParams.toString()}`;
-            } else {
-                if (!selectedCollege?.id) {
-                    setPodium([]);
-                    setEntries([]);
-                    setMetadata(null);
-                    setCurrentUserRank(null);
-                    setSelectedCollegeMeta(null);
-                    setIsLoading(false);
-                    return;
-                }
-                endpointPath = `/api/leaderboard/colleges/${encodeURIComponent(selectedCollege.id)}?${queryParams.toString()}`;
-            }
-
-            const rankingsUrl = buildApiUrl(endpointPath);
-            let res: Response | null = null;
-            try {
-                res = await fetch(rankingsUrl, { credentials: "include" });
-            } catch {
-                // network error
-            }
-
-            if (!res || !res.ok) {
-                let errorDetail = "";
-                try {
-                    const errorJson = await res?.clone().json();
-                    errorDetail = errorJson?.message || "";
-                } catch {
-                    // response body wasn't JSON
-                }
-                const subject = activeTab === "college" ? "College League" : "Global";
-                const statusStr = res?.status ? ` (${res.status})` : "";
-                throw new Error(errorDetail || `Failed to load ${subject} leaderboard${statusStr}`);
-            }
-
-            const data = await res.json();
-            if (!data.success) {
-                throw new Error(data.error || data.message || "API returned failure response");
-            }
-
-            if (activeTab === "global") {
-                const globalData = data as LeaderboardResponse;
-                setMetadata(globalData.metadata);
-                setPodium(globalData.podium || []);
-                setEntries(globalData.entries || []);
-                if (globalData.collegesRepresentedCount !== undefined) {
-                    setCollegesRepresentedCount(globalData.collegesRepresentedCount);
-                }
-
-                if (globalData.currentUser) {
-                    setCurrentUserRank(globalData.currentUser);
-                } else if (currentUsername && globalData.entries) {
-                    const found =
-                        globalData.entries.find((e: LeaderboardEntry) => e.username?.toLowerCase() === currentUsername.toLowerCase()) ||
-                        globalData.podium?.find((e: LeaderboardEntry) => e.username?.toLowerCase() === currentUsername.toLowerCase());
-                    setCurrentUserRank(found || null);
-                } else {
-                    setCurrentUserRank(null);
-                }
-                setSelectedCollegeMeta(null);
-            } else {
-                const collegeData = data as CollegeLeaderboardResponse;
-                setMetadata(collegeData.metadata);
-                setPodium(collegeData.podium || []);
-                setEntries(collegeData.entries || []);
-                if (collegeData.collegesRepresentedCount !== undefined) {
-                    setCollegesRepresentedCount(collegeData.collegesRepresentedCount);
-                }
-
-                setSelectedCollegeMeta({
-                    id: collegeData.college.id,
-                    name: collegeData.college.name,
-                    code: collegeData.college.code,
-                    city: collegeData.college.city,
-                    country: collegeData.college.country,
-                    totalStudents: collegeData.totalStudents,
-                });
-
-                if (collegeData.currentUser) {
-                    setCurrentUserRank(collegeData.currentUser);
-                } else if (currentUsername && collegeData.entries) {
-                    const found =
-                        collegeData.entries.find((e: LeaderboardEntry) => e.username?.toLowerCase() === currentUsername.toLowerCase()) ||
-                        collegeData.podium?.find((e: LeaderboardEntry) => e.username?.toLowerCase() === currentUsername.toLowerCase());
-                    setCurrentUserRank(found || null);
-                } else {
-                    setCurrentUserRank(null);
-                }
-            }
-        } catch (err: any) {
-            const errorMsg = err.message || "Leaderboard standings are syncing. Please refresh in a moment.";
-            toast.error(errorMsg, {
-                title: activeTab === "college" ? "Campus Standings" : "Leaderboard Notice",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [activeTab, selectedCollege?.id, page, limit, period, filter, debouncedSearch, currentUsername, toast]);
-
-    useEffect(() => {
-        fetchLeaderboard();
-    }, [fetchLeaderboard]);
-
-    // -------------------------------------------------------------------------
-    // 5. Authorized Sync Now Handler
+    // 6. Authorized Sync Now Handler (Server Recompute + Cache Invalidation)
     // -------------------------------------------------------------------------
     const handleSyncNow = async () => {
-        setIsSyncing(true);
         try {
-            const syncUrl = buildApiUrl("/api/leaderboard/sync");
-            let res: Response | null = null;
-            try {
-                res = await fetch(syncUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                });
-            } catch {
-                // network error
-            }
-
-            if (res && res.ok) {
-                await fetchLeaderboard();
-                toast.success("Leaderboard synced successfully.", { title: "Synced" });
-            } else {
-                throw new Error("Sync failed or requires authentication");
+            await dispatch(syncLeaderboardNow()).unwrap();
+            toast.success("Leaderboard synced successfully.", { title: "Synced" });
+            if (activeTab === "global") {
+                dispatch(
+                    fetchGlobalLeaderboard({
+                        page,
+                        limit,
+                        period,
+                        filter,
+                        search: debouncedSearch,
+                        user: currentUsername,
+                        forceRefresh: true,
+                    })
+                );
+            } else if (selectedCollege?.id) {
+                dispatch(
+                    fetchCollegeLeaderboard({
+                        collegeId: selectedCollege.id,
+                        page,
+                        limit,
+                        period,
+                        filter,
+                        search: debouncedSearch,
+                        user: currentUsername,
+                        forceRefresh: true,
+                    })
+                );
             }
         } catch (err: any) {
-            console.warn("Sync error:", err.message);
-            toast.error(err.message || "Failed to sync leaderboard.", { title: "Sync Failed" });
-        } finally {
-            setIsSyncing(false);
+            toast.error(err || "Failed to sync leaderboard.", { title: "Sync Failed" });
         }
     };
 
@@ -353,7 +257,7 @@ export const LeaderboardPage: React.FC = () => {
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* ========================================================================= */}
-                        {/* HEADER: Tabs, Prominent Colleges Counter, Search, Period & Sync */}
+                        {/* HEADER: Search Bar on Left, Tabs on Right, Sync & Algorithm */}
                         {/* ========================================================================= */}
                         <LeaderboardHeader
                             metadata={metadata}
@@ -361,11 +265,11 @@ export const LeaderboardPage: React.FC = () => {
                             onTabChange={handleTabChange}
                             collegesRepresentedCount={collegesRepresentedCount}
                             searchQuery={searchQuery}
-                            onSearchChange={setSearchQuery}
+                            onSearchChange={(q) => dispatch(setSearchQuery(q))}
                             filter={filter}
                             onFilterChange={handleFilterChange}
                             period={period}
-                            onPeriodChange={setPeriod}
+                            onPeriodChange={() => {}}
                             onSyncNow={handleSyncNow}
                             isSyncing={isSyncing}
                             onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
@@ -390,7 +294,6 @@ export const LeaderboardPage: React.FC = () => {
                                 />
                             </div>
                         )}
-
 
                         {/* ========================================================================= */}
                         {/* GLOBAL LEADERBOARD: CURRENT USER RANKING STRIP */}
@@ -529,13 +432,15 @@ export const LeaderboardPage: React.FC = () => {
                                     onClick={() => {
                                         const myCol = participatingColleges.find((c) => c.id === userCollegeId);
                                         if (myCol) {
-                                            setSelectedCollege(myCol);
+                                            dispatch(setSelectedCollege(myCol));
                                         } else if (user?.college) {
-                                            setSelectedCollege({
-                                                id: userCollegeId,
-                                                officialName: user.college.officialName,
-                                                city: user.college.city ?? null,
-                                            });
+                                            dispatch(
+                                                setSelectedCollege({
+                                                    id: userCollegeId,
+                                                    officialName: user.college.officialName,
+                                                    city: user.college.city ?? null,
+                                                })
+                                            );
                                         }
                                     }}
                                     className="px-3.5 py-1.5 rounded-lg bg-black text-white text-xs font-black border-2 border-black hover:bg-neutral-800 transition-all shadow-[1px_1px_0px_#000] whitespace-nowrap cursor-pointer self-start sm:self-auto"
@@ -619,7 +524,7 @@ export const LeaderboardPage: React.FC = () => {
                                         totalPages={metadata?.totalPages ?? 1}
                                         totalCoders={metadata?.totalCoders ?? 0}
                                         pageSize={limit}
-                                        onPageChange={(p) => setPage(p)}
+                                        onPageChange={handlePageChange}
                                         isLoading={isLoading}
                                     />
                                 </div>
@@ -627,14 +532,12 @@ export const LeaderboardPage: React.FC = () => {
                         )}
                     </div>
 
-                    {/* ========================================================================= */}
-                    {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms & Resume) */}
-                    {/* ========================================================================= */}
+                    {/* Bottom Full-Width Illustration */}
                     <SectionBottomIllustration alt="Leaderboard workspace illustration" />
                 </section>
             </div>
 
-            {/* Authoritative Orbix Score Algorithm & Platform Capability Modal */}
+            {/* Authoritative Orbix Score Algorithm Modal */}
             <AlgorithmModal
                 isOpen={isAlgorithmModalOpen}
                 onClose={() => setIsAlgorithmModalOpen(false)}

@@ -116,6 +116,34 @@ export const cacheLeaderboard = {
     },
 
     /**
+     * Fetch cached individual user rank
+     */
+    async getUserRank(username: string, context = "global") {
+        try {
+            if (!redis || redis.status !== "ready") return null;
+            const key = `orbix:leaderboard:v1:userrank:${encodeURIComponent(username.toLowerCase())}:${context}`;
+            const data = await redis.get(key);
+            return data ? JSON.parse(data) : null;
+        } catch (err) {
+            return null;
+        }
+    },
+
+    /**
+     * Store individual user rank in Redis cache
+     */
+    async setUserRank(username: string, context = "global", payload: any) {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const key = `orbix:leaderboard:v1:userrank:${encodeURIComponent(username.toLowerCase())}:${context}`;
+            const ttl = getJitter(GLOBAL_LEADERBOARD_TTL);
+            await redis.setex(key, ttl, JSON.stringify(payload));
+        } catch (err) {
+            // Non-blocking error
+        }
+    },
+
+    /**
      * Invalidate leaderboard cache keys
      * @param options.collegeId Specific college to invalidate, or all if omitted
      */
@@ -127,6 +155,7 @@ export const cacheLeaderboard = {
             const patterns = [
                 "orbix:leaderboard:v1:global:*",
                 "orbix:leaderboard:v1:colleges:*",
+                "orbix:leaderboard:v1:userrank:*",
             ];
 
             if (options?.collegeId) {
