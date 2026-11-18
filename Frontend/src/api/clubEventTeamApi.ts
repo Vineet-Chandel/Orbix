@@ -41,6 +41,8 @@ export interface EventTeamDetails {
     name: string;
     code: string;
     leaderId: string;
+    leaderUsername?: string;
+    leaderName?: string;
     status: string;
     createdAt: string;
     updatedAt: string;

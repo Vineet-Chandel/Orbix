@@ -293,6 +293,8 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
     const remainingSlots = Math.max(0, maxTeamSize - totalAllocated);
     const capacityRatio = team ? Math.min(100, Math.round((confirmedCount / maxTeamSize) * 100)) : 0;
     const isFull = totalAllocated >= maxTeamSize;
+    const leaderMember = team?.members?.find((m) => m.role === "leader");
+    const leaderDisplayName = leaderMember?.name || team?.leaderName || (leaderMember ? `@${leaderMember.username}` : (team?.leaderUsername ? `@${team.leaderUsername}` : "Squad Leader"));
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
