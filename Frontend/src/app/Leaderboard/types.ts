@@ -34,8 +34,12 @@ export function parseLeaderboardRatings(
                 badge: val.badge || val.tier,
             };
         }
-        if (typeof val === "string" && !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0) {
-            return { rating: parseInt(val, 10) };
+        if (typeof val === "string") {
+            const clean = val.replace(/,/g, "").trim();
+            const parsed = parseInt(clean, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+                return { rating: parsed };
+            }
         }
         return null;
     };

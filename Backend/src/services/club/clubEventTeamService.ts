@@ -110,9 +110,32 @@ export class ClubEventTeamService {
     private static async assertRegistrationOpen(eventId: string, startsAt?: string | null, endsAt?: string | null) {
         const now = Date.now();
 
-        // 1. Check registration stage deadline / status first (authoritative round pipeline)
+        // 1. Check event record if startsAt, endsAt or status are missing
+        let evStartsAt = startsAt;
+        let evEndsAt = endsAt;
+        let evStatus: string | null = null;
+
+        if (!evStartsAt || !evEndsAt) {
+            const evRes = await query(
+                `SELECT starts_at AS "startsAt", ends_at AS "endsAt", status FROM club_events WHERE id = $1 LIMIT 1;`,
+                [eventId]
+            );
+            if (evRes.rows[0]) {
+                evStartsAt = evStartsAt || evRes.rows[0].startsAt;
+                evEndsAt = evEndsAt || evRes.rows[0].endsAt;
+                evStatus = evRes.rows[0].status;
+            }
+        }
+
+        if (evStatus === "completed" || evStatus === "cancelled") {
+            const err: any = new Error(`This event has ${evStatus}. Team rosters are permanently locked.`);
+            err.statusCode = 403;
+            throw err;
+        }
+
+        // 2. Check registration stage deadline / status first (authoritative round pipeline)
         const stageRes = await query(
-            `SELECT id, name, type, action_type, status, ends_at AS "endsAt"
+            `SELECT id, name, type, action_type, status, starts_at AS "startsAt", ends_at AS "endsAt", stage_order AS "stageOrder"
              FROM club_event_stages
              WHERE event_id = $1
              ORDER BY 
@@ -124,7 +147,7 @@ export class ClubEventTeamService {
 
         if (stageRes.rows[0]) {
             const stage = stageRes.rows[0];
-            if (stage.status === "completed") {
+            if (stage.status === "completed" || stage.status === "cancelled") {
                 const err: any = new Error("The registration round has concluded. Team modifications and roster edits are permanently locked.");
                 err.statusCode = 403;
                 throw err;
@@ -134,12 +157,36 @@ export class ClubEventTeamService {
                 err.statusCode = 403;
                 throw err;
             }
+            if (stage.startsAt && now < new Date(stage.startsAt).getTime()) {
+                const err: any = new Error("Registration has not yet started for this event.");
+                err.statusCode = 403;
+                throw err;
+            }
+
+            // Check if any stage AFTER registration has already become active or completed
+            const advancedStageRes = await query(
+                `SELECT id, name FROM club_event_stages 
+                 WHERE event_id = $1 AND stage_order > $2 AND status IN ('active', 'completed')
+                 LIMIT 1;`,
+                [eventId, stage.stageOrder]
+            );
+            if (advancedStageRes.rows[0]) {
+                const err: any = new Error(`Stage "${advancedStageRes.rows[0].name}" has already begun. Team rosters are permanently locked.`);
+                err.statusCode = 403;
+                throw err;
+            }
+
             // Registration stage is active!
             return;
         }
 
-        // 2. If no specific registration stage is configured, check if event has concluded
-        if (endsAt && now >= new Date(endsAt).getTime()) {
+        // 3. If no specific registration stage is configured, check if event has started or concluded
+        if (evStartsAt && now >= new Date(evStartsAt).getTime()) {
+            const err: any = new Error("This event has already started. Team modifications and roster edits are permanently locked.");
+            err.statusCode = 403;
+            throw err;
+        }
+        if (evEndsAt && now >= new Date(evEndsAt).getTime()) {
             const err: any = new Error("This event has concluded. Team modifications and roster edits are permanently locked.");
             err.statusCode = 403;
             throw err;
@@ -270,7 +317,7 @@ export class ClubEventTeamService {
         teamCode: string
     ): Promise<EventTeamDetails> {
         const event = await this.getTeamEvent(eventId);
-        await this.assertRegistrationOpen(eventId, event.startsAt);
+        await this.assertRegistrationOpen(eventId, event.startsAt, event.endsAt);
 
         const cleanCode = (teamCode || "").trim().toUpperCase();
         if (!cleanCode) {
@@ -338,18 +385,23 @@ export class ClubEventTeamService {
         );
 
         // Resolve user & leader for notifications and registration record
-        const [memberUserRes, leaderUserRes] = await Promise.all([
+        const [memberUserRes, leaderUserRes, leaderRegRes] = await Promise.all([
             query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
             query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [team.leaderId]),
+            query(`SELECT status, club_id, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`, [eventId, team.leaderId]),
         ]);
 
         const memberUser = memberUserRes.rows[0];
         const leaderUser = leaderUserRes.rows[0];
+        const leaderReg = leaderRegRes.rows[0];
 
+        const targetStatus = leaderReg?.status || "registered";
+        const targetClubId = leaderReg?.club_id || event.clubId;
         const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
         const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
+        const memberTicketCode = `TKT-${(team.code || "ORB").replace(/[^A-Z0-9]/gi, "").slice(0, 6).toUpperCase()}-${userId.replace(/[^A-Z0-9]/gi, "").slice(0, 4).toUpperCase()}`;
 
-        // Link registration record, or create a pending registration record
+        // Link registration record, or create a full registration record matching team status
         const regCheck = await query(
             `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
             [eventId, userId]
@@ -357,16 +409,16 @@ export class ClubEventTeamService {
         if (regCheck.rows[0]) {
             await query(
                 `UPDATE club_event_registrations 
-                 SET team_id = $1, team_role = 'member', updated_at = NOW()
-                 WHERE id = $2;`,
-                [team.id, regCheck.rows[0].id]
+                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3), updated_at = NOW()
+                 WHERE id = $4;`,
+                [team.id, targetStatus, memberTicketCode, regCheck.rows[0].id]
             );
         } else {
             await query(
                 `INSERT INTO club_event_registrations (
-                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, registered_at, created_at, updated_at
-                 ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, 'member', NOW(), NOW(), NOW());`,
-                [eventId, event.clubId, userId, memberName, memberUser?.email || "developer@orbix.in", team.id]
+                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code, registered_at, created_at, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, NOW(), NOW(), NOW());`,
+                [eventId, targetClubId, userId, targetStatus, memberName, memberUser?.email || "developer@orbix.in", team.id, memberTicketCode]
             );
         }
 
@@ -756,29 +808,48 @@ export class ClubEventTeamService {
             [invitationId]
         );
 
-        // Link registration
-        await query(
-            `UPDATE club_event_registrations 
-             SET team_id = $1, team_role = 'member', updated_at = NOW()
-             WHERE event_id = $2 AND user_id = $3;`,
-            [inv.teamId, inv.eventId, userId]
+        // Resolve user & leader for notifications and registration record
+        const [memberUserRes, leaderUserRes, leaderRegRes] = await Promise.all([
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [inv.leaderId]),
+            query(`SELECT status, club_id, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`, [inv.eventId, inv.leaderId]),
+        ]);
+
+        const memberUser = memberUserRes.rows[0];
+        const leaderUser = leaderUserRes.rows[0];
+        const leaderReg = leaderRegRes.rows[0];
+
+        const targetStatus = leaderReg?.status || "registered";
+        const targetClubId = leaderReg?.club_id || inv.clubId;
+        const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
+        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
+        const memberTicketCode = `TKT-${(inv.teamCode || "ORB").replace(/[^A-Z0-9]/gi, "").slice(0, 6).toUpperCase()}-${userId.replace(/[^A-Z0-9]/gi, "").slice(0, 4).toUpperCase()}`;
+
+        // Link registration record, or create a full registration record matching team status
+        const regCheck = await query(
+            `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
+            [inv.eventId, userId]
         );
+        if (regCheck.rows[0]) {
+            await query(
+                `UPDATE club_event_registrations 
+                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3), updated_at = NOW()
+                 WHERE id = $4;`,
+                [inv.teamId, targetStatus, memberTicketCode, regCheck.rows[0].id]
+            );
+        } else {
+            await query(
+                `INSERT INTO club_event_registrations (
+                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code, registered_at, created_at, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, NOW(), NOW(), NOW());`,
+                [inv.eventId, targetClubId, userId, targetStatus, memberName, memberUser?.email || "developer@orbix.in", inv.teamId, memberTicketCode]
+            );
+        }
 
         const newCount = inv.membersCount + 1;
         if (newCount >= inv.minTeamSize) {
             await query(`UPDATE club_event_teams SET status = 'registered', updated_at = NOW() WHERE id = $1;`, [inv.teamId]);
         }
-
-        // Resolve user & leader for notifications
-        const [memberUserRes, leaderUserRes] = await Promise.all([
-            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
-            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [inv.leaderId]),
-        ]);
-
-        const memberUser = memberUserRes.rows[0];
-        const leaderUser = leaderUserRes.rows[0];
-        const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
-        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
 
         // Dispatch background emails
         if (memberUser?.email) {
