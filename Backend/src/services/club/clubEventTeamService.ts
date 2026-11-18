@@ -940,10 +940,9 @@ export class ClubEventTeamService {
             throw err;
         }
 
-        // Unlink registration
+        // Cleanly delete registration for removed member so they can re-register or join another squad
         await query(
-            `UPDATE club_event_registrations 
-             SET team_id = NULL, team_role = NULL, updated_at = NOW()
+            `DELETE FROM club_event_registrations 
              WHERE event_id = $1 AND user_id = $2;`,
             [team.eventId, targetUserId]
         );
