@@ -396,7 +396,7 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                         <div className="flex items-center gap-2">
                             <Eye className="w-4 h-4 text-sky-800 shrink-0" />
                             <span>
-                                Squad Invitation Preview • You were invited to join this team by <strong className="text-black font-black">{team?.leaderName || `@${team?.leaderUsername}`}</strong>. Inspect the roster and capacity details before accepting.
+                                Squad Invitation Preview • You were invited to join this team by <strong className="text-black font-black">{leaderDisplayName}</strong>. Inspect the roster and capacity details before accepting.
                             </span>
                         </div>
                         <span className="px-2.5 py-0.5 rounded-full bg-white border border-black text-[10px] font-black shrink-0 shadow-[1px_1px_0px_#000]">
