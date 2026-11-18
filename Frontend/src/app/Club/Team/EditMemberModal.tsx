@@ -6,7 +6,7 @@ import { NeoSelect } from "../../../components/NeoSelect";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import { VerifiedBadge } from "../../../components/VerifiedBadge";
 import type { ClubMember, ClubTeam } from "./types";
-import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
+import { EnlargeableAvatar } from "../../../components/media/EnlargeableAvatar";
 
 interface EditMemberModalProps {
     isOpen: boolean;
@@ -204,13 +204,12 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 {/* Header with Member Info */}
                 <div className="flex items-start justify-between gap-3 pb-3 border-b-2 border-black/15">
                     <div className="flex items-center gap-3 min-w-0">
-                        <img
-                            src={member.avatarUrl || DEFAULT_AVATAR_URL}
-                            alt={member.username}
+                        <EnlargeableAvatar
+                            src={member.avatarUrl}
+                            alt={member.displayName || member.username}
+                            displayName={member.displayName}
+                            username={member.username}
                             className="w-11 h-11 rounded-full border-2 border-black object-cover shrink-0"
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                            }}
                         />
                         <div className="min-w-0">
                             <div className="flex items-center gap-1.5">

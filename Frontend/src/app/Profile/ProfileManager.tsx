@@ -704,7 +704,7 @@ export default function ProfileManager() {
                                             )}
                                         </div>
                                         <p className="text-xs font-medium text-neutral-600 mt-1 leading-relaxed">
-                                            Hover or tap avatar to upload, restore, or reset photo. Images are optimized and face-cropped automatically.
+                                            Tap avatar to view. Use the menu to upload, restore, or reset photo. Images are optimized and face-cropped automatically.
                                         </p>
                                         {user?.hasPreviousPhoto && (
                                             <span className="inline-flex items-center gap-1.5 text-[11px] text-black font-bold mt-2">

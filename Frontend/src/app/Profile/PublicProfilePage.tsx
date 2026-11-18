@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { ProjectCard } from "../../components/projects/ProjectCard";
 import { ProjectDetailModal } from "../../components/projects/ProjectDetailModal";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 import { fetchUserProjects } from "../../api/projectApi";
 import type { ProjectItem } from "../../types/project";
 import { RelationshipActionButton } from "../../components/RelationshipActionButton";
@@ -1190,22 +1191,21 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                     {/* Main Identity: Photo, Name, Headline, Location, College */}
                                     <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 text-center sm:text-left">
                                         <div className="relative shrink-0">
-                                            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#FAF6EE] border-[3px] border-black shadow-[4px_4px_0px_#000] overflow-hidden flex items-center justify-center">
-                                                {avatarSrc ? (
-                                                    <img
-                                                        src={avatarSrc}
-                                                        alt={profile.displayName || profile.username}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e) => {
-                                                            (e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                        }}
-                                                    />
-                                                ) : (
+                                            {avatarSrc ? (
+                                                <EnlargeableAvatar
+                                                    src={avatarSrc}
+                                                    alt={profile.displayName || profile.username}
+                                                    displayName={profile.displayName || `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || profile.username}
+                                                    username={profile.username}
+                                                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#FAF6EE] border-[3px] border-black shadow-[4px_4px_0px_#000] overflow-hidden flex items-center justify-center"
+                                                />
+                                            ) : (
+                                                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#FAF6EE] border-[3px] border-black shadow-[4px_4px_0px_#000] overflow-hidden flex items-center justify-center">
                                                     <span className="text-3xl font-black text-black">
                                                         {(profile.firstName?.[0] || profile.username?.[0] || "U").toUpperCase()}
                                                     </span>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
                                             <div className="absolute -bottom-2 -right-2 p-1.5 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]" title="Private Profile">
                                                 <Lock className="w-3.5 h-3.5 text-black stroke-[3]" />
                                             </div>
@@ -1475,22 +1475,21 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
                                     {/* Developer Identity Block: Photo, Full Name, Headline */}
                                     <div className="flex items-center gap-3 pb-3 border-b-2 border-black/10">
-                                        <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center">
-                                            {avatarSrc ? (
-                                                <img
-                                                    src={avatarSrc}
-                                                    alt={profile.displayName || profile.username}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        (e.currentTarget as HTMLElement).style.display = "none";
-                                                    }}
-                                                />
-                                            ) : (
+                                        {avatarSrc ? (
+                                            <EnlargeableAvatar
+                                                src={avatarSrc}
+                                                alt={profile.displayName || profile.username}
+                                                displayName={profile.displayName || `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || profile.username}
+                                                username={profile.username}
+                                                className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center"
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center">
                                                 <span className="text-base font-black text-black">
                                                     {(profile.firstName?.[0] || profile.username?.[0] || "U").toUpperCase()}
                                                 </span>
-                                            )}
-                                        </div>
+                                            </div>
+                                        )}
                                         <div className="min-w-0 flex-1">
                                             <h4 className="text-sm font-black text-black truncate leading-tight">
                                                 {profile.displayName || `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || profile.username}

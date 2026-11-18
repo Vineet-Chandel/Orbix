@@ -24,6 +24,7 @@ import {
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useToast } from "../../context/ToastContext";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ConnectionsSettingsViewProps {
@@ -243,12 +244,11 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
                             >
                                 {/* Left: Avatar & Info */}
                                 <div className="flex items-start gap-3.5 min-w-0">
-                                    <img
+                                    <EnlargeableAvatar
                                         src={avatar}
                                         alt={item.displayName}
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                        }}
+                                        displayName={item.displayName}
+                                        username={item.username}
                                         className="w-11 h-11 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
                                     />
                                     <div className="min-w-0 space-y-0.5">

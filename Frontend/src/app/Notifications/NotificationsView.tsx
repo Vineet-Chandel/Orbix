@@ -46,6 +46,7 @@ import {
     MailOpen,
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 import { downloadPassPdf } from "../../utils/passPdfGenerator";
 import { revealCertificateNotification } from "../../api/certificateStudioApi";
 import { useToast } from "../../context/ToastContext";
@@ -3045,16 +3046,13 @@ export const NotificationsView: React.FC = () => {
                                     {/* Detail Top Header */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
                                         <div className="flex items-center gap-3.5">
-                                            <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-hidden flex-shrink-0">
-                                                <img
-                                                    src={senderAvatar}
-                                                    alt={senderDisplayName}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                    }}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            </div>
+                                            <EnlargeableAvatar
+                                                src={senderAvatar}
+                                                alt={senderDisplayName}
+                                                displayName={senderDisplayName}
+                                                username={senderUsername}
+                                                className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-hidden flex-shrink-0"
+                                            />
                                             <div>
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <h3 className="text-base sm:text-lg font-black text-black tracking-tight">

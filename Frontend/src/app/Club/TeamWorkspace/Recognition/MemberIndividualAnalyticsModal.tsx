@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type { IndividualMemberAnalytics, LeaderboardPeriod } from "../../../../types/workspace";
+import { EnlargeableAvatar } from "../../../../components/media/EnlargeableAvatar";
 
 interface MemberIndividualAnalyticsModalProps {
     clubId: string;
@@ -62,13 +63,25 @@ export const MemberIndividualAnalyticsModal: React.FC<MemberIndividualAnalyticsM
                 {/* Header */}
                 <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                            {data?.avatarUrl ? (
-                                <img src={data.avatarUrl} alt={data.name} className="w-full h-full object-cover" />
-                            ) : (
+                        {data?.avatarUrl ? (
+                            <EnlargeableAvatar
+                                src={data.avatarUrl}
+                                alt={data.name}
+                                displayName={data.name}
+                                username={data.username}
+                                fallbackSrc={null}
+                                fallbackNode={
+                                    <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                        <User className="w-6 h-6 text-slate-400" />
+                                    </div>
+                                }
+                                className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center"
+                            />
+                        ) : (
+                            <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center">
                                 <User className="w-6 h-6 text-slate-400" />
-                            )}
-                        </div>
+                            </div>
+                        )}
                         <div>
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 {data?.name || "Member Analytics"}

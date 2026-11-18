@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 import {
     Compass,
     Search,
@@ -1056,12 +1057,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="flex items-center gap-3 min-w-0">
                                                                 <div className="relative shrink-0">
-                                                                    <img
+                                                                    <EnlargeableAvatar
                                                                         src={avatar}
                                                                         alt={candidate.displayName}
-                                                                        onError={(e) => {
-                                                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                                        }}
+                                                                        displayName={candidate.displayName}
+                                                                        username={candidate.username}
                                                                         className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000]"
                                                                     />
                                                                     {candidate.isOpenToWork && (
@@ -1316,12 +1316,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                     <div className="p-5 space-y-3">
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="flex items-center gap-3 min-w-0">
-                                                                <img
+                                                                <EnlargeableAvatar
                                                                     src={avatar}
                                                                     alt={item.displayName}
-                                                                    onError={(e) => {
-                                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                                    }}
+                                                                    displayName={item.displayName}
+                                                                    username={item.username}
                                                                     className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000] shrink-0"
                                                                 />
                                                                 <div className="min-w-0">
@@ -1526,12 +1525,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                             <div className="p-5 space-y-3">
                                                                 <div className="flex items-start justify-between gap-3">
                                                                     <div className="flex items-center gap-3 min-w-0">
-                                                                        <img
+                                                                        <EnlargeableAvatar
                                                                             src={avatar}
                                                                             alt={item.displayName}
-                                                                            onError={(e) => {
-                                                                                (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                                            }}
+                                                                            displayName={item.displayName}
+                                                                            username={item.username}
                                                                             className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000] shrink-0"
                                                                         />
                                                                         <div className="min-w-0">
@@ -1672,12 +1670,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                             <div className="p-5 space-y-3">
                                                                 <div className="flex items-start justify-between gap-3">
                                                                     <div className="flex items-center gap-3 min-w-0">
-                                                                        <img
+                                                                        <EnlargeableAvatar
                                                                             src={avatar}
                                                                             alt={item.displayName}
-                                                                            onError={(e) => {
-                                                                                (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                                            }}
+                                                                            displayName={item.displayName}
+                                                                            username={item.username}
                                                                             className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000] shrink-0"
                                                                         />
                                                                         <div className="min-w-0">

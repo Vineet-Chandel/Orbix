@@ -23,6 +23,7 @@ import type {
 import { ChangeRoleModal } from "./ChangeRoleModal";
 import { InviteMemberModal } from "./InviteMemberModal";
 import { MemberRecognitionProfileModal } from "../Recognition/MemberRecognitionProfileModal";
+import { EnlargeableAvatar } from "../../../../components/media/EnlargeableAvatar";
 import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface MemberDirectoryViewProps {
@@ -256,17 +257,25 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                                 <tr key={m.id} className="hover:bg-neutral-50/80 transition-colors">
                                     <td className="p-3">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full border-2 border-black bg-neutral-200 overflow-hidden flex items-center justify-center font-black text-xs shrink-0">
-                                                {m.user?.avatarUrl ? (
-                                                    <img
-                                                        src={m.user.avatarUrl}
-                                                        alt={fullName}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    fullName.charAt(0).toUpperCase()
-                                                )}
-                                            </div>
+                                            {m.user?.avatarUrl ? (
+                                                <EnlargeableAvatar
+                                                    src={m.user.avatarUrl}
+                                                    alt={fullName}
+                                                    displayName={fullName}
+                                                    username={m.user.username}
+                                                    fallbackSrc={null}
+                                                    fallbackNode={
+                                                        <div className="w-9 h-9 rounded-full border-2 border-black bg-neutral-200 overflow-hidden flex items-center justify-center font-black text-xs shrink-0">
+                                                            {fullName.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    }
+                                                    className="w-9 h-9 rounded-full border-2 border-black bg-neutral-200 overflow-hidden flex items-center justify-center font-black text-xs shrink-0"
+                                                />
+                                            ) : (
+                                                <div className="w-9 h-9 rounded-full border-2 border-black bg-neutral-200 overflow-hidden flex items-center justify-center font-black text-xs shrink-0">
+                                                    {fullName.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
                                             <div>
                                                 <div className="font-black text-black flex items-center gap-1.5 flex-wrap">
                                                     {fullName}

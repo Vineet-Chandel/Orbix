@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type { MemberRecognitionProfile } from "../../../../types/workspace";
+import { EnlargeableAvatar } from "../../../../components/media/EnlargeableAvatar";
 
 interface MemberRecognitionProfileModalProps {
     isOpen: boolean;
@@ -104,17 +105,25 @@ export const MemberRecognitionProfileModal: React.FC<MemberRecognitionProfileMod
                         <>
                             {/* Member Identity Hero Card */}
                             <div className="p-4 bg-white border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] flex items-center gap-4">
-                                <div className="w-14 h-14 rounded-full border-2 border-black bg-neutral-100 overflow-hidden shrink-0 flex items-center justify-center font-black text-lg">
-                                    {profile.avatarUrl ? (
-                                        <img
-                                            src={profile.avatarUrl}
-                                            alt={profile.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        profile.name.charAt(0).toUpperCase()
-                                    )}
-                                </div>
+                                {profile.avatarUrl ? (
+                                    <EnlargeableAvatar
+                                        src={profile.avatarUrl}
+                                        alt={profile.name}
+                                        displayName={profile.name}
+                                        username={profile.username}
+                                        fallbackSrc={null}
+                                        fallbackNode={
+                                            <div className="w-14 h-14 rounded-full border-2 border-black bg-neutral-100 overflow-hidden shrink-0 flex items-center justify-center font-black text-lg">
+                                                {profile.name.charAt(0).toUpperCase()}
+                                            </div>
+                                        }
+                                        className="w-14 h-14 rounded-full border-2 border-black bg-neutral-100 overflow-hidden shrink-0 flex items-center justify-center font-black text-lg"
+                                    />
+                                ) : (
+                                    <div className="w-14 h-14 rounded-full border-2 border-black bg-neutral-100 overflow-hidden shrink-0 flex items-center justify-center font-black text-lg">
+                                        {profile.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                                 <div className="space-y-1 flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="text-base font-black text-black truncate">

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Eye } from "lucide-react";
 import { useAppDispatch } from "../../store";
 import { updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
@@ -11,6 +12,8 @@ import {
 } from "../../utils/profileApi";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { AdaptiveImageEditorModal } from "../../components/media/AdaptiveImageEditorModal";
+import { useAvatarViewer } from "../../components/media/EnlargeableAvatar";
+import { ProfilePhotoViewerModal } from "./ProfilePhotoViewerModal";
 
 interface ProfilePhotoFrameProps {
     currentPhotoUrl?: string | null;
@@ -36,6 +39,8 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const avatarButtonRef = useRef<HTMLButtonElement>(null);
+    const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
     // Component-level upload & action states
     const [isUploading, setIsUploading] = useState(false);
@@ -44,6 +49,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+    const [menuOpenDown, setMenuOpenDown] = useState(false);
 
     // Adaptive Image Editor state
     const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -60,6 +66,22 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
     const fallbackAvatar = DEFAULT_AVATAR_URL;
 
     const activePhotoSrc = currentPhotoUrl || fallbackAvatar;
+
+    // Shared read-only enlarged photo viewer hook
+    const {
+        isViewerOpen,
+        hasViewablePhoto,
+        openViewer,
+        closeViewer,
+        markImageFailed,
+        returnFocusTo,
+    } = useAvatarViewer(currentPhotoUrl);
+
+    const handleOpenViewer = (triggerEl?: HTMLElement | null) => {
+        if (!hasViewablePhoto) return;
+        setIsMenuOpen(false);
+        openViewer(triggerEl || avatarButtonRef.current);
+    };
 
     // Close mobile/accessible menu on outside click or Escape key
     useEffect(() => {
@@ -255,29 +277,47 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                 className={`group relative ${sizeClasses} rounded-full overflow-hidden border-2 border-black shadow-[3px_3px_0px_#000] bg-neutral-100 flex-shrink-0 select-none transition-transform hover:scale-[1.02] focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2`}
                 aria-busy={isBusy}
             >
-                {/* 1. Profile Image Display */}
-                <img
-                    src={activePhotoSrc}
-                    alt={`${displayName || username}'s profile`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover object-center"
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).src = fallbackAvatar;
+                {/* 1. Interactive Profile Avatar Trigger (Tap/Click to View; Placeholder taps to Upload) */}
+                <button
+                    ref={avatarButtonRef}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => {
+                        if (hasViewablePhoto) {
+                            handleOpenViewer(avatarButtonRef.current);
+                        } else {
+                            fileInputRef.current?.click();
+                        }
                     }}
-                />
+                    aria-label={hasViewablePhoto ? "View profile photo" : "Upload profile photo"}
+                    title={hasViewablePhoto ? "View profile photo" : "Click to change photo"}
+                    className={`orbix-avatar-trigger block w-full h-full rounded-full overflow-hidden p-0 border-0 bg-transparent focus-visible:outline-none ${
+                        hasViewablePhoto ? "cursor-zoom-in" : "cursor-pointer"
+                    }`}
+                >
+                    <img
+                        src={activePhotoSrc}
+                        alt={`${displayName || username}'s profile`}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover object-center"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).src = fallbackAvatar;
+                            markImageFailed();
+                        }}
+                    />
+                </button>
 
-                {/* 2. Desktop Hover Overlay (Hidden during busy state) */}
-                {!isBusy && (
+                {/* 2. Desktop Hover Overlay for Default Placeholder (Hidden during busy state; non-intercepting on touch devices) */}
+                {!isBusy && !hasViewablePhoto && (
                     <div
-                        className="absolute inset-0 bg-black/55 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer"
-                        onClick={() => fileInputRef.current?.click()}
-                        title="Click to change photo"
+                        className="orbix-avatar-hover-overlay absolute inset-0 bg-black/55 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex flex-col items-center justify-center text-white"
+                        aria-hidden="true"
                     >
                         <svg className="w-5 h-5 mb-0.5 text-white/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <span className="text-[10px] font-bold tracking-tight text-white/95">Change</span>
+                        <span className="text-[10px] font-bold tracking-tight text-white/95">Upload</span>
                     </div>
                 )}
 
@@ -310,8 +350,17 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
             {/* 4. Touch & Accessible Options Menu Trigger Button */}
             <div className="absolute -bottom-1 -right-1 z-10">
                 <button
+                    ref={menuTriggerRef}
                     type="button"
-                    onClick={() => setIsMenuOpen((prev) => !prev)}
+                    onClick={() => {
+                        setIsMenuOpen((prev) => {
+                            if (!prev && menuTriggerRef.current) {
+                                const rect = menuTriggerRef.current.getBoundingClientRect();
+                                setMenuOpenDown(rect.top < 220);
+                            }
+                            return !prev;
+                        });
+                    }}
                     disabled={isBusy}
                     className="w-7 h-7 rounded-full bg-neutral-900 hover:bg-black text-white border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                     aria-label="Profile photo options"
@@ -327,9 +376,22 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                 {/* Dropdown Menu for Touch, Keyboard & Explicit Actions */}
                 {isMenuOpen && (
                     <div
-                        className="absolute right-0 bottom-9 w-48 bg-white rounded-xl border-2 border-black shadow-[4px_4px_0px_#000] py-1.5 z-50 animate-fadeIn text-xs font-bold text-black"
+                        className={`absolute right-0 ${menuOpenDown ? "top-9" : "bottom-9"} w-48 bg-white rounded-xl border-2 border-black shadow-[4px_4px_0px_#000] py-1.5 z-50 animate-fadeIn text-xs font-bold text-black`}
                         role="menu"
                     >
+                        {/* Action 0: View Photo (read-only enlarged viewer, hidden when placeholder only) */}
+                        {hasViewablePhoto && (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => handleOpenViewer(menuTriggerRef.current)}
+                                className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2.5 transition-colors cursor-pointer text-neutral-900"
+                            >
+                                <Eye className="w-4 h-4 text-neutral-600 stroke-[2]" />
+                                <span>View Photo</span>
+                            </button>
+                        )}
+
                         {/* Action 1: Change photo */}
                         <button
                             type="button"
@@ -338,7 +400,9 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                                 setIsMenuOpen(false);
                                 fileInputRef.current?.click();
                             }}
-                            className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2.5 transition-colors cursor-pointer text-neutral-900"
+                            className={`w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2.5 transition-colors cursor-pointer text-neutral-900 ${
+                                hasViewablePhoto ? "border-t border-neutral-100" : ""
+                            }`}
                         >
                             <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -406,6 +470,20 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Read-Only Profile Photo Viewer Modal */}
+            {isViewerOpen && (
+                <ProfilePhotoViewerModal
+                    isOpen={isViewerOpen}
+                    onClose={closeViewer}
+                    imageUrl={currentPhotoUrl}
+                    displayName={displayName}
+                    username={username}
+                    alt="Your profile photo"
+                    returnFocusTo={returnFocusTo}
+                    onImageError={markImageFailed}
+                />
+            )}
 
             {/* Adaptive Image Editor Modal */}
             {isEditorOpen && editorSource && (

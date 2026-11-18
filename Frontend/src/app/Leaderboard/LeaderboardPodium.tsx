@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Crown, Flame, CheckCircle2, Building2 } from "lucide-react";
-import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 import { type LeaderboardEntry } from "./types";
 
 interface LeaderboardPodiumProps {
@@ -121,13 +121,12 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
                             }`}
                         >
                             {entry.avatarUrl ? (
-                                <img
+                                <EnlargeableAvatar
                                     src={entry.avatarUrl}
                                     alt={entry.displayName}
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                    }}
-                                    className={`rounded-full object-cover border-2 border-black ${
+                                    displayName={entry.displayName}
+                                    username={entry.username}
+                                    className={`block rounded-full object-cover border-2 border-black ${
                                         isFirst
                                             ? "w-20 h-20 sm:w-22 sm:h-22"
                                             : "w-18 h-18 sm:w-20 sm:h-20"
