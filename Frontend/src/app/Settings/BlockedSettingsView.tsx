@@ -16,6 +16,7 @@ import {
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useToast } from "../../context/ToastContext";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 
 function formatBlockedDate(dateStr: string): string {
     try {
@@ -165,12 +166,11 @@ export const BlockedSettingsView: React.FC = () => {
                                 className="p-4 bg-white hover:bg-[#FAF6EE]/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                             >
                                 <div className="flex items-center gap-3.5 min-w-0">
-                                    <img
+                                    <EnlargeableAvatar
                                         src={avatar}
                                         alt={item.displayName}
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                        }}
+                                        displayName={item.displayName}
+                                        username={item.username}
                                         className="w-11 h-11 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
                                     />
                                     <div className="min-w-0 space-y-0.5">

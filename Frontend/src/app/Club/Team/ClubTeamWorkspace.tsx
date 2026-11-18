@@ -17,6 +17,7 @@ import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
+import { EnlargeableAvatar } from "../../../components/media/EnlargeableAvatar";
 import type { ClubMember, ClubTeam, ClubInvitation, TeamStats } from "./types";
 import { AddMemberModal } from "./AddMemberModal";
 import { CreateTeamModal } from "./CreateTeamModal";
@@ -571,13 +572,12 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                             className="flex items-center justify-between gap-2 p-2 rounded-lg bg-neutral-50 border border-black/20"
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <img
-                                                    src={m.avatarUrl || DEFAULT_AVATAR_URL}
-                                                    alt={m.username}
+                                                <EnlargeableAvatar
+                                                    src={m.avatarUrl}
+                                                    alt={m.displayName || m.username}
+                                                    displayName={m.displayName}
+                                                    username={m.username}
                                                     className="w-7 h-7 rounded-full border border-black object-cover shrink-0"
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                    }}
                                                 />
                                                 <span className="text-xs font-bold text-black truncate">
                                                     {m.displayName}
@@ -844,13 +844,12 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                             {/* Member Name & Avatar */}
                                             <td className="py-3 px-3">
                                                 <div className="flex items-center gap-3">
-                                                    <img
-                                                        src={m.avatarUrl || DEFAULT_AVATAR_URL}
-                                                        alt={m.username}
+                                                    <EnlargeableAvatar
+                                                        src={m.avatarUrl}
+                                                        alt={m.displayName || m.username}
+                                                        displayName={m.displayName}
+                                                        username={m.username}
                                                         className="w-9 h-9 rounded-full border-2 border-black object-cover shrink-0"
-                                                        onError={(e) => {
-                                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                        }}
                                                     />
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-1.5">
@@ -1008,13 +1007,12 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                             {/* User */}
                                             <td className="py-3 px-3">
                                                 <div className="flex items-center gap-2.5">
-                                                    <img
-                                                        src={inv.invitedUser.avatarUrl || DEFAULT_AVATAR_URL}
-                                                        alt={inv.invitedUser.username}
+                                                    <EnlargeableAvatar
+                                                        src={inv.invitedUser.avatarUrl}
+                                                        alt={inv.invitedUser.displayName || inv.invitedUser.username}
+                                                        displayName={inv.invitedUser.displayName}
+                                                        username={inv.invitedUser.username}
                                                         className="w-8 h-8 rounded-full border-2 border-black object-cover shrink-0"
-                                                        onError={(e) => {
-                                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                        }}
                                                     />
                                                     <div>
                                                         <span className="font-black text-black block truncate">

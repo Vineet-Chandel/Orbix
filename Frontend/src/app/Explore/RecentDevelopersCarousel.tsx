@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { OrbixButton } from "../../components/ui/loader";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 import { getPlatformIcon } from "../../utils/platformLinks";
 import { fetchExploreProfiles, type ExploreDeveloper } from "../../utils/profileApi";
 
@@ -499,12 +500,11 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-center gap-3.5 min-w-0">
                                             <div className="relative shrink-0">
-                                                <img
+                                                <EnlargeableAvatar
                                                     src={avatar}
                                                     alt={candidate.displayName}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                    }}
+                                                    displayName={candidate.displayName}
+                                                    username={candidate.username}
                                                     className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000]"
                                                 />
                                                 {candidate.isOpenToWork && (

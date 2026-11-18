@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
+import { EnlargeableAvatar } from "../../../../components/media/EnlargeableAvatar";
 import type {
     WorkspaceChannel,
     WorkspaceMessage,
@@ -787,25 +788,49 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 }`}
                             >
                                 {/* Sender Avatar */}
-                                <div
-                                    className={`w-9 h-9 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center font-black text-xs text-black uppercase shrink-0 mt-0.5 overflow-hidden ${
-                                        msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
-                                            ? "bg-amber-300"
-                                            : "bg-[#FFE566]"
-                                    }`}
-                                >
-                                    {msg.sender?.avatarUrl ? (
-                                        <img
-                                            src={msg.sender.avatarUrl}
-                                            alt={msg.sender.firstName}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : msg.sender?.isClub ? (
-                                        <Building2 className="w-4 h-4 text-black" />
-                                    ) : (
-                                        msg.sender?.firstName?.[0] || "U"
-                                    )}
-                                </div>
+                                {msg.sender?.avatarUrl ? (
+                                    <EnlargeableAvatar
+                                        src={msg.sender.avatarUrl}
+                                        alt={msg.sender.firstName || "User"}
+                                        displayName={`${msg.sender.firstName || ""} ${msg.sender.lastName || ""}`.trim() || msg.sender.username}
+                                        username={msg.sender.username}
+                                        fallbackSrc={null}
+                                        fallbackNode={
+                                            <div
+                                                className={`w-9 h-9 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center font-black text-xs text-black uppercase shrink-0 mt-0.5 overflow-hidden ${
+                                                    msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                                        ? "bg-amber-300"
+                                                        : "bg-[#FFE566]"
+                                                }`}
+                                            >
+                                                {msg.sender?.isClub ? (
+                                                    <Building2 className="w-4 h-4 text-black" />
+                                                ) : (
+                                                    msg.sender?.firstName?.[0] || "U"
+                                                )}
+                                            </div>
+                                        }
+                                        className={`w-9 h-9 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center font-black text-xs text-black uppercase shrink-0 mt-0.5 overflow-hidden ${
+                                            msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                                ? "bg-amber-300"
+                                                : "bg-[#FFE566]"
+                                        }`}
+                                    />
+                                ) : (
+                                    <div
+                                        className={`w-9 h-9 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center font-black text-xs text-black uppercase shrink-0 mt-0.5 overflow-hidden ${
+                                            msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
+                                                ? "bg-amber-300"
+                                                : "bg-[#FFE566]"
+                                        }`}
+                                    >
+                                        {msg.sender?.isClub ? (
+                                            <Building2 className="w-4 h-4 text-black" />
+                                        ) : (
+                                            msg.sender?.firstName?.[0] || "U"
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Message Content Container */}
                                 <div className="min-w-0 flex-1">

@@ -33,6 +33,7 @@ import { useToast } from "../../context/ToastContext";
 import { NeoToggle } from "../../components/NeoToggle";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
+import { EnlargeableAvatar } from "../../components/media/EnlargeableAvatar";
 import { useAppDispatch, useAppSelector, setUser } from "../../store";
 import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
 import {
@@ -42,7 +43,6 @@ import {
     removeConnectionThunk,
     blockUserThunk,
 } from "../../store/networkSlice";
-import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { buildApiUrl } from "../../api/apiClient";
@@ -731,9 +731,11 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                         className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-3"
                                     >
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <img
-                                                src={b.avatarUrl || DEFAULT_AVATAR_URL}
+                                            <EnlargeableAvatar
+                                                src={b.avatarUrl}
                                                 alt={b.displayName}
+                                                displayName={b.displayName}
+                                                username={b.username}
                                                 className="w-11 h-11 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
                                             />
                                             <div className="min-w-0">
@@ -895,9 +897,11 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                             className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-3"
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <img
-                                                    src={c.avatarUrl || DEFAULT_AVATAR_URL}
+                                                <EnlargeableAvatar
+                                                    src={c.avatarUrl}
                                                     alt={c.displayName}
+                                                    displayName={c.displayName}
+                                                    username={c.username}
                                                     className="w-12 h-12 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
                                                 />
                                                 <div className="min-w-0">

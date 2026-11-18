@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { ClubEventApplicantRow } from "../../../api/collegeEventsApi";
 import type { DynamicQuestionMeta } from "./types";
+import { EnlargeableAvatar } from "../../../components/media/EnlargeableAvatar";
 
 interface ApplicationDetailModalProps {
     applicant: ClubEventApplicantRow | null;
@@ -100,9 +101,17 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
                 <div className="p-6 bg-white border-b-3 border-black flex items-start justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
                         {applicant.avatarUrl ? (
-                            <img
+                            <EnlargeableAvatar
                                 src={applicant.avatarUrl}
                                 alt={applicant.applicantName}
+                                displayName={applicant.applicantName}
+                                username={applicant.username}
+                                fallbackSrc={null}
+                                fallbackNode={
+                                    <div className="w-14 h-14 rounded-2xl bg-black text-[#a2ff86] flex items-center justify-center font-black text-lg border-2 border-black shadow-[2px_2px_0px_#000] shrink-0">
+                                        {(applicant.applicantName || "S").slice(0, 2).toUpperCase()}
+                                    </div>
+                                }
                                 className="w-14 h-14 rounded-2xl border-2 border-black object-cover shadow-[2px_2px_0px_#000] shrink-0"
                             />
                         ) : (
