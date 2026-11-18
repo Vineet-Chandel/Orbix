@@ -209,7 +209,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                     </svg>
                                 </button>
                             )}
-                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                            <div className="orbix-page-heading-icon orbix-page-heading-icon--size-8 w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                 <Users className="w-4 h-4 stroke-[2.5]" />
                             </div>
                             <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">

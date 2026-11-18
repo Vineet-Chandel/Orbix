@@ -499,7 +499,7 @@ export const EventTrackerPage: React.FC = () => {
                                     </svg>
                                 </button>
                                 <div className="flex items-center gap-2.5">
-                                    <div className="w-9 h-9 rounded-xl bg-black text-[#FFE566] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                    <div className="orbix-page-heading-icon orbix-page-heading-icon--size-9 w-9 h-9 rounded-xl bg-black text-[#FFE566] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
                                         <CalendarIcon className="w-5 h-5 stroke-[2.5]" />
                                     </div>
                                     <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-900">

@@ -166,7 +166,7 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
                                         </svg>
                                     </button>
                                 )}
-                                <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                <div className="orbix-page-heading-icon orbix-page-heading-icon--card-p4-b3 p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
                                     <FolderKanban className="w-5 h-5 text-black stroke-[2.5]" />
                                 </div>
                                 <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
@@ -209,12 +209,12 @@ export const ProjectsManagementView: React.FC<ProjectsManagementViewProps> = ({
 
                     {/* Capacity Indicator Bar (1.1: Displays number of projects already added) */}
                     <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
+                        <div className="space-y-2 sm:space-y-1">
+                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-2.5 sm:gap-2">
                                 <span className="text-xs font-black uppercase tracking-wider text-black">
                                     Showcase Capacity:
                                 </span>
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-white text-black border-2 border-black shadow-[1px_1px_0px_#000]">
+                                <span className="inline-flex items-center justify-center text-center whitespace-nowrap w-fit shrink-0 px-4 py-1.5 sm:px-2.5 sm:py-0.5 rounded-full text-[length:clamp(0.7rem,3vw,0.75rem)] leading-none sm:text-xs font-black font-mono bg-white text-black border-2 border-black shadow-[1px_1px_0px_#000]">
                                     {count} / {maxCapacity} Projects Added
                                 </span>
                             </div>

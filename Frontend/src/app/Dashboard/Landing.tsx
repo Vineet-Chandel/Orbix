@@ -244,7 +244,7 @@ export default function Dashboard() {
                                                 <line x1="3" y1="18" x2="21" y2="18" />
                                             </svg>
                                         </button>
-                                        <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                        <div className="orbix-page-heading-icon p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
                                             <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
                                         </div>
                                         <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">

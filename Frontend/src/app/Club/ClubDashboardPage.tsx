@@ -525,7 +525,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "team" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <Users className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -536,7 +536,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "team-workspace" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <Layers className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -547,7 +547,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "recruitment" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <UserPlus className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -558,7 +558,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "events" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#38BDF8] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#38BDF8] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <CalendarDays className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -569,7 +569,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "analytics" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <TrendingUp className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -580,7 +580,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "certificates" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <Award className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -591,7 +591,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "feedback-surveys" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <MessageSquareQuote className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -602,7 +602,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "announcements" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <Megaphone className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -613,7 +613,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "profile" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <Edit3 className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -625,7 +625,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "clubs" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <Building2 className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
@@ -636,7 +636,7 @@ export default function ClubDashboardPage() {
 
                                     {activeTab === "settings" && (
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
                                                 <Settings className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">

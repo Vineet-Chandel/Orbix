@@ -613,5 +613,107 @@ html.dark body:has(.blog-container) {
   }
 }
 
+/* ==========================================================================
+   MOBILE PAGE-HEADING ICON VERTICAL ALIGNMENT
+   Aligns the vertical center of each page's heading icon tile with the fixed
+   mobile sidebar toggle button (top: 1.625rem, size: p-2 + w-4 + border-2 =
+   2rem + 4px) at scroll position 0 on mobile viewports (< 640px).
+   Uses align-self: flex-start + transform so heading text, wrapping, and
+   sibling elements remain untouched, and tablet/desktop (>= 640px) stay
+   computed-style identical.
+   ========================================================================== */
+@media (max-width: 639px) {
+  .orbix-page-heading-icon {
+    --orbix-mobile-toggle-size: calc(2rem + 4px);
+    --orbix-heading-icon-size: calc(2.25rem + 4px);
+    --orbix-heading-extra-top: 0px;
+
+    align-self: flex-start;
+    transform: translateY(
+      calc(
+        ((var(--orbix-mobile-toggle-size) - var(--orbix-heading-icon-size)) / 2) -
+          var(--orbix-heading-extra-top)
+      )
+    );
+  }
+
+  .orbix-page-heading-icon--my-1 {
+    --orbix-heading-extra-top: 0.25rem;
+  }
+
+  .orbix-page-heading-icon--card-p4-b3 {
+    --orbix-heading-extra-top: calc(1rem + 3px);
+  }
+
+  .orbix-page-heading-icon--card-p5-b2 {
+    --orbix-heading-extra-top: calc(1.25rem + 2px);
+  }
+
+  .orbix-page-heading-icon--size-9 {
+    --orbix-heading-icon-size: 2.25rem;
+  }
+
+  .orbix-page-heading-icon--size-8 {
+    --orbix-heading-icon-size: 2rem;
+  }
+
+  .orbix-page-heading-icon--club-dashboard {
+    --orbix-heading-icon-size: 2rem;
+    --orbix-heading-extra-top: 1px;
+  }
+}
+
+/* ==========================================================================
+   MOBILE SIDEBAR DRAWER VIEWPORT HEIGHT, SCROLLING & SAFE-AREA FIX
+   Uses dynamic viewport height (100dvh with 100vh fallback) so the slide-over
+   drawer fits the actually visible mobile viewport with browser toolbars open
+   or retracted, prevents flex-child shrinking inside the scrollable nav area
+   (fixing clipped items like "Certificates"), isolates scroll chaining, and
+   preserves bottom safe-area clearance on the pinned profile block.
+   Strictly scoped to the mobile/drawer breakpoint (< 1024px); desktop sidebar
+   (>= 1024px) remains computed-style identical.
+   ========================================================================== */
+@media (max-width: 1023px) {
+  .orbix-mobile-sidebar {
+    height: calc(100vh - 1rem);
+    max-height: calc(100vh - 1rem);
+  }
+
+  @supports (height: 100dvh) {
+    .orbix-mobile-sidebar {
+      height: calc(100dvh - 1rem);
+      max-height: calc(100dvh - 1rem);
+    }
+  }
+
+  .orbix-mobile-sidebar-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+  }
+
+  .orbix-mobile-sidebar-scroll > * {
+    flex-shrink: 0;
+  }
+
+  .orbix-mobile-sidebar-profile {
+    padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .orbix-mobile-sidebar {
+    height: calc(100vh - 1.5rem);
+    max-height: calc(100vh - 1.5rem);
+  }
+
+  @supports (height: 100dvh) {
+    .orbix-mobile-sidebar {
+      height: calc(100dvh - 1.5rem);
+      max-height: calc(100dvh - 1.5rem);
+    }
+  }
+}
+
 
 

@@ -314,7 +314,7 @@ export const ClubSidebar = ({
             onMouseLeave={() => setIsHovered(false)}
             className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 border-black text-black px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isOpen
-                    ? "fixed top-2 sm:top-3 left-2 sm:left-3 z-[60] w-[280px] max-w-[calc(100vw-1rem)] shadow-[6px_6px_0px_#000]"
+                    ? "orbix-mobile-sidebar fixed top-2 sm:top-3 left-2 sm:left-3 z-[60] w-[280px] max-w-[calc(100vw-1rem)] shadow-[6px_6px_0px_#000]"
                     : isExpanded
                     ? "absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] w-64 sm:w-[264px] shadow-[6px_6px_0px_#000]"
                     : "absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] w-[68px] sm:w-[72px] shadow-[4px_4px_0px_#000]"
@@ -369,7 +369,7 @@ export const ClubSidebar = ({
             </div>
 
             {/* Category-Wise Navigation Groups (Scrollable) */}
-            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar overflow-x-hidden pt-2.5 pb-2 px-0.5 pr-1 space-y-1">
+            <div className="orbix-mobile-sidebar-scroll flex-1 min-h-0 overflow-y-auto no-scrollbar overflow-x-hidden pt-2.5 pb-2 px-0.5 pr-1 space-y-1">
                 {clubCategories.map((category, index) => (
                     <div key={category.id} className="space-y-0.5">
                         {/* Divider between categories */}
@@ -399,7 +399,7 @@ export const ClubSidebar = ({
             </div>
 
             {/* Bottom Section: Club Profile Card (DEAD CENTER avatar when collapsed) */}
-            <div ref={profileMenuRef} className="pt-2.5 border-t-2 border-black/15 relative flex-shrink-0 z-[70]">
+            <div ref={profileMenuRef} className="orbix-mobile-sidebar-profile pt-2.5 border-t-2 border-black/15 relative flex-shrink-0 z-[70]">
                 <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen((prev) => !prev)}
