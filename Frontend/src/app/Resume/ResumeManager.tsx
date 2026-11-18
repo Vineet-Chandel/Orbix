@@ -276,7 +276,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                         </svg>
                                     </button>
                                 )}
-                                <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                <div className="orbix-page-heading-icon orbix-page-heading-icon--my-1 p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
                                     <FileText className="w-5 h-5 text-black stroke-[2.5]" />
                                 </div>
                                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-black truncate">

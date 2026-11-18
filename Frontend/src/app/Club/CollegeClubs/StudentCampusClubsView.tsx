@@ -190,7 +190,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                                     </svg>
                                 </button>
                             )}
-                            <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center">
+                            <div className="orbix-page-heading-icon p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                 <Building2 className="w-5 h-5 text-black stroke-[2.5]" />
                             </div>
                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
