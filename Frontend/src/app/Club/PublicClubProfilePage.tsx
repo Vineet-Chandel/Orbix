@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ClubMarkdownRenderer } from "./Profile/ClubMarkdownRenderer";
 import { OrbixLogo } from "../../components/OrbixLogo";
@@ -26,6 +26,7 @@ import { OrbixLoader } from "../../components/ui/loader";
 import { getPlatformIcon } from "../../utils/platformLinks";
 import MessageClubModal from "./MessageClubModal";
 import { useAppSelector } from "../../store";
+import { Sidebar } from "../Dashboard/Sidebar";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { isDemoClubSlug, getDemoClubProfileBundle } from "../../data/demoClubProfileData";
 import { ClubEventCard } from "./ClubEventCard";
@@ -139,6 +140,37 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
     const slug = overrideSlug || params.slug;
 
     const { user } = useAppSelector((state) => state.user);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const showSidebarShell = !isEmbedded && Boolean(user);
+
+    const wrapWithSidebar = (content: ReactNode) => {
+        if (!showSidebarShell) return content;
+        return (
+            <div className="flex min-h-screen w-full min-w-0 bg-[#FAF6EE]">
+                <Sidebar
+                    activeTab="clubs"
+                    isOpen={isMobileSidebarOpen}
+                    onClose={() => setIsMobileSidebarOpen(false)}
+                />
+                <div className="flex-1 min-w-0">{content}</div>
+            </div>
+        );
+    };
+
+    const mobileSidebarToggleButton = showSidebarShell ? (
+        <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+            aria-label="Open sidebar"
+        >
+            <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+        </button>
+    ) : null;
 
     const [club, setClub] = useState<PublicClub | null>(null);
     const [coordinators, setCoordinators] = useState<PublicCoordinator[]>([]);
@@ -287,16 +319,18 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
     }, [upcomingEvents, pastEvents, eventFilter, eventSearch, club]);
 
     if (loading) {
-        return (
+        return wrapWithSidebar(
             <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-6 text-black">
+                {mobileSidebarToggleButton}
                 <OrbixLoader size="lg" />
             </div>
         );
     }
 
     if (isBlockedByClub) {
-        return (
+        return wrapWithSidebar(
             <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-6">
+                {mobileSidebarToggleButton}
                 <div className="max-w-md w-full p-8 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] text-center space-y-4">
                     <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
                         <ShieldAlert className="w-7 h-7 text-black stroke-[2.3]" />
@@ -320,8 +354,9 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
     }
 
     if (notFound || !club) {
-        return (
+        return wrapWithSidebar(
             <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-6">
+                {mobileSidebarToggleButton}
                 <div className="max-w-md w-full p-8 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] text-center space-y-4">
                     <div className="w-14 h-14 rounded-2xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
                         <AlertCircle className="w-7 h-7 text-neutral-600 stroke-[2.3]" />
@@ -346,19 +381,30 @@ export default function PublicClubProfilePage({ overrideSlug, isEmbedded = false
 
     const social = club.socialLinks || {};
 
-    return (
+    return wrapWithSidebar(
         <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen bg-[#FAF6EE]"} bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black`}>
             {/* Top Navigation Bar */}
             {!isEmbedded && (
-                <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black">
-                    <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                        <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
-                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
-                            <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
-                            <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                                Clubs Directory
-                            </span>
-                        </Link>
+                <header
+                    className={`sticky top-0 ${showSidebarShell ? "z-30" : "z-40"} bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black`}
+                >
+                    <div
+                        className={`max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4 ${
+                            showSidebarShell
+                                ? "h-[88px] sm:h-[112px] lg:h-16 pl-6 pr-4 sm:pl-9 sm:pr-6 lg:px-6"
+                                : "h-16 px-4 sm:px-6"
+                        }`}
+                    >
+                        <div className="flex items-center min-w-0">
+                            {mobileSidebarToggleButton}
+                            <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity shrink-0">
+                                <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                                <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
+                                <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                    Clubs Directory
+                                </span>
+                            </Link>
+                        </div>
 
                         <div className="flex items-center gap-2.5">
                             <button

@@ -264,6 +264,18 @@ export default function SettingsPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <button
                                         type="button"
+                                        onClick={() => setIsMobileSidebarOpen(true)}
+                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                                        aria-label="Open sidebar"
+                                    >
+                                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <line x1="3" y1="12" x2="21" y2="12" />
+                                            <line x1="3" y1="6" x2="21" y2="6" />
+                                            <line x1="3" y1="18" x2="21" y2="18" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={() => handleSelectView("hub")}
                                         className="hover:text-black hover:underline cursor-pointer flex items-center gap-1 font-black text-black"
                                     >

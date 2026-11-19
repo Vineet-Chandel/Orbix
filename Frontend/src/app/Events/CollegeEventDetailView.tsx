@@ -21,7 +21,6 @@ import {
     Lock,
     Sparkles,
     AlertCircle,
-    Menu,
     FileText,
     Ticket,
 } from "lucide-react";
@@ -194,6 +193,20 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
     if (loading) {
         return (
             <div className="w-full py-24 flex flex-col items-center justify-center space-y-4">
+                {onOpenMobileSidebar && (
+                    <button
+                        type="button"
+                        onClick={onOpenMobileSidebar}
+                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                        aria-label="Open sidebar"
+                    >
+                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+                )}
                 <OrbixLoader size="lg" />
                 <span className="text-sm font-black text-neutral-600 uppercase tracking-wider">
                     Loading Event Full Page...
@@ -205,6 +218,20 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
     if (error || !event) {
         return (
             <div className="w-full p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] text-center space-y-4 my-auto">
+                {onOpenMobileSidebar && (
+                    <button
+                        type="button"
+                        onClick={onOpenMobileSidebar}
+                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                        aria-label="Open sidebar"
+                    >
+                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+                )}
                 <div className="w-14 h-14 rounded-2xl bg-amber-100 border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
                     <AlertCircle className="w-7 h-7 text-amber-700 stroke-[2.5]" />
                 </div>
@@ -265,10 +292,14 @@ export const CollegeEventDetailView: React.FC<CollegeEventDetailViewProps> = ({
                         <button
                             type="button"
                             onClick={onOpenMobileSidebar}
-                            className="p-2 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] shadow-[2px_2px_0px_#000] lg:hidden cursor-pointer shrink-0"
-                            aria-label="Open navigation sidebar"
+                            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                            aria-label="Open sidebar"
                         >
-                            <Menu className="w-4 h-4 text-black" />
+                            <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <line x1="3" y1="12" x2="21" y2="12" />
+                                <line x1="3" y1="6" x2="21" y2="6" />
+                                <line x1="3" y1="18" x2="21" y2="18" />
+                            </svg>
                         </button>
                     )}
 

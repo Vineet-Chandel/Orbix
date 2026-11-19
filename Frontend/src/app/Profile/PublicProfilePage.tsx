@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -64,6 +64,8 @@ import { GetTheCardModal } from "./GetTheCardModal";
 import { openCollegeVerificationModal, ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT } from "../../utils/collegeVerificationModalEvents";
 import { CARD_THEMES } from "./CardStudio/types";
 import { useToast } from "../../context/ToastContext";
+import { useAppSelector } from "../../store";
+import { Sidebar } from "../Dashboard/Sidebar";
 import { getPlatformIcon, sanitizePlatformUrl } from "../../utils/platformLinks";
 import {
     aggregateCodingStats,
@@ -419,22 +421,52 @@ export const OrbixLogoMark = ({ className = "w-full h-full text-black" }: { clas
     <OrbixLogo className={className} />
 );
 
-export const ProfileHeader = ({ isEmbedded, isDemo }: { isEmbedded?: boolean; isDemo?: boolean }) => {
+export const ProfileHeader = ({
+    isEmbedded,
+    isDemo,
+    onOpenMobileSidebar,
+}: {
+    isEmbedded?: boolean;
+    isDemo?: boolean;
+    onOpenMobileSidebar?: () => void;
+}) => {
     if (isEmbedded) return null;
     return (
-        <header className="w-full px-4 sm:px-8 pt-4 pb-2 flex items-center justify-between select-none">
-            <Link
-                to="/"
-                className="inline-flex items-center gap-2 group cursor-pointer"
-                title="Orbix — Home"
-            >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-black font-black text-sm transition-transform duration-200 group-hover:scale-105">
-                    <OrbixLogoMark className="w-full h-full text-black" />
-                </div>
-                <span className="font-black text-black text-2xl sm:text-3xl tracking-tight leading-none group-hover:text-black transition-colors">
-                    Orbix
-                </span>
-            </Link>
+        <header
+            className={`w-full pb-2 flex items-center justify-between gap-2 select-none ${
+                onOpenMobileSidebar
+                    ? "pl-6 pr-4 pt-6 sm:pl-9 sm:pr-8 sm:pt-8 lg:px-8 lg:pt-4"
+                    : "px-4 sm:px-8 pt-4"
+            }`}
+        >
+            <div className="flex items-center min-w-0">
+                {onOpenMobileSidebar && (
+                    <button
+                        type="button"
+                        onClick={onOpenMobileSidebar}
+                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                        aria-label="Open sidebar"
+                    >
+                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+                )}
+                <Link
+                    to="/"
+                    className="inline-flex items-center gap-2 group cursor-pointer shrink-0"
+                    title="Orbix — Home"
+                >
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-black font-black text-sm transition-transform duration-200 group-hover:scale-105">
+                        <OrbixLogoMark className="w-full h-full text-black" />
+                    </div>
+                    <span className="font-black text-black text-2xl sm:text-3xl tracking-tight leading-none group-hover:text-black transition-colors">
+                        Orbix
+                    </span>
+                </Link>
+            </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
                 <Link
@@ -540,7 +572,25 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const params = useParams<{ username: string }>();
     const username = overrideUsername || params.username;
     const toast = useToast();
+    const { user } = useAppSelector((state) => state.user);
     const isDemo = isDemoProfileUsername(username);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const showSidebarShell = !isEmbedded && Boolean(user);
+    const handleOpenMobileSidebar = showSidebarShell ? () => setIsMobileSidebarOpen(true) : undefined;
+
+    const wrapWithSidebar = (content: ReactNode) => {
+        if (!showSidebarShell) return content;
+        return (
+            <div className="flex min-h-screen w-full min-w-0 bg-[#FAF6EE]">
+                <Sidebar
+                    activeTab="profile"
+                    isOpen={isMobileSidebarOpen}
+                    onClose={() => setIsMobileSidebarOpen(false)}
+                />
+                <div className="flex-1 min-w-0">{content}</div>
+            </div>
+        );
+    };
 
     const [profile, setProfile] = useState<PublicProfileData | null>(() => {
         if (isDemoProfileUsername(username)) {
@@ -847,13 +897,13 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             );
         }
 
-        return (
+        return wrapWithSidebar(
             <div className="min-h-screen bg-[#FAF6EE] text-neutral-900 font-sans selection:bg-black selection:text-white relative overflow-x-hidden flex flex-col justify-between">
                 {/* Subtle canvas dot grid across the entire page */}
                 <div className="fixed inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
                 {/* Orbix Brand Header */}
-                <ProfileHeader isEmbedded={isEmbedded} isDemo={isDemo} />
+                <ProfileHeader isEmbedded={isEmbedded} isDemo={isDemo} onOpenMobileSidebar={handleOpenMobileSidebar} />
 
                 {/* Loading Center Card */}
                 <main className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
@@ -899,13 +949,13 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             );
         }
 
-        return (
+        return wrapWithSidebar(
             <div className="min-h-screen bg-[#FAF6EE] text-neutral-900 font-sans selection:bg-black selection:text-white relative overflow-x-hidden flex flex-col justify-between">
                 {/* Eye-friendly subtle canvas dot grid across the entire page flow */}
                 <div className="fixed inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
                 {/* Orbix Brand Header */}
-                <ProfileHeader isEmbedded={isEmbedded} isDemo={isDemo} />
+                <ProfileHeader isEmbedded={isEmbedded} isDemo={isDemo} onOpenMobileSidebar={handleOpenMobileSidebar} />
 
                 {/* Main Error Diagnosis Card */}
                 <main className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
@@ -1097,7 +1147,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         profile.avatarUrl ||
         DEFAULT_AVATAR_URL;
 
-    return (
+    return wrapWithSidebar(
         <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen pb-16 bg-[#FAF6EE] relative scroll-smooth"} text-neutral-900 font-sans antialiased selection:bg-black selection:text-white`}>
             {/* Eye-friendly subtle canvas dot grid cached on GPU without fixed viewport re-rasterization */}
             {!isEmbedded && (
@@ -1108,7 +1158,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             )}
 
             {/* Minimal Orbix Header — Navigates to "/" (Hidden when embedded in hero showcase) */}
-            <ProfileHeader isEmbedded={isEmbedded} isDemo={isDemo} />
+            <ProfileHeader isEmbedded={isEmbedded} isDemo={isDemo} onOpenMobileSidebar={handleOpenMobileSidebar} />
 
             {/* Private Profile Banner for Owner */}
             {profile.isPublic === false && profile.isOwner && (

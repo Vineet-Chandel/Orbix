@@ -126,18 +126,18 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
                                     alt={entry.displayName}
                                     displayName={entry.displayName}
                                     username={entry.username}
-                                    className={`block rounded-full object-cover border-2 border-black ${
+                                    className={`block rounded-full object-cover object-center overflow-hidden shrink-0 border-2 border-black ${
                                         isFirst
-                                            ? "w-20 h-20 sm:w-22 sm:h-22"
-                                            : "w-18 h-18 sm:w-20 sm:h-20"
+                                            ? "w-20 h-20"
+                                            : "w-[4.5rem] h-[4.5rem] sm:w-20 sm:h-20"
                                     }`}
                                 />
                             ) : (
                                 <div
-                                    className={`rounded-full bg-[#a2ff86] border-2 border-black flex items-center justify-center font-black text-xl text-black ${
+                                    className={`rounded-full bg-[#a2ff86] border-2 border-black flex items-center justify-center shrink-0 font-black text-xl text-black ${
                                         isFirst
-                                            ? "w-20 h-20 sm:w-22 sm:h-22"
-                                            : "w-18 h-18 sm:w-20 sm:h-20"
+                                            ? "w-20 h-20"
+                                            : "w-[4.5rem] h-[4.5rem] sm:w-20 sm:h-20"
                                     }`}
                                 >
                                     {initials}

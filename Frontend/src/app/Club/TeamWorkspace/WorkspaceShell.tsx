@@ -15,7 +15,6 @@ import {
     CheckCircle2,
     Search,
     ShieldAlert,
-    Menu,
     FolderArchive,
     Sparkles,
     History,
@@ -557,12 +556,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 <div className="flex items-center gap-2 flex-wrap">
                     {onOpenMobileSidebar && (
                         <button
+                            type="button"
                             onClick={onOpenMobileSidebar}
-                            className="lg:hidden px-2.5 py-1.5 bg-white hover:bg-neutral-100 text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
-                            title="Open Navigation Menu"
+                            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                            aria-label="Open sidebar"
                         >
-                            <Menu className="w-3.5 h-3.5" />
-                            <span>Menu</span>
+                            <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <line x1="3" y1="12" x2="21" y2="12" />
+                                <line x1="3" y1="6" x2="21" y2="6" />
+                                <line x1="3" y1="18" x2="21" y2="18" />
+                            </svg>
                         </button>
                     )}
                     {clubSelector}

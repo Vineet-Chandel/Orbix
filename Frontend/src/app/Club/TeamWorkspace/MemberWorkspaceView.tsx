@@ -76,9 +76,25 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
         }
     };
 
+    const mobileSidebarToggle = onOpenMobileSidebar ? (
+        <button
+            type="button"
+            onClick={onOpenMobileSidebar}
+            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+            aria-label="Open sidebar"
+        >
+            <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+        </button>
+    ) : null;
+
     if (loading) {
         return (
             <div className="flex-1 w-full min-h-[400px] flex flex-col items-center justify-center gap-3">
+                {mobileSidebarToggle}
                 <OrbixLoader size="lg" />
                 <p className="text-xs font-black uppercase tracking-wider text-neutral-600">Connecting to your club workspace...</p>
             </div>
@@ -89,6 +105,7 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
     if (workspaces.length === 0) {
         return (
             <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 sm:p-10 flex flex-col items-center justify-center text-center animate-in fade-in duration-200">
+                {mobileSidebarToggle}
                 <div className="w-16 h-16 bg-[#FFE566] border-2 border-black rounded-2xl flex items-center justify-center mb-5 shadow-neo-sm">
                     <Briefcase className="w-8 h-8 text-black" />
                 </div>
@@ -125,6 +142,7 @@ export const MemberWorkspaceView: React.FC<MemberWorkspaceViewProps> = ({
     if (paramClubId && !currentWorkspace) {
         return (
             <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 sm:p-10 flex flex-col items-center justify-center text-center animate-in fade-in duration-200">
+                {mobileSidebarToggle}
                 <div className="w-16 h-16 bg-[#FFE566] border-2 border-black rounded-2xl flex items-center justify-center mb-5 shadow-neo-sm">
                     <Building2 className="w-8 h-8 text-black" />
                 </div>

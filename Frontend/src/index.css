@@ -908,5 +908,26 @@ html.dark body:has(.blog-container) {
   }
 }
 
+/* Notification bell modal mobile viewport height & safe-area containment (< 640px only) */
+@media (max-width: 639px) {
+  .orbix-notif-modal-overlay {
+    padding:
+      max(1rem, env(safe-area-inset-top, 0px))
+      max(1rem, env(safe-area-inset-right, 0px))
+      max(1rem, env(safe-area-inset-bottom, 0px))
+      max(1rem, env(safe-area-inset-left, 0px));
+  }
+
+  .orbix-notif-modal {
+    max-height: calc(100vh - 2rem);
+  }
+
+  @supports (height: 100dvh) {
+    .orbix-notif-modal {
+      max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    }
+  }
+}
+
 
 
