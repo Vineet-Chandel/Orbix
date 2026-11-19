@@ -62,6 +62,11 @@ export interface ScopeEligibilityStatus {
     reason: string;
 }
 
+export interface AudiencePoolSizes {
+    panIndia: number;
+    campus: number;
+}
+
 export interface ClubEventCreationEligibility {
     clubId: string;
     currentScore: number;
@@ -70,6 +75,7 @@ export interface ClubEventCreationEligibility {
     isProvisional: boolean;
     campus: ScopeEligibilityStatus;
     panIndia: ScopeEligibilityStatus;
+    audiencePool?: AudiencePoolSizes;
 }
 
 export interface RecordCredibilityEventParams {
@@ -924,6 +930,9 @@ export class ClubCredibilityService {
             panIndiaReason = `3-day Pan-India event creation cooldown is active. Next Pan-India event can be created in ${this.formatDuration(panIndiaRemainingMs)}.`;
         }
 
+        // Calculate dynamic audience pool counts
+        const audiencePool = await this.getAudiencePoolSizes(clubId);
+
         return {
             clubId,
             currentScore,
@@ -956,7 +965,53 @@ export class ClubCredibilityService {
                 lastEventCreatedAt: panIndiaLastCreatedAt,
                 reason: panIndiaReason,
             },
+            audiencePool,
         };
+    }
+
+    /**
+     * Compute platform-wide and institution-specific audience pool counts
+     */
+    public static async getAudiencePoolSizes(clubId: string): Promise<AudiencePoolSizes> {
+        try {
+            const clubDetailsRes = await query(
+                `SELECT college_id, college_name FROM public.verified_clubs WHERE id = $1 LIMIT 1;`,
+                [clubId]
+            );
+            const collegeId = clubDetailsRes.rows[0]?.college_id || null;
+            const collegeName = clubDetailsRes.rows[0]?.college_name || null;
+
+            const panIndiaRes = await query(
+                `SELECT COUNT(*)::int AS count FROM public.users WHERE COALESCE(account_type, 'personal') != 'club';`
+            );
+            const panIndiaCount = panIndiaRes.rows[0]?.count || 0;
+
+            let campusCount = 0;
+            if (collegeId || collegeName) {
+                const campusRes = await query(
+                    `SELECT COUNT(*)::int AS count 
+                     FROM public.users u
+                     WHERE COALESCE(u.account_type, 'personal') != 'club'
+                       AND (
+                         ($1::uuid IS NOT NULL AND u.college_id = $1::uuid)
+                         OR ($2::text IS NOT NULL AND $2::text != '' AND LOWER(TRIM(u.college)) = LOWER(TRIM($2::text)))
+                       );`,
+                    [collegeId, collegeName]
+                );
+                campusCount = campusRes.rows[0]?.count || 0;
+            }
+
+            return {
+                panIndia: panIndiaCount,
+                campus: campusCount,
+            };
+        } catch (err) {
+            console.error("Failed to compute audience pool sizes:", err);
+            return {
+                panIndia: 0,
+                campus: 0,
+            };
+        }
     }
 
     /**

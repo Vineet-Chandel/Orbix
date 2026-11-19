@@ -1991,6 +1991,40 @@ clubRouter.get("/events/creation-eligibility", authenticate, requireClubAccount,
 });
 
 /**
+ * GET /api/club/events/audience-pools
+ * Returns real-time audience pool counts for Pan-India and Campus-Only scopes
+ */
+clubRouter.get("/events/audience-pools", authenticate, requireClubAccount, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+        const clubRes = await query(
+            `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+            [userId]
+        );
+        let clubId = clubRes.rows[0]?.id;
+        if (!clubId) {
+            const staffClub = await getStaffClub(userId);
+            clubId = staffClub?.id;
+        }
+        if (!clubId) {
+            return res.status(404).json({ success: false, message: "Verified club not found." });
+        }
+
+        const audiencePool = await ClubCredibilityService.getAudiencePoolSizes(clubId);
+        return res.json({
+            success: true,
+            audiencePool,
+        });
+    } catch (err: any) {
+        console.error("GET /events/audience-pools error:", err);
+        return res.status(500).json({ success: false, message: "Failed to determine audience pool sizes." });
+    }
+});
+
+/**
  * GET /api/club/events/:eventId
  * Authenticated endpoint for the club to fetch a specific event they own (draft, published, completed, cancelled).
  * Strictly enforces that ONLY the club that owns the event can access it.

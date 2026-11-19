@@ -1244,6 +1244,7 @@ export default function ClubDashboardPage() {
                 onClose={() => setIsScopeModalOpen(false)}
                 onSelectScope={handleSelectScope}
                 collegeName={club?.college_name}
+                collegeId={(club as any)?.college_id || (club as any)?.collegeId}
             />
 
             {/* Club Inbox Modal */}

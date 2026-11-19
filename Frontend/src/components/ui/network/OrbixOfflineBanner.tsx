@@ -20,11 +20,11 @@ export const OrbixOfflineBanner: React.FC = () => {
         <AnimatePresence>
             {isVisible && (
                 <motion.div
-                    initial={{ opacity: 0, y: -24, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="fixed top-3 left-1/2 -translate-x-1/2 z-[99999] pointer-events-auto max-w-[calc(100vw-1.5rem)] select-none"
+                    initial={{ opacity: 0, y: -16, x: 16, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -12, x: 16, scale: 0.95 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="fixed top-5 sm:top-6 right-4 sm:right-6 z-[99999] pointer-events-auto max-w-[calc(100vw-2rem)] select-none"
                     role="status"
                     aria-live="polite"
                 >

@@ -12,9 +12,27 @@ import type {
  */
 export function getApplicantCellValue(
     app: ClubEventApplicantRow,
-    columnId: string
+    columnId: string,
+    minTeamSize?: number,
+    _maxTeamSize?: number
 ): any {
     switch (columnId) {
+        case "teamReadiness": {
+            const teamName =
+                app.teamName ||
+                (app.answers && app.answers.__teamName) ||
+                (app.formResponse && app.formResponse.__teamName) ||
+                "";
+            const isTeam = Boolean(app.teamId || teamName);
+            if (!isTeam) {
+                return "No Team";
+            }
+            const minSize = minTeamSize || (app as any).minTeamSize || 2;
+            const confirmedCount =
+                app.teamMembersCount ??
+                (app.teamMembers ? app.teamMembers.length : 1);
+            return confirmedCount >= minSize ? "Ready" : "Incomplete";
+        }
         case "status":
             return app.status || "pending";
         case "applicantName":
@@ -68,11 +86,17 @@ export function getApplicantCellValue(
 interface UseApplicationsFilterSortProps {
     applications: ClubEventApplicantRow[];
     dynamicQuestions: DynamicQuestionMeta[];
+    minTeamSize?: number;
+    maxTeamSize?: number;
+    isTeamEvent?: boolean;
 }
 
 export function useApplicationsFilterSort({
     applications,
     dynamicQuestions: _dynamicQuestions,
+    minTeamSize,
+    maxTeamSize,
+    isTeamEvent: _isTeamEvent,
 }: UseApplicationsFilterSortProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] =
@@ -116,13 +140,24 @@ export function useApplicationsFilterSort({
     const toggleSort = useCallback((columnId: string) => {
         setSort((prev) => {
             if (!prev || prev.columnId !== columnId) {
-                return { columnId, direction: "asc" };
+                // When clicking teamReadiness, organizers expect ready candidates at the top on the very first tap (desc)
+                const initialDir = columnId === "teamReadiness" ? "desc" : "asc";
+                return { columnId, direction: initialDir };
             }
-            if (prev.direction === "asc") {
-                return { columnId, direction: "desc" };
+
+            if (columnId === "teamReadiness") {
+                // For teamReadiness: desc (Ready first) -> asc (Incomplete first) -> clear to default
+                if (prev.direction === "desc") {
+                    return { columnId, direction: "asc" };
+                }
+                return { columnId: "registeredAt", direction: "desc" };
+            } else {
+                // For text/numeric columns: asc -> desc -> clear to default
+                if (prev.direction === "asc") {
+                    return { columnId, direction: "desc" };
+                }
+                return { columnId: "registeredAt", direction: "desc" };
             }
-            // Clear sort back to default registeredAt desc
-            return { columnId: "registeredAt", direction: "desc" };
         });
     }, []);
 
@@ -170,6 +205,16 @@ export function useApplicationsFilterSort({
                 const stateMatch = (app.institutionState || "").toLowerCase().includes(q);
                 const rollMatch = (app.rollNumber || "").toLowerCase().includes(q);
                 const deptMatch = (app.department || "").toLowerCase().includes(q);
+                const teamNameMatch = (
+                    app.teamName ||
+                    (app.answers && app.answers.__teamName) ||
+                    (app.formResponse && app.formResponse.__teamName) ||
+                    ""
+                )
+                    .toLowerCase()
+                    .includes(q);
+                const readinessVal = getApplicantCellValue(app, "teamReadiness", minTeamSize, maxTeamSize);
+                const readinessMatch = String(readinessVal).toLowerCase().includes(q);
 
                 if (
                     nameMatch ||
@@ -180,7 +225,9 @@ export function useApplicationsFilterSort({
                     cityMatch ||
                     stateMatch ||
                     rollMatch ||
-                    deptMatch
+                    deptMatch ||
+                    teamNameMatch ||
+                    readinessMatch
                 ) {
                     return true;
                 }
@@ -211,11 +258,11 @@ export function useApplicationsFilterSort({
         if (rules.length > 0) {
             result = result.filter((app) => {
                 for (const rule of rules) {
-                    const rawVal = getApplicantCellValue(app, rule.columnId);
+                    const rawVal = getApplicantCellValue(app, rule.columnId, minTeamSize, maxTeamSize);
                     const strVal = String(rawVal ?? "").trim().toLowerCase();
                     const targetVal = String(rule.value ?? "").trim().toLowerCase();
 
-                    // Multi-select checkboxes filter (for status or multi-choice options)
+                    // Multi-select checkboxes filter (for status, teamReadiness or multi-choice options)
                     if (rule.selectedOptions && rule.selectedOptions.length > 0) {
                         const targetOptions = rule.selectedOptions.map((opt) => opt.toLowerCase());
                         if (Array.isArray(rawVal)) {
@@ -248,10 +295,10 @@ export function useApplicationsFilterSort({
                             if (!strVal.startsWith(targetVal)) return false;
                             break;
                         case "is_empty":
-                            if (strVal !== "") return false;
+                            if (strVal !== "" && strVal !== "no team") return false;
                             break;
                         case "is_not_empty":
-                            if (strVal === "") return false;
+                            if (strVal === "" || strVal === "no team") return false;
                             break;
                         case "has_file": {
                             const files = app.fileAttachments?.filter(
@@ -278,8 +325,53 @@ export function useApplicationsFilterSort({
         // 6. Sorting
         if (sort && sort.columnId) {
             result.sort((a, b) => {
-                const valA = getApplicantCellValue(a, sort.columnId);
-                const valB = getApplicantCellValue(b, sort.columnId);
+                // Dedicated Team Readiness Sorting (Ready > Incomplete > Solo)
+                if (sort.columnId === "teamReadiness") {
+                    const getReadinessScore = (app: ClubEventApplicantRow) => {
+                        const teamName =
+                            app.teamName ||
+                            (app.answers && app.answers.__teamName) ||
+                            (app.formResponse && app.formResponse.__teamName) ||
+                            "";
+                        const isTeam = Boolean(app.teamId || teamName);
+                        if (!isTeam) return 0;
+                        const minSize = minTeamSize || (app as any).minTeamSize || 2;
+                        const confirmedCount =
+                            app.teamMembersCount ??
+                            (app.teamMembers ? app.teamMembers.length : 1);
+                        return confirmedCount >= minSize ? 2 : 1;
+                    };
+
+                    const scoreA = getReadinessScore(a);
+                    const scoreB = getReadinessScore(b);
+
+                    if (scoreA !== scoreB) {
+                        // "desc" (arrow down): Ready candidates (score 2) at the top!
+                        // "asc" (arrow up): Incomplete candidates (score 1/0) at the top!
+                        return sort.direction === "desc" ? scoreB - scoreA : scoreA - scoreB;
+                    }
+
+                    // Secondary tie-breaker: number of confirmed team members
+                    const countA = a.teamMembersCount ?? (a.teamMembers ? a.teamMembers.length : 1);
+                    const countB = b.teamMembersCount ?? (b.teamMembers ? b.teamMembers.length : 1);
+                    if (countA !== countB) {
+                        return sort.direction === "desc" ? countB - countA : countA - countB;
+                    }
+
+                    // Tertiary tie-breaker: Team name alphabetical
+                    const teamA = (a.teamName || a.answers?.__teamName || "").toLowerCase();
+                    const teamB = (b.teamName || b.answers?.__teamName || "").toLowerCase();
+                    const cmpTeam = teamA.localeCompare(teamB);
+                    if (cmpTeam !== 0) return cmpTeam;
+
+                    // Final tie-breaker: Student name alphabetical
+                    const nameA = (a.applicantName || "").toLowerCase();
+                    const nameB = (b.applicantName || "").toLowerCase();
+                    return nameA.localeCompare(nameB);
+                }
+
+                const valA = getApplicantCellValue(a, sort.columnId, minTeamSize, maxTeamSize);
+                const valB = getApplicantCellValue(b, sort.columnId, minTeamSize, maxTeamSize);
 
                 // Date sorting for timestamps
                 if (sort.columnId === "registeredAt") {
@@ -312,6 +404,8 @@ export function useApplicationsFilterSort({
         searchQuery,
         columnFilters,
         sort,
+        minTeamSize,
+        maxTeamSize,
     ]);
 
     return {

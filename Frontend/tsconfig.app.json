@@ -10,6 +10,9 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
+    "paths": {
+      "pdf-lib": ["./node_modules/pdf-lib/es/index.d.ts"]
+    },
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
@@ -23,5 +26,6 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
 }

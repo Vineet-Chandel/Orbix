@@ -119,6 +119,36 @@ clubCredibilityRouter.get("/credibility/creation-eligibility", authenticate, req
 clubCredibilityRouter.get("/events/creation-eligibility", authenticate, requireClubAccount, handleGetCreationEligibility);
 
 /**
+ * GET /api/club/events/audience-pools
+ * GET /api/club/audience-pools
+ * Returns real-time audience pool counts for Pan-India and Campus-Only scopes
+ */
+async function handleGetAudiencePools(req: Request, res: Response) {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+        const clubId = await resolveClubIdForUser(userId);
+        if (!clubId) {
+            return res.status(404).json({ success: false, message: "Verified club profile not found." });
+        }
+        const audiencePool = await ClubCredibilityService.getAudiencePoolSizes(clubId);
+        return res.json({
+            success: true,
+            audiencePool,
+        });
+    } catch (err: any) {
+        console.error("GET audience-pools error:", err);
+        return res.status(500).json({ success: false, message: "Failed to determine audience pool sizes." });
+    }
+}
+
+clubCredibilityRouter.get("/credibility/audience-pools", authenticate, requireClubAccount, handleGetAudiencePools);
+clubCredibilityRouter.get("/events/audience-pools", authenticate, requireClubAccount, handleGetAudiencePools);
+clubCredibilityRouter.get("/audience-pools", authenticate, requireClubAccount, handleGetAudiencePools);
+
+/**
  * POST /api/club/credibility/preview-impact
  * Live preview calculation for CredibilityImpactModal
  */

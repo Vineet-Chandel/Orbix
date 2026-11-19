@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import {
     fetchEventCreationEligibility,
+    fetchAudiencePoolSizes,
     type ClubEventCreationEligibility,
+    type AudiencePoolSizes,
 } from "../../api/clubCredibilityApi";
 import { IndiaMapBackdrop, CampusPillarsBackdrop } from "../../components/ScopeBackdrops";
 import { EventCooldownWarningModal } from "./EventCooldownWarningModal";
@@ -25,8 +27,76 @@ export interface EventScopeSelectionModalProps {
     onClose: () => void;
     onSelectScope: (scope: "PAN_INDIA" | "CAMPUS") => void;
     collegeName?: string | null;
+    collegeId?: string | null;
     initialEligibility?: ClubEventCreationEligibility | null;
 }
+
+/**
+ * Format numeric counts matching YouTube subscriber conventions:
+ * - < 1,000: exact count (e.g. 3, 394, 850)
+ * - 1,000 - 999,999: compact K (e.g. 1.2K, 1.4K, 1.6K, 14.2K, 100K)
+ * - 1,000,000+: compact M (e.g. 1.2M, 1.4M, 25M)
+ * Truncation aligns with standard subscriber milestone counters.
+ */
+export function formatYouTubeSubscriberCount(count: number | null | undefined): string {
+    if (count == null || isNaN(count) || count < 0) return "0";
+    if (count < 1000) return count.toLocaleString();
+    if (count < 1_000_000) {
+        const k = Math.floor(count / 100) / 10;
+        return k >= 100 ? `${Math.floor(count / 1000)}K` : `${k.toFixed(1).replace(/\.0$/, "")}K`;
+    }
+    if (count < 1_000_000_000) {
+        const m = Math.floor(count / 100_000) / 10;
+        return m >= 100 ? `${Math.floor(count / 1_000_000)}M` : `${m.toFixed(1).replace(/\.0$/, "")}M`;
+    }
+    const b = Math.floor(count / 100_000_000) / 10;
+    return `${b.toFixed(1).replace(/\.0$/, "")}B`;
+}
+
+interface AudiencePoolBadgeProps {
+    count: number | null | undefined;
+    label?: string;
+    scope: "PAN_INDIA" | "CAMPUS";
+    collegeName?: string | null;
+    isLoading?: boolean;
+}
+
+const AudiencePoolBadge: React.FC<AudiencePoolBadgeProps> = ({
+    count,
+    label = "Pool Size",
+    scope,
+    collegeName,
+    isLoading = false,
+}) => {
+    const isPanIndia = scope === "PAN_INDIA";
+    const formatted = formatYouTubeSubscriberCount(count ?? 0);
+    const tooltip = isPanIndia
+        ? `${(count ?? 0).toLocaleString()} total registered students across all colleges in India`
+        : `${(count ?? 0).toLocaleString()} registered students from ${collegeName || "your college"}`;
+
+    return (
+        <div
+            className={`shrink-0 flex flex-col items-center justify-center px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] transition-all hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 min-w-[68px] sm:min-w-[80px] select-none ${
+                isPanIndia
+                    ? "bg-amber-50/90 hover:bg-amber-100/90 text-amber-950"
+                    : "bg-sky-50/90 hover:bg-sky-100/90 text-sky-950"
+            }`}
+            title={tooltip}
+            aria-label={`${label}: ${formatted}`}
+        >
+            {isLoading && (count === undefined || count === null) ? (
+                <div className="h-4 sm:h-5 w-8 bg-black/10 rounded animate-pulse my-0.5" />
+            ) : (
+                <span className="text-base sm:text-lg font-black tracking-tight leading-none text-black tabular-nums">
+                    {formatted}
+                </span>
+            )}
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-neutral-600 mt-1 leading-none">
+                {label}
+            </span>
+        </div>
+    );
+};
 
 interface TimeParts {
     days: number;
@@ -151,21 +221,44 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
     const [eligibility, setEligibility] = useState<ClubEventCreationEligibility | null>(
         initialEligibility || null
     );
+    const [poolSizes, setPoolSizes] = useState<AudiencePoolSizes | null>(
+        initialEligibility?.audiencePool || null
+    );
+    const [isPoolLoading, setIsPoolLoading] = useState<boolean>(!initialEligibility?.audiencePool);
     const [warningScope, setWarningScope] = useState<"PAN_INDIA" | "CAMPUS" | null>(null);
 
-    // Fetch fresh centralized eligibility on modal open & sync real-time countdown timer
+    // Fetch fresh centralized eligibility & real-time audience pool sizes on modal open
     useEffect(() => {
         if (!isOpen) return;
 
         let isMounted = true;
+        setIsPoolLoading(true);
+
         fetchEventCreationEligibility()
             .then((res) => {
                 if (isMounted && res?.eligibility) {
                     setEligibility(res.eligibility);
+                    if (res.eligibility.audiencePool) {
+                        setPoolSizes(res.eligibility.audiencePool);
+                        setIsPoolLoading(false);
+                    }
                 }
             })
             .catch((err) => {
                 console.error("Failed to load event creation eligibility:", err);
+            });
+
+        // Dedicated fallback query to ensure audience pools always hydrate
+        fetchAudiencePoolSizes()
+            .then((res) => {
+                if (isMounted && res?.audiencePool) {
+                    setPoolSizes(res.audiencePool);
+                    setIsPoolLoading(false);
+                }
+            })
+            .catch((err) => {
+                console.warn("Fallback audience pool fetch note:", err);
+                if (isMounted) setIsPoolLoading(false);
             });
 
         const timer = setInterval(() => {
@@ -221,6 +314,9 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
               second: "2-digit",
           })
         : "Available immediately";
+
+    const panIndiaPoolCount = poolSizes?.panIndia ?? eligibility?.audiencePool?.panIndia ?? null;
+    const campusPoolCount = poolSizes?.campus ?? eligibility?.audiencePool?.campus ?? null;
 
     const handleCardClick = (scope: "PAN_INDIA" | "CAMPUS") => {
         if (scope === "PAN_INDIA") {
@@ -321,25 +417,34 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                     </span>
                                 </div>
 
-                                {/* Scope Icon & Title */}
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div
-                                        className={`w-12 h-12 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center text-black transition-transform ${
-                                            panIndiaEligible
-                                                ? "bg-[#FF9933] group-hover:rotate-[6deg]"
-                                                : "bg-[#FF9933]/60"
-                                        }`}
-                                    >
-                                        <Globe2 className="w-6 h-6 stroke-[2.2]" />
+                                {/* Scope Icon, Title & Responsive Pool Size Box */}
+                                <div className="flex items-center justify-between gap-2.5 sm:gap-3 mb-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div
+                                            className={`w-12 h-12 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center text-black shrink-0 transition-transform ${
+                                                panIndiaEligible
+                                                    ? "bg-[#FF9933] group-hover:rotate-[6deg]"
+                                                    : "bg-[#FF9933]/60"
+                                            }`}
+                                        >
+                                            <Globe2 className="w-6 h-6 stroke-[2.2]" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight truncate">
+                                                PAN INDIA
+                                            </h3>
+                                            <span className="text-xs font-bold text-neutral-600 block truncate">
+                                                Across colleges throughout India
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
-                                            PAN INDIA
-                                        </h3>
-                                        <span className="text-xs font-bold text-neutral-600">
-                                            Across colleges throughout India
-                                        </span>
-                                    </div>
+
+                                    {/* Responsive Audience Pool Size Badge */}
+                                    <AudiencePoolBadge
+                                        count={panIndiaPoolCount}
+                                        scope="PAN_INDIA"
+                                        isLoading={isPoolLoading}
+                                    />
                                 </div>
 
                                 {/* Creation Cooldown Active Card */}
@@ -499,25 +604,35 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
                                     </span>
                                 </div>
 
-                                {/* Scope Icon & Title */}
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div
-                                        className={`w-12 h-12 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center text-black transition-transform ${
-                                            campusEligible
-                                                ? "bg-[#38BDF8] group-hover:rotate-[6deg]"
-                                                : "bg-[#38BDF8]/60"
-                                        }`}
-                                    >
-                                        <GraduationCap className="w-6 h-6 stroke-[2.2]" />
+                                {/* Scope Icon, Title & Responsive Pool Size Box */}
+                                <div className="flex items-center justify-between gap-2.5 sm:gap-3 mb-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div
+                                            className={`w-12 h-12 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center text-black shrink-0 transition-transform ${
+                                                campusEligible
+                                                    ? "bg-[#38BDF8] group-hover:rotate-[6deg]"
+                                                    : "bg-[#38BDF8]/60"
+                                            }`}
+                                        >
+                                            <GraduationCap className="w-6 h-6 stroke-[2.2]" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight truncate">
+                                                CAMPUS ONLY
+                                            </h3>
+                                            <span className="text-xs font-bold text-neutral-600 block truncate">
+                                                Within your institution
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
-                                            CAMPUS ONLY
-                                        </h3>
-                                        <span className="text-xs font-bold text-neutral-600">
-                                            Within your institution
-                                        </span>
-                                    </div>
+
+                                    {/* Responsive Audience Pool Size Badge */}
+                                    <AudiencePoolBadge
+                                        count={campusPoolCount}
+                                        scope="CAMPUS"
+                                        collegeName={collegeName}
+                                        isLoading={isPoolLoading}
+                                    />
                                 </div>
 
                                 {/* Creation Cooldown Active Card */}

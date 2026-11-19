@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts",
+    "test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts src/app/Club/eventScopePoolSize.test.ts src/app/Club/ApplicationsRoster/teamReadinessFilterSort.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

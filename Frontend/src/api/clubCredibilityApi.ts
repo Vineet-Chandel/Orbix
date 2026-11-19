@@ -82,6 +82,11 @@ export interface ScopeEligibilityStatus {
     reason: string;
 }
 
+export interface AudiencePoolSizes {
+    panIndia: number;
+    campus: number;
+}
+
 export interface ClubEventCreationEligibility {
     clubId: string;
     currentScore: number;
@@ -90,6 +95,7 @@ export interface ClubEventCreationEligibility {
     isProvisional: boolean;
     campus: ScopeEligibilityStatus;
     panIndia: ScopeEligibilityStatus;
+    audiencePool?: AudiencePoolSizes;
 }
 
 export interface CreationEligibilityResponse {
@@ -193,4 +199,11 @@ export async function fetchPublicClubCredibility(clubId: string) {
  */
 export async function fetchEventCreationEligibility(): Promise<CreationEligibilityResponse> {
     return apiFetch<CreationEligibilityResponse>("/club/events/creation-eligibility");
+}
+
+/**
+ * Fetch real-time audience pool sizes (Pan-India & Campus-Only students count)
+ */
+export async function fetchAudiencePoolSizes(): Promise<{ success: boolean; audiencePool: AudiencePoolSizes }> {
+    return apiFetch<{ success: boolean; audiencePool: AudiencePoolSizes }>("/club/events/audience-pools");
 }

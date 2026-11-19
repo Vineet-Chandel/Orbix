@@ -259,7 +259,8 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
                       id: "teamReadiness",
                       label: "TEAM READINESS",
                       group: "status",
-                      type: "text",
+                      type: "status",
+                      options: ["Ready", "Incomplete"],
                       minWidth: "min-w-[170px]",
                       sortable: true,
                       filterable: true,
@@ -538,8 +539,8 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
                 return <span className="text-neutral-400 font-normal">—</span>;
             }
 
-            const minSize = minTeamSize || 2;
-            const maxSize = maxTeamSize || minSize;
+            const minSize = minTeamSize || (app as any).minTeamSize || 2;
+            const maxSize = maxTeamSize || (app as any).maxTeamSize || minSize;
             const confirmedCount = app.teamMembersCount ?? (app.teamMembers ? app.teamMembers.length : 1);
             const pendingCount = app.teamPendingCount ?? (app.teamPendingInvites ? app.teamPendingInvites.length : (Array.isArray(app.answers?.__stagedTeammates) ? app.answers.__stagedTeammates.length : 0));
             const isReady = confirmedCount >= minSize;

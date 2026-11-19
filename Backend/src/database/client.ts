@@ -20,7 +20,7 @@ if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test'
         process.loadEnvFile();
     } catch { }
 }
-import pg from "../../node_modules/@types/pg/index.js";
+import pg from "pg";
 import { performance } from "node:perf_hooks";
 
 const { Pool } = pg;

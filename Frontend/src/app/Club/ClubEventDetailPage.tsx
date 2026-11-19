@@ -526,6 +526,9 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     } = useApplicationsFilterSort({
         applications: appsData?.applications || [],
         dynamicQuestions: formQuestions,
+        minTeamSize: event?.minTeamSize,
+        maxTeamSize: event?.maxTeamSize,
+        isTeamEvent: event?.isTeamEvent,
     });
 
     // Reset institution and state filters if event is campus-bounded
@@ -539,6 +542,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     // Active table columns metadata for filter bar chips
     const activeColumnsMeta = useMemo<TableColumnDefinition[]>(() => {
         return [
+            { id: "status", label: "Status", group: "status", type: "status" },
+            { id: "teamReadiness", label: "Team Readiness", group: "status", type: "status", options: ["Ready", "Incomplete"] },
             { id: "applicantName", label: "Student Name", group: "personal", type: "text" },
             { id: "username", label: "Username", group: "personal", type: "text" },
             { id: "applicantEmail", label: "Email Address", group: "personal", type: "text" },
