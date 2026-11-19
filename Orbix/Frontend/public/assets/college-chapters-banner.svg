@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" style="background:#FAF6EE;">
+  <defs>
+    <!-- Dot Grid Pattern -->
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#D8D0C5" />
+    </pattern>
+    
+    <!-- Diagonal Stripes Pattern -->
+    <pattern id="stripes" width="20" height="20" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="20" stroke="#000000" stroke-width="3" opacity="0.08" />
+    </pattern>
+
+    <!-- Hard Drop Shadow Filters -->
+    <filter id="shadow4" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="4" dy="4" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+    <filter id="shadow6" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="6" dy="6" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+    <filter id="shadow8" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="8" dy="8" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+  </defs>
+
+  <!-- Background Base with Grid -->
+  <rect width="1200" height="630" fill="#FAF6EE" />
+  <rect width="1200" height="630" fill="url(#dotGrid)" />
+  <rect width="1200" height="630" fill="none" stroke="#000000" stroke-width="6" />
+
+  <!-- Corner Brackets (Tech Neo-Brutalism) -->
+  <path d="M 16 48 L 16 16 L 48 16" fill="none" stroke="#000000" stroke-width="4" />
+  <path d="M 1184 48 L 1184 16 L 1152 16" fill="none" stroke="#000000" stroke-width="4" />
+  <path d="M 16 582 L 16 614 L 48 614" fill="none" stroke="#000000" stroke-width="4" />
+  <path d="M 1184 582 L 1184 614 L 1152 614" fill="none" stroke="#000000" stroke-width="4" />
+
+  <!-- TOP STATUS BAR -->
+  <g transform="translate(40, 32)">
+    <!-- Main Header Card -->
+    <rect x="0" y="0" width="1120" height="52" rx="14" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+    
+    <!-- Window Dots -->
+    <circle cx="28" cy="26" r="6" fill="#FF5F56" stroke="#000000" stroke-width="2" />
+    <circle cx="48" cy="26" r="6" fill="#FFBD2E" stroke="#000000" stroke-width="2" />
+    <circle cx="68" cy="26" r="6" fill="#27C93F" stroke="#000000" stroke-width="2" />
+
+    <!-- Orbix Logo Badge -->
+    <rect x="96" y="11" width="140" height="30" rx="8" fill="#000000" />
+    <text x="166" y="31" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#a2ff86" text-anchor="middle" letter-spacing="1.5">ORBIX // DOCS</text>
+
+    <!-- Protocol Breadcrumb -->
+    <text x="254" y="32" font-family="ui-monospace, monospace" font-size="13" font-weight="800" fill="#000000">CAMPUS CHAPTER GOVERNANCE &amp; ARCHITECTURE STANDARD</text>
+
+    <!-- AISHE Status Pill -->
+    <rect x="910" y="10" width="195" height="32" rx="16" fill="#FFE566" stroke="#000000" stroke-width="2" />
+    <circle cx="928" cy="26" r="4" fill="#000000" />
+    <text x="942" y="31" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#000000" letter-spacing="0.5">AISHE INDEXED // C-46844</text>
+  </g>
+
+  <!-- HERO TITLE & TAGLINE SECTION -->
+  <g transform="translate(40, 114)">
+    <!-- Decorative Accent Pill -->
+    <rect x="0" y="0" width="270" height="30" rx="15" fill="#FF9933" stroke="#000000" stroke-width="2.5" filter="url(#shadow4)" />
+    <text x="135" y="20" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="1">PAN-INDIA &amp; CAMPUS ECOSYSTEM</text>
+
+    <text x="300" y="21" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#666666">REV. 2026.11 // INSTITUTIONAL STANDARD v2.4</text>
+
+    <!-- Main Title -->
+    <text x="0" y="78" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="950" fill="#000000" letter-spacing="-1.5">COLLEGE CHAPTERS</text>
+    <text x="0" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="900" fill="#000000" letter-spacing="-1">ARCHITECTURE &amp; PLAYBOOK</text>
+
+    <!-- Subtitle Bar -->
+    <rect x="0" y="146" width="620" height="34" rx="8" fill="#FFE566" stroke="#000000" stroke-width="2.5" filter="url(#shadow4)" />
+    <text x="16" y="169" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" fill="#000000">Decentralized Student Engineering • Campus Hubs • Pan-India Arenas</text>
+  </g>
+
+  <!-- 3-PILLAR INTERACTIVE SCHEMATIC CARDS -->
+  <g transform="translate(40, 320)">
+    
+    <!-- CARD 1: AISHE CAMPUS HUB & GENESIS -->
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="350" height="225" rx="18" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow6)" />
+      
+      <!-- Top Card Header -->
+      <rect x="0" y="0" width="350" height="42" rx="18" fill="#FAF6EE" stroke="#000000" stroke-width="3" />
+      <rect x="14" y="10" width="24" height="24" rx="6" fill="#FFE566" stroke="#000000" stroke-width="2" />
+      <text x="26" y="26" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000" text-anchor="middle">🏛️</text>
+      <text x="48" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#000000">01. AISHE Campus Hub</text>
+      
+      <!-- Content Elements -->
+      <g transform="translate(16, 56)">
+        <rect x="0" y="0" width="318" height="36" rx="8" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="10" y="22" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#000000">Pranveer Singh Inst. of Tech (PSIT)</text>
+
+        <!-- Feature Bullets -->
+        <g transform="translate(0, 48)">
+          <rect x="0" y="0" width="150" height="24" rx="6" fill="#a2ff86" stroke="#000000" stroke-width="1.5" />
+          <text x="75" y="16" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#000000" text-anchor="middle">AISHE: C-46844</text>
+
+          <rect x="160" y="0" width="158" height="24" rx="6" fill="#E8F5E9" stroke="#000000" stroke-width="1.5" />
+          <text x="239" y="16" font-family="system-ui, sans-serif" font-size="10" font-weight="800" fill="#1B5E20" text-anchor="middle">✓ Verified Hub</text>
+        </g>
+
+        <!-- Text description -->
+        <text x="0" y="94" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#444444" width="318">
+          <tspan x="0" dy="0">Single canonical university anchor. Multi-club</tspan>
+          <tspan x="0" dy="16">federation: ACM, AWS SBG, GDG, Codex.</tspan>
+          <tspan x="0" dy="16">Sovereign coordinator keys &amp; dean verification.</tspan>
+        </text>
+      </g>
+    </g>
+
+    <!-- CARD 2: DUAL-SCOPE EVENT ENGINE -->
+    <g transform="translate(385, 0)">
+      <rect x="0" y="0" width="350" height="225" rx="18" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow6)" />
+      
+      <!-- Top Card Header -->
+      <rect x="0" y="0" width="350" height="42" rx="18" fill="#FAF6EE" stroke="#000000" stroke-width="3" />
+      <rect x="14" y="10" width="24" height="24" rx="6" fill="#FF9933" stroke="#000000" stroke-width="2" />
+      <text x="26" y="26" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000" text-anchor="middle">⚡</text>
+      <text x="48" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#000000">02. Event &amp; Pass Engine</text>
+      
+      <!-- Content Elements -->
+      <g transform="translate(16, 56)">
+        <rect x="0" y="0" width="154" height="40" rx="8" fill="#FFF9C4" stroke="#000000" stroke-width="1.5" />
+        <text x="77" y="18" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#000000" text-anchor="middle">CAMPUS WORKSHOPS</text>
+        <text x="77" y="32" font-family="ui-monospace, monospace" font-size="9" font-weight="700" fill="#666600" text-anchor="middle">College-Gated RSVPs</text>
+
+        <rect x="164" y="0" width="154" height="40" rx="8" fill="#FFE0B2" stroke="#000000" stroke-width="1.5" />
+        <text x="241" y="18" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#000000" text-anchor="middle">PAN-INDIA ARENAS</text>
+        <text x="241" y="32" font-family="ui-monospace, monospace" font-size="9" font-weight="700" fill="#E65100" text-anchor="middle">Nationwide Open</text>
+
+        <!-- Live Sync Pill -->
+        <g transform="translate(0, 52)">
+          <rect x="0" y="0" width="318" height="26" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+          <circle cx="16" cy="13" r="4" fill="#00C853" />
+          <text x="28" y="17" font-family="ui-monospace, monospace" font-size="10" font-weight="800" fill="#000000">LIVE SYNC: QR Ticket Pass &amp; Check-in</text>
+        </g>
+
+        <!-- Description -->
+        <text x="0" y="98" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#444444" width="318">
+          <tspan x="0" dy="0">Real-time registration counter, attendance</tspan>
+          <tspan x="0" dy="16">check-in scanners, and venue synchronization.</tspan>
+        </text>
+      </g>
+    </g>
+
+    <!-- CARD 3: CERTIFICATES & CAMPUS SCORE -->
+    <g transform="translate(770, 0)">
+      <rect x="0" y="0" width="350" height="225" rx="18" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow6)" />
+      
+      <!-- Top Card Header -->
+      <rect x="0" y="0" width="350" height="42" rx="18" fill="#FAF6EE" stroke="#000000" stroke-width="3" />
+      <rect x="14" y="10" width="24" height="24" rx="6" fill="#a2ff86" stroke="#000000" stroke-width="2" />
+      <text x="26" y="26" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000" text-anchor="middle">🎓</text>
+      <text x="48" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#000000">03. Credentials &amp; Score</text>
+      
+      <!-- Content Elements -->
+      <g transform="translate(16, 56)">
+        <!-- Certificate Badge -->
+        <rect x="0" y="0" width="318" height="34" rx="8" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <rect x="8" y="7" width="90" height="20" rx="4" fill="#000000" />
+        <text x="53" y="21" font-family="ui-monospace, monospace" font-size="9" font-weight="900" fill="#a2ff86" text-anchor="middle">CERT STUDIO</text>
+        <text x="108" y="22" font-family="ui-monospace, monospace" font-size="10" font-weight="800" fill="#000000">SHA-256 Verified Ledger</text>
+
+        <!-- Metric Badges -->
+        <g transform="translate(0, 44)">
+          <rect x="0" y="0" width="150" height="30" rx="6" fill="#E1F5FE" stroke="#000000" stroke-width="1.5" />
+          <text x="75" y="19" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#0277BD" text-anchor="middle">Inter-College Rank</text>
+
+          <rect x="160" y="0" width="158" height="30" rx="6" fill="#F3E5F5" stroke="#000000" stroke-width="1.5" />
+          <text x="239" y="19" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#6A1B9A" text-anchor="middle">Bayesian Trust Band</text>
+        </g>
+
+        <!-- Description -->
+        <text x="0" y="96" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#444444" width="318">
+          <tspan x="0" dy="0">Turnkey batch credential generation, tamper-proof</tspan>
+          <tspan x="0" dy="16">public verification links, and national scoreboard.</tspan>
+        </text>
+      </g>
+    </g>
+
+  </g>
+
+  <!-- BOTTOM ACCENT BANNER (FOOTER BAR) -->
+  <g transform="translate(40, 564)">
+    <rect x="0" y="0" width="1120" height="36" rx="10" fill="#000000" stroke="#000000" stroke-width="2" />
+    <circle cx="20" cy="18" r="4" fill="#a2ff86" />
+    <text x="32" y="22" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFFFFF">ARCHITECTURAL SPECIFICATION: COLLEGE CHAPTERS &amp; CAMPUS ECOSYSTEM</text>
+    <text x="1104" y="22" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFE566" text-anchor="end">OPEN TO ALL INDIAN COLLEGES &amp; UNIVERSITIES →</text>
+  </g>
+</svg>

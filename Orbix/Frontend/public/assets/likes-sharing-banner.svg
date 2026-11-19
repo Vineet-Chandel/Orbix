@@ -1,0 +1,226 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" style="background:#FAF6EE;">
+  <defs>
+    <!-- Dot Grid Pattern -->
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#D8D0C5" />
+    </pattern>
+    
+    <!-- Diagonal Stripes Pattern -->
+    <pattern id="stripes" width="20" height="20" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="20" stroke="#000000" stroke-width="3" opacity="0.08" />
+    </pattern>
+
+    <!-- Hard Drop Shadow Filters -->
+    <filter id="shadow4" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="4" dy="4" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+    <filter id="shadow6" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="6" dy="6" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+    <filter id="shadow8" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="8" dy="8" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+  </defs>
+
+  <!-- Background Base with Grid -->
+  <rect width="1200" height="630" fill="#FAF6EE" />
+  <rect width="1200" height="630" fill="url(#dotGrid)" />
+  <rect width="1200" height="630" fill="none" stroke="#000000" stroke-width="6" />
+
+  <!-- Corner Brackets (Tech Neo-Brutalism) -->
+  <path d="M 16 48 L 16 16 L 48 16" fill="none" stroke="#000000" stroke-width="4" />
+  <path d="M 1184 48 L 1184 16 L 1152 16" fill="none" stroke="#000000" stroke-width="4" />
+  <path d="M 16 582 L 16 614 L 48 614" fill="none" stroke="#000000" stroke-width="4" />
+  <path d="M 1184 582 L 1184 614 L 1152 614" fill="none" stroke="#000000" stroke-width="4" />
+
+  <!-- TOP STATUS BAR -->
+  <g transform="translate(40, 32)">
+    <rect x="0" y="0" width="1120" height="52" rx="14" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+    
+    <!-- Window Dots -->
+    <circle cx="28" cy="26" r="6" fill="#FF5F56" stroke="#000000" stroke-width="2" />
+    <circle cx="48" cy="26" r="6" fill="#FFBD2E" stroke="#000000" stroke-width="2" />
+    <circle cx="68" cy="26" r="6" fill="#27C93F" stroke="#000000" stroke-width="2" />
+
+    <!-- Orbix Logo Badge -->
+    <rect x="96" y="11" width="160" height="30" rx="8" fill="#000000" />
+    <text x="176" y="31" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#FF70A6" text-anchor="middle" letter-spacing="1.5">ORBIX // ENGAGE</text>
+
+    <!-- Protocol Breadcrumb -->
+    <text x="276" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#555555">SPECIFICATION: BLOG_LIKES_AND_EVENT_SHARING_V1</text>
+    
+    <!-- Live Pill -->
+    <g transform="translate(980, 12)">
+      <rect x="0" y="0" width="120" height="28" rx="8" fill="#a2ff86" stroke="#000000" stroke-width="2" />
+      <circle cx="16" cy="14" r="5" fill="#000000" />
+      <text x="64" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="0.5">ACTIVE SPEC</text>
+    </g>
+  </g>
+
+  <!-- MAIN CONTENT SPLIT -->
+  <!-- LEFT: Hero Typography & Key Pillars -->
+  <g transform="translate(40, 114)">
+    <!-- Category Badge -->
+    <g>
+      <rect x="0" y="0" width="260" height="36" rx="10" fill="#FF70A6" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+      <text x="130" y="23" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="1">COMMUNITY &amp; ENGAGEMENT</text>
+    </g>
+
+    <!-- Main Title -->
+    <text x="0" y="82" font-family="system-ui, sans-serif" font-size="44" font-weight="900" fill="#000000" letter-spacing="-1.5">Likes &amp; Event Sharing</text>
+    <text x="0" y="124" font-family="system-ui, sans-serif" font-size="20" font-weight="800" fill="#444444">Appreciation Engine &bull; 3-Action Distribution &bull; Cooldown Safety</text>
+
+    <!-- Summary Box -->
+    <g transform="translate(0, 150)">
+      <rect x="0" y="0" width="530" height="150" rx="16" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow6)" />
+      
+      <!-- Striped accent bar -->
+      <path d="M 0 0 L 12 0 L 12 150 L 0 150 Z" fill="#FF70A6" />
+      
+      <text x="32" y="34" font-family="system-ui, sans-serif" font-size="15" font-weight="900" fill="#000000">CANONICAL ENGAGEMENT CAPABILITIES</text>
+      
+      <circle cx="42" cy="62" r="5" fill="#FF70A6" stroke="#000000" stroke-width="1.5" />
+      <text x="58" y="66" font-family="system-ui, sans-serif" font-size="13.5" font-weight="700" fill="#222222">Publication-Bound Blog Appreciation (Instant SWR + Optimistic)</text>
+
+      <circle cx="42" cy="94" r="5" fill="#70D6FF" stroke="#000000" stroke-width="1.5" />
+      <text x="58" y="98" font-family="system-ui, sans-serif" font-size="13.5" font-weight="700" fill="#222222">3 Distribution Vectors: Internal Peer, Device Native, Direct Link</text>
+
+      <circle cx="42" cy="126" r="5" fill="#FFE566" stroke="#000000" stroke-width="1.5" />
+      <text x="58" y="130" font-family="system-ui, sans-serif" font-size="13.5" font-weight="700" fill="#222222">Anti-Inflation Accounting &amp; 3-Invitation Cycle Cooldown Safeguard</text>
+    </g>
+
+    <!-- Key Metrics Triple Bar -->
+    <g transform="translate(0, 324)">
+      <!-- Metric 1 -->
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="166" height="84" rx="14" fill="#FFE566" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+        <text x="83" y="34" font-family="ui-monospace, monospace" font-size="28" font-weight="900" fill="#000000" text-anchor="middle">3</text>
+        <text x="83" y="58" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="0.5">INVITATION CYCLE</text>
+        <text x="83" y="72" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#555555" text-anchor="middle">Per Recipient / Event</text>
+      </g>
+
+      <!-- Metric 2 -->
+      <g transform="translate(182, 0)">
+        <rect x="0" y="0" width="166" height="84" rx="14" fill="#a2ff86" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+        <text x="83" y="34" font-family="ui-monospace, monospace" font-size="28" font-weight="900" fill="#000000" text-anchor="middle">1h</text>
+        <text x="83" y="58" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="0.5">COOLDOWN TIMER</text>
+        <text x="83" y="72" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#555555" text-anchor="middle">Anti-Spam Throttling</text>
+      </g>
+
+      <!-- Metric 3 -->
+      <g transform="translate(364, 0)">
+        <rect x="0" y="0" width="166" height="84" rx="14" fill="#70D6FF" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+        <text x="83" y="34" font-family="ui-monospace, monospace" font-size="28" font-weight="900" fill="#000000" text-anchor="middle">+1</text>
+        <text x="83" y="58" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="0.5">UNIQUE ACCOUNTING</text>
+        <text x="83" y="72" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#555555" text-anchor="middle">First Qualifying Share</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- RIGHT: Interactive Architectural UI Mockup -->
+  <g transform="translate(610, 114)">
+    <!-- Base Card Container -->
+    <rect x="0" y="0" width="550" height="460" rx="20" fill="#FFFFFF" stroke="#000000" stroke-width="4" filter="url(#shadow8)" />
+    
+    <!-- Top Bar inside Card -->
+    <path d="M 0 20 C 0 8.95 8.95 0 20 0 L 530 0 C 541.05 0 550 8.95 550 20 L 550 48 L 0 48 Z" fill="#FAF6EE" stroke="#000000" stroke-width="0" />
+    <line x1="0" y1="48" x2="550" y2="48" stroke="#000000" stroke-width="3" />
+    
+    <circle cx="24" cy="24" r="5" fill="#FF5F56" stroke="#000000" stroke-width="1.5" />
+    <circle cx="40" cy="24" r="5" fill="#FFBD2E" stroke="#000000" stroke-width="1.5" />
+    <circle cx="56" cy="24" r="5" fill="#27C93F" stroke="#000000" stroke-width="1.5" />
+    <text x="80" y="29" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#000000">ORBIX_INTERACTION_FRAMEWORK.TS</text>
+
+    <!-- Component 1: Heart Like Action Showcase -->
+    <g transform="translate(26, 68)">
+      <rect x="0" y="0" width="498" height="95" rx="14" fill="#FFF5F7" stroke="#000000" stroke-width="2.5" filter="url(#shadow4)" />
+      
+      <!-- Heart Icon Circle -->
+      <circle cx="48" cy="48" r="28" fill="#FF70A6" stroke="#000000" stroke-width="2.5" />
+      <path d="M 48 56 L 38 45 C 33 40 33 33 39 29 C 44 26 47 30 48 32 C 49 30 52 26 57 29 C 63 33 63 40 58 45 Z" fill="#FFFFFF" stroke="#000000" stroke-width="2" stroke-linejoin="round" />
+      
+      <text x="92" y="38" font-family="system-ui, sans-serif" font-size="16" font-weight="900" fill="#000000">Blog &amp; Event Appreciation</text>
+      <text x="92" y="58" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#666666">Publication-bound ID &bull; Optimistic SWR &bull; Instant Feedback</text>
+      <text x="92" y="78" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#FF0055">STATUS: LIKED &bull; COUNT: 1,420 &bull; DELTA: +1</text>
+    </g>
+
+    <!-- Component 2: 3-Action Event Sharing Showcase -->
+    <g transform="translate(26, 180)">
+      <rect x="0" y="0" width="498" height="150" rx="14" fill="#F4F3EE" stroke="#000000" stroke-width="2.5" filter="url(#shadow4)" />
+      
+      <text x="20" y="28" font-family="system-ui, sans-serif" font-size="14" font-weight="900" fill="#000000">COLLEGE EVENT SHARE MODAL</text>
+      
+      <!-- Action 1: Share Within Orbix -->
+      <g transform="translate(18, 42)">
+        <rect x="0" y="0" width="146" height="88" rx="10" fill="#FFFFFF" stroke="#000000" stroke-width="2" />
+        <rect x="10" y="10" width="24" height="24" rx="6" fill="#70D6FF" stroke="#000000" stroke-width="1.5" />
+        <text x="22" y="27" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000" text-anchor="middle">&gt;</text>
+        <text x="12" y="54" font-family="system-ui, sans-serif" font-size="11.5" font-weight="900" fill="#000000">Within Orbix</text>
+        <text x="12" y="70" font-family="system-ui, sans-serif" font-size="9.5" font-weight="700" fill="#555555">Peer Connections</text>
+        <text x="12" y="82" font-family="ui-monospace, monospace" font-size="9" font-weight="800" fill="#009900">+1 First Share</text>
+      </g>
+
+      <!-- Action 2: Share Externally -->
+      <g transform="translate(176, 42)">
+        <rect x="0" y="0" width="146" height="88" rx="10" fill="#FFFFFF" stroke="#000000" stroke-width="2" />
+        <rect x="10" y="10" width="24" height="24" rx="6" fill="#a2ff86" stroke="#000000" stroke-width="1.5" />
+        <text x="22" y="27" font-family="system-ui, sans-serif" font-size="12" font-weight="900" fill="#000000" text-anchor="middle">&#x2197;</text>
+        <text x="12" y="54" font-family="system-ui, sans-serif" font-size="11.5" font-weight="900" fill="#000000">Externally</text>
+        <text x="12" y="70" font-family="system-ui, sans-serif" font-size="9.5" font-weight="700" fill="#555555">Native Device UI</text>
+        <text x="12" y="82" font-family="ui-monospace, monospace" font-size="9" font-weight="800" fill="#009900">+1 Completed</text>
+      </g>
+
+      <!-- Action 3: Copy Event Link -->
+      <g transform="translate(334, 42)">
+        <rect x="0" y="0" width="146" height="88" rx="10" fill="#FFFFFF" stroke="#000000" stroke-width="2" />
+        <rect x="10" y="10" width="24" height="24" rx="6" fill="#FFE566" stroke="#000000" stroke-width="1.5" />
+        <text x="22" y="27" font-family="system-ui, sans-serif" font-size="12" font-weight="900" fill="#000000" text-anchor="middle">&#x29c9;</text>
+        <text x="12" y="54" font-family="system-ui, sans-serif" font-size="11.5" font-weight="900" fill="#000000">Copy Link</text>
+        <text x="12" y="70" font-family="system-ui, sans-serif" font-size="9.5" font-weight="700" fill="#555555">Direct URL</text>
+        <text x="12" y="82" font-family="ui-monospace, monospace" font-size="9" font-weight="800" fill="#777777">+0 Unchanged</text>
+      </g>
+    </g>
+
+    <!-- Component 3: Cooldown Cycle State Machine -->
+    <g transform="translate(26, 348)">
+      <rect x="0" y="0" width="498" height="92" rx="14" fill="#000000" stroke="#000000" stroke-width="2.5" filter="url(#shadow4)" />
+      
+      <!-- Terminal dots -->
+      <circle cx="20" cy="18" r="4" fill="#FF5F56" />
+      <circle cx="32" cy="18" r="4" fill="#FFBD2E" />
+      <circle cx="44" cy="18" r="4" fill="#27C93F" />
+      <text x="60" y="22" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#a2ff86">SHARING_CYCLE_POLICY_MONITOR</text>
+      
+      <!-- Flow indicators -->
+      <g transform="translate(20, 36)">
+        <rect x="0" y="0" width="94" height="42" rx="6" fill="#1A1B1F" stroke="#a2ff86" stroke-width="1.5" />
+        <text x="47" y="18" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#a2ff86" text-anchor="middle">INVITE #1</text>
+        <text x="47" y="32" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#FFFFFF" text-anchor="middle">ALLOWED (+1)</text>
+
+        <text x="108" y="26" font-family="ui-monospace, monospace" font-size="14" font-weight="900" fill="#888888">&rarr;</text>
+
+        <rect x="124" y="0" width="94" height="42" rx="6" fill="#1A1B1F" stroke="#FFE566" stroke-width="1.5" />
+        <text x="171" y="18" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FFE566" text-anchor="middle">INVITE #2</text>
+        <text x="171" y="32" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#FFFFFF" text-anchor="middle">ALLOWED (+0)</text>
+
+        <text x="232" y="26" font-family="ui-monospace, monospace" font-size="14" font-weight="900" fill="#888888">&rarr;</text>
+
+        <rect x="248" y="0" width="94" height="42" rx="6" fill="#1A1B1F" stroke="#FF70A6" stroke-width="1.5" />
+        <text x="295" y="18" font-family="ui-monospace, monospace" font-size="11" font-weight="800" fill="#FF70A6" text-anchor="middle">INVITE #3</text>
+        <text x="295" y="32" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#FFFFFF" text-anchor="middle">TRIGGER 1H</text>
+
+        <text x="356" y="26" font-family="ui-monospace, monospace" font-size="14" font-weight="900" fill="#888888">&rarr;</text>
+
+        <rect x="372" y="0" width="86" height="42" rx="6" fill="#FF5F56" stroke="#FFFFFF" stroke-width="1.5" />
+        <text x="415" y="18" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#FFFFFF" text-anchor="middle">COOLDOWN</text>
+        <text x="415" y="32" font-family="system-ui, sans-serif" font-size="9" font-weight="800" fill="#000000" text-anchor="middle">RESTRICTED</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- BOTTOM METADATA BAR -->
+  <g transform="translate(40, 584)">
+    <text x="0" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#555555">ORBIX ECOSYSTEM SPECIFICATION // DOCS &bull; REPUTATION &amp; ENGAGEMENT STANDARD</text>
+    <text x="1120" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#000000" text-anchor="end">&copy; 2026 ORBIX. AUTHENTIC ENGAGEMENT INFRASTRUCTURE.</text>
+  </g>
+</svg>

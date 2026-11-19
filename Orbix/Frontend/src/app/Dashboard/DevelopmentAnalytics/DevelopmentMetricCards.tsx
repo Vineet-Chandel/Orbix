@@ -1,0 +1,65 @@
+import React from "react";
+import type { DevelopmentAnalyticsData } from "../../../store/developmentAnalyticsSlice";
+
+interface DevelopmentMetricCardsProps {
+    data?: DevelopmentAnalyticsData | null;
+    isLoading?: boolean;
+    totalContributionsFallback?: number;
+}
+
+export const DevelopmentMetricCards: React.FC<DevelopmentMetricCardsProps> = ({
+    data,
+    isLoading = false,
+    totalContributionsFallback,
+}) => {
+    const contributions = data?.contributions ?? totalContributionsFallback ?? 0;
+    const repos = data?.repos ?? 0;
+    const stars = data?.stars ?? 0;
+    const followers = data?.followers ?? 0;
+
+    const metrics = [
+        {
+            value: contributions.toLocaleString(),
+            label: "Contributions",
+        },
+        {
+            value: repos.toLocaleString(),
+            label: "Repos",
+        },
+        {
+            value: stars.toLocaleString(),
+            label: "Stars",
+        },
+        {
+            value: followers.toLocaleString(),
+            label: "Followers",
+        },
+    ];
+
+    return (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 w-full">
+            {metrics.map((metric, idx) => (
+                <div
+                    key={idx}
+                    className="flex flex-col items-center justify-center text-center p-2.5 sm:p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2.5px_2.5px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:translate-y-[-1px] transition-all select-none min-w-0"
+                >
+                    {isLoading && !data && !totalContributionsFallback ? (
+                        <div className="animate-pulse space-y-2 flex flex-col items-center w-full">
+                            <div className="h-8 w-16 bg-neutral-200 rounded-lg border border-black/20" />
+                            <div className="h-3.5 w-20 bg-neutral-100 rounded" />
+                        </div>
+                    ) : (
+                        <>
+                            <span className="text-xl xs:text-2xl sm:text-4xl md:text-5xl font-black text-black tracking-tight font-sans block leading-none truncate max-w-full">
+                                {metric.value}
+                            </span>
+                            <span className="text-[10px] sm:text-xs md:text-sm font-black text-neutral-700 uppercase tracking-wider mt-1.5 sm:mt-2.5 truncate max-w-full">
+                                {metric.label}
+                            </span>
+                        </>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+};

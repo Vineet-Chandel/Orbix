@@ -1,0 +1,271 @@
+import type { CardThemeConfig } from "../../../../app/Profile/CardStudio/types";
+import { CARD_THEMES } from "../../../../app/Profile/CardStudio/types";
+import type {
+    AggregatedCodingStats,
+    CoderTypeBadge,
+    GitHubCardStats,
+    RankedPlatform,
+    ConnectedPlatformBadge,
+    RankedContestPlatform,
+} from "../../../../utils/cardStatsAggregator";
+import {
+    demoConnectedPortals,
+    demoTopContests,
+} from "../../../../data/demoProfileData";
+
+import { DEFAULT_AVATAR_URL } from "../../../../utils/avatarConstants";
+
+export const mockUser = {
+    firstName: "Vineet",
+    lastName: "Chandel",
+    username: "Vineet-Chandel",
+    headline: "Full Stack Developer",
+    photoUrl: DEFAULT_AVATAR_URL,
+    avatarUrl: DEFAULT_AVATAR_URL,
+    linkedin: "https://linkedin.com/in/Vineet-Chandel",
+    github: "https://github.com/Vineet-Chandel",
+    website: "https://orbix.dev/profile/u/Vineet-Chandel",
+    links: {
+        github: "https://github.com/Vineet-Chandel",
+        linkedin: "https://linkedin.com/in/Vineet-Chandel",
+        portfolio: "https://orbix.dev/profile/u/Vineet-Chandel",
+        leetcode: "https://leetcode.com/u/Vineet-Chandel",
+    },
+};
+
+export const mockStats: AggregatedCodingStats = {
+    totalSolved: 1680,
+    easy: 480,
+    medium: 890,
+    hard: 310,
+    activeDays: 520,
+    contests: 96,
+    dayStreak: 48,
+    eligiblePlatformsCount: 12,
+    synchronizedCount: 12,
+    incompleteSync: false,
+    qualificationNote: "Grandmaster Track",
+};
+
+export const mockCoderType: CoderTypeBadge = {
+    title: "The Explorer",
+    tagline: "Codes on 12 platforms",
+    level: "Grandmaster",
+    badgeColor: "#6366F1",
+};
+
+export const mockTopPlatforms: RankedPlatform[] = [
+    {
+        id: "github",
+        name: "GitHub",
+        username: "Vineet-Chandel",
+        profileUrl: "https://github.com/Vineet-Chandel",
+        brandColor: "#24292e",
+        isGitHub: true,
+        category: "dev",
+        contributionsOrCommits: 3180,
+        publicRepos: 62,
+        bestWorkingDay: "Wednesday",
+        isVerified: true,
+        solvedCount: 0,
+    },
+    {
+        id: "leetcode",
+        name: "LeetCode",
+        username: "Vineet-Chandel",
+        profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        brandColor: "#FFA116",
+        solvedCount: 912,
+        rating: 2340,
+        peakRating: 2385,
+        tier: "Guardian",
+        tierColor: "#7A4AD8",
+        contestsCount: 56,
+        hasGoodRating: true,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "codeforces",
+        name: "Codeforces",
+        username: "Vineet-Chandel",
+        profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+        brandColor: "#1F8ACB",
+        solvedCount: 468,
+        rating: 2045,
+        peakRating: 2090,
+        tier: "Candidate Master",
+        tierColor: "#DC2625",
+        contestsCount: 38,
+        hasGoodRating: true,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "codechef",
+        name: "CodeChef",
+        username: "Vineet-Chandel",
+        profileUrl: "https://www.codechef.com/users/Vineet-Chandel",
+        brandColor: "#5B4638",
+        solvedCount: 342,
+        rating: 2215,
+        peakRating: 2250,
+        tier: "6★",
+        tierColor: "#FF7F00",
+        contestsCount: 26,
+        hasGoodRating: true,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "geeksforgeeks",
+        name: "GeeksforGeeks",
+        username: "Vineet-Chandel",
+        profileUrl: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+        brandColor: "#2F8D46",
+        solvedCount: 410,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "hackerrank",
+        name: "HackerRank",
+        username: "Vineet-Chandel",
+        profileUrl: "https://www.hackerrank.com/Vineet-Chandel",
+        brandColor: "#00EA64",
+        solvedCount: 245,
+        isVerified: true,
+        category: "practice",
+    },
+];
+
+export const mockAllConnectedPlatforms: ConnectedPlatformBadge[] = [
+    {
+        id: "leetcode",
+        name: "LeetCode",
+        username: "Vineet-Chandel",
+        profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        brandColor: "#FFA116",
+        solvedCount: 912,
+        isVerified: true,
+    },
+    {
+        id: "codeforces",
+        name: "Codeforces",
+        username: "Vineet-Chandel",
+        profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+        brandColor: "#1F8ACB",
+        solvedCount: 468,
+        isVerified: true,
+    },
+    {
+        id: "codechef",
+        name: "CodeChef",
+        username: "Vineet-Chandel",
+        profileUrl: "https://www.codechef.com/users/Vineet-Chandel",
+        brandColor: "#5B4638",
+        solvedCount: 342,
+        isVerified: true,
+    },
+    // {
+    //     id: "github",
+    //     name: "GitHub",
+    //     username: "Vineet-Chandel",
+    //     profileUrl: "https://github.com/Vineet-Chandel",
+    //     brandColor: "#24292e",
+    //     solvedCount: 0,
+    //     isVerified: true,
+    // },
+    {
+        id: "geeksforgeeks",
+        name: "GeeksforGeeks",
+        username: "Vineet-Chandel",
+        profileUrl: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+        brandColor: "#2F8D46",
+        solvedCount: 410,
+        isVerified: true,
+    },
+    {
+        id: "hackerrank",
+        name: "HackerRank",
+        username: "Vineet-Chandel",
+        profileUrl: "https://www.hackerrank.com/Vineet-Chandel",
+        brandColor: "#00EA64",
+        solvedCount: 245,
+        isVerified: true,
+    },
+    {
+        id: "atcoder",
+        name: "AtCoder",
+        username: "Vineet-Chandel",
+        profileUrl: "https://atcoder.jp/users/Vineet-Chandel",
+        brandColor: "#222222",
+        solvedCount: 140,
+        isVerified: true,
+    },
+    // {
+    //     id: "kaggle",
+    //     name: "Kaggle",
+    //     username: "Vineet-Chandel",
+    //     profileUrl: "https://www.kaggle.com/Vineet-Chandel",
+    //     brandColor: "#20BEFF",
+    //     solvedCount: 82,
+    //     isVerified: true,
+    // },
+    // {
+    //     id: "gitlab",
+    //     name: "GitLab",
+    //     username: "Vineet-Chandel",
+    //     profileUrl: "https://gitlab.com/Vineet-Chandel",
+    //     brandColor: "#FC6D26",
+    //     solvedCount: 0,
+    //     isVerified: true,
+    // },
+    // {
+    //     id: "bitbucket",
+    //     name: "Bitbucket",
+    //     username: "Vineet-Chandel",
+    //     profileUrl: "https://bitbucket.org/Vineet-Chandel",
+    //     brandColor: "#0052CC",
+    //     solvedCount: 0,
+    //     isVerified: true,
+    // },
+    {
+        id: "code360",
+        name: "Code360",
+        username: "Vineet-Chandel",
+        profileUrl: "https://naukri.com/code360/profile/Vineet-Chandel",
+        brandColor: "#FF5722",
+        solvedCount: 165,
+        isVerified: true,
+    },
+    {
+        id: "interviewbit",
+        name: "InterviewBit",
+        username: "Vineet-Chandel",
+        profileUrl: "https://www.interviewbit.com/profile/Vineet-Chandel",
+        brandColor: "#0D8BD9",
+        solvedCount: 130,
+        isVerified: true,
+    },
+];
+
+export const mockGithubStats: GitHubCardStats = {
+    connected: true,
+    username: "Vineet-Chandel",
+    name: "Vineet Chandel",
+    avatarUrl: DEFAULT_AVATAR_URL,
+    publicRepos: 62,
+    contributionsOrCommits: 3180,
+    followers: 840,
+    profileUrl: "https://github.com/Vineet-Chandel",
+    bestWorkingDay: "Wednesday",
+};
+
+export const mockTheme: CardThemeConfig = CARD_THEMES.indigo;
+
+export const mockPublicProfileUrl = "https://orbix.dev/profile/u/Vineet-Chandel";
+
+export const mockConnectedPortals: Record<string, any> = demoConnectedPortals;
+
+export const mockTopContests: RankedContestPlatform[] = demoTopContests;

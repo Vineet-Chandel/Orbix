@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675" style="background:#FAF6EE;">
+  <defs>
+    <pattern id="raftDots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#D3CBBE" />
+    </pattern>
+    <filter id="shadow4" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="5" dy="5" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="675" fill="#FAF6EE" />
+  <rect width="1200" height="675" fill="url(#raftDots)" />
+  <rect width="1200" height="675" fill="none" stroke="#000000" stroke-width="8" />
+
+  <!-- Top Bar -->
+  <g transform="translate(40, 36)">
+    <rect x="0" y="0" width="1120" height="54" rx="14" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+    <circle cx="28" cy="27" r="6" fill="#FF5F56" stroke="#000000" stroke-width="2" />
+    <circle cx="48" cy="27" r="6" fill="#FFBD2E" stroke="#000000" stroke-width="2" />
+    <circle cx="68" cy="27" r="6" fill="#27C93F" stroke="#000000" stroke-width="2" />
+
+    <rect x="96" y="12" width="200" height="30" rx="8" fill="#000000" />
+    <text x="196" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="900" fill="#FFE566" text-anchor="middle" letter-spacing="1">RAFTKV // PROTOCOL</text>
+
+    <text x="315" y="33" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#000000">LINEARIZABLE REPLICATED STATE MACHINE</text>
+
+    <rect x="940" y="11" width="165" height="32" rx="16" fill="#a2ff86" stroke="#000000" stroke-width="2" />
+    <circle cx="958" cy="27" r="4" fill="#000000" />
+    <text x="1030" y="32" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">LEADER ELECTED</text>
+  </g>
+
+  <!-- Main Body -->
+  <g transform="translate(40, 116)">
+    <!-- Left Hero Card -->
+    <rect x="0" y="0" width="560" height="500" rx="24" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+    
+    <g transform="translate(36, 44)">
+      <rect x="0" y="0" width="170" height="28" rx="8" fill="#FFE566" stroke="#000000" stroke-width="2" />
+      <text x="85" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="950" fill="#000000" text-anchor="middle" letter-spacing="1">DISTRIBUTED SYSTEMS</text>
+
+      <text x="0" y="78" font-family="system-ui, sans-serif" font-size="44" font-weight="950" fill="#000000" letter-spacing="-1">RaftKV Store</text>
+      <text x="0" y="114" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#555555">High-Throughput In-Memory Sharded Store</text>
+
+      <g transform="translate(0, 140)">
+        <rect x="0" y="0" width="488" height="155" rx="14" fill="#FAF6EE" stroke="#000000" stroke-width="2" />
+        <g transform="translate(20, 24)">
+          <text x="0" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#777777">P99 READ LATENCY</text>
+          <text x="0" y="44" font-family="system-ui, sans-serif" font-size="28" font-weight="950" fill="#000000">0.82 ms</text>
+
+          <text x="250" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#777777">BENCHMARK QPS</text>
+          <text x="250" y="44" font-family="system-ui, sans-serif" font-size="28" font-weight="950" fill="#E65100">85,000 /sec</text>
+
+          <text x="0" y="90" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#000000">✓ Strict Serializability (ReadIndex)</text>
+          <text x="250" y="90" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#000000">✓ Automatic Partition Healing</text>
+        </g>
+      </g>
+
+      <!-- Tech Pills -->
+      <g transform="translate(0, 330)">
+        <rect x="0" y="0" width="60" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="30" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Go</text>
+
+        <rect x="70" y="0" width="70" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="105" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Raft</text>
+
+        <rect x="150" y="0" width="75" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="187" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">gRPC</text>
+
+        <rect x="235" y="0" width="85" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="277" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Protobuf</text>
+
+        <rect x="330" y="0" width="75" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="367" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Docker</text>
+
+        <rect x="415" y="0" width="73" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="451" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Prom</text>
+      </g>
+    </g>
+
+    <!-- Right Cluster Topology -->
+    <g transform="translate(590, 0)">
+      <rect x="0" y="0" width="530" height="500" rx="24" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadow4)" />
+      
+      <g transform="translate(30, 30)">
+        <text x="0" y="20" font-family="ui-monospace, monospace" font-size="13" font-weight="900" fill="#000000">RAFT CONSENSUS CLUSTER TOPOLOGY</text>
+
+        <!-- Node 1: Leader -->
+        <g transform="translate(140, 45)">
+          <rect x="0" y="0" width="190" height="95" rx="14" fill="#FFE566" stroke="#000000" stroke-width="2.5" />
+          <text x="95" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="950" fill="#000000" text-anchor="middle">NODE 01: LEADER</text>
+          <text x="95" y="52" font-family="ui-monospace, monospace" font-size="10" font-weight="800" fill="#000000" text-anchor="middle">Term 14 • CommitIdx 41,200</text>
+          <rect x="35" y="62" width="120" height="20" rx="6" fill="#000000" />
+          <text x="95" y="76" font-family="ui-monospace, monospace" font-size="9" font-weight="900" fill="#a2ff86" text-anchor="middle">ACTIVE HEARTBEAT</text>
+        </g>
+
+        <!-- Heartbeat Lines -->
+        <path d="M 180 140 L 90 200" stroke="#000000" stroke-width="2.5" stroke-dasharray="4,4" />
+        <path d="M 290 140 L 380 200" stroke="#000000" stroke-width="2.5" stroke-dasharray="4,4" />
+
+        <!-- Node 2: Follower -->
+        <g transform="translate(0, 205)">
+          <rect x="0" y="0" width="190" height="95" rx="14" fill="#FAF6EE" stroke="#000000" stroke-width="2" />
+          <text x="95" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000" text-anchor="middle">NODE 02: FOLLOWER</text>
+          <text x="95" y="52" font-family="ui-monospace, monospace" font-size="10" font-weight="700" fill="#666666" text-anchor="middle">Replicated Log Match</text>
+          <rect x="40" y="62" width="110" height="20" rx="6" fill="#E8F5E9" stroke="#000000" stroke-width="1" />
+          <text x="95" y="76" font-family="ui-monospace, monospace" font-size="9" font-weight="800" fill="#1B5E20" text-anchor="middle">SYNCED // OK</text>
+        </g>
+
+        <!-- Node 3: Follower -->
+        <g transform="translate(280, 205)">
+          <rect x="0" y="0" width="190" height="95" rx="14" fill="#FAF6EE" stroke="#000000" stroke-width="2" />
+          <text x="95" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000" text-anchor="middle">NODE 03: FOLLOWER</text>
+          <text x="95" y="52" font-family="ui-monospace, monospace" font-size="10" font-weight="700" fill="#666666" text-anchor="middle">Replicated Log Match</text>
+          <rect x="40" y="62" width="110" height="20" rx="6" fill="#E8F5E9" stroke="#000000" stroke-width="1" />
+          <text x="95" y="76" font-family="ui-monospace, monospace" font-size="9" font-weight="800" fill="#1B5E20" text-anchor="middle">SYNCED // OK</text>
+        </g>
+
+        <!-- Downward Log Replication Bar -->
+        <g transform="translate(0, 335)">
+          <rect x="0" y="0" width="470" height="90" rx="14" fill="#000000" stroke="#000000" stroke-width="2" />
+          <text x="20" y="30" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#a2ff86">WAL &amp; MEMTABLE SNAPSHOTTING</text>
+          <text x="20" y="52" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#DDDDDD">AppendEntries RPC batch streaming with lock-free ringbuffers.</text>
+          <text x="20" y="72" font-family="ui-monospace, monospace" font-size="10" font-weight="700" fill="#FFE566">Fsync interval: 10ms • Snapshot compaction: Automatic</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

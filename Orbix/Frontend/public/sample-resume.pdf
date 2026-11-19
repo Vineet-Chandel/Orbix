@@ -1,0 +1,96 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Length 2019 >>
+stream
+BT
+/F1 20 Tf
+54 730 Td
+(VINEET CHANDEL) Tj
+/F2 10 Tf
+0 -18 Td
+(Full Stack Engineer & Distributed Systems Architect | Top 0.5% LeetCode Guardian) Tj
+0 -14 Td
+(Bengaluru, India  |  vineet@orbix.dev  |  github.com/Vineet-Chandel  |  orbix.dev/profile/u/Vineet-Chandel) Tj
+
+/F1 12 Tf
+0 -28 Td
+(PROFESSIONAL SUMMARY) Tj
+/F2 10 Tf
+0 -15 Td
+(Passionate Full Stack Engineer with 1,680+ algorithmic problems solved across global platforms.) Tj
+0 -13 Td
+(Proven experience building high-throughput distributed microservices, real-time analytics engines,) Tj
+0 -13 Td
+(and intuitive developer productivity platforms in TypeScript, Node.js, Go, React, and PostgreSQL.) Tj
+
+/F1 12 Tf
+0 -26 Td
+(TECHNICAL SKILLS) Tj
+/F2 10 Tf
+0 -15 Td
+(Languages: TypeScript, JavaScript, Python, Go, C++, SQL, HTML5, CSS3) Tj
+0 -13 Td
+(Frontend: React 19, Vite, Next.js, Redux Toolkit, Tailwind CSS, Modern Web APIs) Tj
+0 -13 Td
+(Backend: Node.js, Express, PostgreSQL, Redis Cache, Docker, REST, GraphQL, WebSocket) Tj
+0 -13 Td
+(Infrastructure: AWS, Cloudinary CDN, Supabase, Linux, Git, CI/CD Actions) Tj
+
+/F1 12 Tf
+0 -26 Td
+(COMPETITIVE PROGRAMMING & RECOGNITION) Tj
+/F2 10 Tf
+0 -15 Td
+(- LeetCode: Guardian (Rating 2,340) - 912 problems solved, 56 contests completed, top 0.5% globally) Tj
+0 -13 Td
+(- Codeforces: Candidate Master (Rating 1,920) - 480 problems solved across Div 1 & Div 2 rounds) Tj
+0 -13 Td
+(- CodeChef: 5-Star Division 1 (Rating 2,050) - Active competitor in Cook-Off and Starters) Tj
+0 -13 Td
+(- GeeksforGeeks: 410 problems solved | HackerRank: 6-Star Problem Solving badge) Tj
+
+/F1 12 Tf
+0 -26 Td
+(CORE PROJECTS) Tj
+/F2 10 Tf
+0 -15 Td
+(Orbix - Unified Developer Portfolio & Platform Analytics Engine) Tj
+0 -13 Td
+(- Built unified API aggregating verified performance metrics across 8 platforms in real-time) Tj
+0 -13 Td
+(- Implemented high-density Midnight Indigo UI components with sub-50ms render performance) Tj
+0 -13 Td
+(- Engineered secure resume management with Cloudinary raw upload, ATS scans & instant previews) Tj
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000019 00000 n 
+0000000068 00000 n 
+0000000125 00000 n 
+0000000261 00000 n 
+0000000336 00000 n 
+0000000406 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2477
+%%EOF

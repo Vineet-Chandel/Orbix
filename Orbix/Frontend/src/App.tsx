@@ -1,0 +1,274 @@
+import { useEffect, Suspense } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import MainLanding from "./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Landing";
+import ClubLanding from "./LandingPages/Main-Landing-Pages/Club-Account-Landing-Pages/Landing";
+import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
+import { ToastProvider } from "./context/ToastContext";
+import {
+  OrbixLoadingProvider,
+  DashboardRouteSkeleton,
+  DocsRouteSkeleton,
+  ContentRouteSkeleton,
+  AuthRouteSkeleton,
+} from "./components/ui/loader";
+import { OrbixErrorBoundary } from "./components/ui/error/OrbixErrorBoundary";
+import { OrbixOfflineBanner } from "./components/ui/network/OrbixOfflineBanner";
+import { lazyWithRetry } from "./utils/lazyWithRetry";
+import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
+import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
+import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
+import { ScrollToTop } from "./components/ScrollToTop";
+
+// Code-split other routes & showcases with resilient retry logic
+const SignInPage = lazyWithRetry(() => import('./LandingPages/Auth-Pages/Signin/Landing'));
+const SignUpPage = lazyWithRetry(() => import('./LandingPages/Auth-Pages/Signup/Landing'));
+const OAuthCallbackPage = lazyWithRetry(() => import('./LandingPages/Auth-Pages/OAuthCallbackPage'));
+const CustomersPage = lazyWithRetry(() => import("./LandingPages/Customers/Landing"));
+const PricingPage = lazyWithRetry(() => import("./LandingPages/Pricing/Landing"));
+const SupportPage = lazyWithRetry(() => import("./LandingPages/Support/Landing"));
+const PlatformPage = lazyWithRetry(() => import("./LandingPages/Platform/Landing"));
+const BlogLanding = lazyWithRetry(() => import("./LandingPages/Blog/Landing"));
+const BlogCollectionPage = lazyWithRetry(() => import("./LandingPages/Blog/BlogCollectionPage"));
+const DocsHubPage = lazyWithRetry(() => import("./LandingPages/Docs/DocsHubPage"));
+const DocsViewerPage = lazyWithRetry(() => import("./LandingPages/Docs/DocsViewerPage"));
+const Dashboard = lazyWithRetry(() => import("./app/Dashboard/Landing"));
+const ProfileManager = lazyWithRetry(() => import("./app/Profile/ProfileManager"));
+const SettingsPage = lazyWithRetry(() => import("./app/Settings/SettingsPage"));
+const PublicProfilePage = lazyWithRetry(() => import("./app/Profile/PublicProfilePage"));
+const ProfilesOnboardingPage = lazyWithRetry(() => import("./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage"));
+const LeaderboardPage = lazyWithRetry(() => import("./app/Leaderboard/LeaderboardPage"));
+const EventTrackerPage = lazyWithRetry(() => import("./app/Events/EventTrackerPage"));
+const Card = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Card").then(m => ({ default: m.Card })));
+const Platform = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Platform").then(m => ({ default: m.Platform })));
+const Events = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Events").then(m => ({ default: m.Events })));
+const ClubStatusPage = lazyWithRetry(() => import("./app/Club/ClubStatusPage"));
+const ClubReviewerQueuePage = lazyWithRetry(() => import("./app/Club/ClubReviewerQueuePage"));
+const ClubDashboardPage = lazyWithRetry(() => import("./app/Club/ClubDashboardPage"));
+const PublicClubProfilePage = lazyWithRetry(() => import("./app/Club/PublicClubProfilePage"));
+const PrivacyPolicyPage = lazyWithRetry(() => import("./LandingPages/Legal/PrivacyPolicyPage"));
+const TermsConditionsPage = lazyWithRetry(() => import("./LandingPages/Legal/TermsConditionsPage"));
+const GuardianConsentPage = lazyWithRetry(() => import("./LandingPages/Legal/GuardianConsentPage"));
+const FounderCollegeVerificationsPage = lazyWithRetry(() => import("./app/Internal/FounderCollegeVerificationsPage"));
+const PublicEventRegistrationPage = lazyWithRetry(() => import("./app/Events/PublicEventRegistrationPage"));
+const PublicCertificateVerifyPage = lazyWithRetry(() => import("./app/Certificates/PublicCertificateVerifyPage"));
+const JoinClubPage = lazyWithRetry(() => import("./app/Club/JoinClubPage"));
+
+const WorkspaceRedirect = () => {
+  const { user } = useAppSelector((state) => state.user);
+  if (!user) return <Navigate to="/auth/signin" replace />;
+  if (user.accountType === "club") {
+    if (user.clubStatus === "approved" || user.verifiedClub) {
+      return <Navigate to="/club/dashboard" replace />;
+    }
+    return <Navigate to="/club/status" replace />;
+  }
+  return <Dashboard />;
+};
+
+const LegacyProfileRedirect = () => {
+  const { username } = useParams<{ username: string }>();
+  if (!username || username === "setup") {
+    return <ProfilesOnboardingPage />;
+  }
+  return <Navigate to={`/profile/u/${encodeURIComponent(username)}`} replace />;
+};
+
+const SingleBlogParamRedirect = () => {
+  const { pageId } = useParams<{ pageId: string }>();
+  if (!pageId || pageId === 'overview') {
+    return <Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />;
+  }
+  return <Navigate to={`/blog/aws-sbg-psit/aws-launchpad-2026/${pageId}`} replace />;
+};
+
+const LegacyActivityRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  if (!params.has("tab") && !params.has("segment")) {
+    params.set("tab", "applications");
+  }
+  return <Navigate to={`/activity?${params.toString()}`} replace />;
+};
+
+const AuthenticatedClubRedirect = () => {
+  const { user } = useAppSelector((state) => state.user);
+  if (user) {
+    if (user.accountType === "club") {
+      return <Navigate to="/club/dashboard" replace />;
+    }
+    return <Navigate to="/college-clubs" replace />;
+  }
+  return <ClubLanding />;
+};
+
+const App = () => {
+  const dispatch = useAppDispatch();
+
+  // Fetch /profile/me on app load/refresh to sync Redux with active session
+  useEffect(() => {
+    dispatch(fetchUserProfile());
+  }, [dispatch]);
+
+  return (
+    <OrbixLoadingProvider>
+      <ToastProvider>
+        <BrowserRouter>
+          {/* Universal automatic scroll restoration on route navigation */}
+          <ScrollToTop />
+
+          {/* Global Network Connectivity Status Banner */}
+          <OrbixOfflineBanner />
+
+          {/* Authoritative Single Institutional Email Token Listener & Single Global Verification Modal Host */}
+          <CollegeEmailVerificationListener />
+          <GlobalCollegeVerificationModal />
+
+          <OrbixErrorBoundary level="route">
+            <Suspense fallback={<ContentRouteSkeleton />}>
+              <Routes>
+                {/* Public Landing & Marketing Pages */}
+                <Route path="/" element={<MainLanding />} />
+                <Route path="/clubs" element={<AuthenticatedClubRedirect />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/support" element={<SupportPage />} />
+
+                {/* Legal & Minor Attendee Consent Routes */}
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
+                <Route path="/terms" element={<TermsConditionsPage />} />
+                <Route path="/terms-and-conditions" element={<Navigate to="/terms" replace />} />
+                <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
+                <Route path="/events/guardian-consent" element={<GuardianConsentPage />} />
+                <Route path="/platform" element={<PlatformPage />} />
+                <Route path="/demo" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
+                <Route path="/demo/profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
+                <Route path="/demo-profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
+                <Route path="/demo/club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
+                <Route path="/demo-club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+                <Route path="/events" element={<EventTrackerPage />} />
+                <Route path="/events/:eventId/register" element={<PublicEventRegistrationPage />} />
+                <Route path="/card" element={<Card />} />
+                <Route path="/platforms" element={<Platform />} />
+                <Route path="/orbit" element={<Platform />} />
+                <Route path="/events-showcase" element={<Events />} />
+                <Route path="/event-calendar" element={<Events />} />
+
+                {/* Blog / Documentation Pages — /blog/hoster_name/blog_name/:pageId */}
+                <Route path="/blog/:hoster/:blogName" element={<BlogLanding />} />
+                <Route path="/blog/:hoster/:blogName/:pageId" element={<BlogLanding />} />
+
+                {/* Blog Collection Hub Routes */}
+                <Route path="/blogs" element={<BlogCollectionPage />} />
+                <Route path="/blog" element={<BlogCollectionPage />} />
+                <Route path="/blogs/:hoster/:blogName" element={<BlogLanding />} />
+                <Route path="/blogs/:hoster/:blogName/:pageId" element={<BlogLanding />} />
+                <Route path="/blog/:pageId" element={<SingleBlogParamRedirect />} />
+
+                {/* Docs Routes */}
+                <Route path="/docs" element={<Suspense fallback={<DocsRouteSkeleton />}><DocsHubPage /></Suspense>} />
+                <Route path="/docs/algorithm" element={<Suspense fallback={<DocsRouteSkeleton />}><DocsViewerPage /></Suspense>} />
+                <Route path="/docs/:slug" element={<Suspense fallback={<DocsRouteSkeleton />}><DocsViewerPage /></Suspense>} />
+                <Route path="/docs/:folderId/:docId" element={<Suspense fallback={<DocsRouteSkeleton />}><DocsViewerPage /></Suspense>} />
+
+                {/* Public Shareable Profile Showcase Route */}
+                <Route path="/profile/u/:username" element={<PublicProfilePage />} />
+                <Route path="/profile/:username" element={<LegacyProfileRedirect />} />
+                <Route path="/u/:username" element={<LegacyProfileRedirect />} />
+
+                {/* Public Certificate Verification Routes */}
+                <Route path="/verify/certificate/:credentialCode" element={<PublicCertificateVerifyPage />} />
+                <Route path="/verify-cert/:credentialCode" element={<PublicCertificateVerifyPage />} />
+                <Route path="/verify/:credentialCode" element={<PublicCertificateVerifyPage />} />
+                <Route path="/verify" element={<PublicCertificateVerifyPage />} />
+
+                {/* Auth Pages */}
+                <Route path="/auth/signup" element={<Suspense fallback={<AuthRouteSkeleton />}><SignUpPage /></Suspense>} />
+                <Route path="/auth/signin" element={<Suspense fallback={<AuthRouteSkeleton />}><SignInPage /></Suspense>} />
+                <Route path="/auth/forgot-password" element={<Navigate to="/auth/signin?view=forgot-password" replace />} />
+                <Route path="/forgot-password" element={<Navigate to="/auth/signin?view=forgot-password" replace />} />
+                <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+                <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
+                <Route path="/workspace" element={<WorkspaceRedirect />} />
+
+                {/* Legacy Activity, Tracker & Invitation Redirects */}
+                <Route path="/student/activity" element={<LegacyActivityRedirect />} />
+                <Route path="/events/tracker" element={<LegacyActivityRedirect />} />
+                <Route path="/workspace-invite" element={<JoinClubPage />} />
+
+                {/* Club Verification, Dedicated Dashboard & Public Presence */}
+                <Route path="/club/team-workspace/join" element={<JoinClubPage />} />
+                <Route path="/join-club" element={<JoinClubPage />} />
+                <Route path="/club/join" element={<JoinClubPage />} />
+                <Route element={<Suspense fallback={<DashboardRouteSkeleton />}><ClubProtectedRoute /></Suspense>}>
+                  <Route path="/club/status" element={<ClubStatusPage />} />
+                  <Route path="/clubs/status" element={<Navigate to="/club/status" replace />} />
+                  <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />
+                  <Route path="/club/dashboard" element={<ClubDashboardPage />} />
+                  <Route path="/club/team" element={<ClubDashboardPage />} />
+                  <Route path="/club/team-workspace" element={<ClubDashboardPage />} />
+                  <Route path="/club/recruitment" element={<ClubDashboardPage />} />
+                  <Route path="/club/events" element={<ClubDashboardPage />} />
+                  <Route path="/club/events/:eventId" element={<ClubDashboardPage />} />
+                  <Route path="/club/events/:eventId/checkin" element={<ClubDashboardPage />} />
+                  <Route path="/club/analytics" element={<ClubDashboardPage />} />
+                  <Route path="/club/trends" element={<Navigate to="/club/analytics" replace />} />
+                  <Route path="/club/certificates" element={<ClubDashboardPage />} />
+                  <Route path="/club/feedback-surveys" element={<ClubDashboardPage />} />
+                  <Route path="/club/announcements" element={<ClubDashboardPage />} />
+                  <Route path="/club/credibility" element={<Navigate to="/club/dashboard" replace />} />
+                  <Route path="/club/profile" element={<ClubDashboardPage />} />
+                  <Route path="/club/manage-profile" element={<Navigate to="/club/profile" replace />} />
+                  <Route path="/club/clubs" element={<ClubDashboardPage />} />
+                  <Route path="/club/campus-clubs" element={<Navigate to="/club/clubs" replace />} />
+                  <Route path="/club/other-clubs" element={<Navigate to="/club/clubs" replace />} />
+                  <Route path="/club/settings" element={<ClubDashboardPage />} />
+                  <Route path="/club/inbox" element={<ClubDashboardPage />} />
+                </Route>
+                <Route path="/clubs/:slug" element={<PublicClubProfilePage />} />
+                <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
+
+                {/* New User Onboarding & Profiles Links Setup */}
+                <Route path="/onboarding" element={<ProfilesOnboardingPage />} />
+                <Route path="/auth/profiles" element={<ProfilesOnboardingPage />} />
+                <Route path="/profile/setup" element={<ProfilesOnboardingPage />} />
+
+                {/* Protected Routes */}
+                <Route element={<Suspense fallback={<DashboardRouteSkeleton />}><ProtectedRoute /></Suspense>}>
+                  {/* Internal Founder College Verification Review Console */}
+                  <Route path="/internal/college-verifications" element={<FounderCollegeVerificationsPage />} />
+                  <Route path="/internal/college-verification" element={<Navigate to="/internal/college-verifications" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/college-clubs" element={<Dashboard />} />
+                  <Route path="/campus-clubs" element={<Dashboard />} />
+                  <Route path="/college-events" element={<Dashboard />} />
+                  <Route path="/college-events/:eventId" element={<Dashboard />} />
+                  <Route path="/college-events/:eventId/:slug" element={<Dashboard />} />
+                  <Route path="/activity" element={<Dashboard />} />
+                  <Route path="/applications" element={<Dashboard />} />
+                  <Route path="/explore" element={<Dashboard />} />
+                  <Route path="/trends" element={<Dashboard />} />
+                  <Route path="/reports" element={<Dashboard />} />
+                  <Route path="/notifications" element={<Dashboard />} />
+                  <Route path="/inbox" element={<Dashboard />} />
+                  <Route path="/profile" element={<ProfileManager />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/resume" element={<Dashboard />} />
+                  <Route path="/projects" element={<Dashboard />} />
+                  <Route path="/wallet" element={<Dashboard />} />
+                  <Route path="/certificates" element={<Dashboard />} />
+                  <Route path="/workspace" element={<Dashboard />} />
+                  <Route path="/workspace/:clubId" element={<Dashboard />} />
+                  <Route path="/workspace/:clubId/:section" element={<Dashboard />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </OrbixErrorBoundary>
+        </BrowserRouter>
+      </ToastProvider>
+    </OrbixLoadingProvider>
+  );
+};
+
+export default App;

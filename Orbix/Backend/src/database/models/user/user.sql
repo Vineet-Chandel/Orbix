@@ -1,0 +1,18 @@
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    username VARCHAR(20) UNIQUE NOT NULL,
+
+    firstName VARCHAR(50) NOT NULL,
+    middleName VARCHAR(50),
+    lastName VARCHAR(50) NOT NULL,
+
+    email VARCHAR(255) UNIQUE NOT NULL,
+
+    password VARCHAR(255) NOT NULL,
+
+    termsAccepted BOOLEAN NOT NULL DEFAULT FALSE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

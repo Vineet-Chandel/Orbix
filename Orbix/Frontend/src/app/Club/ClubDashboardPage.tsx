@@ -1,0 +1,1271 @@
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useNavigate, useSearchParams, useLocation, useParams } from "react-router-dom";
+import {
+    Calendar,
+    CalendarDays,
+    Plus,
+    Edit3,
+    Bell,
+    Users,
+    ArrowRight,
+    Building2,
+    Mail,
+    Settings,
+    TrendingUp,
+    Award,
+    Layers,
+    UserPlus,
+    Megaphone,
+    MessageSquareQuote,
+} from "lucide-react";
+import {
+    useAppDispatch,
+    useAppSelector,
+    clearUser,
+    fetchClubProfile,
+    fetchClubEvents,
+    createClubEvent,
+    updateClubEvent,
+    addEventOptimistic,
+    updateEventOptimistic,
+    type ClubEvent,
+    type CreateClubEventPayload,
+    type ClubEventStatus,
+    type ClubEventFilter,
+} from "../../store";
+import { useToast } from "../../context/ToastContext";
+import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
+import { ClubSidebar, type ClubTab } from "./ClubSidebar";
+import ClubInboxModal from "./ClubInboxModal";
+import { ClubEventModal } from "./ClubEventModal";
+import { ClubEventAnalyticsSection } from "./ClubEventAnalyticsSection";
+import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
+import { WorkspaceShell } from "./TeamWorkspace/WorkspaceShell";
+import type { TeamStats } from "./Team/types";
+import { ClubProfileManager } from "./Profile/ClubProfileManager";
+import { ClubSettingsView } from "./Settings/ClubSettingsView";
+import { OtherClubsSection } from "./OtherClubsSection";
+import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
+import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
+import { CertificateStudioWorkspace } from "./CertificateStudio/CertificateStudioWorkspace";
+import { EventScopeSelectionModal } from "./EventScopeSelectionModal";
+import { ClubCredibilityWorkspace } from "./Credibility/ClubCredibilityWorkspace";
+import { ClubEventCard } from "./ClubEventCard";
+import { DashboardRouteSkeleton } from "../../components/ui/loader";
+
+interface VerifiedClub {
+    id: string;
+    auth_user_id: string;
+    name: string;
+    slug: string;
+    clubUsername?: string;
+    category: string;
+    college_id?: string;
+    college_name: string;
+    college_city: string;
+    college_state: string;
+    college_country: string;
+    short_description: string | null;
+    about: string | null;
+    logo_url: string | null;
+    logoUrl?: string | null;
+    cover_image_url: string | null;
+    coverImageUrl?: string | null;
+    website_url: string | null;
+    public_email: string | null;
+    social_links: {
+        github?: string;
+        linkedin?: string;
+        instagram?: string;
+        x?: string;
+        twitter?: string;
+        discord?: string;
+        website?: string;
+        social?: string;
+    } | null;
+    is_active: boolean;
+    verified_at: string;
+    created_at: string;
+}
+
+interface ClubStats {
+    upcoming_count: string | number;
+    past_count: string | number;
+    draft_count: string | number;
+    total_count: string | number;
+}
+
+export default function ClubDashboardPage() {
+    const { eventId } = useParams<{ eventId?: string }>();
+    const navigate = useNavigate();
+    const dispatch = useAppDispatch();
+    const { user } = useAppSelector((state) => state.user);
+    const toast = useToast();
+
+    // Centralized Redux club state
+    const clubState = useAppSelector((state) => state.club);
+    const { events } = useAppSelector((state) => state.clubEvents);
+
+    // Data States (initialized immediately from Redux if already in memory)
+    const [club, setClub] = useState<VerifiedClub | null>(clubState.club as any);
+    const [, setStats] = useState<ClubStats>(clubState.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
+    const [loading, setLoading] = useState(!clubState.isInitialized);
+
+    // Synchronize local states with Redux club slice
+    useEffect(() => {
+        if (clubState.club) {
+            setClub(clubState.club as any);
+        }
+        if (clubState.stats) {
+            setStats(clubState.stats);
+        }
+        if (clubState.isInitialized) {
+            setLoading(false);
+        }
+    }, [clubState.club, clubState.stats, clubState.isInitialized]);
+
+    // Path to Club Tab mapping & clean full route paths
+    const getClubTabFromPath = (pathname: string): ClubTab => {
+        if (pathname.startsWith("/club/team-workspace")) return "team-workspace";
+        if (pathname.startsWith("/club/recruitment")) return "recruitment";
+        if (pathname.startsWith("/club/team")) return "team";
+        if (pathname.startsWith("/club/events")) return "events";
+        if (pathname.startsWith("/club/analytics") || pathname.startsWith("/club/trends")) return "analytics";
+        if (pathname.startsWith("/club/certificates")) return "certificates";
+        if (pathname.startsWith("/club/feedback-surveys") || pathname.startsWith("/club/feedback")) return "feedback-surveys";
+        if (pathname.startsWith("/club/announcements") || pathname.startsWith("/club/announcement")) return "announcements";
+        if (pathname.startsWith("/club/credibility")) return "overview";
+        if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
+        if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
+        if (pathname.startsWith("/club/settings")) return "settings";
+        return "overview";
+    };
+
+    const clubTabToPath: Record<ClubTab, string> = {
+        overview: "/club/dashboard",
+        team: "/club/team",
+        "team-workspace": "/club/team-workspace",
+        recruitment: "/club/recruitment",
+        events: "/club/events",
+        analytics: "/club/analytics",
+        certificates: "/club/certificates",
+        "feedback-surveys": "/club/feedback-surveys",
+        announcements: "/club/announcements",
+        credibility: "/club/dashboard",
+        profile: "/club/profile",
+        clubs: "/club/clubs",
+        settings: "/club/settings",
+    };
+
+    // Navigation & Clean Full Route Sync
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTabState] = useState<ClubTab>(() => {
+        if (!eventId && !location.pathname.startsWith("/club/events")) {
+            const tabQuery = searchParams.get("tab") as ClubTab | null;
+            if (tabQuery && clubTabToPath[tabQuery]) {
+                return tabQuery;
+            }
+        }
+        return getClubTabFromPath(location.pathname);
+    });
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+    // Keep activeTab in sync with route changes (browser back/forward, direct links)
+    useEffect(() => {
+        setActiveTabState(getClubTabFromPath(location.pathname));
+    }, [location.pathname]);
+
+    // Backward compatibility: automatically migrate legacy query parameters (?tab=team) to clean full routes (/club/team)
+    useEffect(() => {
+        if (eventId || location.pathname.startsWith("/club/events")) {
+            return;
+        }
+        const tabQuery = searchParams.get("tab") as ClubTab | null;
+        if (tabQuery && clubTabToPath[tabQuery]) {
+            navigate(clubTabToPath[tabQuery], { replace: true });
+        }
+    }, [searchParams, navigate, eventId, location.pathname]);
+
+    // Deep link support for /club/inbox
+    useEffect(() => {
+        if (location.pathname === "/club/inbox") {
+            setIsInboxModalOpen(true);
+        }
+    }, [location.pathname]);
+
+    // Switch tab by navigating to the full route
+    const handleTabChange = (tab: ClubTab) => {
+        setActiveTabState(tab);
+        const targetPath = clubTabToPath[tab] || "/club/dashboard";
+        if (location.pathname !== targetPath) {
+            navigate(targetPath);
+        }
+    };
+
+    // Team Stats and Sidebar Badge States
+    const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
+    const [teamPendingCount, setTeamPendingCount] = useState<number>(0);
+
+    // Fetch team stats (counts & pending invitations)
+    const fetchTeamStats = async (clubId: string) => {
+        try {
+            const res = await fetch(`/api/club/team/stats?clubId=${clubId}`, { credentials: "include" });
+            if (res.ok) {
+                const data = await res.json();
+                if (data?.success) {
+                    setTeamStats(data);
+                    if (typeof data.pendingInvitations === "number") {
+                        setTeamPendingCount(data.pendingInvitations);
+                    }
+                }
+            }
+        } catch {
+            // silent fail for team badge sync
+        }
+    };
+
+    // Club Inbox & Moderation States
+    const [isInboxModalOpen, setIsInboxModalOpen] = useState(false);
+    const [inboxCounts, setInboxCounts] = useState<{ unreadCount: number; mutedCount: number; totalCount: number }>({
+        unreadCount: 0,
+        mutedCount: 0,
+        totalCount: 0,
+    });
+
+    // Event Modal State
+    const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const [isScopeModalOpen, setIsScopeModalOpen] = useState(false);
+    const [selectedScope, setSelectedScope] = useState<"PAN_INDIA" | "CAMPUS">("CAMPUS");
+    const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
+    const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
+    const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
+    const [isCertStudioOpen, setIsCertStudioOpen] = useState(false);
+
+    // In-flight request guards to prevent duplicate concurrent network calls (e.g. StrictMode, rapid switches)
+    const isFetchingClubRef = useRef(false);
+    const isFetchingInboxRef = useRef(false);
+
+    // Fetch club profile and events (leveraging Redux and Redis caching)
+    const fetchClubData = async (force = false) => {
+        if (user?.accountType !== "club") return;
+        if (isFetchingClubRef.current && !force) return;
+        isFetchingClubRef.current = true;
+        try {
+            if (!clubState.isInitialized || force) {
+                setLoading(true);
+            }
+            const [profileResult] = await Promise.allSettled([
+                dispatch(fetchClubProfile({ force })).unwrap(),
+                dispatch(fetchClubEvents(club?.id)).unwrap(),
+            ]);
+
+            if (profileResult.status === "fulfilled") {
+                const profileData = profileResult.value;
+                if (profileData?.club) {
+                    setClub(profileData.club as any);
+                    setStats(profileData.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
+                    fetchTeamStats(profileData.club.id);
+                }
+            } else {
+                const err: any = profileResult.reason;
+                if (typeof err === "string" && (err.includes("401") || err.toLowerCase().includes("unauthorized") || err.toLowerCase().includes("authentication required") || err.toLowerCase().includes("club portal"))) {
+                    navigate("/auth/signin?tab=club", { replace: true });
+                    return;
+                }
+                if (typeof err === "string" && (err.includes("404") || err.includes("403") || err.toLowerCase().includes("no verified club"))) {
+                    navigate("/club/status", { replace: true });
+                    return;
+                }
+            }
+
+        } catch (err) {
+            console.error("Failed to load club dashboard:", err);
+            toast.error("Could not load club dashboard. Please refresh.", { title: "Error" });
+        } finally {
+            setLoading(false);
+            isFetchingClubRef.current = false;
+        }
+    };
+
+    // Fetch inbox unread count
+    const fetchInboxCounts = async () => {
+        if (user?.accountType !== "club" || isFetchingInboxRef.current) return;
+        isFetchingInboxRef.current = true;
+        try {
+            const queryParam = club?.id ? `?clubId=${encodeURIComponent(club.id)}` : "";
+            const res = await fetch(`/api/club/inbox/unread-count${queryParam}`, { credentials: "include" });
+            if (res.ok) {
+                const data = await res.json();
+                if (data?.success && data.counts) {
+                    setInboxCounts({
+                        unreadCount: Number(data.counts.unreadCount) || 0,
+                        mutedCount: Number(data.counts.mutedCount) || 0,
+                        totalCount: Number(data.counts.totalCount) || 0,
+                    });
+                }
+            }
+        } catch {
+            // silent fail for badge sync
+        } finally {
+            isFetchingInboxRef.current = false;
+        }
+    };
+
+    useEffect(() => {
+        if (user?.accountType !== "club") return;
+        fetchClubData();
+        fetchInboxCounts();
+
+        const notifInterval = setInterval(fetchInboxCounts, 30000);
+        window.addEventListener("focus", fetchInboxCounts);
+
+        return () => {
+            clearInterval(notifInterval);
+            window.removeEventListener("focus", fetchInboxCounts);
+        };
+    }, [user?.accountType]);
+
+    // Open Event Scope Selection Modal
+    const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
+        setEditingEvent(null);
+        setInitialModalStatus(initialStatus);
+        setActiveTabState("events");
+        navigate("/club/events");
+        setIsScopeModalOpen(true);
+    };
+
+    // Callback when event scope is selected from the scope modal
+    const handleSelectScope = (scope: "PAN_INDIA" | "CAMPUS") => {
+        setSelectedScope(scope);
+        setIsScopeModalOpen(false);
+        setIsEventModalOpen(true);
+    };
+
+    // Handle Event Save (Optimistic create or update with background API processing)
+    const handleModalSubmit = (payload: CreateClubEventPayload, isEditing: boolean, eventId?: string) => {
+        if (isEditing && eventId) {
+            const previousEvent = events.find((e) => e.id === eventId);
+            // 1. Optimistic Redux update immediately
+            dispatch(updateEventOptimistic({ id: eventId, changes: payload }));
+            setIsEventModalOpen(false);
+            setEditingEvent(null);
+            toast.success("Event updated successfully!", { title: "Success" });
+
+            // 2. Background API call
+            dispatch(updateClubEvent({ eventId, payload, previousEvent }))
+                .unwrap()
+                .catch((err: any) => {
+                    toast.error(err?.message || "Failed to sync update to server. Changes reverted.", {
+                        title: "Sync Error",
+                    });
+                });
+        } else {
+            const tempId = `opt-event-${Date.now()}`;
+            const optimisticEvent: ClubEvent = {
+                id: tempId,
+                clubId: club?.id || "",
+                title: payload.title,
+                slug: payload.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+                summary: payload.summary || null,
+                description: payload.description || null,
+                startsAt: payload.startsAt,
+                endsAt: payload.endsAt || null,
+                timezone: payload.timezone || "Asia/Kolkata",
+                locationType: payload.locationType,
+                venueOrLocation: payload.venueOrLocation || null,
+                registrationUrl: payload.registrationUrl || null,
+                coverImageUrl: payload.coverImageUrl || null,
+                status: payload.status,
+                publishedAt: payload.status === "published" ? new Date().toISOString() : null,
+                createdAt: new Date().toISOString(),
+                isOptimistic: true,
+            };
+
+            // 1. Optimistic Redux add immediately: instantly reflects in listing & counts!
+            dispatch(addEventOptimistic(optimisticEvent));
+            setIsEventModalOpen(false);
+            setEditingEvent(null);
+
+            const statusToastText =
+                payload.status === "published"
+                    ? "Event published! Added to live listing immediately."
+                    : payload.status === "draft"
+                    ? "Event saved to drafts immediately."
+                    : "Event saved as cancelled.";
+
+            toast.success(statusToastText, { title: "Event Added" });
+
+            // 2. Background API call
+            dispatch(createClubEvent({ tempId, payload }))
+                .unwrap()
+                .catch((err: any) => {
+                    toast.error(err?.message || "Failed to persist event to server. Removed from listing.", {
+                        title: "Sync Error",
+                    });
+                });
+        }
+    };
+
+    // Event subsets
+    const publishedEvents = useMemo(() => events.filter((e) => e.status === "published"), [events]);
+    const completedEvents = useMemo(() => events.filter((e) => e.status === "completed"), [events]);
+    const draftEvents = useMemo(() => events.filter((e) => e.status === "draft"), [events]);
+    const cancelledEvents = useMemo(() => events.filter((e) => e.status === "cancelled"), [events]);
+
+    // Filtered Events for Events View
+    const filteredEvents = useMemo(() => {
+        if (eventFilter === "all") return events;
+        return events.filter((e) => e.status === eventFilter);
+    }, [events, eventFilter]);
+
+    // Handle Logout
+    const handleSignOut = async () => {
+        try {
+            await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        } catch {
+            // ignore
+        }
+        dispatch(clearUser());
+        navigate("/auth/signin?tab=club", { replace: true });
+    };
+
+    // Date formatting matching Personal Account ("Today, 29 October 2026")
+    const formattedDate = new Intl.DateTimeFormat("en-US", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    }).format(new Date());
+
+    if (loading) {
+        return <DashboardRouteSkeleton />;
+    }
+
+    if (!club) {
+        return (
+            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-4 text-black">
+                <div className="max-w-md w-full bg-white rounded-2xl border-2 border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000] text-center space-y-4">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_#000]">
+                        <Building2 className="w-7 h-7 text-black stroke-[2.5]" />
+                    </div>
+                    <div className="space-y-1">
+                        <h2 className="text-lg font-black text-black">Club Session Unavailable</h2>
+                        <p className="text-xs text-neutral-600 font-medium">
+                            We could not synchronize club credentials for this session. Please refresh or sign in to continue.
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => fetchClubData(true)}
+                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer"
+                        >
+                            Retry Sync
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate("/auth/signin")}
+                            className="px-4 py-2 rounded-xl bg-black text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer"
+                        >
+                            Sign In
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
+            {/* Club Sidebar — Dashboard, Team, Events, and Manage Profile */}
+            <ClubSidebar
+                club={club}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                isOpen={isMobileSidebarOpen}
+                onClose={() => setIsMobileSidebarOpen(false)}
+                unreadInboxCount={inboxCounts.unreadCount}
+                teamPendingCount={teamPendingCount}
+                eventsCount={events.length}
+                onOpenInbox={() => setIsInboxModalOpen(true)}
+                onSignOut={handleSignOut}
+            />
+
+            {/* Main Content Area Container matching Personal Account */}
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
+                <section
+                    aria-label="Orbix Club Space"
+                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-3 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                >
+                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+                        {/* Dynamic Header Bar tailored to each tab */}
+                        {((!eventId && !isEventModalOpen) || activeTab !== "events") && (
+                            <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            {/* Left: Mobile Toggle & Tab-Specific Title & Badges */}
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileSidebarOpen(true)}
+                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                        aria-label="Open sidebar"
+                                    >
+                                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <line x1="3" y1="12" x2="21" y2="12" />
+                                            <line x1="3" y1="6" x2="21" y2="6" />
+                                            <line x1="3" y1="18" x2="21" y2="18" />
+                                        </svg>
+                                    </button>
+
+                                    {activeTab === "overview" && (
+                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                            Welcome, {club.name}!
+                                        </h1>
+                                    )}
+
+                                    {activeTab === "team" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Users className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Club Team & Organisation
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "team-workspace" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Layers className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Team Workspace
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "recruitment" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Recruitment & Member Drives
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "events" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#38BDF8] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <CalendarDays className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Events & Workshops
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "analytics" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Trends & Analytics
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "certificates" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Award className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Certificates & Credentials
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "feedback-surveys" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <MessageSquareQuote className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Feedback & Surveys
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "announcements" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Megaphone className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Announcement
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "profile" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Edit3 className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Manage Club Profile
+                                            </h1>
+                                        </div>
+                                    )}
+
+
+                                    {activeTab === "clubs" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Building2 className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Campus Chapters & Directory
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "settings" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Settings className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Club Settings
+                                            </h1>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Dynamic Contextual Badges & Subtitle */}
+                                <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                                    {activeTab === "overview" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Today, {formattedDate}
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700 hidden sm:inline">
+                                                · Verified Collegiate Club Space
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-500 hidden md:inline">
+                                                · {club.college_name}
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "team" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Team Roster
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Overview of all active student club leads and core team members
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "team-workspace" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Workspace Departments
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Build organizational hierarchy, create departments, and appoint team leads
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "recruitment" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Auditions & Drives
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Dispatch invitation links, manage pending invites, and onboard new chapter talent
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "events" && (
+                                        <span className="text-xs font-bold text-neutral-700">
+                                            Manage published sessions, drafts, and meetups
+                                        </span>
+                                    )}
+
+                                    {activeTab === "analytics" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Event Intelligence
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · 4-month turnout velocity, participation ratios, and session lifecycle metrics
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "certificates" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Official Credentials
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Issue verifiable participation & merit credentials to campus students
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "feedback-surveys" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Audience Feedback
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Create surveys, evaluate attendee sentiment, and collect event ratings
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "announcements" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Club Broadcasts
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Broadcast important announcements, club notices, and event highlights to campus
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "profile" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Public Branding
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Club narrative, contact details, socials and public showcase
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "clubs" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Campus Directory
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Discover student chapters, cross-club collaborations & peer initiatives
+                                            </span>
+                                            {club.college_name && (
+                                                <span className="text-xs font-bold text-neutral-500 hidden md:inline">
+                                                    · {club.college_name}
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {activeTab === "settings" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Settings & Preferences
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Organization credentials, collegiate verification & showcase privacy
+                                            </span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right: Tab-Specific Primary Actions & Inbox Bell */}
+                            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
+                                {(activeTab === "events" || activeTab === "analytics") && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openCreateEventModal("published")}
+                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    >
+                                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                                        <span>Create New Event</span>
+                                    </button>
+                                )}
+
+                                {activeTab === "certificates" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    >
+                                        <Award className="w-4 h-4 stroke-[2.5]" />
+                                        <span>Issue Certificates</span>
+                                    </button>
+                                )}
+
+                                {/* Club Notifications / Inbox Bell Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsInboxModalOpen(true)}
+                                    className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-[#FFE566]/20 text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] hover:shadow-[3.5px_3.5px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px] select-none"
+                                    title={`Club Notifications & Inbox ${inboxCounts.unreadCount > 0 ? `(${inboxCounts.unreadCount} unread)` : ""}`}
+                                    aria-label="Club Notifications & Inbox"
+                                >
+                                    <Bell className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2] transition-transform duration-200 group-hover:rotate-12" />
+                                    {inboxCounts.unreadCount > 0 && (
+                                        <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FFE566] rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] pointer-events-none select-none">
+                                            {inboxCounts.unreadCount > 99 ? "99+" : inboxCounts.unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                        )}
+
+                        {/* TAB: MANAGE CLUB PROFILE */}
+                        {activeTab === "profile" && (
+                            <ClubProfileManager
+                                clubId={club.id}
+                                onProfileUpdated={(updatedClub) => {
+                                    if (updatedClub) {
+                                        setClub(updatedClub as any);
+                                    }
+                                }}
+                            />
+                        )}
+
+                        {/* TAB: DASHBOARD OVERVIEW */}
+                        {activeTab === "overview" && (
+                            <div className="space-y-6">
+                                {/* Overview Metrics Grid (Top of Dashboard) */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                    {/* Card 1: Upcoming Sessions */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTabChange("events")}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Upcoming Sessions
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#38BDF8] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <CalendarDays className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {publishedEvents.length}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            {events.length} total event{events.length === 1 ? "" : "s"} scheduled
+                                        </span>
+                                    </button>
+
+                                    {/* Card 2: Active Teams */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTabChange("team")}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Active Teams
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#a2ff86] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <Building2 className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {teamStats?.activeTeams ?? 0}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            Departments & divisions
+                                        </span>
+                                    </button>
+
+                                    {/* Card 3: Total Members */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTabChange("team")}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Club Members
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <Users className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {teamStats?.totalMembers ?? 0}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            {teamPendingCount} pending invite{teamPendingCount === 1 ? "" : "s"}
+                                        </span>
+                                    </button>
+
+                                    {/* Card 4: Club Inquiries / Inbox */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsInboxModalOpen(true)}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Inbox & Inquiries
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#FF80D7] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <Mail className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {inboxCounts.unreadCount}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            {inboxCounts.totalCount} total developer message{inboxCounts.totalCount === 1 ? "" : "s"}
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {/* Club Credibility & Accountability Standing (Full Width) */}
+                                <ClubCredibilityWorkspace />
+
+                                {/* Recent Events Preview */}
+                                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-5 h-5 text-black" />
+                                            <h3 className="text-base font-black text-black">Recent & Upcoming Sessions</h3>
+                                        </div>
+                                        {events.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleTabChange("events")}
+                                                className="text-xs font-black text-black hover:underline flex items-center gap-1 cursor-pointer"
+                                            >
+                                                <span>View All ({events.length})</span>
+                                                <ArrowRight className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {events.length === 0 ? (
+                                        <div className="py-8 text-center space-y-2">
+                                            <CalendarDays className="w-8 h-8 text-neutral-400 mx-auto" />
+                                            <p className="text-xs font-bold text-neutral-700">No events or workshops published yet.</p>
+                                            <p className="text-[11px] text-neutral-500 max-w-sm mx-auto">
+                                                Begin scheduling sessions, coding meetups, or hackathons for your chapter.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => openCreateEventModal("published")}
+                                                className="mt-2 px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
+                                            >
+                                                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                                                <span>Create First Event</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                            {events.slice(0, 4).map((ev) => (
+                                                <ClubEventCard
+                                                    key={ev.id}
+                                                    event={ev}
+                                                    onSelect={(id) => navigate(`/club/events/${id}`)}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: CLUB TEAM WORKSPACE */}
+                        {activeTab === "team-workspace" && (
+                            <WorkspaceShell
+                                club={club}
+                                isClubContext={true}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                            />
+                        )}
+
+                        {/* TAB: CLUB TEAM & ORGANISATION */}
+                        {(activeTab === "team" || activeTab === "recruitment") && (
+                            <ClubTeamWorkspace
+                                club={club}
+                                hideHeaderTitle={true}
+                                initialTab={
+                                    activeTab === "recruitment"
+                                        ? "invitations"
+                                        : "overview"
+                                }
+                                onOpenInbox={() => setIsInboxModalOpen(true)}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                onStatsLoaded={(stats: TeamStats) => {
+                                    setTeamStats(stats);
+                                    if (typeof stats.pendingInvitations === "number") {
+                                        setTeamPendingCount(stats.pendingInvitations);
+                                    }
+                                }}
+                            />
+                        )}
+
+                        {/* TAB: CLUB EVENTS & WORKSHOPS (EXCLUSIVELY FOR EVENTS TAB) */}
+                        {activeTab === "events" && (
+                            eventId ? (
+                                <ClubEventDetailWorkspace
+                                    eventId={eventId}
+                                    club={club}
+                                    onBack={() => navigate("/club/events")}
+                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                />
+                            ) : isEventModalOpen ? (
+                                <ClubEventModal
+                                    isOpen={isEventModalOpen}
+                                    onClose={() => {
+                                        setIsEventModalOpen(false);
+                                        setEditingEvent(null);
+                                    }}
+                                    onSubmit={handleModalSubmit}
+                                    editingEvent={editingEvent}
+                                    selectedScope={selectedScope}
+                                    clubId={club?.id}
+                                    clubName={club?.name}
+                                    clubLogoUrl={club?.logo_url || undefined}
+                                    collegeName={club?.college_name}
+                                    collegeId={club?.college_id}
+                                    initialStatus={initialModalStatus}
+                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                />
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Filter Pills Bar */}
+                                    <div className="p-3 sm:p-4 rounded-2xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("all")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "all"
+                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            All ({events.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("published")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "published"
+                                                    ? "bg-emerald-300 text-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Published ({publishedEvents.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("completed")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "completed"
+                                                    ? "bg-sky-300 text-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Completed ({completedEvents.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("draft")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "draft"
+                                                    ? "bg-amber-300 text-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Drafts ({draftEvents.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("cancelled")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "cancelled"
+                                                    ? "bg-rose-300 text-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Cancelled ({cancelledEvents.length})
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Event Cards Grid */}
+                                {filteredEvents.length === 0 ? (
+                                    <div className="p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-3">
+                                        <Calendar className="w-10 h-10 text-neutral-400 mx-auto" />
+                                        <h3 className="font-black text-base text-neutral-800">
+                                            No {eventFilter !== "all" ? eventFilter : ""} events found
+                                        </h3>
+                                        <p className="text-xs font-medium text-neutral-500 max-w-sm mx-auto">
+                                            {eventFilter === "cancelled"
+                                                ? "No sessions have been cancelled."
+                                                : eventFilter === "draft"
+                                                ? "You have no events saved as drafts."
+                                                : "Create workshops, hackathons, and guest speaker sessions for your chapter."}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => openCreateEventModal("published")}
+                                            className="mt-2 px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-2"
+                                        >
+                                            <Plus className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Create New Event</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        {filteredEvents.map((ev) => (
+                                            <ClubEventCard
+                                                key={ev.id}
+                                                event={ev}
+                                                onSelect={(id) => navigate(`/club/events/${id}`)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            )
+                        )}
+
+                        {/* TAB: TRENDS & ANALYTICS */}
+                        {activeTab === "analytics" && (
+                            <div className="space-y-6">
+                                <ClubEventAnalyticsSection
+                                    events={events}
+                                    currentFilter={eventFilter}
+                                    onSelectFilter={(filter) => {
+                                        setEventFilter(filter);
+                                        navigate(`/club/events?filter=${filter}`);
+                                    }}
+                                    onOpenCreateModal={() => openCreateEventModal("published")}
+                                />
+                            </div>
+                        )}
+
+                        {/* TAB: CERTIFICATES & CREDENTIALS STUDIO */}
+                        {activeTab === "certificates" && (
+                            <CertificateStudioWorkspace
+                                clubId={club.id}
+                                clubName={club.name}
+                                clubLogo={club.logo_url}
+                                onOpenLegacyModal={() => setIsCertStudioOpen(true)}
+                            />
+                        )}
+
+                        {/* TAB: FEEDBACK & SURVEYS */}
+                        {activeTab === "feedback-surveys" && (
+                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                                <div className="w-14 h-14 rounded-2xl bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mx-auto text-black">
+                                    <MessageSquareQuote className="w-7 h-7 stroke-[2.2]" />
+                                </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="font-black text-lg sm:text-xl text-black">
+                                        Feedback & Surveys
+                                    </h3>
+                                    <p className="text-xs sm:text-sm font-medium text-neutral-600">
+                                        Participant feedback collection, post-event surveys, and satisfaction analytics will appear here.
+                                    </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-600 text-xs font-bold font-mono">
+                                    Module in development
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: ANNOUNCEMENTS */}
+                        {activeTab === "announcements" && (
+                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                                <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mx-auto text-black">
+                                    <Megaphone className="w-7 h-7 stroke-[2.2]" />
+                                </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="font-black text-lg sm:text-xl text-black">
+                                        Campus Announcements
+                                    </h3>
+                                    <p className="text-xs sm:text-sm font-medium text-neutral-600">
+                                        Campus-wide club broadcasts, bulletin updates, and notification feeds will be managed here.
+                                    </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-600 text-xs font-bold font-mono">
+                                    Module in development
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: CAMPUS CLUBS & DIRECTORY */}
+                        {activeTab === "clubs" && (
+                            <OtherClubsSection
+                                currentClubId={club.id}
+                                currentClubSlug={club.slug}
+                                collegeId={(club as any).college_id || (club as any).collegeId}
+                                collegeName={club.college_name}
+                                currentClubData={club}
+                                onNavigateToEditProfile={() => handleTabChange("profile")}
+                                onNavigateToTab={handleTabChange}
+                            />
+                        )}
+
+                        {/* TAB: CLUB SETTINGS & PREFERENCES */}
+                        {activeTab === "settings" && (
+                            <ClubSettingsView
+                                club={club}
+                                user={user}
+                                onSignOut={handleSignOut}
+                            />
+                        )}
+                    </div>
+
+                    {/* Neo-brutalist Section Bottom Illustration matching Personal Account */}
+                    <SectionBottomIllustration alt="Orbix club space illustration" />
+                </section>
+            </div>
+
+            {/* Event Scope Selection Modal (Pan India vs Campus-Only) */}
+            <EventScopeSelectionModal
+                isOpen={isScopeModalOpen}
+                onClose={() => setIsScopeModalOpen(false)}
+                onSelectScope={handleSelectScope}
+                collegeName={club?.college_name}
+            />
+
+            {/* Club Inbox Modal */}
+            <ClubInboxModal
+                isOpen={isInboxModalOpen}
+                onClose={() => {
+                    setIsInboxModalOpen(false);
+                    if (location.pathname === "/club/inbox") {
+                        navigate("/club/dashboard", { replace: true });
+                    }
+                    fetchInboxCounts();
+                }}
+                clubId={club.id}
+                clubName={club.name}
+                onUnreadCountChange={(newCount) => setInboxCounts((prev) => ({ ...prev, unreadCount: newCount }))}
+            />
+
+            {/* Attached Certificate Issuance Studio Modal */}
+            <ClubCertificateStudioModal
+                isOpen={isCertStudioOpen}
+                onClose={() => setIsCertStudioOpen(false)}
+            />
+        </div>
+    );
+}
