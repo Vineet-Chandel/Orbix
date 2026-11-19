@@ -93,8 +93,12 @@ export function parseRatingsSafe(
             rNum = Math.round(val);
         } else if (typeof val === "object" && typeof val.rating === "number" && val.rating > 0) {
             rNum = Math.round(val.rating);
-        } else if (typeof val === "string" && !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0) {
-            rNum = parseInt(val, 10);
+        } else if (typeof val === "string") {
+            const cleanStr = val.replace(/,/g, "").trim();
+            const parsed = parseInt(cleanStr, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+                rNum = parsed;
+            }
         }
 
         if (rNum && rNum > 0) {
@@ -343,8 +347,11 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
             rVal = Math.round(snap.contestRating);
         } else if (typeof snap.currentRating === "number" && snap.currentRating > 0) {
             rVal = snap.currentRating;
-        } else if (typeof snap.rating === "string" && !isNaN(parseInt(snap.rating, 10)) && parseInt(snap.rating, 10) > 0) {
-            rVal = parseInt(snap.rating, 10);
+        } else if (typeof snap.rating === "string") {
+            const clean = snap.rating.replace(/,/g, "").trim();
+            if (!isNaN(parseInt(clean, 10)) && parseInt(clean, 10) > 0) {
+                rVal = parseInt(clean, 10);
+            }
         }
 
         if (!rVal || rVal <= 0) {
@@ -352,7 +359,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
                 if (!s) continue;
                 const lbl = String(s.label || "").toLowerCase();
                 if (lbl === "rating" || lbl.includes("rating")) {
-                    const strVal = String(s.value || "");
+                    const strVal = String(s.value || "").replace(/,/g, "");
                     const m = strVal.match(/(\d+)/);
                     if (m && m[1]) {
                         rVal = parseInt(m[1], 10);

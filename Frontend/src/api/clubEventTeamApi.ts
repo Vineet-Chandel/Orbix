@@ -41,6 +41,8 @@ export interface EventTeamDetails {
     name: string;
     code: string;
     leaderId: string;
+    leaderUsername?: string;
+    leaderName?: string;
     status: string;
     createdAt: string;
     updatedAt: string;
@@ -249,6 +251,22 @@ export const clubEventTeamApi = {
         const data = await res.json();
         if (!res.ok) {
             throw new Error(data.message || "Failed to rename team.");
+        }
+        return data;
+    },
+
+    /**
+     * Transfer leadership to another confirmed member (Leader only)
+     */
+    async transferLeadership(eventId: string, teamId: string, newLeaderUserId: string): Promise<{ success: boolean; message: string; team?: EventTeamDetails }> {
+        const res = await fetch(buildApiUrl(`/events/${eventId}/teams/${teamId}/transfer-leader`), {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ newLeaderUserId }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to transfer leadership.");
         }
         return data;
     },

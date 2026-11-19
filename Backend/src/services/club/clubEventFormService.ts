@@ -479,10 +479,43 @@ export class ClubEventFormService {
                     canSubmit = false;
                     isClosed = true;
                     closedReason = "Access restricted: You cannot register for this club's events.";
+                } else if (reg.status === "cancelled") {
+                    canSubmit = false;
+                    isClosed = true;
+                    closedReason = "You have previously withdrawn your application for this event. Re-application for this session is restricted.";
                 } else if (reg.status === "registered" || reg.status === "attended" || reg.status === "pending") {
                     if (!form.settings.allowEditResponse) {
                         canSubmit = false;
                     }
+                }
+            } else {
+                // If no direct registration row was found, check if student is in a team for this event
+                const teamMemberRes = await query(
+                    `SELECT tm.team_id AS "teamId", tm.role AS "teamRole", t.name AS "teamName", t.code AS "teamCode",
+                            lr.status AS "leaderStatus", lr.ticket_code AS "leaderTicketCode"
+                     FROM club_event_team_members tm
+                     JOIN club_event_teams t ON t.id = tm.team_id
+                     LEFT JOIN club_event_registrations lr ON lr.event_id = tm.event_id AND lr.user_id = t.leader_id
+                     WHERE tm.event_id = $1 AND tm.user_id = $2 LIMIT 1;`,
+                    [eventId, userId]
+                );
+
+                if (teamMemberRes.rows[0]) {
+                    const tm = teamMemberRes.rows[0];
+                    userResponse = {
+                        id: `team_reg_${tm.teamId}`,
+                        status: tm.leaderStatus || "registered",
+                        ticketCode: `TKT-${(tm.teamCode || "ORB").replace(/[^A-Z0-9]/gi, "").slice(0, 6).toUpperCase()}-${userId.replace(/[^A-Z0-9]/gi, "").slice(0, 4).toUpperCase()}`,
+                        applicantName: studentProfile?.fullName,
+                        applicantEmail: studentProfile?.email,
+                        teamId: tm.teamId,
+                        teamRole: tm.teamRole,
+                        teamName: tm.teamName,
+                        teamCode: tm.teamCode,
+                        answers: {},
+                        fileAttachments: [],
+                    };
+                    canSubmit = false;
                 }
             }
         }
@@ -2880,8 +2913,28 @@ Organizer Request: ${userPrompt}`;
                 }
             }
 
-            // 6. Check Existing Registration
+            // 6. Check Existing Registration & Active Team Participation
             if (userId) {
+                // Check if user is in an existing team for this event as a member
+                const activeTeamMember = await client.query(
+                    `SELECT tm.team_id, tm.role, t.name AS "teamName"
+                     FROM club_event_team_members tm
+                     JOIN club_event_teams t ON t.id = tm.team_id
+                     WHERE tm.event_id = $1 AND tm.user_id = $2 LIMIT 1;`,
+                    [eventId, userId]
+                );
+
+                if (activeTeamMember.rows[0]) {
+                    const tm = activeTeamMember.rows[0];
+                    if (tm.role === "member") {
+                        const error: any = new Error(
+                            `You are already participating in this event as a member of team "${tm.teamName}". You cannot register again. To register individually or lead a different squad, you must leave your current team first.`
+                        );
+                        error.statusCode = 409;
+                        throw error;
+                    }
+                }
+
                 const existingReg = await client.query(
                     `SELECT id, status, ticket_code FROM club_event_registrations
                      WHERE event_id = $1 AND user_id = $2 FOR UPDATE;`,
@@ -2892,6 +2945,12 @@ Organizer Request: ${userPrompt}`;
                     const currentStatus = existingReg.rows[0].status;
                     if (currentStatus === "blocked") {
                         const error: any = new Error("Access Restricted: You don't have permission to register for this event.");
+                        error.statusCode = 403;
+                        throw error;
+                    }
+
+                    if (currentStatus === "cancelled") {
+                        const error: any = new Error("You have previously withdrawn your application for this event. Re-application for this session is restricted.");
                         error.statusCode = 403;
                         throw error;
                     }

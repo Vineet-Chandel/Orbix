@@ -47,6 +47,7 @@ export interface EventTeamDetails {
     leaderName: string;
     status: string;
     createdAt: string;
+    isLeader: boolean;
     isLocked: boolean; // Event already started or registration deadline passed
     lockReason?: string | null;
     registrationDeadline?: string | null;
@@ -110,9 +111,32 @@ export class ClubEventTeamService {
     private static async assertRegistrationOpen(eventId: string, startsAt?: string | null, endsAt?: string | null) {
         const now = Date.now();
 
-        // 1. Check registration stage deadline / status first (authoritative round pipeline)
+        // 1. Check event record if startsAt, endsAt or status are missing
+        let evStartsAt = startsAt;
+        let evEndsAt = endsAt;
+        let evStatus: string | null = null;
+
+        if (!evStartsAt || !evEndsAt) {
+            const evRes = await query(
+                `SELECT starts_at AS "startsAt", ends_at AS "endsAt", status FROM club_events WHERE id = $1 LIMIT 1;`,
+                [eventId]
+            );
+            if (evRes.rows[0]) {
+                evStartsAt = evStartsAt || evRes.rows[0].startsAt;
+                evEndsAt = evEndsAt || evRes.rows[0].endsAt;
+                evStatus = evRes.rows[0].status;
+            }
+        }
+
+        if (evStatus === "completed" || evStatus === "cancelled") {
+            const err: any = new Error(`This event has ${evStatus}. Team rosters are permanently locked.`);
+            err.statusCode = 403;
+            throw err;
+        }
+
+        // 2. Check registration stage deadline / status first (authoritative round pipeline)
         const stageRes = await query(
-            `SELECT id, name, type, action_type, status, ends_at AS "endsAt"
+            `SELECT id, name, type, action_type, status, starts_at AS "startsAt", ends_at AS "endsAt", stage_order AS "stageOrder"
              FROM club_event_stages
              WHERE event_id = $1
              ORDER BY 
@@ -124,7 +148,7 @@ export class ClubEventTeamService {
 
         if (stageRes.rows[0]) {
             const stage = stageRes.rows[0];
-            if (stage.status === "completed") {
+            if (stage.status === "completed" || stage.status === "cancelled") {
                 const err: any = new Error("The registration round has concluded. Team modifications and roster edits are permanently locked.");
                 err.statusCode = 403;
                 throw err;
@@ -134,12 +158,36 @@ export class ClubEventTeamService {
                 err.statusCode = 403;
                 throw err;
             }
+            if (stage.startsAt && now < new Date(stage.startsAt).getTime()) {
+                const err: any = new Error("Registration has not yet started for this event.");
+                err.statusCode = 403;
+                throw err;
+            }
+
+            // Check if any stage AFTER registration has already become active or completed
+            const advancedStageRes = await query(
+                `SELECT id, name FROM club_event_stages 
+                 WHERE event_id = $1 AND stage_order > $2 AND status IN ('active', 'completed')
+                 LIMIT 1;`,
+                [eventId, stage.stageOrder]
+            );
+            if (advancedStageRes.rows[0]) {
+                const err: any = new Error(`Stage "${advancedStageRes.rows[0].name}" has already begun. Team rosters are permanently locked.`);
+                err.statusCode = 403;
+                throw err;
+            }
+
             // Registration stage is active!
             return;
         }
 
-        // 2. If no specific registration stage is configured, check if event has concluded
-        if (endsAt && now >= new Date(endsAt).getTime()) {
+        // 3. If no specific registration stage is configured, check if event has started or concluded
+        if (evStartsAt && now >= new Date(evStartsAt).getTime()) {
+            const err: any = new Error("This event has already started. Team modifications and roster edits are permanently locked.");
+            err.statusCode = 403;
+            throw err;
+        }
+        if (evEndsAt && now >= new Date(evEndsAt).getTime()) {
             const err: any = new Error("This event has concluded. Team modifications and roster edits are permanently locked.");
             err.statusCode = 403;
             throw err;
@@ -161,6 +209,17 @@ export class ClubEventTeamService {
         if (!teamName || teamName.length < 2 || teamName.length > 80) {
             const err: any = new Error("Team name must be between 2 and 80 characters.");
             err.statusCode = 400;
+            throw err;
+        }
+
+        // Check if user has previously withdrawn from this event
+        const withdrawnCheckLeader = await query(
+            `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 AND status = 'cancelled' LIMIT 1;`,
+            [eventId, leaderUserId]
+        );
+        if (withdrawnCheckLeader.rows[0]) {
+            const err: any = new Error("You have previously withdrawn your application for this event. Re-registering or creating a squad is restricted.");
+            err.statusCode = 403;
             throw err;
         }
 
@@ -270,7 +329,7 @@ export class ClubEventTeamService {
         teamCode: string
     ): Promise<EventTeamDetails> {
         const event = await this.getTeamEvent(eventId);
-        await this.assertRegistrationOpen(eventId, event.startsAt);
+        await this.assertRegistrationOpen(eventId, event.startsAt, event.endsAt);
 
         const cleanCode = (teamCode || "").trim().toUpperCase();
         if (!cleanCode) {
@@ -300,6 +359,17 @@ export class ClubEventTeamService {
         if (team.membersCount >= event.maxTeamSize) {
             const err: any = new Error(`Team "${team.name}" has reached its maximum size of ${event.maxTeamSize} members.`);
             err.statusCode = 400;
+            throw err;
+        }
+
+        // Check if user has previously withdrawn from this event
+        const withdrawnCheckMember = await query(
+            `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 AND status = 'cancelled' LIMIT 1;`,
+            [eventId, userId]
+        );
+        if (withdrawnCheckMember.rows[0]) {
+            const err: any = new Error("You have previously withdrawn your application for this event. Re-joining a squad is restricted.");
+            err.statusCode = 403;
             throw err;
         }
 
@@ -338,18 +408,23 @@ export class ClubEventTeamService {
         );
 
         // Resolve user & leader for notifications and registration record
-        const [memberUserRes, leaderUserRes] = await Promise.all([
+        const [memberUserRes, leaderUserRes, leaderRegRes] = await Promise.all([
             query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
             query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [team.leaderId]),
+            query(`SELECT status, club_id, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`, [eventId, team.leaderId]),
         ]);
 
         const memberUser = memberUserRes.rows[0];
         const leaderUser = leaderUserRes.rows[0];
+        const leaderReg = leaderRegRes.rows[0];
 
+        const targetStatus = leaderReg?.status || "registered";
+        const targetClubId = leaderReg?.club_id || event.clubId;
         const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
         const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
+        const memberTicketCode = `TKT-${(team.code || "ORB").replace(/[^A-Z0-9]/gi, "").slice(0, 6).toUpperCase()}-${userId.replace(/[^A-Z0-9]/gi, "").slice(0, 4).toUpperCase()}`;
 
-        // Link registration record, or create a pending registration record
+        // Link registration record, or create a full registration record matching team status
         const regCheck = await query(
             `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
             [eventId, userId]
@@ -357,16 +432,16 @@ export class ClubEventTeamService {
         if (regCheck.rows[0]) {
             await query(
                 `UPDATE club_event_registrations 
-                 SET team_id = $1, team_role = 'member', updated_at = NOW()
-                 WHERE id = $2;`,
-                [team.id, regCheck.rows[0].id]
+                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3), updated_at = NOW()
+                 WHERE id = $4;`,
+                [team.id, targetStatus, memberTicketCode, regCheck.rows[0].id]
             );
         } else {
             await query(
                 `INSERT INTO club_event_registrations (
-                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, registered_at, created_at, updated_at
-                 ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, 'member', NOW(), NOW(), NOW());`,
-                [eventId, event.clubId, userId, memberName, memberUser?.email || "developer@orbix.in", team.id]
+                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code, registered_at, created_at, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, NOW(), NOW(), NOW());`,
+                [eventId, targetClubId, userId, targetStatus, memberName, memberUser?.email || "developer@orbix.in", team.id, memberTicketCode]
             );
         }
 
@@ -568,6 +643,17 @@ export class ClubEventTeamService {
             throw err;
         }
 
+        // Check if target user has previously withdrawn from this event
+        const withdrawnCheckInvitee = await query(
+            `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 AND status = 'cancelled' LIMIT 1;`,
+            [eventId, targetUser.id]
+        );
+        if (withdrawnCheckInvitee.rows[0]) {
+            const err: any = new Error(`@${targetUser.username} previously withdrew their application for this event and cannot be invited.`);
+            err.statusCode = 400;
+            throw err;
+        }
+
         // Insert invitation
         const invRes = await query(
             `INSERT INTO club_event_team_invitations (team_id, event_id, inviter_user_id, invitee_user_id, status, created_at)
@@ -702,8 +788,15 @@ export class ClubEventTeamService {
         const inv = invRes.rows[0];
 
         if (inv.status !== "pending") {
-            const err: any = new Error(`This invitation has already been ${inv.status}.`);
+            if (inv.status === "cancelled") {
+                const err: any = new Error("This invitation was revoked by the team leader and has concluded. You can no longer join this team.");
+                err.statusCode = 410;
+                err.code = "INVITATION_CONCLUDED";
+                throw err;
+            }
+            const err: any = new Error(`This invitation has already been ${inv.status} and is concluded.`);
             err.statusCode = 400;
+            err.code = "INVITATION_CONCLUDED";
             throw err;
         }
 
@@ -741,6 +834,17 @@ export class ClubEventTeamService {
             throw err;
         }
 
+        // Check if user has previously withdrawn from this event
+        const withdrawnCheckAccept = await query(
+            `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 AND status = 'cancelled' LIMIT 1;`,
+            [inv.eventId, userId]
+        );
+        if (withdrawnCheckAccept.rows[0]) {
+            const err: any = new Error("You have previously withdrawn your application for this event. Re-joining a squad is restricted.");
+            err.statusCode = 403;
+            throw err;
+        }
+
         // Add user to team members
         await query(
             `INSERT INTO club_event_team_members (team_id, event_id, user_id, role, joined_at)
@@ -756,29 +860,48 @@ export class ClubEventTeamService {
             [invitationId]
         );
 
-        // Link registration
-        await query(
-            `UPDATE club_event_registrations 
-             SET team_id = $1, team_role = 'member', updated_at = NOW()
-             WHERE event_id = $2 AND user_id = $3;`,
-            [inv.teamId, inv.eventId, userId]
+        // Resolve user & leader for notifications and registration record
+        const [memberUserRes, leaderUserRes, leaderRegRes] = await Promise.all([
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
+            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [inv.leaderId]),
+            query(`SELECT status, club_id, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`, [inv.eventId, inv.leaderId]),
+        ]);
+
+        const memberUser = memberUserRes.rows[0];
+        const leaderUser = leaderUserRes.rows[0];
+        const leaderReg = leaderRegRes.rows[0];
+
+        const targetStatus = leaderReg?.status || "registered";
+        const targetClubId = leaderReg?.club_id || inv.clubId;
+        const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
+        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
+        const memberTicketCode = `TKT-${(inv.teamCode || "ORB").replace(/[^A-Z0-9]/gi, "").slice(0, 6).toUpperCase()}-${userId.replace(/[^A-Z0-9]/gi, "").slice(0, 4).toUpperCase()}`;
+
+        // Link registration record, or create a full registration record matching team status
+        const regCheck = await query(
+            `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
+            [inv.eventId, userId]
         );
+        if (regCheck.rows[0]) {
+            await query(
+                `UPDATE club_event_registrations 
+                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3), updated_at = NOW()
+                 WHERE id = $4;`,
+                [inv.teamId, targetStatus, memberTicketCode, regCheck.rows[0].id]
+            );
+        } else {
+            await query(
+                `INSERT INTO club_event_registrations (
+                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code, registered_at, created_at, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, NOW(), NOW(), NOW());`,
+                [inv.eventId, targetClubId, userId, targetStatus, memberName, memberUser?.email || "developer@orbix.in", inv.teamId, memberTicketCode]
+            );
+        }
 
         const newCount = inv.membersCount + 1;
         if (newCount >= inv.minTeamSize) {
             await query(`UPDATE club_event_teams SET status = 'registered', updated_at = NOW() WHERE id = $1;`, [inv.teamId]);
         }
-
-        // Resolve user & leader for notifications
-        const [memberUserRes, leaderUserRes] = await Promise.all([
-            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
-            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [inv.leaderId]),
-        ]);
-
-        const memberUser = memberUserRes.rows[0];
-        const leaderUser = leaderUserRes.rows[0];
-        const memberName = memberUser?.firstname ? `${memberUser.firstname} ${memberUser.lastname || ""}`.trim() : memberUser?.username || "Developer";
-        const leaderName = leaderUser?.firstname ? `${leaderUser.firstname} ${leaderUser.lastname || ""}`.trim() : leaderUser?.username || "Team Leader";
 
         // Dispatch background emails
         if (memberUser?.email) {
@@ -869,10 +992,9 @@ export class ClubEventTeamService {
             throw err;
         }
 
-        // Unlink registration
+        // Cleanly delete registration for removed member so they can re-register or join another squad
         await query(
-            `UPDATE club_event_registrations 
-             SET team_id = NULL, team_role = NULL, updated_at = NOW()
+            `DELETE FROM club_event_registrations 
              WHERE event_id = $1 AND user_id = $2;`,
             [team.eventId, targetUserId]
         );
@@ -910,6 +1032,81 @@ export class ClubEventTeamService {
         }
 
         return { success: true, message: `Removed ${targetName} from team.` };
+    }
+
+    /**
+     * 6b. Transfer Leadership to another confirmed team member (Leader power)
+     */
+    static async transferLeadership(
+        teamId: string,
+        currentLeaderUserId: string,
+        newLeaderUserId: string
+    ) {
+        const teamRes = await query(
+            `SELECT t.id, t.event_id AS "eventId", t.name, t.leader_id AS "leaderId", e.starts_at AS "startsAt", e.ends_at AS "endsAt"
+             FROM club_event_teams t
+             JOIN club_events e ON e.id = t.event_id
+             WHERE t.id = $1 LIMIT 1;`,
+            [teamId]
+        );
+
+        if (!teamRes.rows[0]) {
+            const err: any = new Error("Team not found.");
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const team = teamRes.rows[0];
+        if (team.leaderId !== currentLeaderUserId) {
+            const err: any = new Error("Only the current team leader can transfer leadership.");
+            err.statusCode = 403;
+            throw err;
+        }
+
+        if (newLeaderUserId === currentLeaderUserId) {
+            const err: any = new Error("You are already the leader of this team.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        await this.assertRegistrationOpen(team.eventId, team.startsAt, team.endsAt);
+
+        // Verify target user is an active member of this team
+        const targetMemberRes = await query(
+            `SELECT tm.user_id, u.username, u.firstname, u.lastname
+             FROM club_event_team_members tm
+             JOIN users u ON u.id = tm.user_id
+             WHERE tm.team_id = $1 AND tm.user_id = $2 LIMIT 1;`,
+            [teamId, newLeaderUserId]
+        );
+
+        if (!targetMemberRes.rows[0]) {
+            const err: any = new Error("Selected user is not a confirmed member of this team.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const targetUser = targetMemberRes.rows[0];
+        const newLeaderName = `${targetUser.firstname || ""} ${targetUser.lastname || ""}`.trim() || targetUser.username;
+
+        // 1. Update team leader
+        await query(`UPDATE club_event_teams SET leader_id = $1, updated_at = NOW() WHERE id = $2;`, [newLeaderUserId, teamId]);
+
+        // 2. Update roles in team members
+        await query(`UPDATE club_event_team_members SET role = 'member' WHERE team_id = $1 AND user_id = $2;`, [teamId, currentLeaderUserId]);
+        await query(`UPDATE club_event_team_members SET role = 'leader' WHERE team_id = $1 AND user_id = $2;`, [teamId, newLeaderUserId]);
+
+        // 3. Update team_role in registrations
+        await query(`UPDATE club_event_registrations SET team_role = 'member', updated_at = NOW() WHERE event_id = $1 AND user_id = $2;`, [team.eventId, currentLeaderUserId]);
+        await query(`UPDATE club_event_registrations SET team_role = 'leader', updated_at = NOW() WHERE event_id = $1 AND user_id = $2;`, [team.eventId, newLeaderUserId]);
+
+        return {
+            success: true,
+            message: `Leadership successfully transferred to @${targetUser.username}.`,
+            newLeaderId: newLeaderUserId,
+            newLeaderUsername: targetUser.username,
+            newLeaderName,
+        };
     }
 
     /**
@@ -954,8 +1151,7 @@ export class ClubEventTeamService {
                 // Last member disband
                 await query(`DELETE FROM club_event_teams WHERE id = $1;`, [teamId]);
                 await query(
-                    `UPDATE club_event_registrations SET team_id = NULL, team_role = NULL, updated_at = NOW()
-                     WHERE event_id = $1 AND user_id = $2;`,
+                    `DELETE FROM club_event_registrations WHERE event_id = $1 AND user_id = $2;`,
                     [team.eventId, userId]
                 );
                 return { success: true, message: `Team "${team.name}" has been disbanded.` };
@@ -975,7 +1171,7 @@ export class ClubEventTeamService {
 
                 // Remove previous leader
                 await query(`DELETE FROM club_event_team_members WHERE team_id = $1 AND user_id = $2;`, [teamId, userId]);
-                await query(`UPDATE club_event_registrations SET team_id = NULL, team_role = NULL, updated_at = NOW() WHERE event_id = $1 AND user_id = $2;`, [team.eventId, userId]);
+                await query(`DELETE FROM club_event_registrations WHERE event_id = $1 AND user_id = $2;`, [team.eventId, userId]);
 
                 // Check remaining members and update status if below minTeamSize
                 const remCountRes = await query(
@@ -998,7 +1194,7 @@ export class ClubEventTeamService {
 
         // Regular member leave
         await query(`DELETE FROM club_event_team_members WHERE team_id = $1 AND user_id = $2;`, [teamId, userId]);
-        await query(`UPDATE club_event_registrations SET team_id = NULL, team_role = NULL, updated_at = NOW() WHERE event_id = $1 AND user_id = $2;`, [team.eventId, userId]);
+        await query(`DELETE FROM club_event_registrations WHERE event_id = $1 AND user_id = $2;`, [team.eventId, userId]);
 
         // Check remaining members and update status if below minTeamSize
         const remCountRes = await query(
@@ -1098,7 +1294,7 @@ export class ClubEventTeamService {
         const teamRes = await query(
             `SELECT t.id, t.event_id AS "eventId", t.club_id AS "clubId", t.name, t.code,
                     t.leader_id AS "leaderId", t.status, t.created_at AS "createdAt",
-                    e.starts_at AS "startsAt",
+                    e.starts_at AS "startsAt", e.ends_at AS "endsAt", e.status AS "eventStatus",
                     COALESCE(e.min_team_size, 2) AS "minTeamSize",
                     COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                     u.username AS "leaderUsername",
@@ -1121,7 +1317,7 @@ export class ClubEventTeamService {
 
         // Check stage deadline / timeline locking
         const stageRes = await query(
-            `SELECT id, name, type, action_type, status, ends_at AS "endsAt"
+            `SELECT id, name, type, action_type, status, starts_at AS "startsAt", ends_at AS "endsAt", stage_order AS "stageOrder"
              FROM club_event_stages
              WHERE event_id = $1
              ORDER BY 
@@ -1135,16 +1331,34 @@ export class ClubEventTeamService {
         let lockReason: string | null = null;
         let registrationDeadline: string | null = null;
 
-        if (stageRes.rows[0]) {
+        if (t.eventStatus === "completed" || t.eventStatus === "cancelled") {
+            isLocked = true;
+            lockReason = `This event has ${t.eventStatus}. Team rosters are locked.`;
+        } else if (stageRes.rows[0]) {
             const s = stageRes.rows[0];
             registrationDeadline = s.endsAt;
-            if (s.status === "completed") {
+            if (s.status === "completed" || s.status === "cancelled") {
                 isLocked = true;
                 lockReason = "The registration round has concluded.";
             } else if (s.endsAt && Date.now() >= new Date(s.endsAt).getTime()) {
                 isLocked = true;
                 lockReason = "The registration round deadline has passed.";
+            } else {
+                // Check if later stage is active or completed
+                const advancedStageRes = await query(
+                    `SELECT id, name FROM club_event_stages 
+                     WHERE event_id = $1 AND stage_order > $2 AND status IN ('active', 'completed')
+                     LIMIT 1;`,
+                    [t.eventId, s.stageOrder]
+                );
+                if (advancedStageRes.rows[0]) {
+                    isLocked = true;
+                    lockReason = `Competition round "${advancedStageRes.rows[0].name}" has begun.`;
+                }
             }
+        } else if (t.startsAt && Date.now() >= new Date(t.startsAt).getTime()) {
+            isLocked = true;
+            lockReason = "This event has started. Team roster is locked.";
         } else if (t.endsAt && Date.now() >= new Date(t.endsAt).getTime()) {
             isLocked = true;
             lockReason = "This event has concluded.";
@@ -1221,6 +1435,7 @@ export class ClubEventTeamService {
             leaderName,
             status: t.status,
             createdAt: t.createdAt,
+            isLeader: Boolean(viewingUserId && t.leaderId === viewingUserId),
             isLocked,
             lockReason,
             registrationDeadline,

@@ -473,7 +473,7 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                         View Event in Catalog
                                     </Link>
 
-                                    {app.status === "registered" && (
+                                    {(app.status === "registered" || app.status === "pending") && (
                                         <button
                                             type="button"
                                             disabled={cancellingId === app.id || isWithdrawing}
@@ -514,10 +514,34 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                     <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
                                     <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
                                 </div>
-                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
-                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Your pass will be cancelled immediately and cannot be recovered.</span>
-                                </p>
+                                {withdrawTargetApp.isTeamEvent && withdrawTargetApp.teamRole === "leader" ? (
+                                    <div className="pt-2 border-t-2 border-rose-300 space-y-1 text-red-950 font-black">
+                                        <div className="flex items-center gap-1.5 text-xs text-red-700">
+                                            <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                                            <span>CRITICAL: TEAM SQUAD DISBANDMENT</span>
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-neutral-800 leading-relaxed">
+                                            You are the <strong>Team Leader</strong> of squad <strong>"{withdrawTargetApp.teamName || "Your Squad"}"</strong>.
+                                            Withdrawing your application will <strong>automatically withdraw all teammates' applications</strong>, invalidate all member passes, and disband the squad. This action cannot be undone.
+                                        </p>
+                                    </div>
+                                ) : withdrawTargetApp.isTeamEvent && withdrawTargetApp.teamRole === "member" ? (
+                                    <div className="pt-2 border-t-2 border-amber-300 space-y-1 text-amber-950 font-black">
+                                        <div className="flex items-center gap-1.5 text-xs text-amber-800">
+                                            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                                            <span>MEMBER SPOT WITHDRAWAL</span>
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-neutral-800 leading-relaxed">
+                                            You are registered as a member of squad <strong>"{withdrawTargetApp.teamName || "Your Squad"}"</strong>.
+                                            Withdrawing will release only your spot from the squad and invalidate your pass. The rest of the team will remain intact (and may show as incomplete if minimum capacity is unmet).
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Your pass will be cancelled immediately and cannot be recovered.</span>
+                                    </p>
+                                )}
                             </div>
                         </div>
                     ) : undefined

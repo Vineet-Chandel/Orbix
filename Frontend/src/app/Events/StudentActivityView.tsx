@@ -21,6 +21,7 @@ import {
     FileText,
     Lock,
     Sparkles,
+    Eye,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -82,6 +83,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     const [searchQuery, setSearchQuery] = useState("");
     const [cancellingId, setCancellingId] = useState<string | null>(null);
     const [withdrawTargetApp, setWithdrawTargetApp] = useState<StudentApplicationItem | null>(null);
+    const [viewingWithdrawnApp, setViewingWithdrawnApp] = useState<StudentApplicationItem | null>(null);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
 
     // Certificates data
@@ -94,6 +96,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     const [managingTeamApp, setManagingTeamApp] = useState<StudentApplicationItem | null>(null);
     const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
     const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null);
+    const [previewingInvite, setPreviewingInvite] = useState<any | null>(null);
 
     // Team formation modal state (for unlinked team events)
     const { user } = useAppSelector((state) => state.user);
@@ -128,7 +131,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
             loadInvitations();
             loadApplications();
         } catch (err: any) {
-            toast.error(err.message || "Failed to respond to invitation.");
+            toast.error(err.message || "Failed to respond to invitation.", {
+                title: err.message?.includes("concluded") || err.message?.includes("revoked") ? "Invitation Concluded" : "Error"
+            });
+            // Automatically clear concluded/revoked invitations immediately from the view
+            loadInvitations();
         } finally {
             setRespondingInviteId(null);
         }
@@ -511,6 +518,15 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                             <div className="flex items-center gap-2 self-end sm:self-center">
                                                 <button
                                                     type="button"
+                                                    onClick={() => setPreviewingInvite(inv)}
+                                                    className="px-3 py-1.5 rounded-lg border-2 border-black bg-[#e0f2fe] hover:bg-[#bae6fd] text-sky-950 text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-all"
+                                                    title="Preview team roster, join code & details"
+                                                >
+                                                    <Eye className="w-3.5 h-3.5 text-sky-800" />
+                                                    <span>Preview</span>
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={() => handleRespondInvitation(inv.id, "decline")}
                                                     disabled={respondingInviteId === inv.id}
                                                     className="px-3 py-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1"
@@ -721,7 +737,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                             {/* Action Controls */}
                                             <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-black/10 mt-auto">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    {app.teamId ? (
+                                                    {app.teamId && app.status !== "cancelled" ? (
                                                         <button
                                                             type="button"
                                                             onClick={() => setManagingTeamApp(app)}
@@ -730,7 +746,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                             <Users className="w-3.5 h-3.5" />
                                                             <span>Manage Team Roster</span>
                                                         </button>
-                                                    ) : app.isTeamEvent ? (
+                                                    ) : app.isTeamEvent && app.status !== "cancelled" ? (
                                                         <button
                                                             type="button"
                                                             onClick={() => {
@@ -768,6 +784,15 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                                             <Ban className="w-3.5 h-3.5 text-rose-600" />
                                                             Application not selected
                                                         </span>
+                                                    ) : app.status === "cancelled" ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setViewingWithdrawnApp(app)}
+                                                            className="px-3 py-1.5 rounded-lg border-2 border-black bg-neutral-200 hover:bg-neutral-300 text-neutral-800 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                        >
+                                                            <Ban className="w-3.5 h-3.5 text-neutral-600" />
+                                                            <span>Application Withdrawn</span>
+                                                        </button>
                                                     ) : null}
                                                 </div>
 
@@ -1256,10 +1281,34 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                         <span className="font-mono text-amber-700 font-bold uppercase text-[11px]">Awaiting Organizer Review</span>
                                     </div>
                                 )}
-                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
-                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Your admission pass will be immediately invalidated and your seat will be released.</span>
-                                </p>
+                                {withdrawTargetApp.isTeamEvent && withdrawTargetApp.teamRole === "leader" ? (
+                                    <div className="pt-2 border-t-2 border-rose-300 space-y-1 text-red-950 font-black">
+                                        <div className="flex items-center gap-1.5 text-xs text-red-700">
+                                            <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                                            <span>CRITICAL: TEAM SQUAD DISBANDMENT</span>
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-neutral-800 leading-relaxed">
+                                            You are the <strong>Team Leader</strong> of squad <strong>"{withdrawTargetApp.teamName || "Your Squad"}"</strong>.
+                                            Withdrawing your application will <strong>automatically withdraw all teammates' applications</strong>, invalidate all member passes, and disband the squad. This action cannot be undone.
+                                        </p>
+                                    </div>
+                                ) : withdrawTargetApp.isTeamEvent && withdrawTargetApp.teamRole === "member" ? (
+                                    <div className="pt-2 border-t-2 border-amber-300 space-y-1 text-amber-950 font-black">
+                                        <div className="flex items-center gap-1.5 text-xs text-amber-800">
+                                            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                                            <span>MEMBER SPOT WITHDRAWAL</span>
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-neutral-800 leading-relaxed">
+                                            You are registered as a member of squad <strong>"{withdrawTargetApp.teamName || "Your Squad"}"</strong>.
+                                            Withdrawing will release only your spot from the squad and invalidate your pass. The rest of the team will remain intact (and may show as incomplete if minimum capacity is unmet).
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Your admission pass will be immediately invalidated and your seat will be released.</span>
+                                    </p>
+                                )}
                             </div>
                         </div>
                     ) : undefined
@@ -1273,6 +1322,78 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 inputPlaceholder='Type "WITHDRAW" to confirm'
             />
 
+            {/* Application Withdrawn Details Modal */}
+            {viewingWithdrawnApp && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150">
+                    <div className="relative w-full max-w-lg bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-3 border-black shadow-[8px_8px_0px_#000] rounded-3xl p-6 sm:p-7 space-y-5">
+                        <button
+                            type="button"
+                            onClick={() => setViewingWithdrawnApp(null)}
+                            className="absolute -top-3 -right-3 p-2 rounded-xl bg-white border-2 border-black hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 z-30"
+                            title="Close"
+                        >
+                            <Ban className="w-4 h-4 stroke-[2.5]" />
+                        </button>
+
+                        <div className="flex items-center justify-between pb-3 border-b-2 border-black">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-white border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <Ban className="w-5 h-5 text-rose-400 stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <span className="font-black text-sm uppercase tracking-tight text-black block">Application Withdrawn</span>
+                                    <span className="text-[10px] font-bold text-neutral-500 block">Registration Policy Enforcement</span>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-neutral-200 text-neutral-800 border border-black shadow-[1px_1px_0px_#000]">
+                                Withdrawn
+                            </span>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-amber-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-black text-amber-950 uppercase tracking-wide">
+                                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 stroke-[2.5]" />
+                                <span>Re-Registration Restricted</span>
+                            </div>
+                            <p className="text-xs font-medium text-neutral-800 leading-relaxed">
+                                You previously withdrew your application for{" "}
+                                <strong className="text-black font-black">"{viewingWithdrawnApp.eventTitle}"</strong>.
+                            </p>
+                            <p className="text-[11px] text-neutral-600 leading-relaxed font-semibold">
+                                As per event guidelines and to prevent roster tampering, re-applying or switching to another team for this session is restricted.
+                            </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-white border-2 border-black space-y-1.5 text-xs font-bold text-neutral-700">
+                            <div className="flex justify-between items-center text-neutral-500 text-[10px] uppercase font-mono">
+                                <span>Event:</span>
+                                <span className="text-black font-black">{viewingWithdrawnApp.eventTitle}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-neutral-500 text-[10px] uppercase font-mono">
+                                <span>Host Club:</span>
+                                <span className="text-black font-black">{viewingWithdrawnApp.clubName}</span>
+                            </div>
+                            {viewingWithdrawnApp.teamName && (
+                                <div className="flex justify-between items-center text-neutral-500 text-[10px] uppercase font-mono">
+                                    <span>Squad:</span>
+                                    <span className="text-black font-black">{viewingWithdrawnApp.teamName} ({viewingWithdrawnApp.teamRole === "leader" ? "Leader" : "Member"})</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setViewingWithdrawnApp(null)}
+                                className="px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Event Team Management Modal */}
             {managingTeamApp && managingTeamApp.teamId && (
                 <EventTeamManagementModal
@@ -1284,6 +1405,30 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                     eventStartsAt={managingTeamApp.startsAt}
                     onTeamUpdated={loadApplications}
                     onTeamLeft={loadApplications}
+                />
+            )}
+
+            {/* Preview Team Invitation Modal */}
+            {previewingInvite && (
+                <EventTeamManagementModal
+                    isOpen={Boolean(previewingInvite)}
+                    onClose={() => setPreviewingInvite(null)}
+                    eventId={previewingInvite.eventId}
+                    teamId={previewingInvite.teamId}
+                    eventTitle={previewingInvite.eventTitle}
+                    eventStartsAt={previewingInvite.startsAt}
+                    isInviteePreview={true}
+                    invitationId={previewingInvite.id}
+                    onAcceptInvite={async () => {
+                        const invId = previewingInvite.id;
+                        setPreviewingInvite(null);
+                        await handleRespondInvitation(invId, "accept");
+                    }}
+                    onDeclineInvite={async () => {
+                        const invId = previewingInvite.id;
+                        setPreviewingInvite(null);
+                        await handleRespondInvitation(invId, "decline");
+                    }}
                 />
             )}
 

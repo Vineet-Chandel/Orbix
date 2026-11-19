@@ -200,6 +200,24 @@ eventTeamRouter.delete("/events/:eventId/teams/:teamId/invites/:invitationId", a
     }
 });
 
+eventTeamRouter.post("/events/:eventId/teams/:teamId/invites/:invitationId/cancel", authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = req.params.eventId as string;
+        const teamId = req.params.teamId as string;
+        const invitationId = req.params.invitationId as string;
+        const leaderUserId = req.user!.id;
+
+        const result = await ClubEventTeamService.cancelInvitation(eventId, teamId, leaderUserId, invitationId);
+        return res.json(result);
+    } catch (err: any) {
+        console.error("Cancel invitation error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to revoke invitation.",
+        });
+    }
+});
+
 /**
  * GET /api/events/invitations/my
  * Returns all active pending invitations received by the logged in user
@@ -283,6 +301,31 @@ eventTeamRouter.delete("/events/:eventId/teams/:teamId/members/:targetUserId", a
         return res.status(err.statusCode || 500).json({
             success: false,
             message: err.message || "Failed to remove member.",
+        });
+    }
+});
+
+/**
+ * POST /api/events/:eventId/teams/:teamId/transfer-leader
+ * Leader transfers team leadership to another confirmed member
+ */
+eventTeamRouter.post("/events/:eventId/teams/:teamId/transfer-leader", authenticate, async (req: Request, res: Response) => {
+    try {
+        const teamId = req.params.teamId as string;
+        const leaderUserId = req.user!.id;
+        const { newLeaderUserId } = req.body;
+
+        if (!newLeaderUserId) {
+            return res.status(400).json({ success: false, message: "Target user ID for leadership transfer is required." });
+        }
+
+        const result = await ClubEventTeamService.transferLeadership(teamId, leaderUserId, newLeaderUserId);
+        return res.json(result);
+    } catch (err: any) {
+        console.error("Transfer leadership error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to transfer leadership.",
         });
     }
 });
