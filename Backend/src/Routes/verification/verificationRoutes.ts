@@ -117,42 +117,11 @@ verificationRouter.post("/verify-otp", authenticate, async (req: Request, res: R
  * Securely associates a verified Firebase phone number with the authenticated Supabase user account.
  * Requires caller authentication and server-side cryptographic token validation.
  */
-verificationRouter.post("/phone/verify-firebase", authenticate, async (req: Request, res: Response) => {
-    try {
-        const userId = req.user?.id;
-        const { idToken, phone } = req.body;
-
-        if (!userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized. Please log in." });
-        }
-
-        if (!idToken || typeof idToken !== "string") {
-            return res.status(400).json({ success: false, message: "Firebase ID token is required." });
-        }
-
-        if (!phone || typeof phone !== "string") {
-            return res.status(400).json({ success: false, message: "Phone number is required." });
-        }
-
-        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
-        const userAgent = req.headers["user-agent"] || "unknown";
-
-        const result = await PhoneVerificationService.verifyFirebasePhoneAssociation({
-            idToken,
-            expectedPhone: phone,
-            userId,
-            ipAddress: ip,
-            userAgent,
-        });
-
-        return res.status(200).json(result);
-    } catch (err: any) {
-        const statusCode = err.statusCode || 400;
-        return res.status(statusCode).json({
-            success: false,
-            message: err.message || "Failed to associate phone number",
-        });
-    }
+verificationRouter.post("/phone/verify-firebase", authenticate, async (_req: Request, res: Response) => {
+    return res.status(400).json({
+        success: false,
+        message: "Firebase phone verification has been removed.",
+    });
 });
 
 export default verificationRouter;

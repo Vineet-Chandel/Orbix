@@ -33,7 +33,7 @@ export interface ClubRegistrationInput {
     contactPersonRole: string;
     contactEmail: string;
     collegeOfficialEmail?: string;
-    contactPhone: string;
+    contactPhone?: string;
 
     // Verification references
     collegeWebsiteUrl?: string;
@@ -68,8 +68,8 @@ export interface ValidatedClubRegistrationData {
     contactPersonRole: string;
     contactEmail: string;
     collegeOfficialEmail: string | null;
-    contactPhone: string;
-    contactPhoneFormatted: string;
+    contactPhone: string | null;
+    contactPhoneFormatted: string | null;
 
     collegeWebsiteUrl: string | null;
     clubWebsiteUrl: string | null;
@@ -184,16 +184,15 @@ export default function ClubRegistrationValidator(
         collegeOfficialEmail = rawOfficial;
     }
 
-    const rawPhone = typeof data.contactPhone === "string" ? data.contactPhone.trim() : "";
-    if (!rawPhone) {
-        throw new ValidationError("Primary contact phone number is required.");
+    let contactPhone: string | null = null;
+    let contactPhoneFormatted: string | null = null;
+    if (typeof data.contactPhone === "string" && data.contactPhone.trim()) {
+        const normPhone = normalizePhoneNumber(data.contactPhone.trim());
+        if (normPhone.isValid) {
+            contactPhone = normPhone.canonical;
+            contactPhoneFormatted = normPhone.formatted;
+        }
     }
-    const normPhone = normalizePhoneNumber(rawPhone);
-    if (!normPhone.isValid) {
-        throw new ValidationError("Please provide a valid 10-digit mobile phone number (e.g. 9389205207).");
-    }
-    const contactPhone = normPhone.canonical;
-    const contactPhoneFormatted = normPhone.formatted;
 
     // 4. Verification References
     let collegeWebsiteUrl: string | null = null;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { User, Users } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
@@ -13,10 +13,9 @@ export default function SignUpPage() {
     const errorParam = searchParams.get("error");
     const redirectParam = searchParams.get("redirect") || searchParams.get("returnUrl");
     const toast = useToast();
-    const [registrationMode, setRegistrationMode] = useState<"personal" | "club">(
-        tabParam === "club" ? "club" : "personal"
-    );
-    const [isClubModalOpen, setIsClubModalOpen] = useState(false);
+    const hasConfirmedClubModalRef = useRef(false);
+    const [isClubModalOpen, setIsClubModalOpen] = useState(() => tabParam === "club");
+    const [registrationMode, setRegistrationMode] = useState<"personal" | "club">("personal");
 
     useEffect(() => {
         if (errorParam) {
@@ -29,18 +28,27 @@ export default function SignUpPage() {
 
     useEffect(() => {
         if (tabParam === "club") {
-            setRegistrationMode("club");
-        } else if (tabParam === "personal") {
+            if (!hasConfirmedClubModalRef.current) {
+                setIsClubModalOpen(true);
+                setRegistrationMode("personal");
+            } else {
+                setRegistrationMode("club");
+            }
+        } else {
+            hasConfirmedClubModalRef.current = false;
+            setIsClubModalOpen(false);
             setRegistrationMode("personal");
         }
     }, [tabParam]);
 
     const handleSelectClub = () => {
+        if (registrationMode === "club") return;
         // Mandatory: immediately open the explanatory modal before showing club form
         setIsClubModalOpen(true);
     };
 
     const handleConfirmClubModal = () => {
+        hasConfirmedClubModalRef.current = true;
         setIsClubModalOpen(false);
         setRegistrationMode("club");
         const nextParams: Record<string, string> = { tab: "club" };
@@ -49,6 +57,7 @@ export default function SignUpPage() {
     };
 
     const handleCancelClubModal = () => {
+        hasConfirmedClubModalRef.current = false;
         setIsClubModalOpen(false);
         setRegistrationMode("personal");
         const nextParams: Record<string, string> = { tab: "personal" };
@@ -57,6 +66,8 @@ export default function SignUpPage() {
     };
 
     const handleSwitchToPersonal = () => {
+        hasConfirmedClubModalRef.current = false;
+        setIsClubModalOpen(false);
         setRegistrationMode("personal");
         const nextParams: Record<string, string> = { tab: "personal" };
         if (redirectParam) nextParams.redirect = redirectParam;
