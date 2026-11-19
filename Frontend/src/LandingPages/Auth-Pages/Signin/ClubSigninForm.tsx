@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { ArrowRight, ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
@@ -15,8 +15,14 @@ export interface ClubSigninFormProps {
 
 export default function ClubSigninForm({ initialIdentifier = "", onForgotPassword }: ClubSigninFormProps = {}) {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const toast = useToast();
     const dispatch = useAppDispatch();
+
+    const redirectParam = searchParams.get("redirect") || searchParams.get("returnUrl");
+    const clubSignupHref = redirectParam
+        ? `/auth/signup?tab=club&redirect=${encodeURIComponent(redirectParam)}`
+        : "/auth/signup?tab=club";
 
     const [formData, setFormData] = useState({
         identity: initialIdentifier || "",
@@ -599,12 +605,12 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
                             <span className="text-[11px] font-bold text-neutral-600">
                                 New student club or community?
                             </span>
-                            <a
-                                href="/auth/signup?tab=club"
+                            <Link
+                                to={clubSignupHref}
                                 className="text-xs font-black text-black underline underline-offset-2 hover:text-neutral-800 transition-colors"
                             >
                                 Apply for Club Verification &rarr;
-                            </a>
+                            </Link>
                         </div>
                     </div>
                 </div>

@@ -634,33 +634,19 @@ clubRouter.post("/verify/send-phone-otp", optionalAuthenticate, async (req: Requ
 
 /**
  * POST /api/club/verify/verify-phone-otp
- * POST /api/club/verify/verify-phone-firebase
- * Verifies mobile phone authentication via Firebase ID Token (or legacy 6-digit OTP in test simulation)
+ * Verifies mobile phone verification code (in test/dev simulation)
  * and returns a cryptographically signed continuation proof token for registration.
  */
 const handleVerifyPhoneRequest = async (req: Request, res: Response) => {
     try {
-        const { phone, otp, idToken } = req.body;
+        const { phone, otp } = req.body;
         if (!phone || typeof phone !== "string") {
             return res.status(400).json({ success: false, message: "Phone number is required." });
         }
 
         const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
-        const userAgent = req.headers["user-agent"] || "unknown";
 
-        // 1. Firebase Phone Authentication flow (primary)
-        if (idToken && typeof idToken === "string") {
-            const result = await PhoneVerificationService.verifyFirebasePhoneAssociation({
-                idToken,
-                expectedPhone: phone,
-                userId: req.user?.id,
-                ipAddress: ip,
-                userAgent,
-            });
-            return res.status(200).json(result);
-        }
-
-        // 2. Legacy / Simulation OTP fallback (for test suite)
+        // Legacy / Simulation OTP fallback (for test suite)
         if (otp && typeof otp === "string") {
             const result = await PhoneVerificationService.verifyOtp({
                 phone,
@@ -672,7 +658,7 @@ const handleVerifyPhoneRequest = async (req: Request, res: Response) => {
 
         return res.status(400).json({
             success: false,
-            message: "Firebase ID token or verification code is required.",
+            message: "Verification code is required.",
         });
     } catch (err: any) {
         const statusCode = err.statusCode || 400;
@@ -684,7 +670,6 @@ const handleVerifyPhoneRequest = async (req: Request, res: Response) => {
 };
 
 clubRouter.post("/verify/verify-phone-otp", handleVerifyPhoneRequest);
-clubRouter.post("/verify/verify-phone-firebase", handleVerifyPhoneRequest);
 
 /**
  * POST /api/club/register
@@ -824,7 +809,7 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             isEmailVerified = true;
         }
 
-        if (validated.phoneVerificationToken) {
+        if (validated.phoneVerificationToken && validated.contactPhone) {
             const validPhone = PhoneVerificationService.verifyVerificationToken(
                 validated.phoneVerificationToken,
                 validated.contactPhone
@@ -838,11 +823,11 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             isPhoneVerified = true;
         }
 
-        // In production, enforce dual email & phone verification
-        if (isProduction && (!isEmailVerified || !isPhoneVerified)) {
+        // In production, enforce primary email verification
+        if (isProduction && !isEmailVerified) {
             return res.status(400).json({
                 success: false,
-                message: "Both primary email and primary mobile number must be verified before completing club registration.",
+                message: "Primary email must be verified before completing club registration.",
             });
         }
 
@@ -1121,9 +1106,9 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             contactPersonName: validated.contactPersonName,
             contactPersonRole: validated.contactPersonRole,
             contactEmail: validated.contactEmail,
-            contactPhone: validated.contactPhone,
-            collegeOfficialEmail: validated.collegeOfficialEmail,
-            clubWebsiteUrl: validated.clubWebsiteUrl,
+            contactPhone: validated.contactPhone || undefined,
+            collegeOfficialEmail: validated.collegeOfficialEmail || undefined,
+            clubWebsiteUrl: validated.clubWebsiteUrl || undefined,
             submittedAt: createdRequest.submitted_at,
             requestId: createdRequest.id,
         });

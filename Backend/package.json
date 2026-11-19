@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "tsx --test src/validators/ClubRegistrationValidator.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate:institutions": "tsx src/database/run_migration.ts",
@@ -24,7 +24,6 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^18.0.6",
     "express": "^5.2.1",
-    "firebase-admin": "^14.5.0",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.13.0",
