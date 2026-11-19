@@ -1,3 +1,5 @@
+import "./certificateFonts.css";
+
 export type CertificateFontCategory =
     | "Formal Serif"
     | "Calligraphy & Script"

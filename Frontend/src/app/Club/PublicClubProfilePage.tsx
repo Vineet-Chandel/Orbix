@@ -1,6 +1,8 @@
-import { useEffect, useState, useMemo, type ReactNode } from "react";
+import { useEffect, useState, useMemo, Suspense, type ReactNode } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ClubMarkdownRenderer } from "./Profile/ClubMarkdownRenderer";
+import { lazyWithRetry } from "../../utils/lazyWithRetry";
+
+const ClubMarkdownRenderer = lazyWithRetry(() => import("./Profile/ClubMarkdownRenderer").then(m => ({ default: m.ClubMarkdownRenderer })));
 import { OrbixLogo } from "../../components/OrbixLogo";
 import {
     ShieldAlert,
@@ -465,7 +467,7 @@ export default function PublicClubProfilePage({
     const social = club.socialLinks || {};
 
     return wrapWithSidebar(
-        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen bg-[#FAF6EE]"} bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black`}>
+        <div className={`${isEmbedded ? "pb-4 public-club-profile-page embedded-showcase-container bg-[#FAF6EE]" : "public-club-profile-page min-h-screen bg-[#FAF6EE]"} bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black`}>
             {/* Top Navigation Bar */}
             {!isEmbedded && (
                 <header
@@ -607,10 +609,10 @@ export default function PublicClubProfilePage({
                     </div>
 
                     {/* Profile Information Row */}
-                    <div className="p-6 sm:p-8 relative">
+                    <div className="p-4 sm:p-8 relative">
                         {/* Overlapping Logo & Identity Row */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-6">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5">
+                        <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-4 sm:gap-6 mb-6">
+                            <div className="flex min-w-0 flex-1 flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-5">
                                 {club.logoUrl ? (
                                     <EnlargeableAvatar
                                         src={club.logoUrl}
@@ -625,10 +627,10 @@ export default function PublicClubProfilePage({
                                     </div>
                                 )}
 
-                                <div className="space-y-1.5 pt-2 sm:pt-4">
+                                <div className="min-w-0 space-y-1.5 pt-2 sm:pt-4">
                                     <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight flex items-center gap-2">
-                                            <span>{club.name}</span>
+                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight flex items-start gap-2 min-w-0">
+                                            <span className="min-w-0 [overflow-wrap:anywhere]">{club.name}</span>
                                             <VerifiedBadge size="md" title="Verified on Orbix" />
                                         </h1>
                                         <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
@@ -861,7 +863,7 @@ export default function PublicClubProfilePage({
                 )}
 
                 {/* Internal Navigation Tabs */}
-                <div className="flex items-center gap-2 border-b-2 border-black pb-2 overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-2 border-b-2 border-black pb-2 overflow-x-auto scrollbar-none [&>button]:shrink-0">
                     {[
                         { id: "about", label: "About & Story", icon: FileText },
                         { id: "coordinators", label: "Coordinators & Leads", icon: UserCheck, count: coordinators.length },
@@ -935,7 +937,9 @@ export default function PublicClubProfilePage({
                                 About {club.name}
                             </h3>
                             {club.about ? (
-                                <ClubMarkdownRenderer content={club.about} />
+                                <Suspense fallback={<p className="text-sm text-neutral-600">Loading club story…</p>}>
+                                    <ClubMarkdownRenderer content={club.about} />
+                                </Suspense>
                             ) : (
                                 <p className="text-xs font-medium text-neutral-500 italic">
                                     No detailed description has been published for this chapter yet.

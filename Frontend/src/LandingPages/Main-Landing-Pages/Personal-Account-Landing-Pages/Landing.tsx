@@ -1,30 +1,14 @@
-import React from 'react';
 import NavBar from '../../NavBar/Landing';
 import Hero from '../Hero/Landing';
-import { Card } from './Card';
-import { Platform } from './Platform';
-import { Events } from './Events';
-import { LeaderboardShowcase as Leaderboard } from './Leaderboard';
-import { ClubsShowcase as Clubs } from './clubs';
-import { Footer } from '../Footer';
+import { lazyWithRetry } from '../../../utils/lazyWithRetry';
+import { DeferredSection as ShowcaseSection } from '../DeferredSection';
 
-/**
- * Optimized Showcase Section:
- * Renders immediately with dummy data for instantaneous UX with zero spinner delays.
- * Uses CSS content-visibility: auto with contain-intrinsic-size for smooth 60fps scrolling.
- */
-function ShowcaseSection({
-  children,
-}: {
-  children: React.ReactNode;
-  fallbackHeight?: number;
-}) {
-  return (
-    <div className="w-full">
-      {children}
-    </div>
-  );
-}
+const Card = lazyWithRetry(() => import('./Card').then(m => ({ default: m.Card })));
+const Platform = lazyWithRetry(() => import('./Platform').then(m => ({ default: m.Platform })));
+const Events = lazyWithRetry(() => import('./Events').then(m => ({ default: m.Events })));
+const Leaderboard = lazyWithRetry(() => import('./Leaderboard').then(m => ({ default: m.LeaderboardShowcase })));
+const Clubs = lazyWithRetry(() => import('./clubs').then(m => ({ default: m.ClubsShowcase })));
+const Footer = lazyWithRetry(() => import('../Footer').then(m => ({ default: m.Footer })));
 
 export default function MainLanding() {
   return (
@@ -36,41 +20,41 @@ export default function MainLanding() {
 
       <Hero mode="developer" />
 
-      <ShowcaseSection fallbackHeight={520}>
+      <ShowcaseSection height={520}>
         <section className="w-full">
           <Card />
         </section>
       </ShowcaseSection>
 
-      <ShowcaseSection fallbackHeight={580}>
+      <ShowcaseSection height={580}>
         <section className="w-full">
           <Platform />
         </section>
       </ShowcaseSection>
 
       {/* Flagship Event Tracker Showcase: Every Contest, One Calendar */}
-      <ShowcaseSection fallbackHeight={620}>
+      <ShowcaseSection height={620}>
         <section className="w-full">
           <Events />
         </section>
       </ShowcaseSection>
 
       {/* Flagship Leaderboard Showcase: See Where You Really Stand */}
-      <ShowcaseSection fallbackHeight={640}>
+      <ShowcaseSection height={640}>
         <section className="w-full">
           <Leaderboard />
         </section>
       </ShowcaseSection>
 
       {/* Flagship Campus Clubs & National Events Hub Showcase */}
-      <ShowcaseSection fallbackHeight={640}>
+      <ShowcaseSection height={640}>
         <section className="w-full">
           <Clubs />
         </section>
       </ShowcaseSection>
 
       {/* Flagship Footer with CTA Banner and Full Width Desk Image */}
-      <ShowcaseSection fallbackHeight={340}>
+      <ShowcaseSection height={340}>
         <Footer />
       </ShowcaseSection>
     </div>

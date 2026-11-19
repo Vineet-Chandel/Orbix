@@ -1,7 +1,7 @@
 import { useEffect, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import MainLanding from "./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Landing";
-import ClubLanding from "./LandingPages/Main-Landing-Pages/Club-Account-Landing-Pages/Landing";
+
 import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import {
@@ -18,6 +18,8 @@ import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
 import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
 import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
 import { ScrollToTop } from "./components/ScrollToTop";
+
+const ClubLanding = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Club-Account-Landing-Pages/Landing"));
 
 // Code-split other routes & showcases with resilient retry logic
 const SignInPage = lazyWithRetry(() => import('./LandingPages/Auth-Pages/Signin/Landing'));

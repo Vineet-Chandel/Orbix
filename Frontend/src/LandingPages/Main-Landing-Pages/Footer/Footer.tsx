@@ -293,7 +293,7 @@ export const Footer: React.FC = () => {
             ========================================================================= */}
             <div className="w-full relative mt-2 sm:mt-4 overflow-hidden bg-transparent select-none pointer-events-none">
                 <img
-                    src="/image.png"
+                    src="/image.webp"
                     alt="Orbix Developer Desk"
                     loading="lazy"
                     decoding="async"

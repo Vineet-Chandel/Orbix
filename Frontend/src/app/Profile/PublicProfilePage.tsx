@@ -649,7 +649,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
     // Dynamic scale measurement for responsive LinkedInCard rendering
     const cardContainerRef = useRef<HTMLDivElement>(null);
-    const [containerWidth, setContainerWidth] = useState<number>(1200);
+    const [containerWidth, setContainerWidth] = useState<number>(0);
 
     // Online/Offline status listeners
     useEffect(() => {
@@ -1148,7 +1148,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         DEFAULT_AVATAR_URL;
 
     return wrapWithSidebar(
-        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen pb-16 bg-[#FAF6EE] relative scroll-smooth"} text-neutral-900 font-sans antialiased selection:bg-black selection:text-white`}>
+        <div className={`${isEmbedded ? "pb-4 public-profile-page embedded-showcase-container bg-[#FAF6EE]" : "public-profile-page min-h-screen pb-16 bg-[#FAF6EE] relative scroll-smooth"} text-neutral-900 font-sans antialiased selection:bg-black selection:text-white`}>
             {/* Eye-friendly subtle canvas dot grid cached on GPU without fixed viewport re-rasterization */}
             {!isEmbedded && (
                 <div
@@ -1352,7 +1352,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                             ) : (
                                 <>
                                     {/* 3D Motion Card Container (Broader Purple LinkedInCard Scaled Proportionately Across All Viewports) */}
-                                    <div style={{ perspective: 1800 }} className="w-full flex justify-center">
+                                    <div style={{ perspective: 1800, aspectRatio: containerWidth === 0 ? "1200 / 627" : undefined }} className="w-full min-w-0 flex justify-center">
                                         <motion.div
                                             className="relative cursor-pointer select-none"
                                             style={{

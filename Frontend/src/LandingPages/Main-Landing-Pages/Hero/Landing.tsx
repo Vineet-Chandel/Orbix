@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, Suspense } from 'react';
 import { motion, AnimatePresence, useScroll } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
-import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
-import PublicClubProfilePage from '../../../app/Club/PublicClubProfilePage';
-import { DEMO_CLUB_SLUG } from '../../../data/demoClubProfileData';
+import { lazyWithRetry } from '../../../utils/lazyWithRetry';
+import { DeferredSection } from '../DeferredSection';
+import { useVisibleMotion } from '../../../hooks/useVisibleMotion';
+
+const PublicProfilePage = lazyWithRetry(() => import('../../../app/Profile/PublicProfilePage'));
+const PublicClubProfilePage = lazyWithRetry(() => import('../../../app/Club/PublicClubProfilePage'));
+const DEMO_CLUB_SLUG = 'aws-swg-psit';
 
 export interface PlatformItem {
     id: string;
@@ -883,6 +887,8 @@ interface HeroHeadlinesProps {
 }
 
 const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesProps) {
+    const headlineRef = useRef<HTMLDivElement>(null);
+    const motionActive = useVisibleMotion(headlineRef);
     const location = useLocation();
     const isClub = mode ? mode === "club" : location.pathname.startsWith("/clubs");
 
@@ -902,37 +908,37 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
 
     // Developer mode tickers
     useEffect(() => {
-        if (isClub || isPaused) return;
+        if (!motionActive || isClub || isPaused) return;
         const timer = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % CONNECTABLE_PLATFORMS.length);
         }, 2800);
         return () => clearInterval(timer);
-    }, [isClub, isPaused]);
+    }, [motionActive, isClub, isPaused]);
 
     useEffect(() => {
-        if (isClub || isOppPaused) return;
+        if (!motionActive || isClub || isOppPaused) return;
         const timer = setInterval(() => {
             setOppIndex((prev) => (prev + 1) % OPPORTUNITIES.length);
         }, 3200);
         return () => clearInterval(timer);
-    }, [isClub, isOppPaused]);
+    }, [motionActive, isClub, isOppPaused]);
 
     // Club mode tickers
     useEffect(() => {
-        if (!isClub || isClubEventPaused) return;
+        if (!motionActive || !isClub || isClubEventPaused) return;
         const timer = setInterval(() => {
             setClubEventIndex((prev) => (prev + 1) % CLUB_EVENTS.length);
         }, 2800);
         return () => clearInterval(timer);
-    }, [isClub, isClubEventPaused]);
+    }, [motionActive, isClub, isClubEventPaused]);
 
     useEffect(() => {
-        if (!isClub || isClubUnlockPaused) return;
+        if (!motionActive || !isClub || isClubUnlockPaused) return;
         const timer = setInterval(() => {
             setClubUnlockIndex((prev) => (prev + 1) % CLUB_UNLOCKS.length);
         }, 3200);
         return () => clearInterval(timer);
-    }, [isClub, isClubUnlockPaused]);
+    }, [motionActive, isClub, isClubUnlockPaused]);
 
     const handleNext = () => {
         setCurrentIndex((prev) => (prev + 1) % CONNECTABLE_PLATFORMS.length);
@@ -955,7 +961,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
         const currentUnlock = CLUB_UNLOCKS[clubUnlockIndex];
 
         return (
-            <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.05rem,4vw,1.65rem)] sm:text-[clamp(1.45rem,3.4vw,2.85rem)] lg:text-[clamp(2rem,3.2vw,3.85rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
+            <div ref={headlineRef} className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.05rem,4vw,1.65rem)] sm:text-[clamp(1.45rem,3.4vw,2.85rem)] lg:text-[clamp(2rem,3.2vw,3.85rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
                 {/* Line 1: Naturally wrapping on small viewports */}
                 <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                     <span>A complete ecosystem for clubs to organize</span>
@@ -997,7 +1003,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
     const currentOpp = OPPORTUNITIES[oppIndex];
 
     return (
-        <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.15rem,4.5vw,1.85rem)] sm:text-[clamp(1.65rem,4vw,3.25rem)] lg:text-[clamp(2.4rem,3.8vw,4.25rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
+        <div ref={headlineRef} className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.15rem,4.5vw,1.85rem)] sm:text-[clamp(1.65rem,4vw,3.25rem)] lg:text-[clamp(2.4rem,3.8vw,4.25rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
             {/* Line 1: Responsive wrapping with animated platform pill */}
             <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>A developer tool to connect</span>
@@ -1054,6 +1060,7 @@ const Landing = ({ mode }: HeroProps) => {
     // Eliminates massive 3,500px GPU texture layer allocation and compositor tile evictions.
     useEffect(() => {
         let rafId: number | null = null;
+        let maxScroll = 0;
 
         const syncScroll = (progressVal: number) => {
             if (rafId !== null) cancelAnimationFrame(rafId);
@@ -1062,9 +1069,8 @@ const Landing = ({ mode }: HeroProps) => {
                 if (!el) return;
                 // Map [0.02, 0.88] to [0, 1] clamped
                 const progress = Math.min(Math.max((progressVal - 0.02) / (0.88 - 0.02), 0), 1);
-                const max = el.scrollHeight - el.clientHeight;
-                if (max > 0) {
-                    el.scrollTop = progress * max;
+                if (maxScroll > 0) {
+                    el.scrollTop = progress * maxScroll;
                 }
             });
         };
@@ -1073,18 +1079,17 @@ const Landing = ({ mode }: HeroProps) => {
             syncScroll(latest);
         });
 
-        // Initialize immediately
-        syncScroll(scrollYProgress.get());
-
         const handleResize = () => {
+            const el = viewportRef.current;
+            maxScroll = el ? Math.max(0, el.scrollHeight - el.clientHeight) : 0;
             syncScroll(scrollYProgress.get());
         };
+        handleResize();
         window.addEventListener("resize", handleResize, { passive: true });
 
         // Observe content size changes (e.g. font load / image load) to maintain correct scroll position
-        const ro = new ResizeObserver(() => {
-            syncScroll(scrollYProgress.get());
-        });
+        const ro = new ResizeObserver(handleResize);
+        if (viewportRef.current) ro.observe(viewportRef.current);
         if (contentRef.current) ro.observe(contentRef.current);
 
         return () => {
@@ -1094,22 +1099,6 @@ const Landing = ({ mode }: HeroProps) => {
             if (rafId !== null) cancelAnimationFrame(rafId);
         };
     }, [scrollYProgress]);
-
-    // Forward mouse wheel events over the mock browser directly to the window,
-    // ensuring the user never gets "trapped" in an inner scroll container and page scroll remains 100% fluid.
-    useEffect(() => {
-        const el = viewportRef.current;
-        if (!el) return;
-
-        const handleWheel = (e: WheelEvent) => {
-            if (e.deltaY !== 0) {
-                window.scrollBy({ top: e.deltaY });
-            }
-        };
-
-        el.addEventListener("wheel", handleWheel, { passive: true });
-        return () => el.removeEventListener("wheel", handleWheel);
-    }, []);
 
     return (
         <div className="relative w-full flex flex-col items-center bg-[#FAF6EE] text-neutral-900 select-none">
@@ -1153,7 +1142,7 @@ const Landing = ({ mode }: HeroProps) => {
                             {/* Viewport Window with Native Composited Scrolling */}
                             <div
                                 ref={viewportRef}
-                                className="relative w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain select-auto"
+                                className="relative w-full min-h-0 flex-1 overflow-y-hidden overflow-x-hidden scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden select-auto"
                                 style={{
                                     scrollbarWidth: 'none',
                                     msOverflowStyle: 'none',
@@ -1164,11 +1153,15 @@ const Landing = ({ mode }: HeroProps) => {
                                     ref={contentRef}
                                     className="embedded-showcase-container w-full"
                                 >
+                                    <DeferredSection height={650}>
+                                    <Suspense fallback={<div className="h-[650px] bg-[#FAF6EE]" aria-label="Loading profile preview" />}>
                                     {mode === 'club' ? (
                                         <PublicClubProfilePage overrideSlug={DEMO_CLUB_SLUG} isEmbedded={true} />
                                     ) : (
                                         <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
                                     )}
+                                    </Suspense>
+                                    </DeferredSection>
                                 </div>
                             </div>
                         </div>

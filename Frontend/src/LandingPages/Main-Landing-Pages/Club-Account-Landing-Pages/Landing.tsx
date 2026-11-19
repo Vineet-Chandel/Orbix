@@ -1,28 +1,9 @@
-import React from 'react';
 import NavBar from '../../NavBar/Landing';
 import Hero from '../Hero/Landing';
-import { Footer } from '../Footer';
+import { lazyWithRetry } from '../../../utils/lazyWithRetry';
+import { DeferredSection as ShowcaseSection } from '../DeferredSection';
+const Footer = lazyWithRetry(() => import('../Footer').then(m => ({ default: m.Footer })));
 
-/**
- * Optimized Showcase Section Wrapper
- */
-function ShowcaseSection({
-  children,
-}: {
-  children: React.ReactNode;
-  fallbackHeight?: number;
-}) {
-  return (
-    <div className="w-full">
-      {children}
-    </div>
-  );
-}
-
-/**
- * Club Account Landing Page (/clubs)
- * Authoritative public landing page from the university & campus clubs' perspective.
- */
 export default function ClubLanding() {
   return (
     <div className="bg-[#FAF6EE] text-slate-900 selection:bg-slate-900 selection:text-white relative overflow-x-clip font-sans min-h-screen">
@@ -38,7 +19,7 @@ export default function ClubLanding() {
       {/* Future Club Perspective Showcases will be plugged in here */}
 
       {/* Flagship Footer with CTA Banner and Desk Image */}
-      <ShowcaseSection fallbackHeight={340}>
+      <ShowcaseSection height={340}>
         <Footer />
       </ShowcaseSection>
     </div>

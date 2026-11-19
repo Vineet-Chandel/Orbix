@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, RefreshCw, Layers, ShieldCheck, Sparkles, X } from "lucide-react";
 import { OrbixLogo } from "../../../../components/OrbixLogo";
 
+import { useVisibleMotion } from "../../../../hooks/useVisibleMotion";
+
 export interface PlatformItem {
     id: string;
     name: string;
@@ -575,6 +577,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
 }) => {
     const sectionRef = useRef<HTMLElement>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
+    const motionActive = useVisibleMotion(sectionRef);
 
     // Active platform tracking (hover for desktop, tap/click for mobile & desktop)
     const [hoveredPlatform, setHoveredPlatform] = useState<PlatformItem | null>(null);
@@ -626,7 +629,9 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
     const hasDraggedRef = useRef(false);
 
     useEffect(() => {
+        if (!motionActive) return;
         let animId: number;
+        let previousTime = 0;
         const canvasEl = canvasRef.current;
         if (!canvasEl) return;
 
@@ -636,13 +641,15 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
         canvasEl.style.setProperty("--inner-rot", `${innerAngleRef.current}deg`);
         canvasEl.style.setProperty("--inner-counter-rot", `${-innerAngleRef.current}deg`);
 
-        const update = () => {
+        const update = (time: number) => {
+            const step = previousTime ? Math.min((time - previousTime) / (1000 / 60), 3) : 1;
+            previousTime = time;
             // Calm ambient celestial drift + momentum damping when not actively dragging
             if (!isDraggingRef.current) {
                 // Outer ring drifts clockwise, inner ring counter-clockwise in opposite direction
-                outerAngleRef.current += 0.032 + momentumRef.current * 0.55;
-                innerAngleRef.current -= 0.048 + momentumRef.current * 0.82;
-                momentumRef.current *= 0.93;
+                outerAngleRef.current += (0.032 + momentumRef.current * 0.55) * step;
+                innerAngleRef.current -= (0.048 + momentumRef.current * 0.82) * step;
+                momentumRef.current *= Math.pow(0.93, step);
 
                 if (Math.abs(momentumRef.current) < 0.001) {
                     momentumRef.current = 0;
@@ -660,10 +667,11 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
 
         animId = requestAnimationFrame(update);
         return () => cancelAnimationFrame(animId);
-    }, []);
+    }, [motionActive]);
 
     // Passive window scroll listener for fluid scroll momentum
     useEffect(() => {
+        if (!motionActive) return;
         let lastScrollY = window.scrollY;
 
         const handleScroll = () => {
@@ -678,7 +686,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
 
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
-    }, []);
+    }, [motionActive]);
 
     // Mouse wheel scrub over canvas
     const handleWheel = (e: React.WheelEvent) => {
