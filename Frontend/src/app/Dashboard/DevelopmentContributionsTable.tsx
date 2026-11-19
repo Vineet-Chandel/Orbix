@@ -21,6 +21,10 @@ import {
 } from "../../utils/submissionsAggregator";
 import { isDemoProfileUsername, demoDevelopmentData, demoDevelopmentAnalytics } from "../../data/demoProfileData";
 
+import { InteractiveActivityHeatmap } from "../../components/charts/InteractiveActivityHeatmap";
+
+const DEVELOPMENT_COLORS = ["#FAF6EE", "#a2ff86", "#4ade80", "#22c55e", "#115e24"] as const;
+
 interface DevelopmentContributionsTableProps {
     connectedPortals: Record<string, any>;
     username?: string;
@@ -136,23 +140,6 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
         }
         return { weeks: clientAgg.weeks, monthNames: clientAgg.monthNames };
     }, [remoteData, selectedPortal, weeksCount, clientAgg]);
-
-    // Neo-Brutalist Green Accent Shader mapping
-    const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
-        switch (level) {
-            case 4:
-                return "bg-[#115e24] border-black shadow-[1px_1px_0px_#000]";
-            case 3:
-                return "bg-[#22c55e] border-black shadow-[1px_1px_0px_#000]";
-            case 2:
-                return "bg-[#4ade80] border-black";
-            case 1:
-                return "bg-[#a2ff86] border-black";
-            case 0:
-            default:
-                return "bg-[#FAF6EE] border-black/25 hover:border-black";
-        }
-    };
 
     // Series of platforms sorted strictly from largest number of contributions to lowest
     // ONLY display platforms where contributions can be extracted (count > 0)
@@ -321,60 +308,13 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                 })}
             </div>
 
-            {/* Heatmap Area: Uncovered, Circular Curvy Monochrome Dots with Spaces */}
-            <div
-                style={{ WebkitOverflowScrolling: "touch" }}
-                className="py-4 relative z-10 overflow-x-auto scrollbar-none"
-            >
-                <div className="min-w-[700px] flex flex-col space-y-2">
-                    {/* Month Labels Row aligned across columns */}
-                    <div
-                        className="grid text-xs font-mono text-black/70 font-black select-none pl-7 pr-1"
-                        style={{ gridTemplateColumns: `repeat(${monthNames.length}, minmax(0, 1fr))` }}
-                    >
-                        {monthNames.map((m, idx) => (
-                            <span key={idx} className="block text-left uppercase text-[10px] tracking-wider">
-                                {m}
-                            </span>
-                        ))}
-                    </div>
-
-                    {/* Day Labels Column + Week Columns Grid */}
-                    <div className="flex items-center gap-2.5">
-                        {/* Day labels (Sun through Sat, showing Mon, Wed, Fri aligned with square rows) */}
-                        <div className="flex flex-col gap-1.5 text-[11px] font-mono text-black/60 font-black select-none w-5 flex-shrink-0 text-right">
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                            <div className="aspect-square flex items-center justify-end leading-none">Mon</div>
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                            <div className="aspect-square flex items-center justify-end leading-none">Wed</div>
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                            <div className="aspect-square flex items-center justify-end leading-none">Fri</div>
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                        </div>
-
-                        {/* Weekly Columns Grid with Circular Curvy Dots */}
-                        <div className="flex-1 flex items-center justify-between gap-1.5">
-                            {weeks.map((week, wIdx) => (
-                                <div key={wIdx} className="flex flex-col gap-1.5 flex-1">
-                                    {week.map((day, dIdx) => (
-                                        <div
-                                            key={dIdx}
-                                            onMouseEnter={() => setHoveredCell(day)}
-                                            onMouseLeave={() => setHoveredCell(null)}
-                                            title={`${day.count} contributions on ${day.displayDate}${
-                                                day.platforms.length > 0 ? ` (${day.platforms.join(", ")})` : ""
-                                            }`}
-                                            className={`w-full aspect-square rounded-full border transition-all duration-150 hover:scale-130 cursor-pointer ${getCellColor(
-                                                day.level
-                                            )}`}
-                                        />
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <InteractiveActivityHeatmap
+                weeks={weeks}
+                monthNames={monthNames}
+                colors={DEVELOPMENT_COLORS}
+                activity="contributions"
+                onHoverDay={setHoveredCell}
+            />
 
             {/* Hover Tooltip Info Banner if cell is hovered */}
             <div className="min-h-[36px] flex items-center text-xs sm:text-sm font-mono text-black pt-1">
@@ -393,7 +333,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                         )}
                     </div>
                 ) : (
-                    <span className="text-neutral-500 text-xs font-sans font-medium">Hover over any circular dot to view daily contribution breakdown.</span>
+                    <span className="text-neutral-500 text-xs font-sans font-medium">Hover or use arrow keys for daily details. Tap the chart to change its view.</span>
                 )}
             </div>
 

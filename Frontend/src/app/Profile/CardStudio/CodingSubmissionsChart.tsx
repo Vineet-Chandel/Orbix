@@ -192,17 +192,17 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = Rea
         return "the last 7 months";
     }, [weeks]);
 
-    // Circular Curvy Green Shader mapping
+    // Circular Curvy Warm Practice Shader mapping
     const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
         switch (level) {
             case 4:
-                return "bg-[#39d353] border-[#72ff8f] shadow-[0_0_9px_rgba(57,211,83,0.85)]";
+                return "bg-[#f97316] border-[#fdba74] shadow-[0_0_9px_rgba(249,115,22,0.85)]";
             case 3:
-                return "bg-[#26a641] border-[#3ee667] shadow-[0_0_7px_rgba(38,166,65,0.7)]";
+                return "bg-[#ea580c] border-[#fb923c] shadow-[0_0_7px_rgba(234,88,12,0.7)]";
             case 2:
-                return "bg-[#1a8c42] border-[#34d468] shadow-[0_0_5px_rgba(26,140,66,0.5)]";
+                return "bg-[#c2410c] border-[#f97316] shadow-[0_0_5px_rgba(194,65,12,0.5)]";
             case 1:
-                return "bg-[#0e5c30] border-[#20964c]/80 shadow-[0_0_4px_rgba(14,92,48,0.4)]";
+                return "bg-[#7c2d12] border-[#c2410c]/80 shadow-[0_0_4px_rgba(124,45,18,0.4)]";
             case 0:
             default:
                 return "bg-[#141b25] border-white/[0.08]";
@@ -238,7 +238,7 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = Rea
                         Submissions from {timePeriodStr}
                     </span>
                     <span className="text-neutral-600 font-bold">•</span>
-                    <span className="text-sm font-mono font-bold text-emerald-400 tracking-wide">
+                    <span className="text-sm font-mono font-bold text-amber-400 tracking-wide">
                         {totalLifetimeSubmissions.toLocaleString()} Total Lifetime Submissions
                     </span>
                 </div>
@@ -274,7 +274,7 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = Rea
                     Submissions from {timePeriodStr}
                 </span>
                 <span className="text-neutral-600 font-bold">•</span>
-                <span className="text-[11px] font-mono font-bold text-emerald-400 tracking-wide">
+                <span className="text-[11px] font-mono font-bold text-amber-400 tracking-wide">
                     {totalLifetimeSubmissions.toLocaleString()} Total Lifetime Submissions
                 </span>
             </div>

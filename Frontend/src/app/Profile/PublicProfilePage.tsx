@@ -1829,7 +1829,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                         }`}
                                 >
-                                    <Code2 className="w-3.5 h-3.5 text-[#a2ff86] stroke-[2.5]" />
+                                    <Code2 className="w-3.5 h-3.5 text-[#FFE566] stroke-[2.5]" />
                                     <span>Practice</span>
                                 </motion.button>
 
@@ -1843,7 +1843,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                         }`}
                                 >
-                                    <GitBranch className="w-3.5 h-3.5 text-[#FFE566] stroke-[2.5]" />
+                                    <GitBranch className="w-3.5 h-3.5 text-[#a2ff86] stroke-[2.5]" />
                                     <span>Development</span>
                                 </motion.button>
 

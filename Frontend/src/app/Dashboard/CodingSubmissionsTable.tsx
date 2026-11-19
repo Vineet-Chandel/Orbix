@@ -22,6 +22,7 @@ import {
     type DaySubmissionCell,
     type PlatformSubmissionStat,
 } from "../../utils/submissionsAggregator";
+import { InteractiveActivityHeatmap } from "../../components/charts/InteractiveActivityHeatmap";
 import { isDemoProfileUsername, demoUnifiedSubmissions } from "../../data/demoProfileData";
 
 interface CodingSubmissionsTableProps {
@@ -361,22 +362,61 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
         };
     }, [remoteData, clientAgg, platformBreakdown, selectedPortal, weeksCount]);
 
-    // Circular Curvy Green Accent Shader mapping
-    const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
-        switch (level) {
-            case 4:
-                return "bg-[#216e39] border-[#17562a] shadow-2xs";
-            case 3:
-                return "bg-[#30a14e] border-[#248941]";
-            case 2:
-                return "bg-[#40c463] border-[#33b255]";
-            case 1:
-                return "bg-[#9be9a8] border-[#7cd88c]";
-            case 0:
-            default:
-                return "bg-neutral-100 border-neutral-200/90 hover:border-emerald-300";
-        }
+    // Neo-Brutalist Practice Shader mapping - visually distinct from Development (GitHub Green)
+    const PRACTICE_PALETTES = {
+        default: {
+            colors: ["#FAF6EE", "#fed7aa", "#fb923c", "#ea580c", "#c2410c"],
+            4: "bg-[#c2410c] border-black shadow-[1px_1px_0px_#000]",
+            3: "bg-[#ea580c] border-black shadow-[1px_1px_0px_#000]",
+            2: "bg-[#fb923c] border-black",
+            1: "bg-[#fed7aa] border-black",
+            0: "bg-[#FAF6EE] border-black/25 hover:border-black",
+            legend: [
+                "bg-[#FAF6EE] border border-black/30",
+                "bg-[#fed7aa] border border-black",
+                "bg-[#fb923c] border border-black",
+                "bg-[#ea580c] border border-black shadow-xs",
+                "bg-[#c2410c] border border-black shadow-xs",
+            ],
+        },
+        codeforces: {
+            colors: ["#FAF6EE", "#bfdbfe", "#60a5fa", "#2563eb", "#1e40af"],
+            4: "bg-[#1e40af] border-black shadow-[1px_1px_0px_#000]",
+            3: "bg-[#2563eb] border-black shadow-[1px_1px_0px_#000]",
+            2: "bg-[#60a5fa] border-black",
+            1: "bg-[#bfdbfe] border-black",
+            0: "bg-[#FAF6EE] border-black/25 hover:border-black",
+            legend: [
+                "bg-[#FAF6EE] border border-black/30",
+                "bg-[#bfdbfe] border border-black",
+                "bg-[#60a5fa] border border-black",
+                "bg-[#2563eb] border border-black shadow-xs",
+                "bg-[#1e40af] border border-black shadow-xs",
+            ],
+        },
+        codechef: {
+            colors: ["#FAF6EE", "#fde68a", "#f59e0b", "#d97706", "#78350f"],
+            4: "bg-[#78350f] border-black shadow-[1px_1px_0px_#000]",
+            3: "bg-[#d97706] border-black shadow-[1px_1px_0px_#000]",
+            2: "bg-[#f59e0b] border-black",
+            1: "bg-[#fde68a] border-black",
+            0: "bg-[#FAF6EE] border-black/25 hover:border-black",
+            legend: [
+                "bg-[#FAF6EE] border border-black/30",
+                "bg-[#fde68a] border border-black",
+                "bg-[#f59e0b] border border-black",
+                "bg-[#d97706] border border-black shadow-xs",
+                "bg-[#78350f] border border-black shadow-xs",
+            ],
+        },
     };
+
+    const activePalette = useMemo(() => {
+        const portal = (selectedPortal || "").toLowerCase();
+        if (portal === "codeforces") return PRACTICE_PALETTES.codeforces;
+        if (portal === "codechef") return PRACTICE_PALETTES.codechef;
+        return PRACTICE_PALETTES.default;
+    }, [selectedPortal]);
 
     const hasConnectedPlatforms = useMemo(() => {
         return activePortalsMap.size > 0;
@@ -406,7 +446,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
                         <Link
                             to="/onboarding"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-black hover:bg-neutral-900 text-[#FFE566] font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                         >
                             <span>Connect Coding Platforms</span>
                             <ArrowRight className="w-4 h-4" />
@@ -499,7 +539,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     onClick={() => setSelectedPortal("all")}
                     className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
                         selectedPortal === "all"
-                            ? "bg-black text-[#a2ff86]"
+                            ? "bg-black text-[#FFE566]"
                             : "bg-[#FAF6EE] hover:bg-neutral-200 text-black"
                     }`}
                 >
@@ -520,7 +560,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                             aria-label={plat.portal}
                             className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
                                 isSelected
-                                    ? "bg-black text-[#a2ff86]"
+                                    ? "bg-black text-[#FFE566]"
                                     : "bg-[#FAF6EE] hover:bg-neutral-200 text-black"
                             }`}
                         >
@@ -529,7 +569,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                             </div>
                             <span className="portal-tab-label hidden sm:inline capitalize">{plat.portal}</span>
                             <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded border border-black ${
-                                isSelected ? "bg-[#a2ff86] text-black" : "bg-white text-black"
+                                isSelected ? "bg-[#FFE566] text-black" : "bg-white text-black"
                             }`}>
                                 {Math.max(plat.submissions || 0, plat.solved || 0)}
                             </span>
@@ -538,67 +578,20 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                 })}
             </div>
 
-            {/* Heatmap Area: Uncovered, Circular Curvy Monochrome Dots with Spaces */}
-            <div
-                style={{ WebkitOverflowScrolling: "touch" }}
-                className="py-4 relative z-10 overflow-x-auto scrollbar-none"
-            >
-                <div className="min-w-[700px] flex flex-col space-y-2">
-                    {/* Month Labels Row aligned across columns */}
-                    <div
-                        className="grid text-xs font-mono text-black font-black select-none pl-7 pr-1"
-                        style={{ gridTemplateColumns: `repeat(${monthNames.length}, minmax(0, 1fr))` }}
-                    >
-                        {monthNames.map((m, idx) => (
-                            <span key={idx} className="block text-left">
-                                {m}
-                            </span>
-                        ))}
-                    </div>
-
-                    {/* Day Labels Column + Week Columns Grid */}
-                    <div className="flex items-center gap-2.5">
-                        {/* Day labels (Sun through Sat, showing Mon, Wed, Fri aligned with square rows) */}
-                        <div className="flex flex-col gap-1.5 text-[11px] font-mono text-neutral-600 font-bold select-none w-5 flex-shrink-0 text-right">
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                            <div className="aspect-square flex items-center justify-end leading-none">Mon</div>
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                            <div className="aspect-square flex items-center justify-end leading-none">Wed</div>
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                            <div className="aspect-square flex items-center justify-end leading-none">Fri</div>
-                            <div className="aspect-square flex items-center justify-end leading-none" />
-                        </div>
-
-                        {/* Weekly Columns Grid with Circular Curvy Dots */}
-                        <div className="flex-1 flex items-center justify-between gap-1.5">
-                            {weeks.map((week, wIdx) => (
-                                <div key={wIdx} className="flex flex-col gap-1.5 flex-1">
-                                    {week.map((day, dIdx) => (
-                                        <div
-                                            key={dIdx}
-                                            onMouseEnter={() => setHoveredCell(day)}
-                                            onMouseLeave={() => setHoveredCell(null)}
-                                            title={`${day.count} submissions on ${day.displayDate}${
-                                                day.platforms.length > 0 ? ` (${day.platforms.join(", ")})` : ""
-                                            }`}
-                                            className={`w-full aspect-square rounded-full border transition-all duration-200 hover:scale-130 cursor-pointer ${getCellColor(
-                                                day.level
-                                            )}`}
-                                        />
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <InteractiveActivityHeatmap
+                weeks={weeks}
+                monthNames={monthNames}
+                colors={activePalette.colors}
+                activity="submissions"
+                onHoverDay={setHoveredCell}
+            />
 
             {/* Hover Tooltip Info Banner if cell is hovered */}
             <div className="min-h-[32px] flex items-center text-xs sm:text-sm font-mono text-neutral-800 pt-1">
                 {hoveredCell ? (
                     <div className="inline-flex items-center gap-2 bg-[#FAF6EE] border-2 border-black rounded-xl px-3 py-1 shadow-[2px_2px_0px_#000]">
                         <span className="font-black text-black">{hoveredCell.displayDate}:</span>
-                        <span className="text-black font-black bg-[#a2ff86] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
+                        <span className="text-black font-black bg-[#FFE566] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
                             {hoveredCell.count === 0
                                 ? "No submissions"
                                 : `${hoveredCell.count} ${hoveredCell.count === 1 ? "submission" : "submissions"}`}
@@ -610,7 +603,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                         )}
                     </div>
                 ) : (
-                    <span className="text-neutral-600 text-xs font-bold font-sans">Hover over any circular dot to view daily submission breakdown.</span>
+                    <span className="text-neutral-600 text-xs font-bold font-sans">Hover or use arrow keys for daily details. Tap the chart to change its view.</span>
                 )}
             </div>
 
@@ -621,12 +614,12 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                         <Flame className={`w-4 h-4 ${streakMetrics.currentStreak > 0 ? "text-orange-500 fill-orange-400" : "text-neutral-400"}`} />
                         <span>{streakMetrics.currentStreak} day streak</span>
                         {streakMetrics.isActiveToday ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-400 font-bold ml-0.5 select-none">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="inline-flex items-center gap-1 text-[10px] text-orange-950 bg-orange-100 px-1.5 py-0.5 rounded border border-orange-400 font-bold ml-0.5 select-none">
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
                                 Active today
                             </span>
                         ) : streakMetrics.canExtendToday ? (
-                            <span className="inline-flex items-center text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-400 font-bold ml-0.5 select-none">
+                            <span className="inline-flex items-center text-[10px] text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-400 font-bold ml-0.5 select-none">
                                 Extend today
                             </span>
                         ) : null}
@@ -636,7 +629,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                         <span>{streakMetrics.maxStreak} day best streak</span>
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] text-xs font-black text-black">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <CheckCircle2 className="w-4 h-4 text-orange-600" />
                         <span>
                             {selectedPortal === "all"
                                 ? `${connectedPlatformsList.length} platform${connectedPlatformsList.length === 1 ? "" : "s"} synced`
@@ -649,11 +642,9 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                 <div className="flex items-center gap-2 flex-shrink-0 bg-[#FAF6EE] border-2 border-black rounded-lg px-3 py-1 shadow-[2px_2px_0px_#000]">
                     <span className="text-[10px] uppercase font-black text-black tracking-wider">Less</span>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-neutral-100 border border-neutral-400" />
-                        <span className="w-3 h-3 rounded-full bg-[#9be9a8] border border-[#7cd88c]" />
-                        <span className="w-3 h-3 rounded-full bg-[#40c463] border border-[#33b255]" />
-                        <span className="w-3 h-3 rounded-full bg-[#30a14e] border border-[#248941]" />
-                        <span className="w-3 h-3 rounded-full bg-[#216e39] border border-[#17562a] shadow-xs" />
+                        {activePalette.legend.map((dotClass, idx) => (
+                            <span key={idx} className={`w-3 h-3 rounded-full ${dotClass}`} />
+                        ))}
                     </div>
                     <span className="text-[10px] uppercase font-black text-black tracking-wider">More</span>
                 </div>

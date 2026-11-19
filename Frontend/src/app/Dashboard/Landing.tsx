@@ -276,7 +276,7 @@ export default function Dashboard() {
                                             onClick={() => setActiveDashboardField("practice")}
                                             className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-black transition-all cursor-pointer ${
                                                 activeDashboardField === "practice"
-                                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-black text-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]"
                                                     : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                             }`}
                                         >
