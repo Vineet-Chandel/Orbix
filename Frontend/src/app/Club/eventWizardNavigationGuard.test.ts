@@ -10,7 +10,7 @@ import {
     type WizardNavigationState,
     type FormValidationState,
 } from "./eventWizardNavigationGuard.ts";
-import type { ConfiguredStage } from "./TimelineBuilder/types";
+import type { ConfiguredStage } from "./TimelineBuilder/types.ts";
 
 const createValidForm = (): FormValidationState => ({
     title: "Orbix Hackathon 2026",

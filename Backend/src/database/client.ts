@@ -16,11 +16,11 @@ if (fs.existsSync(backendEnvPath)) {
 }
 
 if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
-  try {
-    process.loadEnvFile();
-  } catch {}
+    try {
+        process.loadEnvFile();
+    } catch { }
 }
-import pg from "pg";
+import pg from "../../node_modules/@types/pg/index.js";
 import { performance } from "node:perf_hooks";
 
 const { Pool } = pg;
@@ -1179,7 +1179,7 @@ export const testDatabaseConnection = async () => {
                     ADD COLUMN IF NOT EXISTS team_role VARCHAR(20) DEFAULT NULL;
             END $$;
         `);
-        
+
         // College Verification (Migration 031)
         await pool.query(`
             CREATE TABLE IF NOT EXISTS public.college_verifications (

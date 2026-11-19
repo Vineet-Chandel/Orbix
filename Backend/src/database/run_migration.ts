@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-import pg from "pg";
+import pg from "../../node_modules/@types/pg/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -529,7 +529,7 @@ export async function runMigrations(options: MigrationOptions = {}): Promise<Mig
                 } catch (adoptErr: any) {
                     try {
                         await adoptClient.query("ROLLBACK;");
-                    } catch {}
+                    } catch { }
                     throw adoptErr;
                 } finally {
                     adoptClient.release();
@@ -537,7 +537,7 @@ export async function runMigrations(options: MigrationOptions = {}): Promise<Mig
             } finally {
                 try {
                     await lockClient.query(`SELECT pg_advisory_unlock(hashtext('orbix_schema_migrations_lock'));`);
-                } catch {}
+                } catch { }
                 lockClient.release();
             }
 
@@ -584,7 +584,7 @@ export async function runMigrations(options: MigrationOptions = {}): Promise<Mig
                 } catch (fileErr: any) {
                     try {
                         await client.query("ROLLBACK;");
-                    } catch {}
+                    } catch { }
                     const safeMsg = sanitizeErrorMessage(fileErr.message);
                     console.error(`❌ Migration failed in ${file}: ${safeMsg}`);
                     throw new Error(`Migration ${file} failed: ${safeMsg}`);
@@ -597,7 +597,7 @@ export async function runMigrations(options: MigrationOptions = {}): Promise<Mig
         } finally {
             try {
                 await lockClient.query(`SELECT pg_advisory_unlock(hashtext('orbix_schema_migrations_lock'));`);
-            } catch {}
+            } catch { }
             lockClient.release();
         }
 
@@ -606,7 +606,7 @@ export async function runMigrations(options: MigrationOptions = {}): Promise<Mig
         if (poolCreatedInternally && activePool) {
             try {
                 await activePool.end();
-            } catch {}
+            } catch { }
         }
     }
 }
