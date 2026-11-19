@@ -51,7 +51,7 @@ interface ApplicationsRosterTableProps {
 }
 
 export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = ({
-    applications,
+    applications: rawApplications,
     dynamicQuestions,
     sort,
     onToggleSort,
@@ -66,6 +66,17 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
     onBatchStatusChange,
 }) => {
     const toast = useToast();
+
+    // Defense-in-depth: Deduplicate applications by teamId so each squad only has one canonical row
+    const applications = useMemo(() => {
+        const seenTeams = new Set<string>();
+        return rawApplications.filter((app) => {
+            if (!app.teamId) return true;
+            if (seenTeams.has(app.teamId)) return false;
+            seenTeams.add(app.teamId);
+            return true;
+        });
+    }, [rawApplications]);
 
     // Detail Inspection Modal State
     const [selectedApplicant, setSelectedApplicant] = useState<ClubEventApplicantRow | null>(null);

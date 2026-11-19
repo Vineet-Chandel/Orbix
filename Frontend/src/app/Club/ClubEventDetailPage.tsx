@@ -204,6 +204,16 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         setLoadingApps(true);
         try {
             const res = await fetchClubEventApplications(eventId);
+            if (res && Array.isArray(res.applications)) {
+                // Deduplicate applications by teamId
+                const seenTeams = new Set<string>();
+                res.applications = res.applications.filter((a) => {
+                    if (!a.teamId) return true;
+                    if (seenTeams.has(a.teamId)) return false;
+                    seenTeams.add(a.teamId);
+                    return true;
+                });
+            }
             setAppsData(res);
         } catch (err: any) {
             console.error("Failed to fetch applications:", err);

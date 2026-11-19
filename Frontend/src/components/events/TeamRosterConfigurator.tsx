@@ -60,6 +60,8 @@ export interface TeamRosterConfiguratorProps {
     onMemberRemoved?: (userId: string) => Promise<void>;
     isLocked?: boolean;
     lockReason?: string | null;
+    scope?: string;
+    hostCollegeName?: string | null;
 }
 
 export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
@@ -76,6 +78,8 @@ export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
     onMemberRemoved,
     isLocked = false,
     lockReason,
+    scope = "CAMPUS",
+    hostCollegeName,
 }) => {
     const toast = useToast();
     const [searchQuery, setSearchQuery] = useState("");
@@ -129,6 +133,12 @@ export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
     const handleAddUser = async (u: SearchUserResult) => {
         if (hasReachedMax) {
             toast.error(`Team is full! Maximum allowed team size is ${maxTeamSize} members.`);
+            return;
+        }
+
+        // Campus Restriction Check: If student is from a different college, block immediately
+        if (u.isCollegeMismatch) {
+            toast.error(u.mismatchReason || `Campus Exclusive: You can only invite developers enrolled at ${hostCollegeName || "your college"}.`);
             return;
         }
 
@@ -234,6 +244,22 @@ export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
                 </div>
             )}
 
+            {/* Campus Exclusive Event Banner */}
+            {scope && scope !== "PAN_INDIA" && (
+                <div className="p-3 rounded-xl bg-amber-50 border-2 border-black text-xs font-bold text-black flex items-center gap-2 shadow-[2px_2px_0px_#000]">
+                    <Building2 className="w-4 h-4 text-amber-700 shrink-0" />
+                    <div className="min-w-0">
+                        <span className="font-black uppercase tracking-wider text-[10px] text-amber-800 block">
+                            Campus-Exclusive Event
+                        </span>
+                        <span className="text-[11px] text-neutral-800">
+                            Invitations are strictly restricted to developers enrolled at{" "}
+                            <strong className="font-black">{hostCollegeName || currentUser.collegeName || "the host institution"}</strong>.
+                        </span>
+                    </div>
+                </div>
+            )}
+
             {/* Member Search & Invitation Input (Active when not locked and not at max capacity) */}
             {!isLocked && (
                 <div className="space-y-1.5">
@@ -279,7 +305,9 @@ export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
                                 const isSelf = u.id === currentUser.id || u.username.toLowerCase() === currentUser.username.toLowerCase();
                                 const isAlreadyStaged = stagedMembers.some((m) => m.id === u.id || m.username.toLowerCase() === u.username.toLowerCase());
                                 const isAlreadyMember = existingMembers.some((m) => m.userId === u.id || m.username.toLowerCase() === u.username.toLowerCase());
-                                const isDisabled = isSelf || isAlreadyStaged || isAlreadyMember || u.isMember || u.hasPendingInvite;
+                                const isCollegeMismatch = Boolean(u.isCollegeMismatch);
+                                const isAlreadyRegistered = Boolean(u.isAlreadyInTeam || u.isMember);
+                                const isDisabled = isSelf || isAlreadyStaged || isAlreadyMember || isAlreadyRegistered || u.hasPendingInvite || isCollegeMismatch;
 
                                 return (
                                     <div
@@ -304,13 +332,18 @@ export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
                                                 </div>
                                                 <div className="text-[11px] font-mono text-neutral-600 truncate flex items-center gap-1.5">
                                                     <span>@{u.username}</span>
-                                                    {(u as any).collegeName && (
+                                                    {u.collegeName && (
                                                         <span className="text-[10px] font-sans text-neutral-500 truncate flex items-center gap-0.5">
                                                             • <Building2 className="w-2.5 h-2.5 inline shrink-0" />
-                                                            <span className="truncate">{(u as any).collegeName}</span>
+                                                            <span className="truncate">{u.collegeName}</span>
                                                         </span>
                                                     )}
                                                 </div>
+                                                {isCollegeMismatch && (
+                                                    <div className="text-[9px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1 mt-0.5">
+                                                        <span>⚠️ Ineligible (Different College)</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -328,10 +361,12 @@ export const TeamRosterConfigurator: React.FC<TeamRosterConfiguratorProps> = ({
                                             <span>
                                                 {isSelf
                                                     ? "You (Leader)"
+                                                    : isCollegeMismatch
+                                                    ? "Different College"
                                                     : isAlreadyStaged || isAlreadyMember
                                                     ? "Added"
-                                                    : u.isMember
-                                                    ? "In Team"
+                                                    : isAlreadyRegistered
+                                                    ? "Already in Team"
                                                     : u.hasPendingInvite
                                                     ? "Invited"
                                                     : "Add to Team"}

@@ -1847,6 +1847,8 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 teamId="new"
                                 minTeamSize={event?.minTeamSize || 2}
                                 maxTeamSize={event?.maxTeamSize || 5}
+                                scope={event?.scope || "CAMPUS"}
+                                hostCollegeName={effectiveProfile.college || event?.clubName || "Host Campus"}
                                 currentUser={{
                                     id: user?.id || "current_user",
                                     username: user?.username || "leader",

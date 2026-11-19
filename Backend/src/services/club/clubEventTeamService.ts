@@ -81,9 +81,14 @@ export class ClubEventTeamService {
                     COALESCE(e.is_team_event, false) AS "isTeamEvent",
                     COALESCE(e.min_team_size, 2) AS "minTeamSize",
                     COALESCE(e.max_team_size, 4) AS "maxTeamSize",
-                    c.name AS "clubName"
+                    COALESCE(e.scope, 'CAMPUS') AS "scope",
+                    COALESCE(e.eligibility, 'college_only') AS "eligibility",
+                    c.name AS "clubName",
+                    c.college_id AS "clubCollegeId",
+                    COALESCE(inst.official_name, c.college_name, 'Host Campus') AS "collegeName"
              FROM club_events e
              JOIN verified_clubs c ON c.id = e.club_id
+             LEFT JOIN institutions inst ON inst.id = c.college_id
              WHERE e.id = $1 LIMIT 1;`,
             [eventId]
         );
@@ -102,6 +107,13 @@ export class ClubEventTeamService {
         }
 
         return event;
+    }
+
+    /**
+     * Evaluates whether an event is restricted to students of the organizing college
+     */
+    private static isCampusRestricted(event: any): boolean {
+        return event.scope !== "PAN_INDIA" && (event.scope === "CAMPUS" || event.eligibility === "college_only");
     }
 
     /**
@@ -212,6 +224,21 @@ export class ClubEventTeamService {
             throw err;
         }
 
+        // Campus Eligibility Check (Exclusively enforced for CAMPUS-scoped events)
+        const isCampusRestricted = this.isCampusRestricted(event);
+        if (isCampusRestricted && event.clubCollegeId) {
+            const leaderUserRes = await query(`SELECT college_id FROM users WHERE id = $1 LIMIT 1;`, [leaderUserId]);
+            const leaderCollegeId = leaderUserRes.rows[0]?.college_id;
+            if (!leaderCollegeId || leaderCollegeId !== event.clubCollegeId) {
+                const err: any = new Error(
+                    `Campus Restricted: You cannot create a squad for this event because it is exclusively open to students enrolled at ${event.collegeName}.`
+                );
+                err.statusCode = 403;
+                err.code = "CAMPUS_COLLEGE_MISMATCH";
+                throw err;
+            }
+        }
+
         // Check if user has previously withdrawn from this event
         const withdrawnCheckLeader = await query(
             `SELECT id FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 AND status = 'cancelled' LIMIT 1;`,
@@ -233,6 +260,20 @@ export class ClubEventTeamService {
         );
         if (existingMember.rows[0]) {
             const err: any = new Error(`You are already a member of team "${existingMember.rows[0].teamName}" for this event. Leave your current team before creating a new one.`);
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Ensure one team only: Check if already registered in another team or active registration
+        const existingActiveReg = await query(
+            `SELECT r.id, r.team_id, t.name AS "teamName"
+             FROM club_event_registrations r
+             LEFT JOIN club_event_teams t ON t.id = r.team_id
+             WHERE r.event_id = $1 AND r.user_id = $2 AND r.status NOT IN ('cancelled', 'rejected') LIMIT 1;`,
+            [eventId, leaderUserId]
+        );
+        if (existingActiveReg.rows[0] && existingActiveReg.rows[0].team_id) {
+            const err: any = new Error(`You are already participating in this event in team "${existingActiveReg.rows[0].teamName}". An Orbix member can only register with one team.`);
             err.statusCode = 400;
             throw err;
         }
@@ -355,6 +396,21 @@ export class ClubEventTeamService {
 
         const team = teamRes.rows[0];
 
+        // Campus Eligibility Check (Exclusively enforced for CAMPUS-scoped events)
+        const isCampusRestricted = this.isCampusRestricted(event);
+        if (isCampusRestricted && event.clubCollegeId) {
+            const userCollegeRes = await query(`SELECT college_id FROM users WHERE id = $1 LIMIT 1;`, [userId]);
+            const userCollegeId = userCollegeRes.rows[0]?.college_id;
+            if (!userCollegeId || userCollegeId !== event.clubCollegeId) {
+                const err: any = new Error(
+                    `Campus Restricted: You cannot join team "${team.name}" because this event is exclusively open to students enrolled at ${event.collegeName}.`
+                );
+                err.statusCode = 403;
+                err.code = "CAMPUS_COLLEGE_MISMATCH";
+                throw err;
+            }
+        }
+
         // Capacity check
         if (team.membersCount >= event.maxTeamSize) {
             const err: any = new Error(`Team "${team.name}" has reached its maximum size of ${event.maxTeamSize} members.`);
@@ -392,6 +448,22 @@ export class ClubEventTeamService {
             throw err;
         }
 
+        // Ensure one team only: Check if already registered in another team or active registration
+        const existingActiveReg = await query(
+            `SELECT r.id, r.team_id, t.name AS "teamName"
+             FROM club_event_registrations r
+             LEFT JOIN club_event_teams t ON t.id = r.team_id
+             WHERE r.event_id = $1 AND r.user_id = $2 AND r.status NOT IN ('cancelled', 'rejected') LIMIT 1;`,
+            [eventId, userId]
+        );
+        if (existingActiveReg.rows[0] && existingActiveReg.rows[0].team_id && existingActiveReg.rows[0].team_id !== team.id) {
+            const err: any = new Error(
+                `You are already registered for this event in team "${existingActiveReg.rows[0].teamName}". An Orbix developer can only register for an event with one team.`
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+
         // Add user as member
         await query(
             `INSERT INTO club_event_team_members (team_id, event_id, user_id, role, joined_at)
@@ -409,7 +481,15 @@ export class ClubEventTeamService {
 
         // Resolve user & leader for notifications and registration record
         const [memberUserRes, leaderUserRes, leaderRegRes] = await Promise.all([
-            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
+            query(
+                `SELECT u.email, u.username, u.firstname, u.lastname, u.roll_number, u.department, u.year_of_study, u.phone,
+                        u.college_id AS "collegeId", inst.official_name AS "institutionName", inst.city AS "institutionCity",
+                        inst.state AS "institutionState", COALESCE(inst.verification_status, 'verified') AS "institutionVerificationStatus"
+                 FROM users u
+                 LEFT JOIN institutions inst ON inst.id = u.college_id
+                 WHERE u.id = $1 LIMIT 1;`,
+                [userId]
+            ),
             query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [team.leaderId]),
             query(`SELECT status, club_id, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`, [eventId, team.leaderId]),
         ]);
@@ -432,16 +512,59 @@ export class ClubEventTeamService {
         if (regCheck.rows[0]) {
             await query(
                 `UPDATE club_event_registrations 
-                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3), updated_at = NOW()
+                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3),
+                     institution_id = COALESCE(institution_id, $5),
+                     institution_name = COALESCE(institution_name, $6),
+                     institution_city = COALESCE(institution_city, $7),
+                     institution_state = COALESCE(institution_state, $8),
+                     department = COALESCE(department, $9),
+                     year_of_study = COALESCE(year_of_study, $10),
+                     roll_number = COALESCE(roll_number, $11),
+                     phone_number = COALESCE(phone_number, $12),
+                     updated_at = NOW()
                  WHERE id = $4;`,
-                [team.id, targetStatus, memberTicketCode, regCheck.rows[0].id]
+                [
+                    team.id,
+                    targetStatus,
+                    memberTicketCode,
+                    regCheck.rows[0].id,
+                    memberUser?.collegeId || null,
+                    memberUser?.institutionName || null,
+                    memberUser?.institutionCity || null,
+                    memberUser?.institutionState || null,
+                    memberUser?.department || null,
+                    memberUser?.year_of_study || null,
+                    memberUser?.roll_number || null,
+                    memberUser?.phone || null,
+                ]
             );
         } else {
             await query(
                 `INSERT INTO club_event_registrations (
-                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code, registered_at, created_at, updated_at
-                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, NOW(), NOW(), NOW());`,
-                [eventId, targetClubId, userId, targetStatus, memberName, memberUser?.email || "developer@orbix.in", team.id, memberTicketCode]
+                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code,
+                    institution_id, institution_name, institution_city, institution_state, institution_verification_status,
+                    department, year_of_study, roll_number, phone_number,
+                    registered_at, created_at, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW(), NOW());`,
+                [
+                    eventId,
+                    targetClubId,
+                    userId,
+                    targetStatus,
+                    memberName,
+                    memberUser?.email || "developer@orbix.in",
+                    team.id,
+                    memberTicketCode,
+                    memberUser?.collegeId || null,
+                    memberUser?.institutionName || null,
+                    memberUser?.institutionCity || null,
+                    memberUser?.institutionState || null,
+                    memberUser?.institutionVerificationStatus || "unverified",
+                    memberUser?.department || null,
+                    memberUser?.year_of_study || null,
+                    memberUser?.roll_number || null,
+                    memberUser?.phone || null,
+                ]
             );
         }
 
@@ -496,6 +619,9 @@ export class ClubEventTeamService {
         const clean = (searchQuery || "").trim().replace(/^@/, "");
         if (!clean || clean.length < 2) return [];
 
+        const event = await this.getTeamEvent(eventId);
+        const isCampusRestricted = this.isCampusRestricted(event);
+
         const safeTeamId = (teamId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teamId))
             ? teamId
             : '00000000-0000-0000-0000-000000000000';
@@ -503,11 +629,17 @@ export class ClubEventTeamService {
         const res = await query(
             `SELECT u.id, u.username, u.firstname AS "firstName", u.lastname AS "lastName",
                     COALESCE(u.avatar_url, '') AS "avatarUrl", u.email,
+                    u.college_id AS "collegeId",
                     COALESCE(inst.official_name, '') AS "collegeName",
                     EXISTS (
                         SELECT 1 FROM club_event_team_members tm 
                         WHERE tm.event_id = $1 AND tm.user_id = u.id
                     ) AS "isAlreadyInTeam",
+                    EXISTS (
+                        SELECT 1 FROM club_event_registrations r
+                        WHERE r.event_id = $1 AND r.user_id = u.id AND r.status NOT IN ('cancelled', 'rejected')
+                          AND ($2 = '00000000-0000-0000-0000-000000000000' OR r.team_id IS DISTINCT FROM $2::uuid)
+                    ) AS "isAlreadyRegistered",
                     EXISTS (
                         SELECT 1 FROM club_event_team_invitations ti 
                         WHERE ti.team_id = $2 AND ti.invitee_user_id = u.id AND ti.status = 'pending'
@@ -522,26 +654,60 @@ export class ClubEventTeamService {
                  OR LOWER(u.lastname) LIKE LOWER($4)
                )
              ORDER BY 
+               CASE WHEN $7::boolean = true AND u.college_id = $8::uuid THEN 0
+                    WHEN $7::boolean = true THEN 1
+                    ELSE 0
+               END,
                CASE WHEN LOWER(u.username) = LOWER($5) THEN 0
                     WHEN LOWER(u.username) LIKE LOWER($6) THEN 1
                     ELSE 2 
                END,
                u.username ASC
              LIMIT 15;`,
-            [eventId, safeTeamId, currentUserId, `%${clean}%`, clean, `${clean}%`]
+            [
+                eventId,
+                safeTeamId,
+                currentUserId,
+                `%${clean}%`,
+                clean,
+                `${clean}%`,
+                isCampusRestricted,
+                event.clubCollegeId || '00000000-0000-0000-0000-000000000000'
+            ]
         );
 
-        return res.rows.map((row) => ({
-            id: row.id,
-            username: row.username,
-            name: `${row.firstName || ""} ${row.lastName || ""}`.trim() || row.username,
-            avatarUrl: row.avatarUrl || null,
-            email: row.email,
-            collegeName: row.collegeName || null,
-            isAlreadyInTeam: Boolean(row.isAlreadyInTeam),
-            hasPendingInvite: Boolean(row.hasPendingInvite),
-            publicProfileUrl: `/profile/${row.username}`,
-        }));
+        return res.rows.map((row) => {
+            const isCollegeMismatch = isCampusRestricted && Boolean(event.clubCollegeId && row.collegeId !== event.clubCollegeId);
+            const isAlreadyTaken = Boolean(row.isAlreadyInTeam || row.isAlreadyRegistered);
+            const isEligible = !isCollegeMismatch && !isAlreadyTaken;
+
+            let mismatchReason: string | null = null;
+            if (isCollegeMismatch) {
+                mismatchReason = `Campus Restricted: Only students from ${event.collegeName} can be invited.`;
+            } else if (row.isAlreadyInTeam) {
+                mismatchReason = `@${row.username} is already participating in another team for this event.`;
+            } else if (row.isAlreadyRegistered) {
+                mismatchReason = `@${row.username} is already registered for this event. One member can only register with one team.`;
+            }
+
+            return {
+                id: row.id,
+                username: row.username,
+                name: `${row.firstName || ""} ${row.lastName || ""}`.trim() || row.username,
+                avatarUrl: row.avatarUrl || null,
+                email: row.email,
+                collegeId: row.collegeId || null,
+                collegeName: row.collegeName || null,
+                isMember: Boolean(row.isAlreadyInTeam),
+                isAlreadyInTeam: isAlreadyTaken,
+                isAlreadyRegistered: Boolean(row.isAlreadyRegistered),
+                hasPendingInvite: Boolean(row.hasPendingInvite),
+                isCollegeMismatch,
+                isEligible,
+                mismatchReason,
+                publicProfileUrl: `/profile/${row.username}`,
+            };
+        });
     }
 
     /**
@@ -554,6 +720,7 @@ export class ClubEventTeamService {
         targetUsername: string
     ) {
         const event = await this.getTeamEvent(eventId);
+        const isCampusRestricted = this.isCampusRestricted(event);
         await this.assertRegistrationOpen(eventId, event.startsAt);
 
         // Verify caller is team leader
@@ -597,7 +764,11 @@ export class ClubEventTeamService {
         // Find target user
         const cleanUsername = targetUsername.trim().replace(/^@/, "");
         const targetRes = await query(
-            `SELECT id, username, firstname, lastname, email FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+            `SELECT u.id, u.username, u.firstname, u.lastname, u.email, u.college_id AS "collegeId",
+                    COALESCE(inst.official_name, '') AS "collegeName"
+             FROM users u
+             LEFT JOIN institutions inst ON inst.id = u.college_id
+             WHERE LOWER(u.username) = LOWER($1) LIMIT 1;`,
             [cleanUsername]
         );
 
@@ -615,6 +786,18 @@ export class ClubEventTeamService {
             throw err;
         }
 
+        // Campus Restriction Check: For CAMPUS events, invitee MUST be from organizing college
+        if (isCampusRestricted && event.clubCollegeId) {
+            if (!targetUser.collegeId || targetUser.collegeId !== event.clubCollegeId) {
+                const err: any = new Error(
+                    `Campus Restricted: @${cleanUsername} is enrolled at ${targetUser.collegeName || "another institution"}. For campus-only events organized by ${event.clubName}, you can only invite students enrolled at ${event.collegeName}.`
+                );
+                err.statusCode = 403;
+                err.code = "CAMPUS_COLLEGE_MISMATCH";
+                throw err;
+            }
+        }
+
         // Check if already in this event's teams
         const inTeamCheck = await query(
             `SELECT m.team_id, t.name AS "teamName"
@@ -625,7 +808,23 @@ export class ClubEventTeamService {
         );
 
         if (inTeamCheck.rows[0]) {
-            const err: any = new Error(`@${targetUser.username} is already a member of team "${inTeamCheck.rows[0].teamName}".`);
+            const err: any = new Error(`@${targetUser.username} is already participating in team "${inTeamCheck.rows[0].teamName}". An Orbix developer can only register for an event with one team.`);
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Ensure one team only: Check if already registered in another team or active registration
+        const targetRegCheck = await query(
+            `SELECT r.id, r.team_id, t.name AS "teamName"
+             FROM club_event_registrations r
+             LEFT JOIN club_event_teams t ON t.id = r.team_id
+             WHERE r.event_id = $1 AND r.user_id = $2 AND r.status NOT IN ('cancelled', 'rejected') LIMIT 1;`,
+            [eventId, targetUser.id]
+        );
+        if (targetRegCheck.rows[0] && targetRegCheck.rows[0].team_id && targetRegCheck.rows[0].team_id !== teamId) {
+            const err: any = new Error(
+                `@${targetUser.username} is already registered for this event in team "${targetRegCheck.rows[0].teamName}". An Orbix member can only register with one team.`
+            );
             err.statusCode = 400;
             throw err;
         }
@@ -771,10 +970,17 @@ export class ClubEventTeamService {
                     e.title AS "eventTitle", e.starts_at AS "startsAt",
                     COALESCE(e.max_team_size, 4) AS "maxTeamSize",
                     COALESCE(e.min_team_size, 2) AS "minTeamSize",
+                    COALESCE(e.scope, 'CAMPUS') AS "scope",
+                    COALESCE(e.eligibility, 'college_only') AS "eligibility",
+                    c.name AS "clubName",
+                    c.college_id AS "clubCollegeId",
+                    COALESCE(inst.official_name, c.college_name, 'Host Campus') AS "collegeName",
                     (SELECT COUNT(*)::int FROM club_event_team_members WHERE team_id = t.id) AS "membersCount"
              FROM club_event_team_invitations i
              JOIN club_event_teams t ON t.id = i.team_id
              JOIN club_events e ON e.id = i.event_id
+             JOIN verified_clubs c ON c.id = e.club_id
+             LEFT JOIN institutions inst ON inst.id = c.college_id
              WHERE i.id = $1 AND i.invitee_user_id = $2 LIMIT 1;`,
             [invitationId, userId]
         );
@@ -813,6 +1019,21 @@ export class ClubEventTeamService {
         }
 
         // Accept Flow
+        // Campus Restriction Check:
+        const isCampusRestricted = this.isCampusRestricted(inv);
+        if (isCampusRestricted && inv.clubCollegeId) {
+            const userCollegeRes = await query(`SELECT college_id FROM users WHERE id = $1 LIMIT 1;`, [userId]);
+            const userCollegeId = userCollegeRes.rows[0]?.college_id;
+            if (!userCollegeId || userCollegeId !== inv.clubCollegeId) {
+                const err: any = new Error(
+                    `Campus Restricted: You cannot join team "${inv.teamName}" because this event is exclusively open to students enrolled at ${inv.collegeName}.`
+                );
+                err.statusCode = 403;
+                err.code = "CAMPUS_COLLEGE_MISMATCH";
+                throw err;
+            }
+        }
+
         if (inv.membersCount >= inv.maxTeamSize) {
             const err: any = new Error(`Team "${inv.teamName}" has reached its maximum size of ${inv.maxTeamSize} members.`);
             err.statusCode = 400;
@@ -830,6 +1051,22 @@ export class ClubEventTeamService {
 
         if (inTeamCheck.rows[0]) {
             const err: any = new Error(`You are already in team "${inTeamCheck.rows[0].teamName}". Leave it before accepting this invitation.`);
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Ensure one team only: Check if already registered in another team or active registration
+        const existingActiveReg = await query(
+            `SELECT r.id, r.team_id, t.name AS "teamName"
+             FROM club_event_registrations r
+             LEFT JOIN club_event_teams t ON t.id = r.team_id
+             WHERE r.event_id = $1 AND r.user_id = $2 AND r.status NOT IN ('cancelled', 'rejected') LIMIT 1;`,
+            [inv.eventId, userId]
+        );
+        if (existingActiveReg.rows[0] && existingActiveReg.rows[0].team_id && existingActiveReg.rows[0].team_id !== inv.teamId) {
+            const err: any = new Error(
+                `You are already registered for this event in team "${existingActiveReg.rows[0].teamName}". An Orbix developer can only register for an event with one team.`
+            );
             err.statusCode = 400;
             throw err;
         }
@@ -862,7 +1099,15 @@ export class ClubEventTeamService {
 
         // Resolve user & leader for notifications and registration record
         const [memberUserRes, leaderUserRes, leaderRegRes] = await Promise.all([
-            query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [userId]),
+            query(
+                `SELECT u.email, u.username, u.firstname, u.lastname, u.roll_number, u.department, u.year_of_study, u.phone,
+                        u.college_id AS "collegeId", inst.official_name AS "institutionName", inst.city AS "institutionCity",
+                        inst.state AS "institutionState", COALESCE(inst.verification_status, 'verified') AS "institutionVerificationStatus"
+                 FROM users u
+                 LEFT JOIN institutions inst ON inst.id = u.college_id
+                 WHERE u.id = $1 LIMIT 1;`,
+                [userId]
+            ),
             query(`SELECT email, username, firstname, lastname FROM users WHERE id = $1 LIMIT 1;`, [inv.leaderId]),
             query(`SELECT status, club_id, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`, [inv.eventId, inv.leaderId]),
         ]);
@@ -885,16 +1130,59 @@ export class ClubEventTeamService {
         if (regCheck.rows[0]) {
             await query(
                 `UPDATE club_event_registrations 
-                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3), updated_at = NOW()
+                 SET team_id = $1, team_role = 'member', status = $2, ticket_code = COALESCE(ticket_code, $3),
+                     institution_id = COALESCE(institution_id, $5),
+                     institution_name = COALESCE(institution_name, $6),
+                     institution_city = COALESCE(institution_city, $7),
+                     institution_state = COALESCE(institution_state, $8),
+                     department = COALESCE(department, $9),
+                     year_of_study = COALESCE(year_of_study, $10),
+                     roll_number = COALESCE(roll_number, $11),
+                     phone_number = COALESCE(phone_number, $12),
+                     updated_at = NOW()
                  WHERE id = $4;`,
-                [inv.teamId, targetStatus, memberTicketCode, regCheck.rows[0].id]
+                [
+                    inv.teamId,
+                    targetStatus,
+                    memberTicketCode,
+                    regCheck.rows[0].id,
+                    memberUser?.collegeId || null,
+                    memberUser?.institutionName || null,
+                    memberUser?.institutionCity || null,
+                    memberUser?.institutionState || null,
+                    memberUser?.department || null,
+                    memberUser?.year_of_study || null,
+                    memberUser?.roll_number || null,
+                    memberUser?.phone || null,
+                ]
             );
         } else {
             await query(
                 `INSERT INTO club_event_registrations (
-                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code, registered_at, created_at, updated_at
-                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, NOW(), NOW(), NOW());`,
-                [inv.eventId, targetClubId, userId, targetStatus, memberName, memberUser?.email || "developer@orbix.in", inv.teamId, memberTicketCode]
+                    event_id, club_id, user_id, status, applicant_name, applicant_email, team_id, team_role, ticket_code,
+                    institution_id, institution_name, institution_city, institution_state, institution_verification_status,
+                    department, year_of_study, roll_number, phone_number,
+                    registered_at, created_at, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'member', $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW(), NOW());`,
+                [
+                    inv.eventId,
+                    targetClubId,
+                    userId,
+                    targetStatus,
+                    memberName,
+                    memberUser?.email || "developer@orbix.in",
+                    inv.teamId,
+                    memberTicketCode,
+                    memberUser?.collegeId || null,
+                    memberUser?.institutionName || null,
+                    memberUser?.institutionCity || null,
+                    memberUser?.institutionState || null,
+                    memberUser?.institutionVerificationStatus || "unverified",
+                    memberUser?.department || null,
+                    memberUser?.year_of_study || null,
+                    memberUser?.roll_number || null,
+                    memberUser?.phone || null,
+                ]
             );
         }
 

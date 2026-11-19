@@ -4214,7 +4214,22 @@ clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount
         }
 
         const applicantsRes = await query(
-            `SELECT
+            `WITH ranked_registrations AS (
+                SELECT r.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY COALESCE(r.team_id, r.id)
+                           ORDER BY 
+                               CASE WHEN r.team_role = 'leader' OR r.user_id = t.leader_id THEN 0
+                                    WHEN r.answers IS NOT NULL AND r.answers != '{}'::jsonb THEN 1
+                                    ELSE 2
+                               END,
+                               r.registered_at ASC
+                       ) AS rn
+                FROM club_event_registrations r
+                LEFT JOIN club_event_teams t ON t.id = r.team_id
+                WHERE r.event_id = $1 AND r.club_id = $2
+            )
+            SELECT
                 r.id,
                 r.user_id AS "userId",
                 COALESCE(r.applicant_name, TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS "applicantName",
@@ -4273,10 +4288,10 @@ clubRouter.get("/events/:eventId/applications", authenticate, requireClubAccount
                     'role', 'invitee',
                     'status', i.status
                 )) FROM club_event_team_invitations i JOIN users iu ON iu.id = i.invitee_user_id WHERE i.team_id = r.team_id AND i.status = 'pending') AS "teamPendingInvites"
-             FROM club_event_registrations r
+             FROM ranked_registrations r
              JOIN users u ON u.id = r.user_id
              LEFT JOIN club_event_teams t ON t.id = r.team_id
-             WHERE r.event_id = $1 AND r.club_id = $2
+             WHERE r.rn = 1
              ORDER BY r.registered_at DESC;`,
             [eventId, event.club_id]
         );
@@ -4398,13 +4413,34 @@ clubRouter.patch("/events/:eventId/applications/batch", authenticate, requireClu
                  review_notes = COALESCE($3, review_notes),
                  updated_at = NOW()
              WHERE id = ANY($4::uuid[]) AND event_id = $5::uuid
-             RETURNING id, user_id AS "userId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+             RETURNING id, user_id AS "userId", team_id AS "teamId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
                        department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
                        status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
             [status, userId, reviewNotes || null, eligibleIds, eventId]
         );
 
         const updatedRows = updateRes.rows;
+
+        // If any updated registrations belong to teams, synchronize all teammates and team status
+        const affectedTeamIds = Array.from(new Set(updatedRows.map((r: any) => r.teamId).filter(Boolean)));
+        if (affectedTeamIds.length > 0) {
+            await query(
+                `UPDATE club_event_registrations
+                 SET status = $1::varchar,
+                     reviewed_at = NOW(),
+                     reviewed_by_user_id = $2::uuid,
+                     review_notes = COALESCE($3, review_notes),
+                     updated_at = NOW()
+                 WHERE team_id = ANY($4::uuid[]) AND event_id = $5::uuid AND NOT (id = ANY($6::uuid[]));`,
+                [status, userId, reviewNotes || null, affectedTeamIds, eventId, eligibleIds]
+            );
+
+            if (status === "registered") {
+                await query(`UPDATE club_event_teams SET status = 'registered', updated_at = NOW() WHERE id = ANY($1::uuid[]);`, [affectedTeamIds]);
+            } else if (status === "rejected") {
+                await query(`UPDATE club_event_teams SET status = 'rejected', updated_at = NOW() WHERE id = ANY($1::uuid[]);`, [affectedTeamIds]);
+            }
+        }
 
         // Background dispatch notifications for updated applicants
         try {
@@ -4566,7 +4602,7 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                  checked_in_at = CASE WHEN $6::boolean = true AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
                  updated_at = NOW()
              WHERE id = $4::uuid AND event_id = $5::uuid
-             RETURNING id, user_id AS "userId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+             RETURNING id, user_id AS "userId", team_id AS "teamId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
                        department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
                        status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
             [status, userId, reviewNotes || null, registrationId, eventId, isAttended]
@@ -4575,6 +4611,27 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
         if (!updateRes.rows[0]) return res.status(404).json({ success: false, message: "Registration record not found." });
 
         const updatedRow = updateRes.rows[0];
+
+        // If this registration belongs to a team, synchronize status across all teammates and update squad status
+        if (updatedRow.teamId) {
+            await query(
+                `UPDATE club_event_registrations
+                 SET status = $1::varchar,
+                     reviewed_at = NOW(),
+                     reviewed_by_user_id = $2::uuid,
+                     review_notes = COALESCE($3, review_notes),
+                     checked_in_at = CASE WHEN $6::boolean = true AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
+                     updated_at = NOW()
+                 WHERE team_id = $4::uuid AND event_id = $5::uuid AND id != $7::uuid;`,
+                [status, userId, reviewNotes || null, updatedRow.teamId, eventId, isAttended, registrationId]
+            );
+
+            if (status === "registered") {
+                await query(`UPDATE club_event_teams SET status = 'registered', updated_at = NOW() WHERE id = $1;`, [updatedRow.teamId]);
+            } else if (status === "rejected") {
+                await query(`UPDATE club_event_teams SET status = 'rejected', updated_at = NOW() WHERE id = $1;`, [updatedRow.teamId]);
+            }
+        }
 
         // Send real-time notification to applicant on status change
         try {
@@ -4693,7 +4750,24 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
         if (!staffClub) return res.status(403).send("Forbidden.");
 
         const applicantsRes = await query(
-            `SELECT
+            `WITH ranked_registrations AS (
+                SELECT r.*,
+                       t.name AS team_name,
+                       t.code AS team_code,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY COALESCE(r.team_id, r.id)
+                           ORDER BY 
+                               CASE WHEN r.team_role = 'leader' OR r.user_id = t.leader_id THEN 0
+                                    WHEN r.answers IS NOT NULL AND r.answers != '{}'::jsonb THEN 1
+                                    ELSE 2
+                               END,
+                               r.registered_at ASC
+                       ) AS rn
+                FROM club_event_registrations r
+                LEFT JOIN club_event_teams t ON t.id = r.team_id
+                WHERE r.event_id = $1 AND r.club_id = $2
+            )
+            SELECT
                 r.ticket_code,
                 COALESCE(r.applicant_name, TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS name,
                 u.username,
@@ -4715,10 +4789,16 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
                 COALESCE(r.notes, '') AS notes,
                 r.answers,
                 r.form_response,
-                r.file_attachments
-             FROM club_event_registrations r
+                r.file_attachments,
+                r.team_id,
+                r.team_role,
+                r.team_name,
+                r.team_code,
+                (SELECT string_agg(CONCAT(TRIM(CONCAT(mu.firstname, ' ', COALESCE(mu.lastname, ''))), ' (@', mu.username, ', ', m.role, ')'), '; ')
+                 FROM club_event_team_members m JOIN users mu ON mu.id = m.user_id WHERE m.team_id = r.team_id) AS team_members_text
+             FROM ranked_registrations r
              JOIN users u ON u.id = r.user_id
-             WHERE r.event_id = $1 AND r.club_id = $2
+             WHERE r.rn = 1
              ORDER BY r.registered_at ASC;`,
             [eventId, eventRes.rows[0].club_id]
         );
@@ -4815,6 +4895,8 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
             return `"${str}"`;
         };
 
+        const hasTeamRegistrations = applicantsRes.rows.some((r) => r.team_id || r.team_name);
+
         const headers = [
             "Status",
             "Student Name",
@@ -4826,6 +4908,7 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
             "State",
             "Roll / Student ID",
             "Department",
+            ...(hasTeamRegistrations ? ["Team Name", "Team Role", "Confirmed Teammates"] : []),
             ...customQuestions.map((q) => q.title),
             "Registered At",
         ];
@@ -4858,6 +4941,14 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
                 escapeCsv(r.department || ansObj["q_department"] || ""),
             ];
 
+            const teamRow = hasTeamRegistrations
+                ? [
+                      escapeCsv(r.team_name || ""),
+                      escapeCsv(r.team_role ? r.team_role.toUpperCase() : (r.team_name ? "LEADER" : "")),
+                      escapeCsv(r.team_members_text || ""),
+                  ]
+                : [];
+
             const customValues = customQuestions.map((q) => {
                 if (q.type === "file_upload") {
                     const matchedFiles = attachments.filter((f: any) => f.questionId === q.id);
@@ -4885,7 +4976,7 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, requireClub
                 escapeCsv(r.registered_at ? new Date(r.registered_at).toLocaleString() : ""),
             ];
 
-            return [...personalRow, ...customValues, ...timestampRow].join(",");
+            return [...personalRow, ...teamRow, ...customValues, ...timestampRow].join(",");
         });
 
         const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");

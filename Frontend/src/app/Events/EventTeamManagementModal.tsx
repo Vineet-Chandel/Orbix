@@ -570,6 +570,12 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                                                                             <span>@{user.username}</span>
                                                                             <ExternalLink className="w-2.5 h-2.5" />
                                                                         </a>
+                                                                        {user.collegeName && (
+                                                                            <>
+                                                                                <span>•</span>
+                                                                                <span className="truncate max-w-[150px] text-neutral-500 font-sans">{user.collegeName}</span>
+                                                                            </>
+                                                                        )}
                                                                         {user.email && (
                                                                             <>
                                                                                 <span>•</span>
@@ -577,11 +583,20 @@ export const EventTeamManagementModal: React.FC<EventTeamManagementModalProps> =
                                                                             </>
                                                                         )}
                                                                     </div>
+                                                                    {user.isCollegeMismatch && (
+                                                                        <p className="text-[9px] font-black uppercase text-red-600 mt-0.5">
+                                                                            ⚠️ Ineligible: Enrolled at another college
+                                                                        </p>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
                                                             <div>
-                                                                {user.isMember ? (
+                                                                {user.isCollegeMismatch ? (
+                                                                    <span className="text-[10px] font-black uppercase text-red-700 px-2 py-1 bg-red-50 rounded-md border border-red-300">
+                                                                        Other College
+                                                                    </span>
+                                                                ) : user.isMember || (user as any).isAlreadyInTeam ? (
                                                                     <span className="text-[10px] font-black uppercase text-neutral-500 px-2 py-1 bg-neutral-100 rounded-md border border-neutral-300">
                                                                         In Team
                                                                     </span>

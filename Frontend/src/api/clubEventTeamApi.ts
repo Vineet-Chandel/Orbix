@@ -68,6 +68,13 @@ export interface SearchUserResult {
     avatarUrl: string;
     isMember: boolean;
     hasPendingInvite: boolean;
+    collegeId?: string | null;
+    collegeName?: string | null;
+    isCollegeMismatch?: boolean;
+    isEligible?: boolean;
+    mismatchReason?: string | null;
+    isAlreadyInTeam?: boolean;
+    isAlreadyRegistered?: boolean;
 }
 
 export const clubEventTeamApi = {

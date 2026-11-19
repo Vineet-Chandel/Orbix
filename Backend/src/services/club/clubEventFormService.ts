@@ -2915,7 +2915,7 @@ Organizer Request: ${userPrompt}`;
 
             // 6. Check Existing Registration & Active Team Participation
             if (userId) {
-                // Check if user is in an existing team for this event as a member
+                // Check if user is in an existing team for this event
                 const activeTeamMember = await client.query(
                     `SELECT tm.team_id, tm.role, t.name AS "teamName"
                      FROM club_event_team_members tm
@@ -2928,7 +2928,7 @@ Organizer Request: ${userPrompt}`;
                     const tm = activeTeamMember.rows[0];
                     if (tm.role === "member") {
                         const error: any = new Error(
-                            `You are already participating in this event as a member of team "${tm.teamName}". You cannot register again. To register individually or lead a different squad, you must leave your current team first.`
+                            `You are already participating in this event as a member of team "${tm.teamName}". An Orbix developer can only register for an event with one team.`
                         );
                         error.statusCode = 409;
                         throw error;
