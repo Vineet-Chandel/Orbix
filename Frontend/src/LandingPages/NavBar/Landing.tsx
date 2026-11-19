@@ -364,21 +364,21 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
             <nav
                 ref={navRef}
                 aria-label="Main Navigation"
-                className="w-[96%] sm:w-[92%] md:w-[86%] lg:w-[80%] max-w-5xl pointer-events-auto relative flex items-center justify-between gap-1 sm:gap-2.5 p-1 pl-2.5 sm:pl-4 pr-1.5 sm:pr-2.5 rounded-full bg-white/95 backdrop-blur-md border-2 border-black shadow-[4px_4px_0px_#000] transition-all duration-300 h-[50px] sm:h-[54px]"
+                className="w-[96%] sm:w-[94%] md:w-[94%] lg:w-[88%] xl:w-[80%] max-w-5xl pointer-events-auto relative flex items-center justify-between gap-1 sm:gap-2 lg:gap-2.5 p-1 pl-2 sm:pl-3 lg:pl-4 pr-1 sm:pr-2 lg:pr-2.5 rounded-full bg-white/95 backdrop-blur-md border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] transition-all duration-300 h-[48px] sm:h-[52px] lg:h-[54px]"
             >
                 {/* Brand Logo & Title */}
                 <Link
                     to="/"
-                    className="flex items-center gap-2 sm:gap-2.5 py-1 mr-1 sm:mr-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 hover:opacity-85 transition-opacity shrink-0"
+                    className="flex items-center gap-1.5 sm:gap-2 lg:gap-2.5 py-1 mr-1 sm:mr-1.5 lg:mr-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 hover:opacity-85 transition-opacity shrink-0"
                 >
-                    <OrbixLogo className="w-8 h-8 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
-                    <span className="font-black text-xl sm:text-2xl md:text-3xl tracking-tight text-black leading-none">
+                    <OrbixLogo className="w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                    <span className="font-black text-lg sm:text-xl md:text-xl lg:text-2xl tracking-tight text-black leading-none">
                         Orbix
                     </span>
                 </Link>
 
                 {/* Navigation Items with Animated Slider (Desktop Only) */}
-                <div className="hidden md:flex items-center gap-0.5 sm:gap-1">
+                <div className="hidden md:flex items-center gap-0.5 lg:gap-1 shrink-0">
                     {NAV_ITEMS.map((item) => {
                         const isRouteActive = activeTab === item.id;
                         const isHovered = hoveredTab === item.id;
@@ -397,7 +397,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                     id={`nav-item-${item.id}`}
                                     type="button"
                                     onClick={() => handleTabClick(item.id)}
-                                    className={`relative z-10 flex items-center h-[36px] sm:h-[40px] px-2.5 sm:px-4 rounded-full text-xs sm:text-sm transition-colors duration-200 focus:outline-none select-none cursor-pointer ${isSelected
+                                    className={`relative z-10 flex items-center h-[34px] sm:h-[36px] lg:h-[40px] px-2 md:px-2.5 lg:px-4 rounded-full text-xs lg:text-sm transition-colors duration-200 focus:outline-none select-none cursor-pointer ${isSelected
                                         ? 'text-white font-semibold'
                                         : isHovered
                                             ? 'text-neutral-950 font-medium'
@@ -431,7 +431,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                         />
                                     )}
 
-                                    <div className="flex items-center gap-1.5 sm:gap-2">
+                                    <div className="flex items-center gap-1 lg:gap-2">
                                         {/* Item Icon */}
                                         <span className={`transition-colors duration-200 ${isSelected ? 'text-white' : isHovered ? 'text-neutral-950' : 'text-neutral-500'}`}>
                                             {item.icon}
@@ -463,12 +463,10 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                 </div>
 
                 {/* Right Action Buttons */}
-                <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto shrink-0">
-
-
+                <div className="flex items-center gap-1 sm:gap-2 lg:gap-2.5 ml-auto shrink-0">
                     {/* Authenticated User Notification Bell (Desktop Only) */}
                     {isLoggedIn && (
-                        <div className="hidden md:flex">
+                        <div className="hidden md:flex shrink-0">
                             <NotificationBell variant="light" />
                         </div>
                     )}
@@ -479,7 +477,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         onClick={toggleMobileMenu}
                         aria-label="Toggle navigation menu"
                         aria-expanded={isMobileMenuOpen}
-                        className={`md:hidden relative flex items-center justify-center w-[36px] h-[36px] rounded-full border-2 border-black transition-all cursor-pointer shrink-0 ${isMobileMenuOpen
+                        className={`md:hidden relative flex items-center justify-center w-[34px] h-[34px] sm:w-[36px] sm:h-[36px] rounded-full border-2 border-black transition-all cursor-pointer shrink-0 ${isMobileMenuOpen
                             ? "bg-[#FFE566] text-black shadow-[2px_2px_0px_#000]"
                             : "bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
                             }`}
@@ -500,7 +498,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         onClick={handleWorkspaceClick}
                         disabled={loading}
                         title={isLoggedIn ? `${displayName} - Open Workspace` : "Sign in to Orbix"}
-                        className={`group relative inline-flex items-center h-[36px] sm:h-[40px] gap-1 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden mr-0.5 sm:mr-1 shrink-0 ${isLoggedIn ? "pl-1 sm:pl-1.5 pr-2.5 sm:pr-3.5" : "pl-3 sm:pl-4 pr-2.5 sm:pr-3.5"
+                        className={`group relative inline-flex items-center h-[34px] sm:h-[36px] lg:h-[40px] gap-1 sm:gap-1.5 lg:gap-2 rounded-full bg-black text-white font-black text-xs lg:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden mr-0.5 sm:mr-1 shrink-0 ${isLoggedIn ? "pl-1 sm:pl-1.5 pr-2 sm:pr-2.5 lg:pr-3.5" : "pl-2.5 sm:pl-3 lg:pl-4 pr-2 sm:pr-2.5 lg:pr-3.5"
                             }`}
                     >
                         {isLoggedIn && (
@@ -510,13 +508,13 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                 onError={(e) => {
                                     (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                 }}
-                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover ring-1 ring-white/20 shadow-xs flex-shrink-0"
+                                className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 rounded-full object-cover ring-1 ring-white/20 shadow-xs flex-shrink-0"
                             />
                         )}
 
                         <span>{isLoggedIn ? "Workspace" : "Sign in"}</span>
 
-                        <span className="w-5 h-5 rounded-full bg-white/15 flex items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5 flex-shrink-0">
+                        <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white/15 flex items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5 flex-shrink-0">
                             <svg
                                 className="w-3 h-3 text-white"
                                 viewBox="0 0 24 24"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -309,9 +309,47 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
     }, [fallbackDevelopers, currentUsername]);
 
     const [developers, setDevelopers] = useState<ExploreDeveloper[]>(initialCandidates);
-    const [currentPairIndex, setCurrentPairIndex] = useState<number>(0);
+    const [currentIndex, setCurrentIndex] = useState<number>(0);
     const [isPaused, setIsPaused] = useState<boolean>(false);
     const [requestedUsernames, setRequestedUsernames] = useState<Set<string>>(new Set());
+
+    // Responsive detection: Desktop (>= 768px / md) shows 2 cards per slide; Mobile (< 768px) shows 1 card per slide
+    const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+        if (typeof window !== "undefined") {
+            return window.innerWidth >= 768;
+        }
+        return true;
+    });
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const mq = window.matchMedia("(min-width: 768px)");
+        const onChange = (e: MediaQueryListEvent) => {
+            setIsDesktop(e.matches);
+        };
+        setIsDesktop(mq.matches);
+        mq.addEventListener("change", onChange);
+        return () => mq.removeEventListener("change", onChange);
+    }, []);
+
+    // Track previous isDesktop to seamlessly map carousel index across resize
+    const prevIsDesktopRef = useRef(isDesktop);
+    const cardsPerPage = isDesktop ? 2 : 1;
+    const totalPages = Math.max(1, Math.ceil(developers.length / cardsPerPage));
+    const activeIndex = Math.min(currentIndex, totalPages - 1);
+
+    useEffect(() => {
+        if (prevIsDesktopRef.current !== isDesktop) {
+            if (isDesktop) {
+                // Mobile -> Desktop: convert single index to pair index
+                setCurrentIndex((prev) => Math.floor(prev / 2));
+            } else {
+                // Desktop -> Mobile: convert pair index to single dev index
+                setCurrentIndex((prev) => Math.min(prev * 2, Math.max(0, developers.length - 1)));
+            }
+            prevIsDesktopRef.current = isDesktop;
+        }
+    }, [isDesktop, developers.length]);
 
     // Update candidates if fallback pool or currentUsername changes
     useEffect(() => {
@@ -321,7 +359,7 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
             .slice(0, 10);
         if (filtered.length > 0) {
             setDevelopers(filtered);
-            setCurrentPairIndex(0);
+            setCurrentIndex(0);
         }
     }, [currentUsername, fallbackDevelopers]);
 
@@ -337,7 +375,7 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                 });
                 if (isMounted && res.success && Array.isArray(res.users) && res.users.length > 0) {
                     setDevelopers(res.users);
-                    setCurrentPairIndex(0);
+                    setCurrentIndex(0);
                 }
             } catch (err) {
                 console.error("Failed to fetch recent active developers:", err);
@@ -349,29 +387,47 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
         };
     }, [currentUsername]);
 
-    const totalItems = developers.length;
-    const totalPairs = Math.max(1, Math.ceil(totalItems / 2));
-
     const handleNext = useCallback(() => {
-        if (totalPairs <= 1) return;
-        setCurrentPairIndex((prev) => (prev + 1) % totalPairs);
-    }, [totalPairs]);
+        if (totalPages <= 1) return;
+        setCurrentIndex((prev) => (prev + 1) % totalPages);
+    }, [totalPages]);
 
     const handlePrev = useCallback(() => {
-        if (totalPairs <= 1) return;
-        setCurrentPairIndex((prev) => (prev - 1 + totalPairs) % totalPairs);
-    }, [totalPairs]);
+        if (totalPages <= 1) return;
+        setCurrentIndex((prev) => (prev - 1 + totalPages) % totalPages);
+    }, [totalPages]);
 
     // 4-second auto-advancing carousel
     useEffect(() => {
-        if (isPaused || totalPairs <= 1) return;
+        if (isPaused || totalPages <= 1) return;
 
         const interval = setInterval(() => {
             handleNext();
         }, 4000);
 
         return () => clearInterval(interval);
-    }, [isPaused, totalPairs, handleNext]);
+    }, [isPaused, totalPages, handleNext]);
+
+    // Mobile touch gestures: tap pauses, swipe left/right navigates
+    const touchStartX = useRef<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        setIsPaused(true);
+        touchStartX.current = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        setIsPaused(false);
+        if (touchStartX.current === null) return;
+        const diff = touchStartX.current - e.changedTouches[0].clientX;
+        const SWIPE_THRESHOLD = 45;
+        if (diff > SWIPE_THRESHOLD) {
+            handleNext();
+        } else if (diff < -SWIPE_THRESHOLD) {
+            handlePrev();
+        }
+        touchStartX.current = null;
+    };
 
     const handleLocalConnect = async (candidate: ExploreDeveloper) => {
         setRequestedUsernames((prev) => new Set(prev).add(candidate.username));
@@ -399,54 +455,53 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
         return null;
     }
 
-    // Get current pair (2 confronting cards)
-    const card1 = developers[currentPairIndex * 2];
-    const card2 = developers[currentPairIndex * 2 + 1];
-    const currentCards = [card1, card2].filter(Boolean);
+    // Visible cards: exactly 1 on mobile, 2 confronting cards on desktop
+    const startIndex = activeIndex * cardsPerPage;
+    const currentCards = developers.slice(startIndex, startIndex + cardsPerPage);
 
     return (
         <section
             aria-label="Recently Active Developers Carousel"
-            className="rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] p-4 sm:p-6 space-y-4 transition-all"
+            className="rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] p-3.5 sm:p-6 space-y-3.5 sm:space-y-4 transition-all"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
-            onTouchStart={() => setIsPaused(true)}
-            onTouchEnd={() => setIsPaused(false)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
         >
             {/* Header: Title + Live Indicator + Navigation Indicator */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b-2 border-black/10">
-                <div className="flex items-center gap-2.5">
-                    <span className="p-2 rounded-xl bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b-2 border-black/10">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="shrink-0 p-2 rounded-xl bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]">
                         <Sparkles className="w-4 h-4 stroke-[2.5]" />
                     </span>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-base sm:text-lg font-black text-black tracking-tight">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-base sm:text-lg font-black text-black tracking-tight leading-tight">
                                 Recent People on Platform
                             </h2>
-                            <span className="relative flex h-2.5 w-2.5" title="Live platform activity">
+                            <span className="relative flex h-2.5 w-2.5 shrink-0" title="Live platform activity">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                             </span>
                         </div>
-                        <p className="text-xs font-bold text-neutral-600">
+                        <p className="text-xs font-bold text-neutral-600 leading-normal">
                             Recently active engineers • Auto-cycles every 4 seconds
                         </p>
                     </div>
                 </div>
 
-                {/* Controls & Pagination Pills */}
-                <div className="flex items-center gap-2 self-end sm:self-auto">
+                {/* Desktop Controls & Pagination Pills (md+ only) */}
+                <div className="hidden md:flex items-center gap-2 self-end sm:self-auto shrink-0">
                     {/* Slide indicator dots */}
-                    {totalPairs > 1 && (
+                    {totalPages > 1 && (
                         <div className="flex items-center gap-1.5 mr-2">
-                            {Array.from({ length: totalPairs }).map((_, idx) => (
+                            {Array.from({ length: totalPages }).map((_, idx) => (
                                 <button
                                     key={idx}
                                     type="button"
-                                    onClick={() => setCurrentPairIndex(idx)}
+                                    onClick={() => setCurrentIndex(idx)}
                                     className={`h-2 transition-all rounded-full border border-black cursor-pointer ${
-                                        idx === currentPairIndex
+                                        idx === activeIndex
                                             ? "w-6 bg-black"
                                             : "w-2 bg-neutral-300 hover:bg-neutral-400"
                                     }`}
@@ -458,27 +513,27 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                     )}
 
                     <span className="text-xs font-mono font-black text-neutral-700 bg-white px-2.5 py-1 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                        {currentPairIndex + 1} / {totalPairs}
+                        {activeIndex + 1} / {totalPages}
                     </span>
                 </div>
             </div>
 
-            {/* Row with Left Button, 2 Confronting Cards, and Right Button */}
+            {/* Carousel Body: Flanked by Side Buttons on Desktop, Full-Width on Mobile */}
             <div className="relative flex items-center gap-2 sm:gap-4">
-                {/* Left Moving Button */}
+                {/* Left Moving Button (Desktop md+ only; hidden on mobile to give card 100% width) */}
                 <button
                     type="button"
                     onClick={handlePrev}
-                    disabled={totalPairs <= 1}
-                    className="shrink-0 p-2 sm:p-3 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#FFE566] hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed z-10"
+                    disabled={totalPages <= 1}
+                    className="hidden md:flex shrink-0 p-2 sm:p-3 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#FFE566] hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed z-10 items-center justify-center"
                     title="Previous Developers"
                     aria-label="Previous Developers"
                 >
                     <ChevronLeft className="w-5 h-5 stroke-[3] text-black" />
                 </button>
 
-                {/* 2 Confronting Cards Grid */}
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Cards Container: 1 full-width card on mobile (< md), 2 confronting cards on desktop (md+) */}
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
                     {currentCards.map((candidate) => {
                         const avatar =
                             candidate.photoUrl && candidate.photoUrl !== DEFAULT_AVATAR_URL
@@ -493,35 +548,35 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                         return (
                             <article
                                 key={candidate.id || candidate.username}
-                                className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all flex flex-col justify-between overflow-hidden group animate-in fade-in duration-300"
+                                className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all flex flex-col justify-between overflow-hidden group animate-in fade-in duration-300 w-full min-w-0"
                             >
-                                <div className="p-5 space-y-4">
+                                <div className="p-4 sm:p-5 space-y-3.5 sm:space-y-4">
                                     {/* Top Row: Enlarged Avatar + Name + Verification + Score */}
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="flex items-start justify-between gap-2.5 sm:gap-3 min-w-0">
+                                        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
                                             <div className="relative shrink-0">
                                                 <EnlargeableAvatar
                                                     src={avatar}
                                                     alt={candidate.displayName}
                                                     displayName={candidate.displayName}
                                                     username={candidate.username}
-                                                    className="w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000]"
+                                                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-black shadow-[2.5px_2.5px_0px_#000]"
                                                 />
                                                 {candidate.isOpenToWork && (
                                                     <span
-                                                        className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-black"
+                                                        className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-emerald-400 rounded-full border-2 border-black"
                                                         title="Open to Work"
                                                     />
                                                 )}
                                             </div>
 
                                             <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <h3 className="font-black text-base text-black tracking-tight truncate group-hover:text-emerald-700 transition-colors">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <h3 className="font-black text-sm sm:text-base text-black tracking-tight truncate group-hover:text-emerald-700 transition-colors">
                                                         {candidate.displayName}
                                                     </h3>
                                                     {Boolean(candidate.isVerifiedCoder) && (
-                                                        <span title="Verified Developer (Email OTP Verified)">
+                                                        <span title="Verified Developer (Email OTP Verified)" className="shrink-0">
                                                             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                                         </span>
                                                     )}
@@ -533,9 +588,9 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                                         </div>
 
                                         {/* Score Pill & 3-Dot Menu */}
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#FFE566] text-black font-black text-xs border border-black shadow-[1.5px_1.5px_0px_#000]">
-                                                <Trophy className="w-3 h-3" />
+                                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                            <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-[#FFE566] text-black font-black text-xs border border-black shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                                <Trophy className="w-3 h-3 shrink-0" />
                                                 <span>{candidate.orbixScore.toLocaleString()}</span>
                                             </span>
                                             {renderCardActionMenu(`recent-${candidate.id || candidate.username}`, {
@@ -550,7 +605,7 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
 
                                     {/* Headline */}
                                     {candidate.headline ? (
-                                        <p className="text-xs font-bold text-neutral-800 line-clamp-2 leading-relaxed">
+                                        <p className="text-xs font-bold text-neutral-800 line-clamp-2 leading-relaxed break-words">
                                             {candidate.headline}
                                         </p>
                                     ) : (
@@ -562,13 +617,13 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                                     {/* Meta: College & Location */}
                                     <div className="space-y-1 text-[11px] font-bold text-neutral-600">
                                         {candidate.college && (
-                                            <div className="flex items-center gap-1.5 truncate">
+                                            <div className="flex items-center gap-1.5 min-w-0">
                                                 <GraduationCap className="w-3.5 h-3.5 text-black shrink-0" />
                                                 <span className="truncate">{candidate.college}</span>
                                             </div>
                                         )}
                                         {candidate.location && (
-                                            <div className="flex items-center gap-1.5 truncate">
+                                            <div className="flex items-center gap-1.5 min-w-0">
                                                 <MapPin className="w-3.5 h-3.5 text-black shrink-0" />
                                                 <span className="truncate">{candidate.location}</span>
                                             </div>
@@ -596,15 +651,15 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
 
                                     {/* Connected Portals Icons */}
                                     {candidate.connectedPortals.length > 0 && (
-                                        <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] font-mono font-bold text-neutral-600">
-                                            <div className="flex items-center gap-1.5">
+                                        <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] font-mono font-bold text-neutral-600 flex-wrap gap-2">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 {candidate.connectedPortals.map((p, pIdx) => {
                                                     const icon = getPlatformIcon(p.portal, "w-4 h-4");
                                                     return (
                                                         <span
                                                             key={pIdx}
                                                             title={`${p.portal}: @${p.portalUsername} (${p.verified ? "Verified" : "Unverified"})`}
-                                                            className="p-1 rounded bg-[#FAF6EE] border border-black"
+                                                            className="p-1 rounded bg-[#FAF6EE] border border-black shrink-0"
                                                         >
                                                             {icon}
                                                         </span>
@@ -613,7 +668,7 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                                             </div>
 
                                             {candidate.totalSolved > 0 && (
-                                                <span className="text-black font-black">
+                                                <span className="text-black font-black shrink-0">
                                                     {candidate.totalSolved} Solved
                                                 </span>
                                             )}
@@ -624,31 +679,33 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                                 {/* Action Footer: Connect & In-Place Inspection */}
                                 <div className="p-3 bg-[#FAF6EE] border-t-2 border-black flex items-center gap-2">
                                     {isRequested ? (
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border-2 border-black font-black text-xs text-neutral-600 shadow-[1.5px_1.5px_0px_#000]">
+                                        <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border-2 border-black font-black text-xs text-neutral-600 shadow-[1.5px_1.5px_0px_#000] shrink-0 min-h-[34px]">
                                             <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
                                             <span>Requested</span>
                                         </span>
                                     ) : (
-                                        <OrbixButton
-                                            size="sm"
-                                            variant="yellow"
-                                            icon={<UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />}
-                                            loading={isConnecting}
-                                            loadingLabel="Connecting..."
-                                            onClick={() => handleLocalConnect(candidate)}
-                                            title={`Send connection request to ${candidate.displayName}`}
-                                        >
-                                            Connect
-                                        </OrbixButton>
+                                        <div className="shrink-0">
+                                            <OrbixButton
+                                                size="sm"
+                                                variant="yellow"
+                                                icon={<UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />}
+                                                loading={isConnecting}
+                                                loadingLabel="Connecting..."
+                                                onClick={() => handleLocalConnect(candidate)}
+                                                title={`Send connection request to ${candidate.displayName}`}
+                                            >
+                                                Connect
+                                            </OrbixButton>
+                                        </div>
                                     )}
 
                                     <button
                                         type="button"
                                         onClick={() => handleSelect(candidate.username)}
-                                        className="flex-1 py-2 px-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5 transition-transform hover:translate-x-[1px]"
+                                        className="flex-1 min-w-0 py-2 px-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5 transition-transform hover:translate-x-[1px] whitespace-nowrap min-h-[34px]"
                                     >
-                                        <span>View Profile</span>
-                                        <ArrowRight className="w-3.5 h-3.5" />
+                                        <span className="truncate">View Profile</span>
+                                        <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                                     </button>
                                 </div>
                             </article>
@@ -656,14 +713,67 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
                     })}
                 </div>
 
-                {/* Right Moving Button */}
+                {/* Right Moving Button (Desktop md+ only; hidden on mobile to give card 100% width) */}
                 <button
                     type="button"
                     onClick={handleNext}
-                    disabled={totalPairs <= 1}
-                    className="shrink-0 p-2 sm:p-3 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#FFE566] hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed z-10"
+                    disabled={totalPages <= 1}
+                    className="hidden md:flex shrink-0 p-2 sm:p-3 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#FFE566] hover:shadow-[4px_4px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed z-10 items-center justify-center"
                     title="Next Developers"
                     aria-label="Next Developers"
+                >
+                    <ChevronRight className="w-5 h-5 stroke-[3] text-black" />
+                </button>
+            </div>
+
+            {/* Mobile Navigation Controls Row (Dedicated row below the single card on < md) */}
+            <div className="flex md:hidden items-center justify-between gap-2 pt-1">
+                {/* Previous Developer Button */}
+                <button
+                    type="button"
+                    onClick={handlePrev}
+                    disabled={totalPages <= 1}
+                    className="shrink-0 p-2 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#FFE566] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                    title="Previous Developer"
+                    aria-label="Previous Developer"
+                >
+                    <ChevronLeft className="w-5 h-5 stroke-[3] text-black" />
+                </button>
+
+                {/* Center: Slide indicator dots + Position Counter Pill */}
+                <div className="flex items-center gap-2 min-w-0">
+                    {totalPages > 1 && (
+                        <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none max-w-[140px]">
+                            {Array.from({ length: totalPages }).map((_, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setCurrentIndex(idx)}
+                                    className={`h-2 transition-all rounded-full border border-black cursor-pointer shrink-0 ${
+                                        idx === activeIndex
+                                            ? "w-5 bg-black"
+                                            : "w-1.5 bg-neutral-300 hover:bg-neutral-400"
+                                    }`}
+                                    title={`Go to developer ${idx + 1}`}
+                                    aria-label={`Developer ${idx + 1}`}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    <span className="text-xs font-mono font-black text-neutral-700 bg-white px-2.5 py-1 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                        {activeIndex + 1} / {totalPages}
+                    </span>
+                </div>
+
+                {/* Next Developer Button */}
+                <button
+                    type="button"
+                    onClick={handleNext}
+                    disabled={totalPages <= 1}
+                    className="shrink-0 p-2 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#FFE566] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                    title="Next Developer"
+                    aria-label="Next Developer"
                 >
                     <ChevronRight className="w-5 h-5 stroke-[3] text-black" />
                 </button>

@@ -1351,118 +1351,118 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 </div>
                             ) : (
                                 <>
-                                    {/* 3D Motion Card Container (Matches Card.tsx from Main Landing Page) */}
+                                    {/* 3D Motion Card Container (Broader Purple LinkedInCard Scaled Proportionately Across All Viewports) */}
                                     <div style={{ perspective: 1800 }} className="w-full flex justify-center">
-                                <motion.div
-                                    className="relative cursor-pointer select-none"
-                                    style={{
-                                        width: 1200 * cardScale,
-                                        height: 627 * cardScale,
-                                        transformStyle: "preserve-3d",
-                                    }}
-                                    animate={{ rotateY: cardFace === "back" ? 180 : 0 }}
-                                    transition={{ duration: 0.75, ease: [0.23, 1, 0.32, 1] }}
-                                    onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-label="Flip Developer Profile Card in 3D"
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === " ") {
-                                            e.preventDefault();
-                                            setCardFace((f) => (f === "front" ? "back" : "front"));
-                                        }
-                                    }}
-                                >
-                                    {/* Front Face */}
-                                    <div
-                                        className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border border-neutral-800 shadow-2xl"
-                                        style={{
-                                            backfaceVisibility: "hidden",
-                                            WebkitBackfaceVisibility: "hidden",
-                                            boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
-                                        }}
-                                    >
-                                        <div
+                                        <motion.div
+                                            className="relative cursor-pointer select-none"
                                             style={{
-                                                width: 1200,
-                                                height: 627,
-                                                transform: `scale(${cardScale})`,
-                                                transformOrigin: "top left",
+                                                width: 1200 * cardScale,
+                                                height: 627 * cardScale,
+                                                transformStyle: "preserve-3d",
+                                            }}
+                                            animate={{ rotateY: cardFace === "back" ? 180 : 0 }}
+                                            transition={{ duration: 0.75, ease: [0.23, 1, 0.32, 1] }}
+                                            onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-label="Flip Developer Profile Card in 3D"
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    setCardFace((f) => (f === "front" ? "back" : "front"));
+                                                }
                                             }}
                                         >
-                                            <LinkedInCard
-                                                user={{
-                                                    ...profile,
-                                                    photoUrl: avatarSrc,
+                                            {/* Front Face */}
+                                            <div
+                                                className="absolute inset-0 w-full h-full rounded-[24px] sm:rounded-[32px] overflow-hidden border border-neutral-800 shadow-2xl"
+                                                style={{
+                                                    backfaceVisibility: "hidden",
+                                                    WebkitBackfaceVisibility: "hidden",
+                                                    boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
                                                 }}
-                                                stats={stats}
-                                                coderType={coderType}
-                                                topPlatforms={showcasedPlatforms}
-                                                allConnectedPlatforms={allConnectedPlatforms}
-                                                githubStats={githubStats}
-                                                includeGitHub={false}
-                                                theme={CARD_THEMES.indigo}
-                                                face="front"
-                                                publicProfileUrl={profilePageUrl}
-                                                connectedPortals={connectedPortals}
-                                                topContests={showcasedContests}
-                                                showSocialLinks={false}
-                                                onHireMeClick={() => setIsHireModalOpen(true)}
-                                            />
-                                        </div>
+                                            >
+                                                <div
+                                                    style={{
+                                                        width: 1200,
+                                                        height: 627,
+                                                        transform: `scale(${cardScale})`,
+                                                        transformOrigin: "top left",
+                                                    }}
+                                                >
+                                                    <LinkedInCard
+                                                        user={{
+                                                            ...profile,
+                                                            photoUrl: avatarSrc,
+                                                        }}
+                                                        stats={stats}
+                                                        coderType={coderType}
+                                                        topPlatforms={showcasedPlatforms}
+                                                        allConnectedPlatforms={allConnectedPlatforms}
+                                                        githubStats={githubStats}
+                                                        includeGitHub={false}
+                                                        theme={CARD_THEMES.indigo}
+                                                        face="front"
+                                                        publicProfileUrl={profilePageUrl}
+                                                        connectedPortals={connectedPortals}
+                                                        topContests={showcasedContests}
+                                                        showSocialLinks={false}
+                                                        onHireMeClick={() => setIsHireModalOpen(true)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Back Face (Rotated 180 deg) */}
+                                            <div
+                                                className="absolute inset-0 w-full h-full rounded-[24px] sm:rounded-[32px] overflow-hidden border border-neutral-800 shadow-2xl"
+                                                style={{
+                                                    backfaceVisibility: "hidden",
+                                                    WebkitBackfaceVisibility: "hidden",
+                                                    transform: "rotateY(180deg)",
+                                                    boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        width: 1200,
+                                                        height: 627,
+                                                        transform: `scale(${cardScale})`,
+                                                        transformOrigin: "top left",
+                                                    }}
+                                                >
+                                                    <LinkedInCard
+                                                        user={{
+                                                            ...profile,
+                                                            photoUrl: avatarSrc,
+                                                        }}
+                                                        stats={stats}
+                                                        coderType={coderType}
+                                                        topPlatforms={showcasedPlatforms}
+                                                        allConnectedPlatforms={allConnectedPlatforms}
+                                                        githubStats={githubStats}
+                                                        includeGitHub={false}
+                                                        theme={CARD_THEMES.indigo}
+                                                        face="back"
+                                                        publicProfileUrl={profilePageUrl}
+                                                        connectedPortals={connectedPortals}
+                                                        topContests={showcasedContests}
+                                                        showSocialLinks={false}
+                                                        onHireMeClick={() => setIsHireModalOpen(true)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </motion.div>
                                     </div>
 
-                                    {/* Back Face (Rotated 180 deg) */}
-                                    <div
-                                        className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border border-neutral-800 shadow-2xl"
-                                        style={{
-                                            backfaceVisibility: "hidden",
-                                            WebkitBackfaceVisibility: "hidden",
-                                            transform: "rotateY(180deg)",
-                                            boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                width: 1200,
-                                                height: 627,
-                                                transform: `scale(${cardScale})`,
-                                                transformOrigin: "top left",
-                                            }}
+                                    {/* Smart Connected Links Strip: Dedicated Neo-Brutalist Grid (Consistent & Smart Allocation) */}
+                                    {displayLinks.length > 0 && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 12 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.35, delay: 0.1 }}
+                                            style={{ width: Math.max(1200 * cardScale, 260), maxWidth: "100%" }}
+                                            className="mt-6 sm:mt-8 w-full relative z-10"
                                         >
-                                            <LinkedInCard
-                                                user={{
-                                                    ...profile,
-                                                    photoUrl: avatarSrc,
-                                                }}
-                                                stats={stats}
-                                                coderType={coderType}
-                                                topPlatforms={showcasedPlatforms}
-                                                allConnectedPlatforms={allConnectedPlatforms}
-                                                githubStats={githubStats}
-                                                includeGitHub={false}
-                                                theme={CARD_THEMES.indigo}
-                                                face="back"
-                                                publicProfileUrl={profilePageUrl}
-                                                connectedPortals={connectedPortals}
-                                                topContests={showcasedContests}
-                                                showSocialLinks={false}
-                                                onHireMeClick={() => setIsHireModalOpen(true)}
-                                            />
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </div>
-
-                            {/* Smart Connected Links Strip: Dedicated Neo-Brutalist Grid (Consistent & Smart Allocation) */}
-                            {displayLinks.length > 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 12 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.35, delay: 0.1 }}
-                                    style={{ width: Math.max(1200 * cardScale, 260), maxWidth: "100%" }}
-                                    className="mt-6 sm:mt-8 w-full relative z-10"
-                                >
                                     <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
                                         {displayLinks.map((item, idx) => {
                                             const formattedUrl = sanitizePlatformUrl(item.url);

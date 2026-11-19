@@ -139,15 +139,15 @@ export const ClubCredibilityWorkspace: React.FC = () => {
     const renderLedgerCard = (entry: CredibilityLedgerEntry) => (
         <div
             key={entry.id}
-            className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] dark:bg-[#1a1a1a] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4"
+            className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] dark:bg-[#1a1a1a] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4 min-w-0 max-w-full"
         >
-            <div className="space-y-1.5 max-w-2xl">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-white">
+            <div className="space-y-1.5 max-w-2xl min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-white shrink-0">
                         {entry.sourceAction.replace(/_/g, " ")}
                     </span>
                     {entry.eventScope && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black bg-white text-black inline-flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black bg-white text-black inline-flex items-center gap-1 shrink-0">
                             {entry.eventScope === "PAN_INDIA" ? (
                                 <>
                                     <Globe2 className="w-2.5 h-2.5" />
@@ -162,11 +162,11 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                         </span>
                     )}
                     {entry.status === "reversed" && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-300">
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-300 shrink-0">
                             Reversed via Appeal
                         </span>
                     )}
-                    <span className="text-[11px] font-bold text-neutral-500">
+                    <span className="text-[11px] font-bold text-neutral-500 whitespace-nowrap">
                         {new Date(entry.createdAt).toLocaleDateString("en-IN", {
                             day: "numeric",
                             month: "short",
@@ -177,22 +177,22 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                     </span>
                 </div>
 
-                <h4 className="text-sm sm:text-base font-black text-black dark:text-white">
+                <h4 className="text-sm sm:text-base font-black text-black dark:text-white break-words [overflow-wrap:anywhere]">
                     {entry.eventTitle ? `Event: ${entry.eventTitle}` : entry.reasonCode}
                 </h4>
 
-                <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 leading-relaxed break-words [overflow-wrap:anywhere]">
                     {entry.explanation}
                 </p>
             </div>
 
             {/* Score Transition Box & Action */}
-            <div className="flex items-center gap-4 shrink-0">
-                <div className="p-3 rounded-xl bg-white dark:bg-[#121212] border-2 border-black shadow-[2px_2px_0px_#000] text-right space-y-0.5">
+            <div className="flex items-center gap-3 sm:gap-4 shrink-0 flex-wrap">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#121212] border-2 border-black shadow-[2px_2px_0px_#000] text-left sm:text-right space-y-0.5 min-w-[120px]">
                     <div className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                         Score Impact
                     </div>
-                    <div className="flex items-center justify-end gap-1.5 font-black text-sm">
+                    <div className="flex items-center justify-start sm:justify-end gap-1.5 font-black text-sm">
                         <span className="text-neutral-500">{Math.round(entry.scoreBefore)}</span>
                         <span
                             className={`px-1.5 py-0.5 rounded text-xs font-black ${
@@ -216,14 +216,14 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => handleOpenAppeal(entry)}
-                        className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                        className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 whitespace-nowrap shrink-0"
                     >
                         Appeal
                     </button>
                 )}
 
                 {entry.hasAppeal && (
-                    <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black">
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black whitespace-nowrap shrink-0">
                         Appeal {entry.latestAppealStatus?.replace(/_/g, " ")}
                     </span>
                 )}
@@ -471,17 +471,21 @@ export const ClubCredibilityWorkspace: React.FC = () => {
             </div>
 
             {/* Section 2: Credibility Ledger (Immutable Audit History) */}
-            <div className="p-6 sm:p-7 rounded-3xl bg-white dark:bg-[#141414] border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
+            <div className="p-4 sm:p-6 md:p-7 rounded-3xl bg-white dark:bg-[#141414] border-3 border-black shadow-[6px_6px_0px_#000] space-y-5 min-w-0 max-w-full">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-black/10 dark:border-white/10 pb-4">
-                    <div>
-                        <h3 className="text-lg font-black text-black dark:text-white tracking-tight flex items-center gap-2">
-                            <FileText className="w-5 h-5 stroke-[2.5]" />
-                            <span>Credibility History Ledger</span>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FAF6EE] dark:bg-neutral-800 text-black dark:text-white border border-black">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <FileText className="w-5 h-5 stroke-[2.5] shrink-0 text-black dark:text-white" />
+                                <h3 className="text-base sm:text-lg font-black text-black dark:text-white tracking-tight">
+                                    Credibility History Ledger
+                                </h3>
+                            </div>
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FAF6EE] dark:bg-neutral-800 text-black dark:text-white border border-black shrink-0 whitespace-nowrap">
                                 {totalHistoryCount} entries
                             </span>
-                        </h3>
-                        <p className="text-xs font-bold text-neutral-500 mt-0.5">
+                        </div>
+                        <p className="text-xs font-bold text-neutral-500 mt-1 leading-relaxed">
                             Every verified event completion, cancellation, and credential issuance recorded with evidence weights.
                         </p>
                     </div>
@@ -539,21 +543,21 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                         className="w-full max-w-5xl max-h-[90vh] bg-white dark:bg-[#141414] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
                     >
                         {/* Modal Header */}
-                        <div className="p-5 sm:p-6 border-b-2 border-black/10 dark:border-white/10 bg-[#FAF6EE] dark:bg-[#1a1a1a] flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 rounded-2xl bg-black text-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
-                                    <FileText className="w-5 h-5 stroke-[2.5]" />
+                        <div className="p-4 sm:p-6 border-b-2 border-black/10 dark:border-white/10 bg-[#FAF6EE] dark:bg-[#1a1a1a] flex items-center justify-between gap-3 sm:gap-4">
+                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                                <div className="p-2 sm:p-2.5 rounded-2xl bg-black text-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] shrink-0">
+                                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="text-lg sm:text-xl font-black text-black dark:text-white tracking-tight">
+                                        <h3 className="text-base sm:text-xl font-black text-black dark:text-white tracking-tight">
                                             Credibility History Ledger
                                         </h3>
-                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] shrink-0 whitespace-nowrap">
                                             {modalTotal || totalHistoryCount} Total Entries
                                         </span>
                                     </div>
-                                    <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 mt-0.5">
+                                    <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 mt-0.5 leading-relaxed">
                                         Full immutable audit trail of all verified event completions, cancellations, and credential actions.
                                     </p>
                                 </div>
@@ -562,7 +566,7 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsLedgerModalOpen(false)}
-                                className="p-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                className="p-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
                                 title="Close modal"
                                 aria-label="Close"
                             >

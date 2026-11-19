@@ -274,26 +274,26 @@ export default function Dashboard() {
                                         <button
                                             type="button"
                                             onClick={() => setActiveDashboardField("practice")}
-                                            className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                                            className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-black transition-all cursor-pointer ${
                                                 activeDashboardField === "practice"
                                                     ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
                                                     : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                             }`}
                                         >
-                                            <Code2 className="w-4 h-4" />
+                                            <Code2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                             <span>Practice</span>
                                         </button>
 
                                         <button
                                             type="button"
                                             onClick={() => setActiveDashboardField("development")}
-                                            className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                                            className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-black transition-all cursor-pointer ${
                                                 activeDashboardField === "development"
                                                     ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
                                                     : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                                             }`}
                                         >
-                                            <GitBranch className="w-4 h-4" />
+                                            <GitBranch className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                             <span>Development</span>
                                         </button>
                                     </div>

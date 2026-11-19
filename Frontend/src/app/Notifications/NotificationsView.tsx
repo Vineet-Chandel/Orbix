@@ -774,28 +774,24 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ onOpenMobi
 
     return (
         <div className="flex-1 flex flex-col min-w-0 space-y-4 sm:space-y-5 select-none">
-            {/* Mobile Sticky Sidebar Toggle Slot (Matches /dashboard spacing without overlapping the Inbox card border) */}
-            {onOpenMobileSidebar && (
-                <div className="lg:hidden h-9 flex items-center">
-                    <button
-                        type="button"
-                        onClick={onOpenMobileSidebar}
-                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
-                        aria-label="Open sidebar"
-                    >
-                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <line x1="3" y1="12" x2="21" y2="12" />
-                            <line x1="3" y1="6" x2="21" y2="6" />
-                            <line x1="3" y1="18" x2="21" y2="18" />
-                        </svg>
-                    </button>
-                </div>
-            )}
-
             {/* Top Workspace Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
                 <div className="space-y-1.5 min-w-0">
                     <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        {onOpenMobileSidebar && (
+                            <button
+                                type="button"
+                                onClick={onOpenMobileSidebar}
+                                className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                                aria-label="Open sidebar"
+                            >
+                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <line x1="3" y1="12" x2="21" y2="12" />
+                                    <line x1="3" y1="6" x2="21" y2="6" />
+                                    <line x1="3" y1="18" x2="21" y2="18" />
+                                </svg>
+                            </button>
+                        )}
                         <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
                             <Inbox className="w-5 h-5 text-black stroke-[2.5]" />
                         </div>

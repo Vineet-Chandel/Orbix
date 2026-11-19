@@ -955,9 +955,9 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
         const currentUnlock = CLUB_UNLOCKS[clubUnlockIndex];
 
         return (
-            <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(0.52rem,2.45vw,0.92rem)] sm:text-[clamp(0.95rem,2.65vw,3.25rem)] text-black font-MyCustomFont3 pt-[95px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-1.5 sm:px-4 md:px-6 max-w-full text-center leading-[1.25] sm:leading-[1.18] md:leading-[1.15] select-none">
-                {/* Line 1: Strictly single line, never wraps */}
-                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
+            <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.05rem,4vw,1.65rem)] sm:text-[clamp(1.45rem,3.4vw,2.85rem)] lg:text-[clamp(2rem,3.2vw,3.85rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
+                {/* Line 1: Naturally wrapping on small viewports */}
+                <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                     <span>A complete ecosystem for clubs to organize</span>
 
                     <AnimatedPill
@@ -971,8 +971,8 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
                     />
                 </div>
 
-                {/* Line 2: Strictly single line, never wraps */}
-                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
+                {/* Line 2: Naturally wrapping */}
+                <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                     <span>and unlock</span>
                     <AnimatedPill
                         item={currentUnlock}
@@ -985,8 +985,8 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
                     />
                 </div>
 
-                {/* Line 3: Strictly single line */}
-                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center text-center max-w-full'>
+                {/* Line 3: Naturally wrapping */}
+                <div className='flex flex-wrap items-center justify-center text-center max-w-full'>
                     <span>with registrations, certificates, and Pan India reach.</span>
                 </div>
             </div>
@@ -997,25 +997,27 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
     const currentOpp = OPPORTUNITIES[oppIndex];
 
     return (
-        <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(0.62rem,3.15vw,1.05rem)] sm:text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[95px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-1.5 sm:px-4 md:px-6 max-w-full text-center leading-[1.25] sm:leading-[1.18] md:leading-[1.15] select-none">
-            {/* Line 1: Strictly single line, never wraps */}
-            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
+        <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.15rem,4.5vw,1.85rem)] sm:text-[clamp(1.65rem,4vw,3.25rem)] lg:text-[clamp(2.4rem,3.8vw,4.25rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
+            {/* Line 1: Responsive wrapping with animated platform pill */}
+            <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>A developer tool to connect</span>
 
-                <AnimatedPill
-                    item={current}
-                    onClick={handleNext}
-                    onPause={() => setIsPaused(true)}
-                    onResume={() => setIsPaused(false)}
-                    title="Click to switch platform"
-                    enterDelay={0.2}
-                    enterRotate={-12}
-                />
-                <span>,</span>
+                <span className="inline-flex items-center gap-0.5 whitespace-nowrap">
+                    <AnimatedPill
+                        item={current}
+                        onClick={handleNext}
+                        onPause={() => setIsPaused(true)}
+                        onResume={() => setIsPaused(false)}
+                        title="Click to switch platform"
+                        enterDelay={0.2}
+                        enterRotate={-12}
+                    />
+                    <span>,</span>
+                </span>
             </div>
 
-            {/* Line 2: Strictly single line, never wraps regardless of text changes */}
-            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
+            {/* Line 2: Responsive wrapping with opportunity pill */}
+            <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>and redirecting</span>
                 <AnimatedPill
                     item={currentOpp}
@@ -1029,8 +1031,8 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
                 <span>economics for</span>
             </div>
 
-            {/* Line 3: Strictly single line */}
-            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center text-center max-w-full'>
+            {/* Line 3 */}
+            <div className='flex flex-wrap items-center justify-center text-center max-w-full'>
                 <span>our developers.</span>
             </div>
         </div>
@@ -1132,7 +1134,7 @@ const Landing = ({ mode }: HeroProps) => {
                                     <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#FFBD2E] border border-black inline-block" />
                                     <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#27C93F] border border-black inline-block" />
                                 </div>
-                                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-0.5 sm:py-1 rounded-full bg-[#FAF6EE] border border-black text-[10px] sm:text-xs font-mono text-black font-bold max-w-[200px] sm:max-w-[340px] md:max-w-[440px] truncate shadow-[1px_1px_0px_#000]">
+                                <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-0.5 sm:py-1 rounded-full bg-[#FAF6EE] border border-black text-[10px] sm:text-xs font-mono text-black font-bold max-w-[130px] xs:max-w-[200px] sm:max-w-[340px] md:max-w-[440px] min-w-0 truncate shadow-[1px_1px_0px_#000]">
                                     <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>

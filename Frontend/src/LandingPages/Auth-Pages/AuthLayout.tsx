@@ -73,11 +73,6 @@ export const AuthLayout = ({
                 <div className={`w-full ${wide ? "max-w-2xl xl:max-w-3xl" : "max-w-[490px]"} mx-auto my-auto py-2 transition-all duration-200`}>
                     {/* Header Heading matching landing page neo-brutalist theme */}
                     <div className="mb-7 text-center">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] mb-3.5 select-none bg-white text-black">
-                            <span className="w-2 h-2 rounded-full bg-[#FFE566] border border-black" />
-                            <span>{trigger ? "Welcome Back" : "Get Started Free"}</span>
-                        </div>
-
                         <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-black tracking-tight text-black leading-tight">
                             {title}
                         </h1>

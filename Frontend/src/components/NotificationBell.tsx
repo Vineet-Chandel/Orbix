@@ -220,7 +220,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
             {/* Notification Dropdown Flyout (Desktop >= 640px) / Centered Modal (Mobile < 640px) */}
             {isOpen && (
                 <div
-                    className="orbix-notif-modal-overlay fixed inset-0 z-[75] flex items-center justify-center bg-black/40 overscroll-contain sm:contents"
+                    className="orbix-notif-modal-overlay fixed inset-0 z-[75] flex items-center justify-center bg-black/40 p-3 sm:p-0 overscroll-contain sm:contents"
                     onClick={() => setIsOpen(false)}
                 >
                     <div

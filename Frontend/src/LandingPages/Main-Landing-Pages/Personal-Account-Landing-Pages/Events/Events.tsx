@@ -914,7 +914,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                 {/* 3. Platform Filter Chips Row (High Contrast Platform Chips) */}
                 <section className="space-y-2">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-2 overflow-x-auto py-2.5 px-1 scrollbar-none max-w-full">
+                        <div className="flex items-center gap-2 overflow-x-auto py-2.5 px-1 scrollbar-none max-w-full min-w-0">
                             {/* "All Platforms" chip */}
                             <button
                                 type="button"

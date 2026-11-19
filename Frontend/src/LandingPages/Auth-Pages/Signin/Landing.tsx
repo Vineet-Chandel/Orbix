@@ -139,11 +139,11 @@ export default function SignInPage() {
             wide={false}
         >
             {/* Segmented Control / Signin-Type Selector */}
-            <div className="w-full p-1 bg-white border-2 border-black rounded-full shadow-[2px_2px_0px_#000] flex items-center mb-5 select-none">
+            <div className="w-full p-1 bg-white border-2 border-black rounded-full shadow-[2px_2px_0px_#000] grid grid-cols-2 mb-5 select-none">
                 <button
                     type="button"
                     onClick={handleSwitchToPersonal}
-                    className={`flex-1 py-2 px-3 rounded-full text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`w-full py-2 px-3 rounded-full text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         loginMode === "personal"
                             ? "bg-black text-white shadow-[1px_1px_0px_#000]"
                             : "bg-transparent text-neutral-600 hover:text-black"
@@ -157,7 +157,7 @@ export default function SignInPage() {
                 <button
                     type="button"
                     onClick={handleSwitchToClub}
-                    className={`flex-1 py-2 px-3 rounded-full text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`w-full py-2 px-3 rounded-full text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         loginMode === "club"
                             ? "bg-black text-white shadow-[1px_1px_0px_#000]"
                             : "bg-transparent text-neutral-600 hover:text-black"
