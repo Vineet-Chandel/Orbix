@@ -139,7 +139,7 @@ export interface UploadSignatureConfig {
 
 export async function fetchClubFullProfile(clubId?: string): Promise<ClubProfileResponse> {
     const url = clubId ? `/api/club/profile?clubId=${encodeURIComponent(clubId)}` : "/api/club/profile";
-    const res = await fetch(url, { credentials: "include" });
+    const res = await fetch(url, { credentials: "include", signal: AbortSignal.timeout(20000) });
     const data = await res.json();
     if (!res.ok || !data.success) {
         throw new Error(data?.message || "Failed to fetch club profile.");

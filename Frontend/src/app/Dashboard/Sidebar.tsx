@@ -1,3 +1,4 @@
+import { beginSignOut } from "../../api/authRequests";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, GraduationCap, Award, UserPlus } from "lucide-react";
@@ -8,7 +9,6 @@ import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
-import { buildApiUrl } from "../../api/apiClient";
 import { workspaceApi } from "../../api/workspaceApi";
 import { JoinClubModal } from "../Club/JoinClubModal";
 import type { UserClubWorkspaceSummary } from "../../types/workspace";
@@ -252,20 +252,11 @@ export const Sidebar = ({
     const displayEmail = user?.gmail || (user as any)?.email || "";
     const avatarSrc = user?.photoUrl || user?.avatarUrl || (user as any)?.avatar || DEFAULT_AVATAR_URL;
 
-    const handleSignOut = async () => {
-        try {
-            const logoutUrl = buildApiUrl("/api/auth/logout");
-            await fetch(logoutUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ gmail: user?.gmail || "" }),
-            });
-        } catch {
-            // ignore
-        }
+    const handleSignOut = () => {
+        const revocation = beginSignOut();
         dispatch(clearUser());
-        navigate("/auth/signin");
+        navigate("/auth/signin", { replace: true });
+        void revocation.catch((error) => console.warn("[Auth]", error.message));
     };
 
     const handleItemClick = (tab: SidebarTab) => {

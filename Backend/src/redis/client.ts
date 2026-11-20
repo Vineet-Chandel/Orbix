@@ -19,7 +19,8 @@ export function createRedisClient(customUrl?: string, role: "cache" | "queue" | 
 
     if (url && (url.startsWith("redis://") || url.startsWith("rediss://"))) {
         client = new Redis(url, {
-            maxRetriesPerRequest: role === "queue" ? null : 3,
+            maxRetriesPerRequest: role === "queue" ? null : 1,
+            ...(role === "queue" ? {} : { commandTimeout: 750, connectTimeout: 1500, enableOfflineQueue: false }),
             enableReadyCheck: true,
             lazyConnect: false,
         });
@@ -29,7 +30,8 @@ export function createRedisClient(customUrl?: string, role: "cache" | "queue" | 
             port: Number(process.env.REDIS_PORT) || 6379,
             username: process.env.REDIS_USERNAME || undefined,
             password: process.env.REDIS_PASSWORD || undefined,
-            maxRetriesPerRequest: role === "queue" ? null : 3,
+            maxRetriesPerRequest: role === "queue" ? null : 1,
+            ...(role === "queue" ? {} : { commandTimeout: 750, connectTimeout: 1500, enableOfflineQueue: false }),
             enableReadyCheck: true,
             lazyConnect: false,
         });

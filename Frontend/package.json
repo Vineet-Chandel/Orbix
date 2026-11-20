@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts src/app/Club/eventScopePoolSize.test.ts src/app/Club/ApplicationsRoster/teamReadinessFilterSort.test.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:forms": "npx tsx --test src/api/clubEventFormApi.test.ts src/app/Club/FormBuilder/draftSaveQueue.test.ts"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",

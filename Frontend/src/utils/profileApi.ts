@@ -1080,7 +1080,7 @@ export interface PrivacyAuditResponse {
 /**
  * Fetch discoverable public developer profiles with searching, filtering, and pagination
  */
-export async function fetchExploreProfiles(params: ExploreQueryParams = {}): Promise<ExploreResponse> {
+export async function fetchExploreProfiles(params: ExploreQueryParams = {}, signal?: AbortSignal): Promise<ExploreResponse> {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
         throw new Error("You appear to be offline. Please verify your internet connection.");
     }
@@ -1097,7 +1097,7 @@ export async function fetchExploreProfiles(params: ExploreQueryParams = {}): Pro
 
     const qs = query.toString();
     const path = `/api/profile/explore${qs ? `?${qs}` : ""}`;
-    return apiFetch<ExploreResponse>(path, { method: "GET" });
+    return apiFetch<ExploreResponse>(path, { method: "GET", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000) });
 }
 
 /**

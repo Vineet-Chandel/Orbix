@@ -147,6 +147,8 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
     // Submission states
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const submitLock = useRef(false);
+    const hasPendingUploads = Object.values(uploadProgress).some((progress) => progress > 0);
     const [submittedRegistration, setSubmittedRegistration] = useState<any>(userResponse || null);
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [copiedTicket, setCopiedTicket] = useState(false);
@@ -659,7 +661,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
     // Multi-Section Navigation with Conditional Routing
     const handleNext = async () => {
-        if (!activeSection) return;
+        if (!activeSection || isSubmitting || hasPendingUploads) return;
         if (!validateSection(activeSection)) {
             toast.error("Please answer all required questions properly before proceeding.");
             return;
@@ -724,7 +726,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
     // Form Submission with Idempotency Key Guard & Double Click Prevention
     const handleSubmit = async () => {
-        if (isSubmitting) return;
+        if (submitLock.current || isSubmitting || hasPendingUploads) return;
 
         const studentName = answers["q_student_name"] || effectiveProfile.fullName || "Student";
         const studentEmail = answers["q_student_email"] || effectiveProfile.email || "";
@@ -767,6 +769,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         }
 
         try {
+            submitLock.current = true;
             setIsSubmitting(true);
 
             // Generate cryptographically unique idempotency key
@@ -847,6 +850,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         } catch (err: any) {
             toast.error(err.message || "Failed to submit registration.");
         } finally {
+            submitLock.current = false;
             setIsSubmitting(false);
         }
     };
@@ -2818,11 +2822,13 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 <button
                     type="button"
                     onClick={handleNext}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || hasPendingUploads}
                     className="h-10 px-6 py-2 rounded-xl border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                     style={{ backgroundColor: accentColor, color: "#000" }}
                 >
-                    {isSubmitting ? (
+                    {hasPendingUploads ? (
+                        <><OrbixLoader size="xs" variant="inline" color="#000" /><span>Uploading attachments...</span></>
+                    ) : isSubmitting ? (
                         <>
                             <OrbixLoader size="xs" variant="inline" color="#000" />
                             <span>Submitting registration...</span>

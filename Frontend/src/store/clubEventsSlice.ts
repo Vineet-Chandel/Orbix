@@ -93,7 +93,7 @@ export const fetchClubEvents = createAsyncThunk<
 >("clubEvents/fetchClubEvents", async (clubId, { rejectWithValue }) => {
     try {
         const url = clubId ? `/api/club/events?clubId=${encodeURIComponent(clubId)}` : "/api/club/events";
-        const res = await fetch(url, { credentials: "include" });
+        const res = await fetch(url, { credentials: "include", signal: AbortSignal.timeout(20000) });
         const data = await res.json().catch(() => null);
 
         if (!res.ok || !data?.success) {

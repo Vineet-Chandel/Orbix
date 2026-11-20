@@ -25,6 +25,8 @@ export interface NetworkState {
     activeTab: "explore" | "connections" | "requests";
     explore: {
         items: ExploreDeveloper[];
+        requestId?: string;
+        queryKey?: string;
         total: number;
         page: number;
         hasMore: boolean;
@@ -112,13 +114,13 @@ export const fetchExploreDevelopersThunk = createAsyncThunk(
             limit?: number;
             isInitial?: boolean;
         },
-        { rejectWithValue }
+        { rejectWithValue, signal }
     ) => {
         if (typeof navigator !== "undefined" && !navigator.onLine) {
             return rejectWithValue("You appear to be offline. Please verify your internet connection.");
         }
         try {
-            const res = await fetchExploreProfiles(params);
+            const res = await fetchExploreProfiles(params, signal);
             if (!res.success) {
                 return rejectWithValue((res as any).message || "Failed to load explore developers");
             }
@@ -404,9 +406,15 @@ export const networkSlice = createSlice({
         },
     },
     extraReducers: (builder) => {
+        builder.addCase("user/clearUser", () => initialState);
         // --- Fetch Explore Developers ---
         builder
             .addCase(fetchExploreDevelopersThunk.pending, (state, action) => {
+                const { search, college, openToWork, verifiedOnly, sortBy } = action.meta.arg;
+                const queryKey = JSON.stringify([search, college, openToWork, verifiedOnly, sortBy]);
+                if (action.meta.arg.isInitial && state.explore.queryKey !== queryKey) state.explore.items = [];
+                state.explore.queryKey = queryKey;
+                state.explore.requestId = action.meta.requestId;
                 if (action.meta.arg.isInitial) {
                     state.explore.isLoading = true;
                 } else {
@@ -415,6 +423,8 @@ export const networkSlice = createSlice({
                 state.explore.error = null;
             })
             .addCase(fetchExploreDevelopersThunk.fulfilled, (state, action) => {
+                if (state.explore.requestId !== action.meta.requestId) return;
+                state.explore.requestId = undefined;
                 state.explore.isLoading = false;
                 state.explore.isLoadingMore = false;
                 const { users, total, page, totalPages, isInitial, availableColleges } = action.payload;
@@ -437,8 +447,11 @@ export const networkSlice = createSlice({
                 state.explore.hasMore = page < totalPages && users.length > 0;
             })
             .addCase(fetchExploreDevelopersThunk.rejected, (state, action) => {
+                if (state.explore.requestId !== action.meta.requestId) return;
+                state.explore.requestId = undefined;
                 state.explore.isLoading = false;
                 state.explore.isLoadingMore = false;
+                if (action.meta.aborted) return;
                 state.explore.error = (action.payload as string) || "Failed to load explore developers";
                 // On failure, disable hasMore if no items or if initial to prevent scroll retry flood
                 if (action.meta.arg.isInitial || state.explore.items.length === 0) {

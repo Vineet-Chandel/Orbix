@@ -1,3 +1,4 @@
+import { beginSignOut } from "../../api/authRequests";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -10,7 +11,6 @@ import { updateProfile } from "../../utils/profileApi";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
-import { buildApiUrl } from "../../api/apiClient";
 import type { SettingsViewKey } from "./types";
 import { SettingsHub } from "./SettingsHub";
 import { AccountCenterView } from "./AccountCenterView";
@@ -32,7 +32,7 @@ export default function SettingsPage() {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [isLoggingOut] = useState(false);
 
     // Controlled public profile state directly from user
     const [isPublic, setIsPublic] = useState<boolean>(() => {
@@ -131,30 +131,11 @@ export default function SettingsPage() {
     };
 
     // Handle logout action
-    const handleConfirmLogout = async () => {
-        setIsLoggingOut(true);
-        try {
-            const signoutUrl = buildApiUrl("/api/auth/signout");
-            await fetch(signoutUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-        } catch {
-            // ignore network failure on logout
-        } finally {
-            try {
-                localStorage.removeItem("orbix_token");
-                localStorage.removeItem("orbix_user");
-            } catch {
-                // ignore
-            }
-            dispatch(clearUser());
-            setIsLoggingOut(false);
-            setIsLogoutModalOpen(false);
-            toast.success("You have been signed out successfully.", { title: "Logged Out" });
-            navigate("/auth/signin");
-        }
+    const handleConfirmLogout = () => {
+        const revocation = beginSignOut();
+        dispatch(clearUser());
+        navigate("/auth/signin", { replace: true });
+        void revocation.catch((error) => console.warn("[Auth]", error.message));
     };
 
     // Render active view based on currentView

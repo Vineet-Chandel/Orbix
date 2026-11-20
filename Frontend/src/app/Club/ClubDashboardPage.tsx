@@ -1,4 +1,6 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { lazyWithRetry } from "../../utils/lazyWithRetry";
+import { beginSignOut } from "../../api/authRequests";
+import { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import { useNavigate, useSearchParams, useLocation, useParams } from "react-router-dom";
 import {
     Calendar,
@@ -36,20 +38,20 @@ import {
 import { useToast } from "../../context/ToastContext";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ClubSidebar, type ClubTab } from "./ClubSidebar";
-import ClubInboxModal from "./ClubInboxModal";
-import { ClubEventModal } from "./ClubEventModal";
-import { ClubEventAnalyticsSection } from "./ClubEventAnalyticsSection";
-import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
-import { WorkspaceShell } from "./TeamWorkspace/WorkspaceShell";
+const ClubInboxModal = lazyWithRetry(() => import("./ClubInboxModal"));
+const ClubEventModal = lazyWithRetry(() => import("./ClubEventModal").then((m) => ({ default: m.ClubEventModal })));
+const ClubEventAnalyticsSection = lazyWithRetry(() => import("./ClubEventAnalyticsSection").then((m) => ({ default: m.ClubEventAnalyticsSection })));
+const ClubTeamWorkspace = lazyWithRetry(() => import("./Team/ClubTeamWorkspace").then((m) => ({ default: m.ClubTeamWorkspace })));
+const WorkspaceShell = lazyWithRetry(() => import("./TeamWorkspace/WorkspaceShell").then((m) => ({ default: m.WorkspaceShell })));
 import type { TeamStats } from "./Team/types";
-import { ClubProfileManager } from "./Profile/ClubProfileManager";
-import { ClubSettingsView } from "./Settings/ClubSettingsView";
-import { OtherClubsSection } from "./OtherClubsSection";
-import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
-import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
-import { CertificateStudioWorkspace } from "./CertificateStudio/CertificateStudioWorkspace";
-import { EventScopeSelectionModal } from "./EventScopeSelectionModal";
-import { ClubCredibilityWorkspace } from "./Credibility/ClubCredibilityWorkspace";
+const ClubProfileManager = lazyWithRetry(() => import("./Profile/ClubProfileManager").then((m) => ({ default: m.ClubProfileManager })));
+const ClubSettingsView = lazyWithRetry(() => import("./Settings/ClubSettingsView").then((m) => ({ default: m.ClubSettingsView })));
+const OtherClubsSection = lazyWithRetry(() => import("./OtherClubsSection").then((m) => ({ default: m.OtherClubsSection })));
+const ClubEventDetailWorkspace = lazyWithRetry(() => import("./ClubEventDetailPage").then((m) => ({ default: m.ClubEventDetailWorkspace })));
+const ClubCertificateStudioModal = lazyWithRetry(() => import("./ClubCertificateStudioModal").then((m) => ({ default: m.ClubCertificateStudioModal })));
+const CertificateStudioWorkspace = lazyWithRetry(() => import("./CertificateStudio/CertificateStudioWorkspace").then((m) => ({ default: m.CertificateStudioWorkspace })));
+const EventScopeSelectionModal = lazyWithRetry(() => import("./EventScopeSelectionModal").then((m) => ({ default: m.EventScopeSelectionModal })));
+const ClubCredibilityWorkspace = lazyWithRetry(() => import("./Credibility/ClubCredibilityWorkspace").then((m) => ({ default: m.ClubCredibilityWorkspace })));
 import { ClubEventCard } from "./ClubEventCard";
 import { DashboardRouteSkeleton } from "../../components/ui/loader";
 
@@ -210,7 +212,7 @@ export default function ClubDashboardPage() {
     // Fetch team stats (counts & pending invitations)
     const fetchTeamStats = async (clubId: string) => {
         try {
-            const res = await fetch(`/api/club/team/stats?clubId=${clubId}`, { credentials: "include" });
+            const res = await fetch(`/api/club/team/stats?clubId=${clubId}`, { credentials: "include", signal: AbortSignal.timeout(15000) });
             if (res.ok) {
                 const data = await res.json();
                 if (data?.success) {
@@ -255,9 +257,10 @@ export default function ClubDashboardPage() {
             if (!clubState.isInitialized || force) {
                 setLoading(true);
             }
+            // Event loading must not hold the entire club dashboard behind its response.
+            void dispatch(fetchClubEvents(club?.id));
             const [profileResult] = await Promise.allSettled([
                 dispatch(fetchClubProfile({ force })).unwrap(),
-                dispatch(fetchClubEvents(club?.id)).unwrap(),
             ]);
 
             if (profileResult.status === "fulfilled") {
@@ -294,7 +297,7 @@ export default function ClubDashboardPage() {
         isFetchingInboxRef.current = true;
         try {
             const queryParam = club?.id ? `?clubId=${encodeURIComponent(club.id)}` : "";
-            const res = await fetch(`/api/club/inbox/unread-count${queryParam}`, { credentials: "include" });
+            const res = await fetch(`/api/club/inbox/unread-count${queryParam}`, { credentials: "include", signal: AbortSignal.timeout(15000) });
             if (res.ok) {
                 const data = await res.json();
                 if (data?.success && data.counts) {
@@ -420,14 +423,11 @@ export default function ClubDashboardPage() {
     }, [events, eventFilter]);
 
     // Handle Logout
-    const handleSignOut = async () => {
-        try {
-            await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-        } catch {
-            // ignore
-        }
+    const handleSignOut = () => {
+        const revocation = beginSignOut();
         dispatch(clearUser());
         navigate("/auth/signin?tab=club", { replace: true });
+        void revocation.catch((error) => console.warn("[Auth]", error.message));
     };
 
     // Date formatting matching Personal Account ("Today, 29 October 2026")
@@ -830,7 +830,8 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: MANAGE CLUB PROFILE */}
                         {activeTab === "profile" && (
-                            <ClubProfileManager
+                            <Suspense fallback={<DashboardRouteSkeleton />}>
+                                <ClubProfileManager
                                 clubId={club.id}
                                 onProfileUpdated={(updatedClub) => {
                                     if (updatedClub) {
@@ -838,6 +839,7 @@ export default function ClubDashboardPage() {
                                     }
                                 }}
                             />
+                            </Suspense>
                         )}
 
                         {/* TAB: DASHBOARD OVERVIEW */}
@@ -935,7 +937,9 @@ export default function ClubDashboardPage() {
                                 </div>
 
                                 {/* Club Credibility & Accountability Standing (Full Width) */}
-                                <ClubCredibilityWorkspace />
+                                <Suspense fallback={<DashboardRouteSkeleton />}>
+                                    <ClubCredibilityWorkspace />
+                                </Suspense>
 
                                 {/* Recent Events Preview */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
@@ -989,16 +993,19 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: CLUB TEAM WORKSPACE */}
                         {activeTab === "team-workspace" && (
-                            <WorkspaceShell
+                            <Suspense fallback={<DashboardRouteSkeleton />}>
+                                <WorkspaceShell
                                 club={club}
                                 isClubContext={true}
                                 onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
+                            </Suspense>
                         )}
 
                         {/* TAB: CLUB TEAM & ORGANISATION */}
                         {(activeTab === "team" || activeTab === "recruitment") && (
-                            <ClubTeamWorkspace
+                            <Suspense fallback={<DashboardRouteSkeleton />}>
+                                <ClubTeamWorkspace
                                 club={club}
                                 hideHeaderTitle={true}
                                 initialTab={
@@ -1015,19 +1022,23 @@ export default function ClubDashboardPage() {
                                     }
                                 }}
                             />
+                            </Suspense>
                         )}
 
                         {/* TAB: CLUB EVENTS & WORKSHOPS (EXCLUSIVELY FOR EVENTS TAB) */}
                         {activeTab === "events" && (
                             eventId ? (
-                                <ClubEventDetailWorkspace
+                                <Suspense fallback={<DashboardRouteSkeleton />}>
+                                    <ClubEventDetailWorkspace
                                     eventId={eventId}
                                     club={club}
                                     onBack={() => navigate("/club/events")}
                                     onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 />
+                                </Suspense>
                             ) : isEventModalOpen ? (
-                                <ClubEventModal
+                                <Suspense fallback={<DashboardRouteSkeleton />}>
+                                    <ClubEventModal
                                     isOpen={isEventModalOpen}
                                     onClose={() => {
                                         setIsEventModalOpen(false);
@@ -1044,6 +1055,7 @@ export default function ClubDashboardPage() {
                                     initialStatus={initialModalStatus}
                                     onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 />
+                                </Suspense>
                             ) : (
                                 <div className="space-y-6">
                                     {/* Filter Pills Bar */}
@@ -1148,7 +1160,8 @@ export default function ClubDashboardPage() {
                         {/* TAB: TRENDS & ANALYTICS */}
                         {activeTab === "analytics" && (
                             <div className="space-y-6">
-                                <ClubEventAnalyticsSection
+                                <Suspense fallback={<DashboardRouteSkeleton />}>
+                                    <ClubEventAnalyticsSection
                                     events={events}
                                     currentFilter={eventFilter}
                                     onSelectFilter={(filter) => {
@@ -1157,17 +1170,20 @@ export default function ClubDashboardPage() {
                                     }}
                                     onOpenCreateModal={() => openCreateEventModal("published")}
                                 />
+                                </Suspense>
                             </div>
                         )}
 
                         {/* TAB: CERTIFICATES & CREDENTIALS STUDIO */}
                         {activeTab === "certificates" && (
-                            <CertificateStudioWorkspace
+                            <Suspense fallback={<DashboardRouteSkeleton />}>
+                                <CertificateStudioWorkspace
                                 clubId={club.id}
                                 clubName={club.name}
                                 clubLogo={club.logo_url}
                                 onOpenLegacyModal={() => setIsCertStudioOpen(true)}
                             />
+                            </Suspense>
                         )}
 
                         {/* TAB: FEEDBACK & SURVEYS */}
@@ -1212,7 +1228,8 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: CAMPUS CLUBS & DIRECTORY */}
                         {activeTab === "clubs" && (
-                            <OtherClubsSection
+                            <Suspense fallback={<DashboardRouteSkeleton />}>
+                                <OtherClubsSection
                                 currentClubId={club.id}
                                 currentClubSlug={club.slug}
                                 collegeId={(club as any).college_id || (club as any).collegeId}
@@ -1221,15 +1238,18 @@ export default function ClubDashboardPage() {
                                 onNavigateToEditProfile={() => handleTabChange("profile")}
                                 onNavigateToTab={handleTabChange}
                             />
+                            </Suspense>
                         )}
 
                         {/* TAB: CLUB SETTINGS & PREFERENCES */}
                         {activeTab === "settings" && (
-                            <ClubSettingsView
+                            <Suspense fallback={<DashboardRouteSkeleton />}>
+                                <ClubSettingsView
                                 club={club}
                                 user={user}
                                 onSignOut={handleSignOut}
                             />
+                            </Suspense>
                         )}
                     </div>
 
@@ -1239,16 +1259,19 @@ export default function ClubDashboardPage() {
             </div>
 
             {/* Event Scope Selection Modal (Pan India vs Campus-Only) */}
-            <EventScopeSelectionModal
+            {isScopeModalOpen && <Suspense fallback={<DashboardRouteSkeleton />}>
+<EventScopeSelectionModal
                 isOpen={isScopeModalOpen}
                 onClose={() => setIsScopeModalOpen(false)}
                 onSelectScope={handleSelectScope}
                 collegeName={club?.college_name}
                 collegeId={(club as any)?.college_id || (club as any)?.collegeId}
             />
+            </Suspense>}
 
             {/* Club Inbox Modal */}
-            <ClubInboxModal
+            {isInboxModalOpen && <Suspense fallback={<DashboardRouteSkeleton />}>
+<ClubInboxModal
                 isOpen={isInboxModalOpen}
                 onClose={() => {
                     setIsInboxModalOpen(false);
@@ -1261,12 +1284,15 @@ export default function ClubDashboardPage() {
                 clubName={club.name}
                 onUnreadCountChange={(newCount) => setInboxCounts((prev) => ({ ...prev, unreadCount: newCount }))}
             />
+            </Suspense>}
 
             {/* Attached Certificate Issuance Studio Modal */}
-            <ClubCertificateStudioModal
+            {isCertStudioOpen && <Suspense fallback={<DashboardRouteSkeleton />}>
+<ClubCertificateStudioModal
                 isOpen={isCertStudioOpen}
                 onClose={() => setIsCertStudioOpen(false)}
             />
+            </Suspense>}
         </div>
     );
 }

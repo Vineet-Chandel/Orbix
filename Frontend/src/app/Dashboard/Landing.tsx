@@ -1,32 +1,33 @@
-import { useState, useEffect } from "react";
+import { lazyWithRetry } from "../../utils/lazyWithRetry";
+import { DashboardRouteSkeleton } from "../../components/ui/loader";
+import { useState, useEffect, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Code2, GitBranch, GraduationCap, Sparkles } from "lucide-react";
-import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
+import { useAppSelector } from "../../store";
 import { NotificationBell } from "../../components/NotificationBell";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
 import { Sidebar, type SidebarTab } from "./Sidebar";
-import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
-import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
-import { ContestPerformanceSection } from "./ContestPerformanceSection";
-import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
-import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentAnalyticsSection";
-import { NotificationsView } from "../Notifications/NotificationsView";
-import { TrendsView } from "../Trends/TrendsView";
-import { ResumeManager } from "../Resume/ResumeManager";
-import { ExploreView } from "../Explore/ExploreView";
-import { StudentCampusClubsView } from "../Club/CollegeClubs/StudentCampusClubsView";
-import { CollegeEventsView } from "../Events/CollegeEventsView";
-import { StudentActivityView } from "../Events/StudentActivityView";
-import { ProjectsManagementView } from "../Projects/ProjectsManagementView";
-import { UserCertificateWalletView } from "../Certificates/UserCertificateWalletView";
-import { MemberWorkspaceView } from "../Club/TeamWorkspace/MemberWorkspaceView";
+const CodingSubmissionsTable = lazyWithRetry(() => import("./CodingSubmissionsTable").then((m) => ({ default: m.CodingSubmissionsTable })));
+const DevelopmentContributionsTable = lazyWithRetry(() => import("./DevelopmentContributionsTable").then((m) => ({ default: m.DevelopmentContributionsTable })));
+const ContestPerformanceSection = lazyWithRetry(() => import("./ContestPerformanceSection").then((m) => ({ default: m.ContestPerformanceSection })));
+const PracticeAnalyticsSection = lazyWithRetry(() => import("./PracticeAnalytics/PracticeAnalyticsSection").then((m) => ({ default: m.PracticeAnalyticsSection })));
+const DevelopmentAnalyticsSection = lazyWithRetry(() => import("./DevelopmentAnalytics/DevelopmentAnalyticsSection").then((m) => ({ default: m.DevelopmentAnalyticsSection })));
+const NotificationsView = lazyWithRetry(() => import("../Notifications/NotificationsView").then((m) => ({ default: m.NotificationsView })));
+const TrendsView = lazyWithRetry(() => import("../Trends/TrendsView").then((m) => ({ default: m.TrendsView })));
+const ResumeManager = lazyWithRetry(() => import("../Resume/ResumeManager").then((m) => ({ default: m.ResumeManager })));
+const ExploreView = lazyWithRetry(() => import("../Explore/ExploreView").then((m) => ({ default: m.ExploreView })));
+const StudentCampusClubsView = lazyWithRetry(() => import("../Club/CollegeClubs/StudentCampusClubsView").then((m) => ({ default: m.StudentCampusClubsView })));
+const CollegeEventsView = lazyWithRetry(() => import("../Events/CollegeEventsView").then((m) => ({ default: m.CollegeEventsView })));
+const StudentActivityView = lazyWithRetry(() => import("../Events/StudentActivityView").then((m) => ({ default: m.StudentActivityView })));
+const ProjectsManagementView = lazyWithRetry(() => import("../Projects/ProjectsManagementView").then((m) => ({ default: m.ProjectsManagementView })));
+const UserCertificateWalletView = lazyWithRetry(() => import("../Certificates/UserCertificateWalletView").then((m) => ({ default: m.UserCertificateWalletView })));
+const MemberWorkspaceView = lazyWithRetry(() => import("../Club/TeamWorkspace/MemberWorkspaceView").then((m) => ({ default: m.MemberWorkspaceView })));
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export default function Dashboard() {
     const location = useLocation();
     const navigate = useNavigate();
-    const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
 
     // Determine initial active tab based on pathname
@@ -57,9 +58,6 @@ export default function Dashboard() {
         setActiveTab(getTabFromPath(location.pathname));
     }, [location.pathname]);
 
-    useEffect(() => {
-        dispatch(fetchUserProfile());
-    }, [dispatch]);
 
     const displayName = user?.firstName
         ? `${user.firstName} ${user.lastName || ""}`.trim()
@@ -164,6 +162,7 @@ export default function Dashboard() {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden min-w-0 w-full max-w-full p-2 sm:p-3 lg:p-3">
+                <Suspense fallback={<DashboardRouteSkeleton />}>
                 {activeTab === "college-events" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <CollegeEventsView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
@@ -400,6 +399,7 @@ export default function Dashboard() {
                         <SectionBottomIllustration alt="Dashboard workspace illustration" />
                     </section>
                 )}
+                </Suspense>
             </div>
         </div>
     );

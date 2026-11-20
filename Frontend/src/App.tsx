@@ -107,6 +107,9 @@ const App = () => {
 
   // Fetch /profile/me on app load/refresh to sync Redux with active session
   useEffect(() => {
+    try {
+      if (localStorage.getItem("orbix_signed_out")) return;
+    } catch { /* Verify the session normally when storage is unavailable. */ }
     dispatch(fetchUserProfile());
   }, [dispatch]);
 

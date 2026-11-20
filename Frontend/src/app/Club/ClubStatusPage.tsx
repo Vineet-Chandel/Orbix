@@ -1,3 +1,4 @@
+import { beginSignOut } from "../../api/authRequests";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -269,21 +270,11 @@ export default function ClubStatusPage() {
         return () => clearInterval(timer);
     }, [user?.accountType]);
 
-    const handleLogout = async () => {
-        try {
-            await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
-        } catch {
-            // ignore
-        }
-        try {
-            localStorage.removeItem("orbix_token");
-            localStorage.removeItem("orbix_user");
-        } catch {
-            // ignore
-        }
+    const handleLogout = () => {
+        const revocation = beginSignOut();
         dispatch(clearUser());
-        toast.info("Signed out successfully.");
-        navigate("/auth/signin?tab=club");
+        navigate("/auth/signin?tab=club", { replace: true });
+        void revocation.catch((error) => console.warn("[Auth]", error.message));
     };
 
     // Handle sending OTP to contact email

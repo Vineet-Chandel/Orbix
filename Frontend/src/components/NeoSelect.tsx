@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useId } from "react";
+import React, { useState, useRef, useEffect, useId, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Check } from "lucide-react";
 
 export interface NeoSelectOption {
@@ -27,6 +28,7 @@ export interface NeoSelectProps {
     error?: string;
     "aria-label"?: string;
     size?: "sm" | "md" | "lg";
+    portal?: boolean;
     placement?: "bottom" | "top" | "auto";
 }
 
@@ -54,6 +56,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
     "aria-label": ariaLabel,
     size = "md",
     placement = "auto",
+    portal = false,
 }) => {
     const generatedId = useId();
     const id = propId || generatedId;
@@ -98,6 +101,33 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
     const triggerRef = useRef<HTMLButtonElement>(null);
     const listboxRef = useRef<HTMLUListElement>(null);
 
+    const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+    useLayoutEffect(() => {
+        if (!isOpen || !portal) return;
+        const position = () => {
+            const rect = triggerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const below = window.innerHeight - rect.bottom - 12;
+            const above = rect.top - 12;
+            const top = placement === "top" || (placement === "auto" && below < 240 && above > below);
+            const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 24);
+            setMenuStyle({
+                position: "fixed", width, left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
+                top: top ? undefined : rect.bottom + 6,
+                bottom: top ? window.innerHeight - rect.top + 6 : undefined,
+                maxHeight: Math.max(0, Math.min(320, top ? above : below)),
+                zIndex: 10000,
+            });
+        };
+        position();
+        window.addEventListener("resize", position);
+        window.addEventListener("scroll", position, true);
+        return () => {
+            window.removeEventListener("resize", position);
+            window.removeEventListener("scroll", position, true);
+        };
+    }, [isOpen, portal, placement]);
+
     // Compute dynamic placement
     useEffect(() => {
         if (isOpen && placement === "auto") {
@@ -133,7 +163,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
     useEffect(() => {
         if (!isOpen) return;
         const handleClickOutside = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node) && !listboxRef.current?.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
@@ -263,6 +293,8 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
         lg: "h-12 px-4 text-sm rounded-2xl",
     };
 
+    const renderMenu = (menu: React.ReactNode) => portal ? createPortal(menu, document.body) : menu;
+
     return (
         <div className={`relative w-full ${className}`} ref={containerRef}>
             {label && (
@@ -294,6 +326,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}
                 aria-controls={listboxId}
+                aria-activedescendant={isOpen && highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined}
                 aria-label={ariaLabel || label}
                 className={`w-full flex items-center justify-between gap-2 bg-[#FAF6EE] hover:bg-white focus:bg-white text-black border-2 border-black font-bold transition-all shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] focus:outline-none focus:ring-2 focus:ring-black/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none ${sizeClasses[size]} ${
                     error ? "border-rose-600 bg-rose-50" : ""
@@ -317,15 +350,18 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
             </button>
 
             {/* Dropdown Popover */}
-            {isOpen && (
+            {isOpen && renderMenu(
                 <ul
                     id={listboxId}
                     ref={listboxRef}
                     role="listbox"
                     aria-activedescendant={highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined}
                     tabIndex={-1}
-                    className={`absolute left-0 right-0 ${
-                        effectivePlacement === "top"
+                    style={portal ? menuStyle : undefined}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`${portal ? "" : "absolute left-0 right-0"} ${
+                        portal ? "" : effectivePlacement === "top"
                             ? "bottom-full mb-1.5"
                             : "top-full mt-1.5"
                     } z-[100] rounded-xl sm:rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] p-1.5 space-y-1 overflow-y-auto max-h-60 animate-fadeIn ${dropdownClassName}`}

@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
+    Loader2,
     Trash2,
     Copy,
     Image,
@@ -56,6 +57,7 @@ export interface QuestionCardProps {
     isActive: boolean;
     isQuiz?: boolean;
     defaultPoints?: number;
+    onUploadStateChange?: (questionId: string, uploading: boolean) => void;
     onSelect: () => void;
     onChange: (updated: FormQuestion) => void;
     onDelete: () => void;
@@ -121,6 +123,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
     isActive,
     isQuiz = false,
     defaultPoints = 1,
+    onUploadStateChange,
     onSelect,
     onChange,
     onDelete,
@@ -158,7 +161,20 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
 
     // Uploading states
     const [isUploadingImage, setIsUploadingImage] = useState(false);
-    const [uploadingOptionIdx, setUploadingOptionIdx] = useState<number | null>(null);
+    const [uploadingOptionId, setUploadingOptionId] = useState<string | null>(null);
+
+    const latest = useRef({ question, onChange });
+    latest.current = { question, onChange };
+    const uploadLock = useRef(false);
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
+    useEffect(() => {
+        onUploadStateChange?.(question.id, isUploadingImage || uploadingOptionId !== null);
+        return () => onUploadStateChange?.(question.id, false);
+    }, [isUploadingImage, uploadingOptionId, question.id, onUploadStateChange]);
 
     const isContentBlock =
         question.type === "title_card" ||
@@ -224,14 +240,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
     // Question Image Upload
     const handleUploadQuestionImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file || uploadLock.current) return;
+        const input = e.currentTarget;
+        uploadLock.current = true;
 
         try {
             setIsUploadingImage(true);
             const signatureConfig = await requestFormMediaSignature(eventId, "question", question.id);
             const result = await uploadFileToCloudinary(signatureConfig, file);
-            onChange({
-                ...question,
+            if (!mounted.current) return;
+            latest.current.onChange({
+                ...latest.current.question,
                 imageUrl: result.secureUrl,
                 imagePublicId: result.publicId,
             });
@@ -240,35 +259,44 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
             toast.error(err.message || "Failed to upload image.");
         } finally {
             setIsUploadingImage(false);
-            e.target.value = "";
+            uploadLock.current = false;
+            input.value = "";
         }
     };
 
     // Option Image Upload
     const handleUploadOptionImage = async (optIdx: number, e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file || uploadLock.current) return;
+        const input = e.currentTarget;
+        uploadLock.current = true;
 
         try {
-            setUploadingOptionIdx(optIdx);
+            const optionId = question.options?.[optIdx]?.id;
+            setUploadingOptionId(optionId || null);
             const signatureConfig = await requestFormMediaSignature(eventId, "question", `${question.id}_opt_${optIdx}`);
             const result = await uploadFileToCloudinary(signatureConfig, file);
-            const newOptions = [...(question.options || [])];
-            newOptions[optIdx] = {
-                ...newOptions[optIdx],
+            if (!mounted.current) return;
+            const current = latest.current.question;
+            const newOptions = [...(current.options || [])];
+            const currentIdx = newOptions.findIndex((option) => option.id === optionId);
+            if (currentIdx < 0) return;
+            newOptions[currentIdx] = {
+                ...newOptions[currentIdx],
                 imageUrl: result.secureUrl,
                 imagePublicId: result.publicId,
             };
-            onChange({
-                ...question,
+            latest.current.onChange({
+                ...current,
                 options: newOptions,
             });
             toast.success("Option image attached!");
         } catch (err: any) {
             toast.error(err.message || "Failed to upload option image.");
         } finally {
-            setUploadingOptionIdx(null);
-            e.target.value = "";
+            setUploadingOptionId(null);
+            uploadLock.current = false;
+            input.value = "";
         }
     };
 
@@ -382,19 +410,23 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                         {/* Image attach icon button */}
                         <label
                             className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-neutral-600 dark:text-neutral-400 shadow-sm transition-colors"
-                            title="Attach Image"
+                            aria-busy={isUploadingImage}
+                            title={isUploadingImage ? "Uploading image…" : "Attach Image"}
                         >
-                            <Image className="w-4 h-4" />
+                            {isUploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
+                            {isUploadingImage && <span role="status" className="sr-only">Uploading question image…</span>}
                             <input
                                 type="file"
                                 accept="image/*"
                                 onChange={handleUploadQuestionImage}
                                 className="hidden"
-                                disabled={isUploadingImage}
+                                disabled={isUploadingImage || uploadingOptionId !== null}
                             />
                         </label>
 
                         <NeoSelect
+                            portal
+                            aria-label="Question type"
                             value={question.type}
                             onChange={(val) => handleTypeChange(val as FormQuestionType)}
                             size="sm"
@@ -403,11 +435,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                 label: t.label,
                                 icon: <t.icon className="w-3.5 h-3.5" />,
                             }))}
-                            triggerClassName="text-xs font-semibold min-w-[150px]"
+                            className="w-[190px] sm:w-[210px]"
+                            triggerClassName="text-xs font-semibold"
                         />
                     </div>
                 </div>
 
+                {(isUploadingImage || uploadingOptionId !== null) && (
+                    <div role="status" aria-live="polite" className="flex items-center gap-2 text-xs font-bold text-neutral-600">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Uploading image… Please wait before saving or publishing.
+                    </div>
+                )}
                 {/* Uploaded Question Image Preview */}
                 {question.imageUrl && (
                     <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden bg-neutral-50 dark:bg-neutral-900 max-w-md group/img">
@@ -733,19 +771,19 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                     </div>
                 )}
 
-                {/* 3. Multiple Choice */}
-                {question.type === "multiple_choice" && (
+                {/* Shared choice editor keeps radio and checkbox options consistent. */}
+                {(question.type === "multiple_choice" || question.type === "checkboxes") && (
                     <div className="space-y-2.5 pt-2">
                         {(question.options || []).map((opt, optIdx) => (
                             <div key={opt.id} className="flex items-center gap-2 group/opt">
-                                <div className="w-4 h-4 rounded-full border border-neutral-300 dark:border-neutral-600 shrink-0" />
+                                <div className={`w-4 h-4 border border-neutral-300 dark:border-neutral-600 shrink-0 ${question.type === "checkboxes" ? "rounded" : "rounded-full"}`} />
                                 <input
                                     type="text"
                                     value={opt.text}
                                     onChange={(e) => handleUpdateOption(optIdx, e.target.value)}
                                     placeholder={`Option ${optIdx + 1}`}
                                     disabled={opt.isOther}
-                                    className={`flex-1 text-xs font-bold py-1 px-2 border-b border-black/20 focus:border-black focus:outline-none bg-transparent ${
+                                    className={`min-w-0 flex-1 text-xs font-bold py-1 px-2 border-b border-black/20 focus:border-black focus:outline-none bg-transparent ${
                                         opt.isOther ? "italic text-neutral-500" : "text-black"
                                     }`}
                                 />
@@ -778,18 +816,19 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                     className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-black cursor-pointer"
                                     title="Attach image to option"
                                 >
-                                    <Image className="w-3.5 h-3.5" />
+                                    {uploadingOptionId === opt.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Image className="w-3.5 h-3.5" />}
+                                    {uploadingOptionId === opt.id && <span role="status" className="sr-only">Uploading option image…</span>}
                                     <input
                                         type="file"
                                         accept="image/*"
                                         onChange={(e) => handleUploadOptionImage(optIdx, e)}
                                         className="hidden"
-                                        disabled={uploadingOptionIdx === optIdx}
+                                        disabled={isUploadingImage || uploadingOptionId !== null}
                                     />
                                 </label>
 
                                 {/* Conditional Section Routing dropdown */}
-                                {showRouting && (
+                                {showRouting && question.type === "multiple_choice" && (
                                     <NeoSelect
                                         value={opt.goToSectionId || "next_section"}
                                         onChange={(val) => handleOptionBranching(optIdx, val)}
@@ -812,97 +851,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                         onClick={() => handleRemoveOption(optIdx)}
                                         className="p-1 rounded-lg text-neutral-400 hover:text-rose-600 cursor-pointer"
                                         title="Remove option"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-
-                        <div className="flex items-center gap-3 pt-2 text-xs font-black">
-                            <button
-                                type="button"
-                                onClick={handleAddOption}
-                                className="text-black hover:underline flex items-center gap-1 cursor-pointer"
-                            >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Add Option</span>
-                            </button>
-                            {!(question.options || []).some((o) => o.isOther) && (
-                                <>
-                                    <span className="text-neutral-400">or</span>
-                                    <button
-                                        type="button"
-                                        onClick={handleAddOtherOption}
-                                        className="text-sky-700 hover:underline cursor-pointer"
-                                    >
-                                        Add "Other"
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* 4. Checkboxes */}
-                {question.type === "checkboxes" && (
-                    <div className="space-y-2.5 pt-2">
-                        {(question.options || []).map((opt, optIdx) => (
-                            <div key={opt.id} className="flex items-center gap-2 group/opt">
-                                <div className="w-4 h-4 rounded border border-neutral-300 dark:border-neutral-600 shrink-0" />
-                                <input
-                                    type="text"
-                                    value={opt.text}
-                                    onChange={(e) => handleUpdateOption(optIdx, e.target.value)}
-                                    placeholder={`Option ${optIdx + 1}`}
-                                    disabled={opt.isOther}
-                                    className={`flex-1 text-xs font-bold py-1 px-2 border-b border-black/20 focus:border-black focus:outline-none bg-transparent ${
-                                        opt.isOther ? "italic text-neutral-500" : "text-black"
-                                    }`}
-                                />
-
-                                {/* Option Image Preview */}
-                                {opt.imageUrl && (
-                                    <div className="relative shrink-0">
-                                        <img
-                                            src={getCloudinaryThumbnailUrl(opt.imageUrl, 100)}
-                                            alt=""
-                                            loading="lazy"
-                                            className="w-7 h-7 rounded-lg border border-black object-cover"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const newOpts = [...(question.options || [])];
-                                                newOpts[optIdx] = { ...newOpts[optIdx], imageUrl: null, imagePublicId: null };
-                                                onChange({ ...question, options: newOpts });
-                                            }}
-                                            className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-white border border-black text-rose-600"
-                                        >
-                                            <X className="w-2.5 h-2.5" />
-                                        </button>
-                                    </div>
-                                )}
-
-                                <label
-                                    className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-black cursor-pointer"
-                                    title="Attach image to option"
-                                >
-                                    <Image className="w-3.5 h-3.5" />
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => handleUploadOptionImage(optIdx, e)}
-                                        className="hidden"
-                                        disabled={uploadingOptionIdx === optIdx}
-                                    />
-                                </label>
-
-                                {(question.options || []).length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveOption(optIdx)}
-                                        className="p-1 rounded-lg text-neutral-400 hover:text-rose-600 cursor-pointer"
                                     >
                                         <X className="w-3.5 h-3.5" />
                                     </button>

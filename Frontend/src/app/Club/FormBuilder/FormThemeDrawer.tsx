@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Palette, X, Check, Sparkles, RefreshCw } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
@@ -8,6 +8,7 @@ import { AdaptiveImageDropzone } from "../../../components/media/AdaptiveImageDr
 
 export interface FormThemeDrawerProps {
     isOpen: boolean;
+    onUploadStateChange?: (id: string, uploading: boolean) => void;
     onClose: () => void;
     theme: FormThemeSettings;
     headerImageUrl?: string | null;
@@ -62,6 +63,7 @@ const FONT_OPTIONS: { label: string; value: "sans" | "serif" | "mono" | "display
 
 export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
     isOpen,
+    onUploadStateChange,
     onClose,
     theme,
     headerImageUrl,
@@ -72,18 +74,28 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
     const toast = useToast();
     const [isUploading, setIsUploading] = useState(false);
 
+    const uploadLock = useRef(false);
+    const latestHeaderChange = useRef(onChangeHeaderImage);
+    latestHeaderChange.current = onChangeHeaderImage;
+    useEffect(() => () => onUploadStateChange?.("header", false), [onUploadStateChange]);
+
     if (!isOpen) return null;
 
     const handleUploadHeaderFile = async (file: File) => {
+        if (uploadLock.current) return;
+        uploadLock.current = true;
+        onUploadStateChange?.("header", true);
         try {
             setIsUploading(true);
             const signatureConfig = await requestFormMediaSignature(eventId, "banner");
             const result = await uploadFileToCloudinary(signatureConfig, file);
-            onChangeHeaderImage(result.secureUrl, result.publicId);
+            latestHeaderChange.current(result.secureUrl, result.publicId);
             toast.success("Form header banner updated successfully!");
         } catch (err: any) {
             toast.error(err.message || "Failed to upload header banner.");
         } finally {
+            uploadLock.current = false;
+            onUploadStateChange?.("header", false);
             setIsUploading(false);
         }
     };
@@ -107,7 +119,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
             {/* Backdrop Overlay */}
             <div
                 className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-full h-full bg-black/70 backdrop-blur-sm"
-                onClick={onClose}
+                onClick={() => { if (!isUploading) onClose(); }}
             />
 
             {/* Neo-brutalist Centered Theme Panel (Dead Center of Screen) */}
@@ -131,7 +143,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                     </div>
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => { if (!isUploading) onClose(); }}
                         className="w-8 h-8 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                         title="Close theme panel"
                     >
@@ -343,7 +355,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                     </button>
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => { if (!isUploading) onClose(); }}
                         className="flex-1 py-2.5 rounded-xl bg-[#A2FF86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1.5px_1.5px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 uppercase tracking-wider"
                     >
                         <Sparkles className="w-4 h-4 stroke-[2.5]" />

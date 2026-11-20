@@ -365,24 +365,26 @@ export const RecentDevelopersCarousel: React.FC<RecentDevelopersCarouselProps> =
     // Fetch up to 10 recent developers excluding current candidate and authenticated user
     useEffect(() => {
         let isMounted = true;
+        const controller = new AbortController();
         async function loadRecent() {
             try {
                 const res = await fetchExploreProfiles({
                     sortBy: "recent",
                     limit: 10,
                     excludeUsername: currentUsername,
-                });
+                }, controller.signal);
                 if (isMounted && res.success && Array.isArray(res.users) && res.users.length > 0) {
                     setDevelopers(res.users);
                     setCurrentIndex(0);
                 }
             } catch (err) {
-                console.error("Failed to fetch recent active developers:", err);
+                if (!controller.signal.aborted) console.error("Failed to fetch recent active developers:", err);
             }
         }
         loadRecent();
         return () => {
             isMounted = false;
+            controller.abort();
         };
     }, [currentUsername]);
 

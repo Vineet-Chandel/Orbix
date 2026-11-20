@@ -782,7 +782,7 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
 
         await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
-        await userDetailsCache({
+        void userDetailsCache({
             id: user.id,
             firstName: user.firstName,
             middleName: user.middleName,
@@ -1068,7 +1068,7 @@ const handleSignout = async (req: Request, res: Response) => {
         let userId: string | null = null;
 
         // Extract session ID and user from cookie/JWT
-        const rawToken = req.cookies?.token || req.cookies?.refreshToken;
+        const rawToken = req.cookies?.token || req.cookies?.refreshToken || req.headers.authorization?.replace(/^Bearer /i, "");
         if (rawToken && typeof rawToken === "string") {
             try {
                 const decoded = jwt.decode(rawToken) as any;
@@ -1093,18 +1093,11 @@ const handleSignout = async (req: Request, res: Response) => {
             });
         }
 
-        if (gmail && typeof gmail === 'string') {
-            await deleteUserDetailsCache(gmail).catch(() => { });
-            // Also invalidate profile and portals caches in Redis
-            try {
-                if (redis && redis.status === "ready") {
-                    await Promise.allSettled([
-                        redis.del(`user:portals:${gmail}`),
-                        redis.del(`profile:public:${gmail}`),
-                    ]);
-                }
-            } catch {
-                // ignore
+        if (gmail && typeof gmail === "string") {
+            const normalizedGmail = gmail.toLowerCase().trim();
+            void deleteUserDetailsCache(normalizedGmail).catch(() => undefined);
+            if (redis.status === "ready") {
+                void redis.del(`user:portals:${normalizedGmail}`, `profile:public:${normalizedGmail}`).catch(() => undefined);
             }
         }
 

@@ -381,9 +381,10 @@ export interface FormStatsResponse {
 /**
  * Fetch form definition and context for Club Staff (Builder mode)
  */
-export async function fetchClubEventForm(eventId: string): Promise<ClubEventFormResponse> {
+export async function fetchClubEventForm(eventId: string, signal?: AbortSignal): Promise<ClubEventFormResponse> {
     const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form`, {
         credentials: "include",
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
@@ -412,6 +413,7 @@ export async function saveClubEventForm(
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: AbortSignal.timeout(30000),
         body: JSON.stringify(payload),
     });
     const data = await res.json();
@@ -433,6 +435,7 @@ export async function requestFormMediaSignature(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: AbortSignal.timeout(30000),
         body: JSON.stringify({ type, questionId }),
     });
     const data = await res.json();
@@ -548,6 +551,8 @@ export function uploadFileToCloudinary(
         formData.append("signature", config.signature);
         formData.append("public_id", config.publicId);
 
+        xhr.timeout = 120000;
+        xhr.addEventListener("timeout", () => reject(new Error("Image upload timed out. Please try again.")));
         xhr.open("POST", config.uploadUrl);
         xhr.send(formData);
     });
@@ -848,6 +853,7 @@ export async function publishClubEventForm(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: AbortSignal.timeout(30000),
         body: JSON.stringify({ changeSummary }),
     });
     const data = await res.json();
@@ -1331,102 +1337,17 @@ export function canonicalizeFormContent(raw: any): Record<string, any> {
     const settings = typeof raw.settings === "string" ? (() => { try { return JSON.parse(raw.settings); } catch { return {}; } })() : (raw.settings || {});
     const themeSettings = typeof raw.themeSettings === "string" ? (() => { try { return JSON.parse(raw.themeSettings); } catch { return {}; } })() : (raw.themeSettings || raw.theme_settings || {});
 
-    const sections = Array.isArray(structure.sections) ? structure.sections : [];
-
-    const normalizedSections = sections.map((sec: any) => ({
-        id: typeof sec.id === "string" ? sec.id.trim() : "",
-        title: typeof sec.title === "string" ? sec.title.trim() : "",
-        description: typeof sec.description === "string" ? sec.description.trim() : "",
-        questions: (Array.isArray(sec.questions) ? sec.questions : []).map((q: any) => ({
-            id: typeof q.id === "string" ? q.id.trim() : "",
-            type: q.type || "short_answer",
-            title: typeof q.title === "string" ? q.title.trim() : "",
-            description: typeof q.description === "string" ? q.description.trim() : "",
-            isRequired: Boolean(q.isRequired),
-            options: Array.isArray(q.options)
-                ? q.options.map((opt: any) =>
-                      typeof opt === "string"
-                          ? opt.trim()
-                          : {
-                                label: typeof opt.label === "string" ? opt.label.trim() : "",
-                                value: typeof opt.value === "string" ? opt.value.trim() : (typeof opt.label === "string" ? opt.label.trim() : ""),
-                                targetSectionId: opt.targetSectionId || null,
-                            }
-                  )
-                : [],
-            validationRules: q.validationRules
-                ? {
-                      minLength: q.validationRules.minLength != null ? Number(q.validationRules.minLength) : null,
-                      maxLength: q.validationRules.maxLength != null ? Number(q.validationRules.maxLength) : null,
-                      minValue: q.validationRules.minValue != null ? Number(q.validationRules.minValue) : null,
-                      maxValue: q.validationRules.maxValue != null ? Number(q.validationRules.maxValue) : null,
-                      minSelect: q.validationRules.minSelect != null ? Number(q.validationRules.minSelect) : null,
-                      maxSelect: q.validationRules.maxSelect != null ? Number(q.validationRules.maxSelect) : null,
-                      regexPattern: q.validationRules.regexPattern || null,
-                      allowedFileTypes: Array.isArray(q.validationRules.allowedFileTypes)
-                          ? [...q.validationRules.allowedFileTypes].map(String).sort()
-                          : null,
-                      maxFileSizeMb: q.validationRules.maxFileSizeMb != null ? Number(q.validationRules.maxFileSizeMb) : null,
-                      maxFiles: q.validationRules.maxFiles != null ? Number(q.validationRules.maxFiles) : null,
-                  }
-                : null,
-            quizOptions: q.quizOptions
-                ? {
-                      points: q.quizOptions.points != null ? Number(q.quizOptions.points) : 0,
-                      correctAnswers: Array.isArray(q.quizOptions.correctAnswers)
-                          ? [...q.quizOptions.correctAnswers].map(String).sort()
-                          : [],
-                      answerExplanation: typeof q.quizOptions.answerExplanation === "string" ? q.quizOptions.answerExplanation.trim() : "",
-                      partialCredit: Boolean(q.quizOptions.partialCredit),
-                  }
-                : null,
-            visibilityRule: q.visibilityRule
-                ? {
-                      dependsOnQuestionId: q.visibilityRule.dependsOnQuestionId || null,
-                      operator: q.visibilityRule.operator || "equals",
-                      value: q.visibilityRule.value != null ? q.visibilityRule.value : null,
-                  }
-                : null,
-            gridRows: Array.isArray(q.gridRows) ? q.gridRows.map((r: any) => (typeof r === "string" ? r.trim() : (r?.label || "").trim())) : null,
-            gridColumns: Array.isArray(q.gridColumns) ? q.gridColumns.map((c: any) => (typeof c === "string" ? c.trim() : (c?.label || "").trim())) : null,
-            scaleMin: q.scaleMin != null ? Number(q.scaleMin) : null,
-            scaleMax: q.scaleMax != null ? Number(q.scaleMax) : null,
-            scaleMinLabel: typeof q.scaleMinLabel === "string" ? q.scaleMinLabel.trim() : null,
-            scaleMaxLabel: typeof q.scaleMaxLabel === "string" ? q.scaleMaxLabel.trim() : null,
-        })),
-    }));
-
-    const normalizedSettings = {
-        isOpen: settings.isOpen !== undefined ? Boolean(settings.isOpen) : true,
-        closedMessage: typeof settings.closedMessage === "string" ? settings.closedMessage.trim() : "",
-        maxResponses: settings.maxResponses != null ? Number(settings.maxResponses) : null,
-        limitOneResponse: settings.limitOneResponse !== undefined ? Boolean(settings.limitOneResponse) : true,
-        allowEditResponse: settings.allowEditResponse !== undefined ? Boolean(settings.allowEditResponse) : false,
-        requireLogin: settings.requireLogin !== undefined ? Boolean(settings.requireLogin) : true,
-        showProgressBar: settings.showProgressBar !== undefined ? Boolean(settings.showProgressBar) : true,
-        confirmationMessage: typeof settings.confirmationMessage === "string" ? settings.confirmationMessage.trim() : "",
-        notifyOnRegistration: settings.notifyOnRegistration !== undefined ? Boolean(settings.notifyOnRegistration) : true,
-        quiz: settings.quiz ? {
-            isQuiz: Boolean(settings.quiz.isQuiz),
-            releaseGradesImmediately: Boolean(settings.quiz.releaseGradesImmediately),
-            showCorrectAnswersToStudents: Boolean(settings.quiz.showCorrectAnswersToStudents),
-            defaultPointsPerQuestion: settings.quiz.defaultPointsPerQuestion != null ? Number(settings.quiz.defaultPointsPerQuestion) : 1,
-        } : null,
-    };
-
-    const normalizedTheme = {
-        accentColor: themeSettings.accentColor || "#38BDF8",
-        fontFamily: themeSettings.fontFamily || "sans",
-        headerPosition: themeSettings.headerPosition || "center",
-    };
-
+    // Compare the actual schema, including media, option text, routing, required,
+    // quiz, validation and theme fields. Whitelisting legacy field names silently
+    // treated real edits as already published.
     return {
-        title: typeof raw.title === "string" ? raw.title.trim() : "",
-        description: typeof raw.description === "string" ? raw.description.trim() : "",
+        title: raw.title || "",
+        description: raw.description || "",
         headerImageUrl: raw.headerImageUrl || raw.header_image_url || null,
-        sections: normalizedSections,
-        settings: normalizedSettings,
-        theme: normalizedTheme,
+        headerImagePublicId: raw.headerImagePublicId || null,
+        structure,
+        settings,
+        themeSettings,
     };
 }
 

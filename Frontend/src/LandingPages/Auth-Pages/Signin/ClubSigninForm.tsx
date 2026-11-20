@@ -1,3 +1,4 @@
+import { requestAuthJson } from "../../../api/authRequests";
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { ArrowRight, ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
@@ -6,7 +7,7 @@ import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
 import { buildApiUrl } from "../../../api/apiClient";
-import { OrbixLoader } from "../../../components/ui/loader";
+import { OrbixInitialLoader, OrbixLoader } from "../../../components/ui/loader";
 
 export interface ClubSigninFormProps {
     initialIdentifier?: string;
@@ -37,6 +38,14 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
     const [errors, setErrors] = useState<{ identity?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
+    const [redirecting, setRedirecting] = useState(false);
+    const [slowConnection, setSlowConnection] = useState(false);
+    const requestLock = useRef(false);
+    const lifetime = useRef(new AbortController());
+    useEffect(() => {
+        lifetime.current = new AbortController();
+        return () => lifetime.current.abort();
+    }, []);
 
     // 2FA Challenge State
     const [step, setStep] = useState<"credentials" | "2fa">("credentials");
@@ -46,6 +55,13 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
     const [cooldownSeconds, setCooldownSeconds] = useState(60);
     const [isResending, setIsResending] = useState(false);
     const [isVerifying2FA, setIsVerifying2FA] = useState(false);
+
+    useEffect(() => {
+        setSlowConnection(false);
+        if (!loading && !isVerifying2FA) return;
+        const timer = setTimeout(() => setSlowConnection(true), 6000);
+        return () => clearTimeout(timer);
+    }, [loading, isVerifying2FA]);
 
     const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -95,6 +111,9 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
     };
 
     const handleLoginSuccess = (resultData: any) => {
+        if (lifetime.current.signal.aborted) return;
+        if (!resultData?.user) throw new Error("The server returned an incomplete sign-in response. Please try again.");
+        setRedirecting(true);
         if (resultData?.token) {
             try {
                 localStorage.setItem("orbix_token", resultData.token);
@@ -131,8 +150,8 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!validate()) return;
-
+        if (requestLock.current || !validate()) return;
+        requestLock.current = true;
         setLoading(true);
 
         try {
@@ -165,14 +184,15 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
             for (const url of endpoints) {
                 try {
-                    const res = await fetch(url, {
+                    const { response: res, data } = await requestAuthJson(url, {
+                        signal: lifetime.current.signal,
                         method: "POST",
                         headers: requestHeaders,
                         credentials: "include",
                         body: requestBody,
                     });
                     response = res;
-                    resultData = await res.json().catch(() => null);
+                    resultData = data;
                     break;
                 } catch (netErr: any) {
                     lastNetworkError = netErr;
@@ -190,7 +210,7 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
                     errorType: lastNetworkError?.name,
                     message: lastNetworkError?.message,
                 });
-                throw new Error("Unable to connect to the authentication server. Please check your network connection or server status.");
+                throw lastNetworkError || new Error("Unable to connect to the authentication server. Please check your network connection.");
             }
 
             if (!response.ok) {
@@ -222,9 +242,11 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
             handleLoginSuccess(resultData);
         } catch (err: any) {
+            if (lifetime.current.signal.aborted) return;
             console.error("Club sign in error:", err);
             await toast.handleError(err, "An unexpected error occurred during club sign in.");
         } finally {
+            requestLock.current = false;
             setLoading(false);
         }
     };
@@ -277,6 +299,8 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
             return;
         }
 
+        if (requestLock.current) return;
+        requestLock.current = true;
         setIsVerifying2FA(true);
         try {
             let deviceId = "";
@@ -307,14 +331,15 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
             for (const url of endpoints) {
                 try {
-                    const res = await fetch(url, {
+                    const { response: res, data } = await requestAuthJson(url, {
+                        signal: lifetime.current.signal,
                         method: "POST",
                         headers: requestHeaders,
                         credentials: "include",
                         body: requestBody,
                     });
                     response = res;
-                    resultData = await res.json().catch(() => null);
+                    resultData = data;
                     break;
                 } catch (netErr: any) {
                     lastNetworkError = netErr;
@@ -345,8 +370,10 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
             handleLoginSuccess(resultData);
         } catch (err: any) {
+            if (lifetime.current.signal.aborted) return;
             await toast.handleError(err, "Failed to verify 2FA code.");
         } finally {
+            requestLock.current = false;
             setIsVerifying2FA(false);
         }
     };
@@ -376,14 +403,15 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
             for (const url of endpoints) {
                 try {
-                    const res = await fetch(url, {
+                    const { response: res, data } = await requestAuthJson(url, {
+                        signal: lifetime.current.signal,
                         method: "POST",
                         headers: requestHeaders,
                         credentials: "include",
                         body: JSON.stringify({ challengeToken }),
                     });
                     response = res;
-                    resultData = await res.json().catch(() => null);
+                    resultData = data;
                     break;
                 } catch (netErr: any) {
                     lastNetworkError = netErr;
@@ -412,11 +440,14 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
             setCooldownSeconds(resultData?.cooldownSeconds || 60);
             toast.success("A new 6-digit code has been sent to your email.", { title: "Code Resent" });
         } catch (err: any) {
+            if (lifetime.current.signal.aborted) return;
             await toast.handleError(err, "Failed to resend 2FA code.");
         } finally {
             setIsResending(false);
         }
     };
+
+    if (redirecting) return <OrbixInitialLoader message="Opening your workspace…" subMessage="Your sign-in is complete. Loading the dashboard." />;
 
     if (step === "2fa") {
         return (
@@ -440,6 +471,7 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
                     </p>
                 </div>
 
+                {slowConnection && <p role="status" className="text-xs font-bold text-amber-800">Your connection is slow. Still connecting securely… You can retry if this takes too long.</p>}
                 <form onSubmit={handleVerify2FA} className="space-y-4">
                     <div className="flex justify-between items-center gap-1.5 sm:gap-2">
                         {otpDigits.map((digit, idx) => (
@@ -518,7 +550,13 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <>
+            {slowConnection && (
+                <p role="status" className="text-xs font-bold text-amber-800">
+                    Your connection is slow. Still connecting securely… You can retry if this takes too long.
+                </p>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             {/* Club Username or Registered Email */}
             <div>
                 <FormInput
@@ -616,5 +654,6 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
                 </div>
             </div>
         </form>
+        </>
     );
 }

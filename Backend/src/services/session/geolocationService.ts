@@ -50,7 +50,7 @@ function isPrivateOrLocalIp(ip: string): boolean {
 
 /**
  * Approximate server-side IP geolocation
- * Always non-blocking, fast timeout (1500ms max), resilient fallback
+ * Uses cached results and a bounded external lookup with a resilient fallback
  */
 export async function resolveApproximateLocation(ip: string): Promise<GeoLocationResult> {
     const fallback: GeoLocationResult = {
@@ -98,17 +98,13 @@ export async function resolveApproximateLocation(ip: string): Promise<GeoLocatio
         // Non-blocking cache error
     }
 
-    // 4. External IP Geolocation with strict 1500ms timeout
+    // 4. Bound external geolocation through headers and response body.
     try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 1500);
-
         // Using free, open IP lookup endpoint with fallback
         const response = await fetch(`https://ipwho.is/${cleanIp}`, {
-            signal: controller.signal,
+            signal: AbortSignal.timeout(1000),
             headers: { "User-Agent": "Orbix-Security-Engine/2.4" },
         });
-        clearTimeout(timeout);
 
         if (response.ok) {
             const data: any = await response.json();
@@ -132,7 +128,7 @@ export async function resolveApproximateLocation(ip: string): Promise<GeoLocatio
                 // Store in memory & Redis
                 localCache.set(cleanIp, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
                 if (redis && redis.status === "ready") {
-                    await redis.set(`geoip:${cleanIp}`, JSON.stringify(result), "EX", 60 * 60 * 48).catch(() => {});
+                    void redis.set(`geoip:${cleanIp}`, JSON.stringify(result), "EX", 60 * 60 * 48).catch(() => {});
                 }
 
                 return result;

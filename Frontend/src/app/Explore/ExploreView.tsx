@@ -27,7 +27,8 @@ import {
 } from "lucide-react";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import { type ExploreDeveloper } from "../../utils/profileApi";
-import PublicProfilePage from "../Profile/PublicProfilePage";
+import { lazyWithRetry } from "../../utils/lazyWithRetry";
+const PublicProfilePage = lazyWithRetry(() => import("../Profile/PublicProfilePage"));
 import { RecentDevelopersCarousel } from "./RecentDevelopersCarousel";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch, useAppSelector } from "../../store";
@@ -113,6 +114,9 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     const containerRef = useRef<HTMLElement | null>(null);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
     const isFetchingRef = useRef<boolean>(false);
+    const activeRequest = useRef<{ abort: () => void } | null>(null);
+    const requestSequence = useRef(0);
+    useEffect(() => () => { activeRequest.current?.abort(); }, []);
     const lastErrorTimeRef = useRef<number>(0);
     const scrollThrottleRef = useRef<number | null>(null);
 
@@ -128,11 +132,13 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     // Initial Load & Tab Counts Hydration
     // -------------------------------------------------------------------------
     useEffect(() => {
-        // Hydrate badge counts across all sections on boot if online
-        if (typeof navigator === "undefined" || navigator.onLine) {
-            dispatch(fetchPendingRequestsThunk({ filter: "all" }));
-            dispatch(fetchConnectionsThunk({ limit: 50, isInitial: true }));
-        }
+        const timer = setTimeout(() => {
+            if (typeof navigator === "undefined" || navigator.onLine) {
+                dispatch(fetchPendingRequestsThunk({ filter: "all" }));
+                dispatch(fetchConnectionsThunk({ limit: 50, isInitial: true }));
+            }
+        }, 800);
+        return () => clearTimeout(timer);
     }, [dispatch]);
 
     // -------------------------------------------------------------------------
@@ -196,11 +202,13 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                 return;
             }
 
-            if (isFetchingRef.current) return;
+            if (isFetchingRef.current && !isInitial) return;
+            if (isInitial) activeRequest.current?.abort();
+            const sequence = ++requestSequence.current;
             isFetchingRef.current = true;
 
             try {
-                await dispatch(
+                const task = dispatch(
                     fetchExploreDevelopersThunk({
                         search: debouncedSearchQuery.trim() || undefined,
                         college: selectedCollege !== "all" ? selectedCollege : undefined,
@@ -209,14 +217,19 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                         limit: PAGE_SIZE,
                         isInitial,
                     })
-                ).unwrap();
+                );
+                activeRequest.current = task;
+                await task.unwrap();
                 lastErrorTimeRef.current = 0;
             } catch (err: any) {
+                if (err?.name === "AbortError" || sequence !== requestSequence.current) return;
                 console.error("Explore fetch error:", err);
                 lastErrorTimeRef.current = Date.now();
             } finally {
-                setIsRefreshing(false);
-                isFetchingRef.current = false;
+                if (sequence === requestSequence.current) {
+                    setIsRefreshing(false);
+                    isFetchingRef.current = false;
+                }
             }
         },
         [
@@ -245,13 +258,13 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
         fetchPage,
     ]);
 
-    // Automatically recover when coming back online
+    // Recover once when connectivity returns; failures wait for an explicit retry.
+    const wasOnline = useRef(isOnline);
     useEffect(() => {
-        if (isOnline && activeTab === "explore" && (explore.error || explore.items.length === 0)) {
-            lastErrorTimeRef.current = 0;
-            fetchPage(1, true);
-        }
-    }, [isOnline, activeTab, explore.error, explore.items.length, fetchPage]);
+        const reconnected = isOnline && !wasOnline.current;
+        wasOnline.current = isOnline;
+        if (reconnected && activeTab === "explore") void fetchPage(1, true);
+    }, [isOnline, activeTab, fetchPage]);
 
     // -------------------------------------------------------------------------
     // Load More Action for Scroll Pagination in Explore
@@ -835,10 +848,12 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
 
                         {/* Public Profile View Component */}
                         <div className="rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000] bg-white overflow-hidden">
+                            <React.Suspense fallback={<div role="status" className="p-12 flex justify-center"><OrbixLoader size="lg" /><span className="sr-only">Loading developer profile…</span></div>}>
                             <PublicProfilePage
                                 overrideUsername={selectedUsername}
                                 isEmbedded={true}
                             />
+                            </React.Suspense>
                         </div>
 
                         {/* Recent Developers 2-Card Auto-Moving Carousel (Explore exclusive) */}
@@ -992,8 +1007,9 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                     </div>
                                 </div>
 
+                                {explore.isLoading && filteredDevelopers.length > 0 && <div role="status" className="flex items-center gap-2 py-2 text-xs font-bold"><OrbixLoader size="xs" /> Updating developers…</div>}
                                 {/* Developers Cards Grid */}
-                                {explore.isLoading ? (
+                                {explore.isLoading && filteredDevelopers.length === 0 ? (
                                     <div className="py-24 flex items-center justify-center text-black">
                                         <OrbixLoader size="lg" />
                                     </div>

@@ -1,3 +1,4 @@
+import { requestAuthJson } from "../../../api/authRequests";
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
@@ -6,7 +7,7 @@ import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
 import { buildApiUrl } from "../../../api/apiClient";
-import { OrbixLoader } from "../../../components/ui/loader";
+import { OrbixInitialLoader, OrbixLoader } from "../../../components/ui/loader";
 
 export interface SigninFormProps {
     initialIdentifier?: string;
@@ -32,6 +33,14 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
     const [errors, setErrors] = useState<{ gmail?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
+    const [redirecting, setRedirecting] = useState(false);
+    const [slowConnection, setSlowConnection] = useState(false);
+    const requestLock = useRef(false);
+    const lifetime = useRef(new AbortController());
+    useEffect(() => {
+        lifetime.current = new AbortController();
+        return () => lifetime.current.abort();
+    }, []);
 
     // 2FA Challenge State
     const [step, setStep] = useState<"credentials" | "2fa">("credentials");
@@ -41,6 +50,13 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     const [cooldownSeconds, setCooldownSeconds] = useState(60);
     const [isResending, setIsResending] = useState(false);
     const [isVerifying2FA, setIsVerifying2FA] = useState(false);
+
+    useEffect(() => {
+        setSlowConnection(false);
+        if (!loading && !isVerifying2FA) return;
+        const timer = setTimeout(() => setSlowConnection(true), 6000);
+        return () => clearTimeout(timer);
+    }, [loading, isVerifying2FA]);
 
     const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -126,6 +142,9 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     };
 
     const handleLoginSuccess = (resultData: any) => {
+        if (lifetime.current.signal.aborted) return;
+        if (!resultData?.user) throw new Error("The server returned an incomplete sign-in response. Please try again.");
+        setRedirecting(true);
         if (resultData?.token) {
             try {
                 localStorage.setItem("orbix_token", resultData.token);
@@ -155,8 +174,8 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!validate()) return;
-
+        if (requestLock.current || !validate()) return;
+        requestLock.current = true;
         setLoading(true);
 
         try {
@@ -189,14 +208,15 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
             for (const url of endpoints) {
                 try {
-                    const res = await fetch(url, {
+                    const { response: res, data } = await requestAuthJson(url, {
+                        signal: lifetime.current.signal,
                         method: "POST",
                         headers: requestHeaders,
                         credentials: "include",
                         body: requestBody,
                     });
                     response = res;
-                    resultData = await res.json().catch(() => null);
+                    resultData = data;
                     break;
                 } catch (netErr: any) {
                     lastNetworkError = netErr;
@@ -214,7 +234,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
                     errorType: lastNetworkError?.name,
                     message: lastNetworkError?.message,
                 });
-                throw new Error("Unable to connect to the authentication server. Please check your network connection or server status.");
+                throw lastNetworkError || new Error("Unable to connect to the authentication server. Please check your network connection.");
             }
 
             if (!response.ok) {
@@ -223,8 +243,8 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
                     (response.status === 404
                         ? "Authentication service route not found (HTTP 404). Please ensure the backend is running."
                         : response.status >= 500
-                        ? "Authentication server encountered an unexpected error (HTTP 500). Please try again shortly."
-                        : "Invalid credentials.");
+                            ? "Authentication server encountered an unexpected error (HTTP 500). Please try again shortly."
+                            : "Invalid credentials.");
                 toast.error(message, {
                     title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Club Account Detected" : "Sign In Failed",
                 });
@@ -246,9 +266,11 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
             handleLoginSuccess(resultData);
         } catch (err: any) {
+            if (lifetime.current.signal.aborted) return;
             console.error("Sign in error:", err);
             await toast.handleError(err, "An unexpected error occurred. Please try again.");
         } finally {
+            requestLock.current = false;
             setLoading(false);
         }
     };
@@ -304,6 +326,8 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             return;
         }
 
+        if (requestLock.current) return;
+        requestLock.current = true;
         setIsVerifying2FA(true);
         try {
             let deviceId = "";
@@ -334,14 +358,15 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
             for (const url of endpoints) {
                 try {
-                    const res = await fetch(url, {
+                    const { response: res, data } = await requestAuthJson(url, {
+                        signal: lifetime.current.signal,
                         method: "POST",
                         headers: requestHeaders,
                         credentials: "include",
                         body: requestBody,
                     });
                     response = res;
-                    resultData = await res.json().catch(() => null);
+                    resultData = data;
                     break;
                 } catch (netErr: any) {
                     lastNetworkError = netErr;
@@ -372,9 +397,11 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
             handleLoginSuccess(resultData);
         } catch (err: any) {
+            if (lifetime.current.signal.aborted) return;
             console.error("2FA verify error:", err);
             await toast.handleError(err, "Failed to verify 2FA code.");
         } finally {
+            requestLock.current = false;
             setIsVerifying2FA(false);
         }
     };
@@ -390,14 +417,15 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
             for (const url of endpoints) {
                 try {
-                    const res = await fetch(url, {
+                    const { response: res, data } = await requestAuthJson(url, {
+                        signal: lifetime.current.signal,
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         credentials: "include",
                         body: JSON.stringify({ challengeToken }),
                     });
                     response = res;
-                    resultData = await res.json().catch(() => null);
+                    resultData = data;
                     break;
                 } catch (netErr: any) {
                     lastNetworkError = netErr;
@@ -426,6 +454,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             setCooldownSeconds(resultData?.cooldownSeconds || 60);
             toast.success("A new 6-digit code has been sent to your email.", { title: "Code Resent" });
         } catch (err: any) {
+            if (lifetime.current.signal.aborted) return;
             await toast.handleError(err, "Failed to resend 2FA code.");
         } finally {
             setIsResending(false);
@@ -433,6 +462,8 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     };
 
     // If in 2FA Mode, render 2FA verification card
+    if (redirecting) return <OrbixInitialLoader message="Opening your workspace…" subMessage="Your sign-in is complete. Loading the dashboard." />;
+
     if (step === "2fa") {
         return (
             <div className="space-y-5">
@@ -457,6 +488,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
                 </div>
 
                 {/* Segmented 6-digit OTP Inputs */}
+                {slowConnection && <p role="status" className="text-xs font-bold text-amber-800">Your connection is slow. Still connecting securely… You can retry if this takes too long.</p>}
                 <form onSubmit={handleVerify2FA} className="space-y-4">
                     <div className="flex justify-between items-center gap-1.5 sm:gap-2">
                         {otpDigits.map((digit, idx) => (
@@ -537,81 +569,88 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <>
+            {slowConnection && (
+                <p role="status" className="text-xs font-bold text-amber-800">
+                    Your connection is slow. Still connecting securely… You can retry if this takes too long.
+                </p>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
 
-            {/* Email / Username Input matching pill design */}
-            <FormInput
-                name="gmail"
-                type="text"
-                placeholder="Username or email"
-                hideLabel
-                value={formData.gmail}
-                onChange={(e) => {
-                    setFormData({ ...formData, gmail: e.target.value });
-                    if (errors.gmail) setErrors({ ...errors, gmail: undefined });
-                }}
-                error={errors.gmail}
-                autoComplete="username"
-            />
+    {/* Email / Username Input matching pill design */}
+    <FormInput
+        name="gmail"
+        type="text"
+        placeholder="Username or email"
+        hideLabel
+        value={formData.gmail}
+        onChange={(e) => {
+            setFormData({ ...formData, gmail: e.target.value });
+            if (errors.gmail) setErrors({ ...errors, gmail: undefined });
+        }}
+        error={errors.gmail}
+        autoComplete="username"
+    />
 
-            {/* Password Input matching pill design */}
-            <FormInput
-                name="password"
-                isPassword
-                placeholder="Password"
-                hideLabel
-                value={formData.password}
-                onChange={(e) => {
-                    setFormData({ ...formData, password: e.target.value });
-                    if (errors.password) setErrors({ ...errors, password: undefined });
-                }}
-                error={errors.password}
-                autoComplete="current-password"
-            />
+    {/* Password Input matching pill design */}
+    <FormInput
+        name="password"
+        isPassword
+        placeholder="Password"
+        hideLabel
+        value={formData.password}
+        onChange={(e) => {
+            setFormData({ ...formData, password: e.target.value });
+            if (errors.password) setErrors({ ...errors, password: undefined });
+        }}
+        error={errors.password}
+        autoComplete="current-password"
+    />
 
-            {/* Forgot Password Link right-aligned matching user screenshot */}
-            <div className="flex justify-end pt-0.5">
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        if (onForgotPassword) {
-                            onForgotPassword(formData.gmail);
-                        } else {
-                            toast.info("Password reset instructions will be sent to your registered email.", { title: "Password Reset" });
-                        }
-                    }}
-                    className="text-xs font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition-colors cursor-pointer"
-                >
-                    Forgot Password?
-                </button>
-            </div>
+    {/* Forgot Password Link right-aligned matching user screenshot */}
+    <div className="flex justify-end pt-0.5">
+        <button
+            type="button"
+            onClick={(e) => {
+                e.preventDefault();
+                if (onForgotPassword) {
+                    onForgotPassword(formData.gmail);
+                } else {
+                    toast.info("Password reset instructions will be sent to your registered email.", { title: "Password Reset" });
+                }
+            }}
+            className="text-xs font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition-colors cursor-pointer"
+        >
+            Forgot Password?
+        </button>
+    </div>
 
-            {/* Neo-brutalist Capsule Button matching landing page theme */}
-            <div className="pt-2">
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                >
-                    {loading ? (
-                        <OrbixLoader size="xs" variant="inline" />
-                    ) : (
-                        <span className="inline-flex items-center gap-2">
-                            <span>Login</span>
-                            <svg
-                                className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform stroke-[2.5]"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                            >
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                                <polyline points="12 5 19 12 12 19" />
-                            </svg>
-                        </span>
-                    )}
-                </button>
-            </div>
-        </form>
+    {/* Neo-brutalist Capsule Button matching landing page theme */}
+    <div className="pt-2">
+        <button
+            type="submit"
+            disabled={loading}
+            className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+        >
+            {loading ? (
+                <OrbixLoader size="xs" variant="inline" />
+            ) : (
+                <span className="inline-flex items-center gap-2">
+                    <span>Login</span>
+                    <svg
+                        className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform stroke-[2.5]"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                    >
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                </span>
+            )}
+        </button>
+    </div>
+            </form>
+        </>
     );
 }

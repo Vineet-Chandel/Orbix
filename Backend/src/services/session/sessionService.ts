@@ -68,15 +68,15 @@ export async function createSession(params: {
 
     // 1. Device and network parsing
     const deviceInfo = parseUserAgentAndDevice(req);
-    const locationInfo = await resolveApproximateLocation(deviceInfo.clientIp);
-
-    // 2. Check if device is recognized for this user
-    const previousDeviceCheck = await query(
-        `SELECT id FROM user_sessions
+    const [locationInfo, previousDeviceCheck] = await Promise.all([
+        resolveApproximateLocation(deviceInfo.clientIp),
+        query(
+            `SELECT id FROM user_sessions
          WHERE user_id = $1 AND device_id_hash = $2 AND status != 'revoked'
          LIMIT 1;`,
-        [userId, deviceInfo.deviceIdHash]
-    );
+            [userId, deviceInfo.deviceIdHash]
+        ),
+    ]);
 
     const isNewDevice = previousDeviceCheck.rows.length === 0;
 
@@ -238,7 +238,7 @@ export async function createSession(params: {
     // 8. Cache session in Redis
     try {
         if (redis && redis.status === "ready") {
-            await redis.set(`session:active:${sessionId}`, userId, "EX", SESSION_TTL_SECONDS);
+            void redis.set(`session:active:${sessionId}`, userId, "EX", SESSION_TTL_SECONDS).catch(() => undefined);
         }
     } catch {
         // Non-blocking cache error

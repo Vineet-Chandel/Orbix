@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import redis from "../../redis/client.js";
+import { createReadThroughCache } from "../../redis/cache/readThroughCache.js";
 import express, { type Request, type Response } from "express";
 import { query, pool } from "../../database/client.js";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
@@ -20,6 +23,7 @@ import { isDemoProfileHandle } from "../../validators/usernamePolicy.js";
 import { DEFAULT_AVATAR_URL } from "../../constants/avatar.js";
 
 const profileRouter = express.Router();
+const cachedExploreMetadata = createReadThroughCache(redis);
 
 // Mount dedicated profile photo management router (/api/profile/photo & /profile/photo)
 profileRouter.use("/photo", photoRouter);
@@ -1325,6 +1329,7 @@ profileRouter.get("/user/:username", optionalAuthenticate, handleGetPublicProfil
  * Strictly guarantees that private profiles (is_public = false) are never returned.
  */
 export const handleExploreProfiles = async (req: Request, res: Response) => {
+    const startedAt = performance.now();
     try {
         const {
             search = "",
@@ -1434,12 +1439,18 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
 
         const whereSql = whereClauses.join(" AND ");
 
-        // Total count query
-        const countRes = await query(
-            `SELECT COUNT(DISTINCT u.id) as total FROM users u WHERE ${whereSql};`,
-            queryParams
-        );
-        const total = parseInt(countRes.rows[0]?.total || "0", 10);
+        // Counts are viewer/filter scoped. Profile and relationship rows stay live.
+        const countParams = [...queryParams];
+        const countKey = createHash("sha256").update(JSON.stringify([whereSql, countParams])).digest("hex");
+        const countPromise = cachedExploreMetadata(`explore:v2:count:${countKey}`, 10, async () => {
+            const result = await query(`SELECT COUNT(*) AS total FROM users u WHERE ${whereSql};`, countParams);
+            return parseInt(result.rows[0]?.total || "0", 10);
+        });
+        const collegesPromise = cachedExploreMetadata<string[]>("explore:v2:colleges", 300, async () => {
+            const result = await query(`SELECT DISTINCT TRIM(college) AS college FROM users
+                WHERE is_public IS TRUE AND college IS NOT NULL AND TRIM(college) != '' ORDER BY college;`);
+            return result.rows.map((row: any) => row.college).filter(Boolean);
+        }).catch(() => [] as string[]);
 
         // Fetch users query
         queryParams.push(limitNum);
@@ -1447,8 +1458,13 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
         queryParams.push(offset);
         const offsetIdx = queryParams.length;
 
-        const usersRes = await query(
-            `SELECT
+        const usersPromise = query(
+            `WITH candidates AS (
+                SELECT u.* FROM users u WHERE ${whereSql}
+                ORDER BY ${orderByClause}, u.id ASC
+                LIMIT $${limitIdx} OFFSET $${offsetIdx}
+            )
+            SELECT
                 u.id,
                 u.username,
                 u.firstname AS "firstName",
@@ -1474,25 +1490,19 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
                 (COALESCE(u.is_email_verified, false) = true) AS "isVerified",
                 (u.resume_url IS NOT NULL AND u.is_resume_public IS NOT FALSE) AS "hasResume",
                 u.created_at AS "createdAt",
-                COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'portal', ul.portal,
-                            'portalUsername', ul.portal_username,
-                            'verified', ul.verified,
-                            'stats', ul.stats
-                        )
-                    ) FILTER (WHERE ul.portal IS NOT NULL),
-                    '[]'
-                ) AS "connectedPortals"
-            FROM users u
-            LEFT JOIN user_links ul ON LOWER(ul.username) = LOWER(u.username)
-            WHERE ${whereSql}
-            GROUP BY u.id
-            ORDER BY ${orderByClause}
-            LIMIT $${limitIdx} OFFSET $${offsetIdx};`,
+                COALESCE(portals.items, '[]'::json) AS "connectedPortals"
+            FROM candidates u
+            LEFT JOIN LATERAL (
+                SELECT json_agg(json_build_object(
+                    'portal', ul.portal, 'portalUsername', ul.portal_username, 'verified', ul.verified
+                ) ORDER BY ul.portal) FILTER (WHERE ul.portal IS NOT NULL) AS items
+                FROM user_links ul WHERE LOWER(ul.username) = LOWER(u.username)
+            ) portals ON TRUE
+            ORDER BY ${orderByClause}, u.id ASC;`,
             queryParams
         );
+
+        const [usersRes, total, availableColleges] = await Promise.all([usersPromise, countPromise, collegesPromise]);
 
         // Pre-resolve relationship states for all returned developers in ONE single batch query
         // This eliminates the N+1 API call storm on the client when browsing explore
@@ -1543,21 +1553,8 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
             };
         });
 
-        // Distinct colleges query across all public developers so the client can filter without losing other colleges
-        let availableColleges: string[] = [];
-        try {
-            const collegesRes = await query(
-                `SELECT DISTINCT TRIM(u.college) as college
-                 FROM users u
-                 WHERE u.is_public IS TRUE 
-                   AND u.college IS NOT NULL 
-                   AND TRIM(u.college) != ''
-                 ORDER BY college ASC;`
-            );
-            availableColleges = collegesRes.rows.map((r: any) => r.college).filter(Boolean);
-        } catch (colErr) {
-            console.warn("Failed to retrieve distinct explore colleges:", colErr);
-        }
+        res.setHeader("Cache-Control", "private, no-store");
+        res.setHeader("Server-Timing", `explore;dur=${(performance.now() - startedAt).toFixed(1)}`);
 
         return res.status(200).json({
             success: true,

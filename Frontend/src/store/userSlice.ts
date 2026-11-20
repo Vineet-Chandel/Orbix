@@ -86,10 +86,12 @@ export interface UserState {
     isAuthenticated: boolean;
     error: string | null;
     lastFetchedAt: number | null;
+    currentRequestId?: string;
 }
 
 const getStoredUser = (): User | null => {
     try {
+        if (localStorage.getItem("orbix_signed_out")) return null;
         const stored = localStorage.getItem("orbix_user");
         return stored ? JSON.parse(stored) : null;
     } catch {
@@ -101,7 +103,7 @@ const initialStoredUser = getStoredUser();
 
 const initialState: UserState = {
     user: initialStoredUser,
-    loading: !initialStoredUser, // only loading if no stored user
+    loading: !initialStoredUser && (() => { try { return !localStorage.getItem("orbix_signed_out"); } catch { return true; } })(),
     isAuthenticated: !!initialStoredUser,
     error: null,
     lastFetchedAt: null,
@@ -109,6 +111,7 @@ const initialState: UserState = {
 
 // Request deduplication lock
 let inFlightFetchPromise: Promise<User> | null = null;
+let profileController: AbortController | null = null;
 
 // Async Thunk to fetch user profile from /profile/me or /me on app load or refresh
 export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | void, { rejectValue: string }>(
@@ -123,6 +126,9 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
             }
         }
 
+        profileController?.abort();
+        const controller = new AbortController();
+        profileController = controller;
         const fetchPromise = (async () => {
             const endpoint = buildApiUrl("/api/profile/me");
             const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
@@ -135,6 +141,7 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
 
             const response = await fetch(endpoint, {
                 method: "GET",
+                signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
                 headers,
                 credentials: "include",
             });
@@ -168,7 +175,7 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
         } catch (err: any) {
             return rejectWithValue(err.message || "Session verification failed");
         } finally {
-            inFlightFetchPromise = null;
+            if (inFlightFetchPromise === fetchPromise) inFlightFetchPromise = null;
         }
     }
 );
@@ -238,6 +245,9 @@ export const userSlice = createSlice({
                 action.payload.isVerifiedCoder = isVerified;
                 action.payload.isVerified = isVerified;
             }
+            profileController?.abort();
+            inFlightFetchPromise = null;
+            state.currentRequestId = undefined;
             state.user = action.payload;
             state.isAuthenticated = !!action.payload;
             state.loading = false;
@@ -246,6 +256,7 @@ export const userSlice = createSlice({
 
             if (action.payload) {
                 try {
+                    localStorage.removeItem("orbix_signed_out");
                     localStorage.setItem("orbix_user", JSON.stringify(action.payload));
                     if (action.payload.platforms) {
                         syncConnectedPortalsStorage(action.payload.platforms);
@@ -274,6 +285,9 @@ export const userSlice = createSlice({
             }
         },
         clearUser: (state) => {
+            profileController?.abort();
+            inFlightFetchPromise = null;
+            state.currentRequestId = undefined;
             state.user = null;
             state.isAuthenticated = false;
             state.loading = false;
@@ -282,6 +296,7 @@ export const userSlice = createSlice({
             try {
                 localStorage.removeItem("orbix_user");
                 localStorage.removeItem("orbix_token");
+                localStorage.removeItem("token");
                 localStorage.removeItem("orbix_connected_portals");
                 localStorage.removeItem("orbix_portals");
             } catch {
@@ -333,13 +348,16 @@ export const userSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            .addCase(fetchUserProfile.pending, (state) => {
+            .addCase(fetchUserProfile.pending, (state, action) => {
+                state.currentRequestId = action.meta.requestId;
                 if (!state.user) {
                     state.loading = true;
                 }
                 state.error = null;
             })
             .addCase(fetchUserProfile.fulfilled, (state, action) => {
+                if (state.currentRequestId !== action.meta.requestId) return;
+                state.currentRequestId = undefined;
                 state.loading = false;
                 state.user = action.payload;
                 state.isAuthenticated = true;
@@ -356,6 +374,8 @@ export const userSlice = createSlice({
                 }
             })
             .addCase(fetchUserProfile.rejected, (state, action) => {
+                if (state.currentRequestId !== action.meta.requestId) return;
+                state.currentRequestId = undefined;
                 state.loading = false;
                 // If unauthorized or expired token, clear user session
                 if (action.payload === "Unauthorized") {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
     Plus,
@@ -53,6 +53,7 @@ import {
     instantiateTemplate,
     type FormTemplateDefinition,
 } from "./formTemplates";
+import { createDraftSaveQueue } from "./draftSaveQueue";
 import { QuestionCard } from "./QuestionCard";
 import { SectionCard } from "./SectionCard";
 import { NeoToggle } from "../../../components/NeoToggle";
@@ -270,6 +271,36 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     // 2. Save Status Indicator State
     const [saveStatus, setSaveStatus] = useState<SaveBadgeStatus>("saved");
     const isInitialLoad = useRef(true);
+    const writeQueue = useRef(createDraftSaveQueue());
+    const lastSavedContent = useRef("");
+    const explicitWriteLock = useRef(false);
+    const [uploadingQuestions, setUploadingQuestions] = useState<Set<string>>(new Set());
+    const handleUploadStateChange = useCallback((id: string, uploading: boolean) => {
+        setUploadingQuestions((previous) => {
+            if (previous.has(id) === uploading) return previous;
+            const next = new Set(previous);
+            if (uploading) next.add(id); else next.delete(id);
+            return next;
+        });
+    }, []);
+    const getSavePayload = (record: ClubEventFormRecord) => ({
+        title: record.title, description: record.description,
+        headerImageUrl: record.headerImageUrl, headerImagePublicId: record.headerImagePublicId,
+        themeSettings: record.themeSettings, settings: record.settings, structure: record.structure,
+    });
+    const contentKey = form ? JSON.stringify(getSavePayload(form)) : "";
+    const latestContentKey = useRef(contentKey);
+    latestContentKey.current = contentKey;
+    // Serialize all draft writes. Identical queued snapshots require only one request.
+    const persistDraft = (record: ClubEventFormRecord) => {
+        const payload = getSavePayload(record);
+        const key = JSON.stringify(payload);
+        const targetEventId = safeEventId;
+        return writeQueue.current.enqueue(`${targetEventId}:${key}`, async () => {
+            await saveClubEventForm(targetEventId, payload);
+            lastSavedContent.current = key;
+        });
+    };
     const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 3. Selection & Undo/Redo States
@@ -346,10 +377,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     };
 
     // Load initial form definition
-    const loadForm = async () => {
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const loadForm = async (signal: AbortSignal) => {
+        setLoadError(null);
+        isInitialLoad.current = true;
         setLoading(true);
         try {
             if (isWizardMode && initialFormRecord) {
+                lastSavedContent.current = JSON.stringify(getSavePayload(initialFormRecord));
+                writeQueue.current.markSaved(`${safeEventId}:${lastSavedContent.current}`);
                 setForm(initialFormRecord);
                 setEvent(initialEventData || { title: initialFormRecord.title || "New Event" });
                 setRegisteredCount(0);
@@ -374,7 +411,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                 return;
             }
 
-            const res = await fetchClubEventForm(eventId);
+            const res = await fetchClubEventForm(eventId, signal);
+            if (signal.aborted) return;
+            lastSavedContent.current = JSON.stringify(getSavePayload(res.form));
+            writeQueue.current.markSaved(`${safeEventId}:${lastSavedContent.current}`);
             setForm(res.form);
             setPublishedVersion(res.publishedVersion || null);
             setEvent(res.event);
@@ -390,23 +430,29 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             }
             setSaveStatus("saved");
         } catch (err: any) {
-            toast.error(err.message || "Failed to load form builder.");
+            if (signal.aborted) return;
+            setLoadError(err.message || "Failed to load form builder.");
         } finally {
-            setLoading(false);
-            isInitialLoad.current = false;
+            if (!signal.aborted) {
+                setLoading(false);
+                isInitialLoad.current = false;
+            }
         }
     };
 
     useEffect(() => {
-        loadForm();
-    }, [eventId, isWizardMode]);
+        const controller = new AbortController();
+        void loadForm(controller.signal);
+        return () => controller.abort();
+    }, [eventId, isWizardMode, loadAttempt]);
+
+    const wizardChangeRef = useRef(onWizardChange);
+    wizardChangeRef.current = onWizardChange;
 
     // Bubble form modifications up in wizard mode
     useEffect(() => {
-        if (isWizardMode && form && onWizardChange) {
-            onWizardChange(form);
-        }
-    }, [form, isWizardMode, onWizardChange]);
+        if (isWizardMode && form) wizardChangeRef.current?.(form);
+    }, [contentKey, isWizardMode]);
 
     // Push new snapshot to undo/redo stack
     const pushHistory = (newStructure: FormStructure) => {
@@ -466,126 +512,84 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [history, historyIndex, form]);
 
-    // Debounced automatic autosave
+    // One debounced writer shared by autosave, Save Draft, and Publish.
     useEffect(() => {
-        if (isInitialLoad.current || !form) return;
-
-        setSaveStatus("unsaved");
-
-        if (autosaveTimer.current) {
-            clearTimeout(autosaveTimer.current);
+        if (isInitialLoad.current || !form || loading) return;
+        if (contentKey === lastSavedContent.current) return;
+        if (isWizardMode) {
+            lastSavedContent.current = contentKey;
+            setSaveStatus("saved");
+            return;
         }
-
+        setSaveStatus("unsaved");
+        if (uploadingQuestions.size || saving || isPublishing) return;
         autosaveTimer.current = setTimeout(async () => {
-            if (isWizardMode) {
-                if (form && onWizardChange) onWizardChange(form);
-                setSaveStatus("saved");
-                return;
-            }
-
-            if (!eventId || eventId === "create-draft") {
-                setSaveStatus("saved");
-                return;
-            }
-
+            if (!eventId || eventId === "create-draft") return;
+            setSaveStatus("saving");
             try {
-                setSaveStatus("saving");
-                await saveClubEventForm(eventId, {
-                    title: form.title,
-                    description: form.description,
-                    headerImageUrl: form.headerImageUrl,
-                    headerImagePublicId: form.headerImagePublicId,
-                    themeSettings: form.themeSettings,
-                    settings: form.settings,
-                    structure: form.structure,
-                    isPublished: false,
-                });
-                setSaveStatus("saved");
+                await persistDraft(form);
+                setSaveStatus(latestContentKey.current === contentKey ? "saved" : "unsaved");
             } catch {
                 setSaveStatus("error");
             }
-        }, 1800);
-
+        }, 1200);
         return () => {
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         };
-    }, [form?.structure, form?.title, form?.description, form?.settings, form?.themeSettings, isWizardMode]);
+    }, [contentKey, loading, isWizardMode, eventId, uploadingQuestions.size, saving, isPublishing]);
 
-    // Explicit Save Draft Button Click
     const handleSaveForm = async () => {
-        if (!form) return;
+        if (!form || explicitWriteLock.current || uploadingQuestions.size) return;
         if (isWizardMode) {
-            if (onWizardChange) onWizardChange(form);
+            onWizardChange?.(form);
             setSaveStatus("saved");
             toast.success("Draft saved to wizard draft!", { title: "Draft Saved" });
             return;
         }
-
         if (!eventId || eventId === "create-draft") return;
+        explicitWriteLock.current = true;
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         setSaving(true);
         setSaveStatus("saving");
         try {
-            const res = await saveClubEventForm(eventId, {
-                title: form.title,
-                description: form.description,
-                headerImageUrl: form.headerImageUrl,
-                headerImagePublicId: form.headerImagePublicId,
-                themeSettings: form.themeSettings,
-                settings: form.settings,
-                structure: form.structure,
-                isPublished: form.isPublished,
-            });
-            setForm(res.form);
-            setSaveStatus("saved");
+            await persistDraft(form);
+            // Keep edits made while the request was in flight.
+            setSaveStatus(latestContentKey.current === contentKey ? "saved" : "unsaved");
             toast.success("Draft saved successfully!", { title: "Draft Saved" });
         } catch (err: any) {
             setSaveStatus("error");
             toast.error(err.message || "Failed to save draft.");
         } finally {
+            explicitWriteLock.current = false;
             setSaving(false);
         }
     };
 
-    // Publish form into an immutable version snapshot
     const handlePublishForm = async () => {
-        if (!form) return;
-        if (isWizardMode) {
-            if (onWizardSubmit) onWizardSubmit();
-            return;
-        }
-
+        if (!form || explicitWriteLock.current || uploadingQuestions.size) return;
+        if (isWizardMode) { onWizardSubmit?.(); return; }
         if (!eventId || eventId === "create-draft") return;
+        explicitWriteLock.current = true;
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         setIsPublishing(true);
         setSaveStatus("saving");
         try {
-            await saveClubEventForm(eventId, {
-                title: form.title,
-                description: form.description,
-                headerImageUrl: form.headerImageUrl,
-                headerImagePublicId: form.headerImagePublicId,
-                themeSettings: form.themeSettings,
-                settings: form.settings,
-                structure: form.structure,
-                isPublished: false,
-            });
-
+            await persistDraft(form);
             const res = await publishClubEventForm(eventId, "Published via Form Studio");
             setPublishedVersion(res.version);
-            setForm(res.form);
-            setSaveStatus("saved");
-            if (res.isUnchanged) {
-                toast.info(`Form is already up to date with Version ${res.version.versionNumber}. No changes to publish.`, {
-                    title: "Already Up to Date",
-                });
-            } else {
-                toast.success(`Form Version ${res.version.versionNumber} is now live for students!`, {
-                    title: "Snapshot Published Live",
-                });
-            }
+            // Merge publication metadata without overwriting newer edits.
+            setForm((current) => current ? {
+                ...current, isPublished: res.form.isPublished,
+                publishedVersionId: res.form.publishedVersionId,
+                publishedAt: res.form.publishedAt, versionCount: res.form.versionCount,
+            } : current);
+            setSaveStatus(latestContentKey.current === contentKey ? "saved" : "unsaved");
+            toast.success(res.isUnchanged ? "Form is already up to date." : `Form Version ${res.version.versionNumber} is now live for students!`);
         } catch (err: any) {
             setSaveStatus("error");
             toast.error(err.message || "Failed to publish form.");
         } finally {
+            explicitWriteLock.current = false;
             setIsPublishing(false);
         }
     };
@@ -605,7 +609,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const updateSections = (updater: (sections: FormSection[]) => FormSection[]) => {
         if (!form) return;
         const currentSections = form.structure?.sections || [];
-        const nextSections = updater([...currentSections]);
+        const nextSections = updater(currentSections.map((section) => ({ ...section, questions: [...section.questions] })));
         const updatedStructure = {
             ...form.structure,
             sections: nextSections,
@@ -797,12 +801,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     // -------------------------------------------------------------------------
     // PHASE 6.1: QUESTION LIBRARY HANDLERS
     // -------------------------------------------------------------------------
+    const libraryRequest = useRef(false);
+    const libraryLoaded = useRef(false);
     const handleOpenQuestionLibrary = async () => {
         setIsQuestionLibraryOpen(true);
-        if (pastEventsLibrary.length === 0) {
+        if (!libraryLoaded.current && !libraryRequest.current) {
+            libraryRequest.current = true;
             setLoadingLibrary(true);
             try {
                 const res = await fetchClubQuestionLibrary(safeEventId, club?.id);
+                libraryLoaded.current = true;
                 setPastEventsLibrary(res.library || []);
                 if (res.library && res.library.length > 0) {
                     setExpandedLibEventId(res.library[0].eventId);
@@ -810,6 +818,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             } catch (err: any) {
                 toast.error(err.message || "Failed to load question library.");
             } finally {
+                libraryRequest.current = false;
                 setLoadingLibrary(false);
             }
         }
@@ -1006,14 +1015,20 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
     if (loading) {
         return (
-            <div className="p-16 flex flex-col items-center justify-center space-y-3">
+            <div role="status" aria-live="polite" className="p-16 flex flex-col items-center justify-center space-y-3">
                 <OrbixLoader size="lg" />
                 <span className="text-xs font-black text-neutral-600">Loading Form Builder Studio...</span>
             </div>
         );
     }
 
-    if (!form) return null;
+    if (loadError) return (
+        <div role="alert" className="p-12 text-center space-y-4">
+            <p className="font-bold">{loadError}</p>
+            <button type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)} className="px-4 py-2 border-2 border-black rounded-xl font-bold">Retry loading form</button>
+        </div>
+    );
+    if (!form) return <p className="p-12 text-center">No registration form is available.</p>;
 
     const accentColor = form.themeSettings?.accentColor || "#38BDF8";
     const sections = form.structure?.sections || [];
@@ -1312,6 +1327,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                         accentColor={accentColor}
                                         cardSurfaceColor={form.themeSettings?.cardSurfaceColor}
                                         cardShadowStyle={form.themeSettings?.cardShadowStyle}
+                                        onUploadStateChange={handleUploadStateChange}
                                         eventId={safeEventId}
                                         isActive={activeQuestionId === question.id}
                                         isQuiz={Boolean(form.settings.quiz?.isQuiz)}
@@ -1646,7 +1662,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={handleSaveForm}
-                            disabled={saving || isPublishing}
+                            disabled={saving || isPublishing || uploadingQuestions.size > 0}
                             className="h-8 sm:h-8.5 px-2 sm:px-2.5 md:px-3 rounded-xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none whitespace-nowrap"
                             title="Save working draft"
                         >
@@ -1665,7 +1681,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <button
                                 type="button"
                                 onClick={handlePublishForm}
-                                disabled={saving || isPublishing || !hasUnpublishedChanges}
+                                disabled={saving || isPublishing || uploadingQuestions.size > 0 || !hasUnpublishedChanges}
                                 className={`h-8 sm:h-8.5 px-2.5 sm:px-3 md:px-3.5 rounded-xl font-black text-[11px] sm:text-xs transition-all flex items-center justify-center gap-1 sm:gap-1.5 shrink-0 whitespace-nowrap border-0 ${
                                     !hasUnpublishedChanges
                                         ? "bg-neutral-100 text-neutral-400 dark:bg-neutral-800/70 dark:text-neutral-500 cursor-not-allowed opacity-90 shadow-none"
@@ -1700,8 +1716,9 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             )}
 
             {/* Theme Drawer */}
-            <React.Suspense fallback={null}>
+            {isThemeDrawerOpen && <React.Suspense fallback={<div role="status" className="fixed inset-0 z-[200] grid place-items-center bg-black/20"><OrbixLoader size="lg" /><span className="sr-only">Loading form appearance…</span></div>}>
                 <FormThemeDrawer
+                    onUploadStateChange={handleUploadStateChange}
                     isOpen={isThemeDrawerOpen}
                     onClose={() => setIsThemeDrawerOpen(false)}
                     theme={form.themeSettings}
@@ -1709,10 +1726,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                     eventId={safeEventId}
                     onChangeTheme={(themeSettings) => setForm({ ...form, themeSettings })}
                     onChangeHeaderImage={(url, publicId) =>
-                        setForm({ ...form, headerImageUrl: url, headerImagePublicId: publicId })
+                        setForm((current) => current ? { ...current, headerImageUrl: url, headerImagePublicId: publicId } : current)
                     }
                 />
-            </React.Suspense>
+            </React.Suspense>}
 
             {/* ---------------------------------------------------------------- */}
             {/* TEMPLATES & QUESTION HUB CHOOSER MODAL (Templates vs Question Bank vs Past Questions) */}
