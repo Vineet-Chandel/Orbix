@@ -3041,6 +3041,18 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ onOpenMobi
                                 );
                             }
 
+                            if ((activeItem.type === "club_announcement_published" || activeItem.type === "club_announcement") && typeof meta.announcementId === "string") {
+                                return (
+                                    <div className="flex-1 space-y-5 p-5 sm:p-6">
+                                        <h2 className="text-xl font-black">{activeItem.title}</h2>
+                                        <p className="whitespace-pre-wrap text-sm text-neutral-600">{activeItem.body}</p>
+                                        <Link to={`/announcements/${encodeURIComponent(meta.announcementId)}`} className="inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#a2ff86] px-5 py-3 text-sm font-black">
+                                            Read announcement <ArrowUpRight className="h-4 w-4" />
+                                        </Link>
+                                    </div>
+                                );
+                            }
+
                             // -------------------------------------------------------------
                             // CASE B: RECRUITER / HIRE INQUIRY OR OTHER NOTIFICATIONS
                             // -------------------------------------------------------------

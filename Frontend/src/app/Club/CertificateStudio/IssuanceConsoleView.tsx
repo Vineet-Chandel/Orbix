@@ -1184,24 +1184,6 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                 Event Integrated
                             </span>
                         </div>
-                        <p className="text-xs text-neutral-600 font-bold flex items-center gap-1.5 mt-0.5">
-                            <span>Event:</span>
-                            <span className="text-black bg-[#FAF6EE] px-2 py-0.5 rounded border border-black/20 font-black">
-                                {activeEventTitle}
-                            </span>
-                            <span>·</span>
-                            <span>Template:</span>
-                            <span className="text-black bg-neutral-100 px-2 py-0.5 rounded border border-black/20">
-                                {activeTemplateName}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => setIsTemplatePickerOpen(true)}
-                                className="text-blue-700 hover:text-blue-900 underline font-black ml-1 cursor-pointer"
-                            >
-                                Change
-                            </button>
-                        </p>
                     </div>
                 </div>
 

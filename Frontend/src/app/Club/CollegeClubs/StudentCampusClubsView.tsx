@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
     Building2,
@@ -13,7 +13,8 @@ import {
     ArrowUpRight,
     SlidersHorizontal,
 } from "lucide-react";
-import { fetchCollegeClubs, type CollegeClubItem, type CollegeClubsResponse } from "../../../utils/clubProfileApi";
+import { useCampusClubsQuery } from "../../../store/personalDataApi";
+import type { CollegeClubItem } from "../../../utils/clubProfileApi";
 import { ClubCard } from "../../../components/ClubCard";
 import { ClubDetailModal } from "../../../components/ClubDetailModal";
 import { InviteCampusLeadsModal } from "../../../components/InviteCampusLeadsModal";
@@ -31,23 +32,21 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
 }) => {
     const { user } = useAppSelector((state) => state.user);
 
-    const [clubs, setClubs] = useState<CollegeClubItem[]>([]);
-    const [collegeData, setCollegeData] = useState<{
-        collegeName: string;
-        collegeId: string | null;
-        collegeCity?: string | null;
-        collegeState?: string | null;
-        collegeAisheCode?: string | null;
-    }>({
-        collegeName: user?.college?.officialName || (typeof user?.college === "string" ? user.college : "") || "",
-        collegeId: user?.collegeId || user?.college?.id || null,
-        collegeCity: user?.college?.city || null,
-        collegeState: user?.college?.state || null,
-        collegeAisheCode: user?.college?.aisheCode || null,
-    });
-
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { currentData: data, isFetching, error: queryError, refetch: loadClubs } = useCampusClubsQuery({
+        userId: user?.id || user?.username || "",
+        collegeId: user?.collegeId || user?.college?.id || undefined,
+        collegeName: user?.college?.officialName || (typeof user?.college === "string" ? user.college : undefined),
+    }, { skip: !user });
+    const clubs = data?.clubs || [];
+    const collegeData = {
+        collegeName: data?.collegeName || user?.college?.officialName || "Your College",
+        collegeId: data?.collegeId || user?.collegeId || null,
+        collegeCity: data?.collegeCity || user?.college?.city || null,
+        collegeState: data?.collegeState || user?.college?.state || null,
+        collegeAisheCode: data?.collegeAisheCode || user?.college?.aisheCode || null,
+    };
+    const loading = !data && isFetching;
+    const error = queryError && "message" in queryError ? queryError.message : null;
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
     // Filters and Search
@@ -58,37 +57,6 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
 
     // Modal state for viewing expanded club details
     const [selectedClubForModal, setSelectedClubForModal] = useState<CollegeClubItem | null>(null);
-
-    const loadClubs = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data: CollegeClubsResponse = await fetchCollegeClubs({
-                collegeId: user?.collegeId || user?.college?.id || undefined,
-                collegeName: user?.college?.officialName || (typeof user?.college === "string" ? user.college : undefined) || undefined,
-            });
-
-            const fetchedClubs: CollegeClubItem[] = Array.isArray(data.clubs) ? data.clubs : [];
-            setClubs(fetchedClubs);
-
-            setCollegeData({
-                collegeName: data.collegeName || user?.college?.officialName || "Your College",
-                collegeId: data.collegeId || user?.collegeId || null,
-                collegeCity: data.collegeCity || user?.college?.city || null,
-                collegeState: data.collegeState || user?.college?.state || null,
-                collegeAisheCode: data.collegeAisheCode || user?.college?.aisheCode || null,
-            });
-        } catch (err: any) {
-            console.error("Failed to load campus clubs:", err);
-            setError(err.message || "Failed to load clubs in your college.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadClubs();
-    }, [user?.collegeId, user?.college]);
 
     // Unique categories extracted from available clubs
     const availableCategories = useMemo(() => {

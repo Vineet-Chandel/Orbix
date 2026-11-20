@@ -21,7 +21,7 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
     const dispatch = useAppDispatch();
 
     const contestData = useAppSelector((state) => (effectiveUser ? state.contests.dataByUser[effectiveUser] : undefined));
-    const isLoading = useAppSelector((state) => (effectiveUser ? state.contests.loadingByUser[effectiveUser] || false : false));
+    const isLoading = useAppSelector((state) => (effectiveUser ? (state.contests.loadingByUser[effectiveUser] && !state.contests.dataByUser[effectiveUser]) || false : false));
 
     const handleRefresh = () => {
         if (!effectiveUser) return;

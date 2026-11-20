@@ -1,7 +1,9 @@
 // Frontend/src/app/Club/TeamWorkspace/WorkspaceShell.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+const ClubAnnouncementsSection = lazy(() => import("../ClubAnnouncementsSection"));
 import {
     Users,
+    Megaphone,
     Hash,
     Shield,
     Activity,
@@ -99,6 +101,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
 
     // Active Navigation Sub-tab
     type ActiveWorkspaceSection =
+        | "announcements"
         | "overview"
         | "departments"
         | "roster"
@@ -461,6 +464,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         capabilities?.capabilities.channels.manage
     );
     const navItems: WorkspaceSectionNavItem[] = [
+        { id: "announcements", label: "Announcements", icon: <Megaphone className="w-3.5 h-3.5" /> },
         {
             id: "overview",
             label: "Workspace Overview",
@@ -650,6 +654,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 </div>
             ) : (
                 <>
+                    {activeSection === "announcements" && (
+                        <Suspense fallback={<div role="status" className="p-8 text-sm font-bold">Loading announcements…</div>}>
+                            <ClubAnnouncementsSection clubId={club.id} />
+                        </Suspense>
+                    )}
                     {/* SECTION 1: OVERVIEW (PHASE 08) */}
             {activeSection === "overview" && (
                 <WorkspaceOverviewView

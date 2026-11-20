@@ -76,7 +76,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
 
     const reduxAnalyticsData = useAppSelector((state) => state.developmentAnalytics.dataByUser[effectiveUser]);
     const reduxAnalyticsLoading = useAppSelector(
-        (state) => state.developmentAnalytics.loadingByUser[effectiveUser] || false
+        (state) => (state.developmentAnalytics.loadingByUser[effectiveUser] && !state.developmentAnalytics.dataByUser[effectiveUser]) || false
     );
     const analyticsData = isDemo ? demoDevelopmentAnalytics : reduxAnalyticsData;
     const isAnalyticsLoading = isDemo ? false : reduxAnalyticsLoading;

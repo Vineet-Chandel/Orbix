@@ -1,5 +1,6 @@
 import express, { type Request, type Response } from "express";
 import redis from "../../redis/client.js";
+import { createRefreshingCache } from "../../redis/cache/refreshingCache.js";
 import { optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 
 const eventsRouter = express.Router();
@@ -47,13 +48,10 @@ export function formatDuration(seconds: number): string {
     return `${minutes}m`;
 }
 
-// Global in-memory cache for fast sub-10ms responses
-let inMemoryEventsCache: {
-    data: any;
-    timestamp: number;
-} | null = null;
-
-const CACHE_TTL_MS = 8 * 60 * 1000; // 8 minutes
+// Public calendar survives freshness expiry while live providers refresh in background.
+const cachedCalendar = createRefreshingCache<any>(redis, {
+    freshMs: 8 * 60 * 1000, staleMs: 60 * 60 * 1000,
+});
 
 // In-memory reminders store (fallback if db query not needed)
 const inMemoryReminders = new Set<string>();
@@ -657,27 +655,13 @@ function generateScheduledEventsForWindow(
  */
 export async function getUnifiedEvents(referenceDate: Date = new Date(), forceRefresh = false) {
     const window = getThreeMonthWindow(referenceDate);
+    return cachedCalendar(`orbix:events:3months:v3:${window.currentMonthStr}`,
+        () => loadUnifiedEvents(referenceDate), forceRefresh);
+}
+
+async function loadUnifiedEvents(referenceDate: Date) {
+    const window = getThreeMonthWindow(referenceDate);
     const now = referenceDate.getTime();
-    const redisCacheKey = `orbix:events:3months:v2:${window.currentMonthStr}`;
-
-    // 1. Check in-memory cache
-    if (!forceRefresh && inMemoryEventsCache && (now - inMemoryEventsCache.timestamp < CACHE_TTL_MS)) {
-        return inMemoryEventsCache.data;
-    }
-
-    // 2. Check Redis cache
-    if (!forceRefresh) {
-        try {
-            const cachedStr = await redis.get(redisCacheKey);
-            if (cachedStr) {
-                const parsed = JSON.parse(cachedStr);
-                inMemoryEventsCache = { data: parsed, timestamp: now };
-                return parsed;
-            }
-        } catch {
-            // Redis error fallback
-        }
-    }
 
     // 3. Fetch from all live APIs in parallel
     const [
@@ -776,16 +760,6 @@ export async function getUnifiedEvents(referenceDate: Date = new Date(), forceRe
         },
         timestamp: now,
     };
-
-    // Update in-memory cache
-    inMemoryEventsCache = { data: result, timestamp: now };
-
-    // Update Redis cache asynchronously
-    try {
-        await redis.setex(redisCacheKey, 600, JSON.stringify(result));
-    } catch {
-        // ignore
-    }
 
     return result;
 }

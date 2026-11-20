@@ -198,7 +198,7 @@ export const ClubSidebar = ({
             items: [
                 {
                     id: "announcements",
-                    label: "Announcement",
+                    label: "Announcements",
                     icon: <Megaphone className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
                     path: "/club/announcements",
                 },

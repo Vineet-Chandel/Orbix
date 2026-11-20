@@ -1,3 +1,4 @@
+import { personalDataApi, useCampusEventsQuery } from "../../store/personalDataApi";
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -24,9 +25,8 @@ import {
     Lock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
-import { useAppSelector } from "../../store";
+import { useAppDispatch, useAppSelector } from "../../store";
 import {
-    fetchCollegeEvents,
     type CollegeEventItem,
 } from "../../api/collegeEventsApi";
 import { DynamicEventRegistrationModal } from "./DynamicEventRegistrationModal";
@@ -54,11 +54,22 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
 
-    const [events, setEvents] = useState<CollegeEventItem[]>([]);
-    const [collegeName, setCollegeName] = useState<string>(
-        user?.college?.officialName || (typeof user?.college === "string" ? user.college : "") || "Your College"
-    );
-    const [loading, setLoading] = useState(true);
+    const dispatch = useAppDispatch();
+    const scope = {
+        userId: user?.id || user?.username || "",
+        collegeId: user?.collegeId || user?.college?.id || undefined,
+        collegeName: user?.college?.officialName || (typeof user?.college === "string" ? user.college : undefined),
+    };
+    const { currentData: data, isFetching, error: queryError } = useCampusEventsQuery(scope, { skip: !user });
+    const events = data?.events || [];
+    const collegeName = data?.collegeName || scope.collegeName || "Your College";
+    const loading = !data && isFetching;
+    useEffect(() => {
+        if (data) primeEventEngagementCache(data.events || []);
+    }, [data]);
+    useEffect(() => {
+        if (queryError) toast.error("Could not load campus events.");
+    }, [queryError]);
     const [searchQuery, setSearchQuery] = useState("");
     const [timeFilter, setTimeFilter] = useState<"live" | "today" | "closed" | "completed" | "passes" | "all">("live");
     const [selectedClubId, setSelectedClubId] = useState<string>("all");
@@ -117,28 +128,6 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
 
         setSelectedEventForModal(ev);
     };
-
-    const loadEvents = async () => {
-        setLoading(true);
-        try {
-            const data = await fetchCollegeEvents({
-                collegeId: user?.collegeId || user?.college?.id || undefined,
-                collegeName: user?.college?.officialName || (typeof user?.college === "string" ? user.college : undefined),
-            });
-            setEvents(data.events || []);
-            primeEventEngagementCache(data.events || []);
-            if (data.collegeName) setCollegeName(data.collegeName);
-        } catch (err: any) {
-            console.error("Failed to load college events:", err);
-            toast.error(err.message || "Could not load campus events.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadEvents();
-    }, [user?.collegeId, user?.college]);
 
     // Unique clubs for the filter dropdown
     const availableClubs = useMemo(() => {
@@ -1143,7 +1132,10 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                 }}
                 event={selectedEventForModal}
                 onSuccess={(updated) => {
-                    setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+                    dispatch(personalDataApi.util.invalidateTags(["Applications"]));
+                    dispatch(personalDataApi.util.updateQueryData("campusEvents", scope, (cached) => {
+                        cached.events = cached.events.map((event) => event.id === updated.id ? updated : event);
+                    }));
                 }}
             />
 

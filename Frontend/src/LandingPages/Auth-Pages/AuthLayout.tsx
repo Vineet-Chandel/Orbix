@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { OrbixLogo } from "../../components/OrbixLogo";
+import { OrbixInitialLoader } from "../../components/ui/loader";
 import { getOrCreateDeviceId } from "../../api/sessionActivityApi";
 import Right from "./Right";
 
@@ -27,7 +28,10 @@ export const AuthLayout = ({
     showSocialAuth = true,
     wide = false,
 }: AuthLayoutProps) => {
+    const [socialRedirecting, setSocialRedirecting] = useState<string | null>(null);
+
     const handleGoogleAuth = () => {
+        setSocialRedirecting("Google");
         const searchParams = new URLSearchParams(window.location.search);
         const returnTo = searchParams.get("returnTo") || "/dashboard";
         let deviceId = "";
@@ -40,6 +44,7 @@ export const AuthLayout = ({
     };
 
     const handleGitHubAuth = () => {
+        setSocialRedirecting("GitHub");
         const searchParams = new URLSearchParams(window.location.search);
         const returnTo = searchParams.get("returnTo") || "/dashboard";
         let deviceId = "";
@@ -52,6 +57,12 @@ export const AuthLayout = ({
     };
     return (
         <div className="min-h-screen w-full bg-[#FAF6EE] flex flex-col lg:flex-row overflow-hidden text-neutral-900 font-sans selection:bg-black selection:text-white relative">
+            {socialRedirecting && (
+                <OrbixInitialLoader
+                    message={`Connecting to ${socialRedirecting}…`}
+                    subMessage="Redirecting to secure authorization portal"
+                />
+            )}
             {/* Eye-friendly subtle canvas dot grid across the entire page flow */}
             <div className="fixed inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 

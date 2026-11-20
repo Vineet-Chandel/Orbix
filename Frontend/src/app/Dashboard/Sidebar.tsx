@@ -9,9 +9,8 @@ import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
-import { workspaceApi } from "../../api/workspaceApi";
+import { useMyWorkspacesQuery } from "../../store/personalDataApi";
 import { JoinClubModal } from "../Club/JoinClubModal";
-import type { UserClubWorkspaceSummary } from "../../types/workspace";
 
 export type SidebarTab =
     | "home"
@@ -93,27 +92,10 @@ export const Sidebar = ({
         return "events";
     });
 
-    const [clubWorkspaces, setClubWorkspaces] = useState<UserClubWorkspaceSummary[]>([]);
-    const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+    const { currentData: workspaceData, isLoading: loadingWorkspaces, refetch: loadWorkspaces } =
+        useMyWorkspacesQuery(user?.id || user?.username || "", { skip: !user });
+    const clubWorkspaces = workspaceData?.workspaces || [];
     const [isJoinClubModalOpen, setIsJoinClubModalOpen] = useState(false);
-
-    const loadWorkspaces = async () => {
-        try {
-            setLoadingWorkspaces(true);
-            const res = await workspaceApi.getMyWorkspaces();
-            if (res.success) {
-                setClubWorkspaces(res.workspaces || []);
-            }
-        } catch (err) {
-            console.warn("[Sidebar] Failed to load user workspaces:", err);
-        } finally {
-            setLoadingWorkspaces(false);
-        }
-    };
-
-    useEffect(() => {
-        loadWorkspaces();
-    }, []);
 
     const handleToggleSection = (section: CollapsibleSection) => {
         setOpenSection((prev) => (prev === section ? null : section));

@@ -22,7 +22,7 @@ export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> =
     const dispatch = useAppDispatch();
 
     const reduxData = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.dataByUser[effectiveUser] : undefined));
-    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.loadingByUser[effectiveUser] || false : false));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? (state.practiceAnalytics.loadingByUser[effectiveUser] && !state.practiceAnalytics.dataByUser[effectiveUser]) || false : false));
 
     const data = isDemo ? demoPracticeAnalytics : reduxData;
     const isLoading = isDemo ? false : reduxLoading;

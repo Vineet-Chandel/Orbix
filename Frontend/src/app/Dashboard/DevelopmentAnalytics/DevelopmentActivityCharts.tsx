@@ -30,7 +30,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
         effectiveUser ? state.developmentAnalytics.dataByUser[effectiveUser] : undefined
     );
     const isAnalyticsLoading = useAppSelector((state) =>
-        effectiveUser ? state.developmentAnalytics.loadingByUser[effectiveUser] || false : false
+        effectiveUser ? (state.developmentAnalytics.loadingByUser[effectiveUser] && !state.developmentAnalytics.dataByUser[effectiveUser]) || false : false
     );
 
     // Fetch development analytics for repository highlights if not loaded

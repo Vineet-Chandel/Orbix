@@ -59,7 +59,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Redux store state
     const reduxData = useAppSelector((state) => (effectiveUser ? state.contests.dataByUser[effectiveUser] : undefined));
-    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.contests.loadingByUser[effectiveUser] : false));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? (state.contests.loadingByUser[effectiveUser] && !state.contests.dataByUser[effectiveUser]) : false));
 
     const contestData = isDemo ? demoContestsData : reduxData;
     const isLoading = isDemo ? false : reduxLoading;

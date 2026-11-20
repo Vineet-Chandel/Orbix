@@ -41,7 +41,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     const isDemo = isDemoProfileUsername(effectiveUser);
     const dispatch = useAppDispatch();
     const reduxRemoteData = useAppSelector((state) => (effectiveUser ? state.submissions.dataByUser[effectiveUser] : undefined));
-    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.submissions.loadingByUser[effectiveUser] : false));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? (state.submissions.loadingByUser[effectiveUser] && !state.submissions.dataByUser[effectiveUser]) : false));
 
     const remoteData = isDemo ? demoUnifiedSubmissions : reduxRemoteData;
     const isLoading = isDemo ? false : reduxLoading;

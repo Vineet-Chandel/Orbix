@@ -19,6 +19,9 @@ import { CollegeEmailVerificationListener } from "./components/CollegeVerificati
 import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
 import { ScrollToTop } from "./components/ScrollToTop";
 
+const AnnouncementPermalinkPage = lazyWithRetry(() => import("./app/Club/Announcements/AnnouncementPermalinkPage"));
+const MemberAnnouncementsPage = lazyWithRetry(() => import("./app/Club/Announcements/MemberAnnouncementsPage"));
+
 const ClubLanding = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Club-Account-Landing-Pages/Landing"));
 
 // Code-split other routes & showcases with resilient retry logic
@@ -230,6 +233,7 @@ const App = () => {
                   <Route path="/club/settings" element={<ClubDashboardPage />} />
                   <Route path="/club/inbox" element={<ClubDashboardPage />} />
                 </Route>
+                <Route path="/announcements/:announcementId" element={<AnnouncementPermalinkPage />} />
                 <Route path="/clubs/:slug" element={<PublicClubProfilePage />} />
                 <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 
@@ -240,6 +244,7 @@ const App = () => {
 
                 {/* Protected Routes */}
                 <Route element={<Suspense fallback={<DashboardRouteSkeleton />}><ProtectedRoute /></Suspense>}>
+                  <Route path="/club-announcements" element={<MemberAnnouncementsPage />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/college-clubs" element={<Dashboard />} />
                   <Route path="/campus-clubs" element={<Dashboard />} />

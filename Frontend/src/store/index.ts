@@ -12,6 +12,7 @@ import networkReducer from "./networkSlice";
 import clubReducer from "./clubSlice";
 import clubEventsReducer from "./clubEventsSlice";
 import leaderboardReducer from "./leaderboardSlice";
+import { personalDataApi } from "./personalDataApi";
 
 export const store = configureStore({
     reducer: {
@@ -27,7 +28,19 @@ export const store = configureStore({
         club: clubReducer,
         clubEvents: clubEventsReducer,
         leaderboard: leaderboardReducer,
+        [personalDataApi.reducerPath]: personalDataApi.reducer,
     },
+    middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(personalDataApi.middleware),
+});
+
+// Drop private cached responses on logout or identity changes, including pending queries.
+let cachedIdentity = store.getState().user.user?.id || store.getState().user.user?.username;
+store.subscribe(() => {
+    const identity = store.getState().user.user?.id || store.getState().user.user?.username;
+    if (identity !== cachedIdentity) {
+        cachedIdentity = identity;
+        store.dispatch(personalDataApi.util.resetApiState());
+    }
 });
 
 export type RootState = ReturnType<typeof store.getState>;

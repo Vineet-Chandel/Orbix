@@ -53,7 +53,7 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
 
     const data = useAppSelector((state) => (effectiveUser ? state.developmentAnalytics.dataByUser[effectiveUser] : undefined));
     const isLoading = useAppSelector(
-        (state) => (effectiveUser ? state.developmentAnalytics.loadingByUser[effectiveUser] || false : false)
+        (state) => (effectiveUser ? (state.developmentAnalytics.loadingByUser[effectiveUser] && !state.developmentAnalytics.dataByUser[effectiveUser]) || false : false)
     );
 
     const handleRefresh = () => {

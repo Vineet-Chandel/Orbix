@@ -38,6 +38,7 @@ export interface EventsState {
     viewMode: "calendar" | "list";
     reminders: string[];
     loading: boolean;
+    fetching: boolean;
     error: string | null;
     lastFetched: number | null;
 }
@@ -65,6 +66,7 @@ const loadInitialState = (): EventsState => {
                 ...parsed,
                 reminders: savedReminders.length > 0 ? savedReminders : (parsed.reminders || []),
                 loading: false,
+                fetching: false,
                 error: null,
             };
         }
@@ -97,6 +99,7 @@ const loadInitialState = (): EventsState => {
         viewMode: "calendar",
         reminders: savedReminders,
         loading: false,
+        fetching: false,
         error: null,
         lastFetched: null,
     };
@@ -123,6 +126,15 @@ export const fetchEvents = createAsyncThunk(
         } catch (err: any) {
             return rejectWithValue(err.message || "Network error fetching events");
         }
+    },
+    {
+        condition: (params, { getState }) => {
+            const state = (getState() as { events: EventsState }).events;
+            if (state.fetching) return false;
+            // Filtered responses are not interchangeable; only reuse the full calendar.
+            if (params?.refresh || params?.type || params?.platform) return true;
+            return !state.lastFetched || Date.now() - state.lastFetched >= 5 * 60 * 1000;
+        },
     }
 );
 
@@ -218,10 +230,12 @@ export const eventsSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchEvents.pending, (state) => {
+                state.fetching = true;
                 state.loading = state.allEvents.length === 0;
                 state.error = null;
             })
             .addCase(fetchEvents.fulfilled, (state, action) => {
+                state.fetching = false;
                 state.loading = false;
                 state.error = null;
                 const payload = action.payload;
@@ -230,7 +244,7 @@ export const eventsSlice = createSlice({
                     state.allEvents = payload.events;
                     state.events = payload.events;
                 }
-                if (payload.upNext) {
+                if ("upNext" in payload) {
                     state.upNext = payload.upNext;
                 }
                 if (payload.countsByPlatform) {
@@ -252,7 +266,7 @@ export const eventsSlice = createSlice({
                     state.stats = payload.stats;
                 }
 
-                state.lastFetched = Date.now();
+                state.lastFetched = action.meta.arg?.type || action.meta.arg?.platform ? null : Date.now();
 
                 // Persist cache to localStorage
                 try {
@@ -279,6 +293,7 @@ export const eventsSlice = createSlice({
                 }
             })
             .addCase(fetchEvents.rejected, (state, action) => {
+                state.fetching = false;
                 state.loading = false;
                 state.error = action.payload as string;
             })

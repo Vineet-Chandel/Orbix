@@ -1,3 +1,4 @@
+import { personalDataApi, useApplicationsQuery, useCertificatesQuery } from "../../store/personalDataApi";
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -25,21 +26,16 @@ import {
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
-    fetchStudentApplications,
     cancelEventRegistration,
     type StudentApplicationItem,
 } from "../../api/collegeEventsApi";
-import {
-    fetchStudentCertificates,
-    type CertificateItem,
-} from "../../api/clubCertificatesApi";
 import { clubEventTeamApi } from "../../api/clubEventTeamApi";
 import { EventTeamManagementModal } from "./EventTeamManagementModal";
 import {
     TeamRosterConfigurator,
     type StagedTeammate,
 } from "../../components/events/TeamRosterConfigurator";
-import { useAppSelector } from "../../store";
+import { useAppDispatch, useAppSelector } from "../../store";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { OrbixLoader } from "../../components/ui/loader";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -76,18 +72,13 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
         }
     }, [tabParam]);
 
-    // Applications & Sessions data
-    const [applications, setApplications] = useState<StudentApplicationItem[]>([]);
-    const [loadingApps, setLoadingApps] = useState(true);
+    // Applications & Sessions filters
     const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled">("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [cancellingId, setCancellingId] = useState<string | null>(null);
     const [withdrawTargetApp, setWithdrawTargetApp] = useState<StudentApplicationItem | null>(null);
     const [viewingWithdrawnApp, setViewingWithdrawnApp] = useState<StudentApplicationItem | null>(null);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
-
-    // Certificates data
-    const [certificates, setCertificates] = useState<CertificateItem[]>([]);
 
     // QR Pass Modal state
     const [activePassApp, setActivePassApp] = useState<StudentApplicationItem | null>(null);
@@ -100,6 +91,18 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
     // Team formation modal state (for unlinked team events)
     const { user } = useAppSelector((state) => state.user);
+    const dispatch = useAppDispatch();
+    const userKey = user?.id || user?.username || "";
+    const { currentData: applicationData, isFetching: fetchingApps, error: appsError, refetch: loadApplications } =
+        useApplicationsQuery(userKey, { skip: !user });
+    const { currentData: certificateData } = useCertificatesQuery(userKey, { skip: !user });
+    const applications = applicationData || [];
+    const certificates = certificateData || [];
+    const loadingApps = !applicationData && fetchingApps;
+    useEffect(() => {
+        if (appsError) toast.error("Failed to load your event applications.");
+    }, [appsError]);
+
     const [configuringTeamApp, setConfiguringTeamApp] = useState<StudentApplicationItem | null>(null);
     const [createTeamName, setCreateTeamName] = useState("");
     const [joinTeamCode, setJoinTeamCode] = useState("");
@@ -141,33 +144,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
         }
     };
 
-    // Load Applications
-    const loadApplications = async () => {
-        setLoadingApps(true);
-        try {
-            const data = await fetchStudentApplications();
-            setApplications(data);
-        } catch (err: any) {
-            console.error("Failed to load applications:", err);
-            toast.error(err.message || "Failed to load your event applications.");
-        } finally {
-            setLoadingApps(false);
-        }
-    };
-
-    // Load Certificates
-    const loadCertificates = async () => {
-        try {
-            const certs = await fetchStudentCertificates();
-            setCertificates(certs);
-        } catch (err: any) {
-            console.error("Failed to load certificates:", err);
-        }
-    };
-
     useEffect(() => {
-        loadApplications();
-        loadCertificates();
         loadInvitations();
     }, []);
 
@@ -213,9 +190,13 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
             setCancellingId(target.id);
             await cancelEventRegistration(target.eventId);
             toast.success(`Registration for "${target.eventTitle}" withdrawn successfully.`);
-            setApplications((prev) =>
-                prev.map((a) => (a.id === target.id ? { ...a, status: "cancelled" } : a))
-            );
+            dispatch(personalDataApi.util.updateQueryData("applications", userKey, (cached) => {
+                const application = cached.find((item) => item.id === target.id);
+                if (application) application.status = "cancelled";
+            }));
+            // Registration status in the campus list must also revalidate after withdrawal.
+            dispatch(personalDataApi.util.invalidateTags(["CampusEvents"]));
+
             setWithdrawTargetApp(null);
         } catch (err: any) {
             toast.error(err.message || "Failed to withdraw registration.");

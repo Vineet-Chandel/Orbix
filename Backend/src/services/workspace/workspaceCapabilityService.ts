@@ -262,7 +262,7 @@ export class WorkspaceCapabilityService {
         };
 
         // 5. Dynamic Navigation Mapping
-        const allowedTabs: string[] = ["overview"];
+        const allowedTabs: string[] = ["overview", "announcements"];
 
         const canViewDepartments =
             capabilities.departments.viewAll ||
@@ -497,7 +497,7 @@ export class WorkspaceCapabilityService {
         const canViewResources = capabilities.assets.view;
         const canViewRecognition = true;
 
-        const allowedTabs: string[] = ["overview"];
+        const allowedTabs: string[] = ["overview", "announcements"];
         if (capabilities.departments.viewAll || capabilities.departments.viewAssigned) allowedTabs.push("departments");
         allowedTabs.push("roster");
         if (canInviteMembers) allowedTabs.push("invitations");

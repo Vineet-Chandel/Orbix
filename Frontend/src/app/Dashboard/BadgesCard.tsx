@@ -59,7 +59,7 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
     const dispatch = useAppDispatch();
 
     const reduxRemoteData = useAppSelector((state) => (effectiveUser ? state.badges.dataByUser[effectiveUser] : undefined));
-    const reduxLoading = useAppSelector((state) => (effectiveUser ? state.badges.loadingByUser[effectiveUser] || false : false));
+    const reduxLoading = useAppSelector((state) => (effectiveUser ? (state.badges.loadingByUser[effectiveUser] && !state.badges.dataByUser[effectiveUser]) || false : false));
 
     const remoteData = isDemo ? demoBadgesData : reduxRemoteData;
     const isLoading = isDemo ? false : reduxLoading;

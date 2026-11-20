@@ -1,4 +1,5 @@
 import redis from "../client.js";
+import { withCacheBudget } from "./withCacheBudget.js";
 
 export interface IUserDetails {
     id: string;
@@ -71,14 +72,15 @@ const getUserDetailsCache = async (identifier: string): Promise<IUserDetails | n
 
         if (!clean.includes("@")) {
             // Identifier is username or UUID, look up email mapping first
-            const mappedEmail = (await redis.get(`auth:user:username:${clean}`)) || (await redis.get(`auth:user:id:${clean}`));
+            const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
+            const mappedEmail = await withCacheBudget(() => redis.get(`auth:user:${isId ? "id" : "username"}:${clean}`));
             if (mappedEmail) {
                 targetGmail = mappedEmail.toLowerCase().trim();
             }
         }
 
         const key = `auth:user:gmail:${targetGmail}`;
-        const user = await redis.hgetall(key);
+        const user = await withCacheBudget(() => redis.hgetall(key));
         if (!user || Object.keys(user).length === 0) {
             return null;
         }

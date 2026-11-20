@@ -169,6 +169,9 @@ export const MIGRATION_SIGNATURES: Record<string, { tables?: string[]; columns?:
     "065_club_event_shares_account_type.sql": {
         columns: ["club_event_shares.account_type"],
     },
+    "068_club_announcements.sql": {
+        tables: ["club_announcements", "club_announcement_assets", "club_announcement_likes", "club_announcement_limits", "club_announcement_jobs", "club_announcement_audit"],
+    },
 };
 
 /**

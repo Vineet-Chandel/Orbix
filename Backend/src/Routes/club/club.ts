@@ -45,7 +45,10 @@ import { sendSoleRegistrationEmail } from "../../services/email/eventRegistratio
 import { EventStageService } from "../../services/events/eventStageService.js";
 import { toggleEventLike } from "../../services/events/eventEngagementService.js";
 
+import clubAnnouncementRouter from "./clubAnnouncementRoutes.js";
+
 const clubRouter = express.Router();
+clubRouter.use("/announcements", clubAnnouncementRouter);
 
 // Mount dedicated Club Team Management router (/api/club/team)
 clubRouter.use("/team", clubTeamRouter);
@@ -3263,23 +3266,31 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
                 CASE WHEN $1::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount",
-                (SELECT s.starts_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationStartsAt",
-                (SELECT s.ends_at FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1) AS "registrationDeadline",
+                registration_stage.starts_at AS "registrationStartsAt",
+                registration_stage.ends_at AS "registrationDeadline",
                 COALESCE(
-                    (SELECT CASE WHEN s.status IN ('completed', 'cancelled') OR NOW() > s.ends_at THEN true ELSE false END
-                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN registration_stage.id IS NOT NULL THEN registration_stage.status IN ('completed', 'cancelled') OR COALESCE(NOW() > registration_stage.ends_at, false) END,
                     CASE WHEN (e.ends_at IS NOT NULL AND NOW() > e.ends_at) OR e.status = 'completed' THEN true ELSE false END
                 ) AS "isRegistrationClosed",
                 COALESCE(
-                    (SELECT CASE WHEN NOW() < s.starts_at THEN true ELSE false END
-                     FROM club_event_stages s WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration') ORDER BY s.stage_order ASC LIMIT 1),
+                    CASE WHEN registration_stage.id IS NOT NULL THEN COALESCE(NOW() < registration_stage.starts_at, false) END,
                     CASE WHEN NOW() < e.starts_at THEN true ELSE false END
                 ) AS "isRegistrationUpcoming",
-                (SELECT s.name FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageName",
-                (SELECT s.stage_order FROM club_event_stages s WHERE s.event_id = e.id AND s.status = 'active' ORDER BY s.stage_order ASC LIMIT 1) AS "currentStageOrder",
+                active_stage.name AS "currentStageName",
+                active_stage.stage_order AS "currentStageOrder",
                 (SELECT COUNT(*)::int FROM club_event_stages s WHERE s.event_id = e.id) AS "stagesCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
+            LEFT JOIN LATERAL (
+                SELECT s.id, s.starts_at, s.ends_at, s.status FROM club_event_stages s
+                WHERE s.event_id = e.id AND (s.type = 'registration' OR s.action_type = 'registration')
+                ORDER BY s.stage_order ASC LIMIT 1
+            ) registration_stage ON true
+            LEFT JOIN LATERAL (
+                SELECT s.name, s.stage_order FROM club_event_stages s
+                WHERE s.event_id = e.id AND s.status = 'active'
+                ORDER BY s.stage_order ASC LIMIT 1
+            ) active_stage ON true
             WHERE e.status IN ('published', 'completed') AND vc.is_active = true
         `;
         const params: any[] = [userId];

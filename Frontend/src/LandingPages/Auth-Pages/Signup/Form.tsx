@@ -19,12 +19,14 @@ import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { buildApiUrl } from "../../../api/apiClient";
 import { isDemoProfileUsername } from "../../../data/demoProfileData";
 import { isDemoClubSlug } from "../../../data/demoClubProfileData";
+import { OrbixInitialLoader } from "../../../components/ui/loader";
 
 export default function SignupForm() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const toast = useToast();
     const dispatch = useAppDispatch();
+    const [redirecting, setRedirecting] = useState(false);
 
     const [formData, setFormData] = useState({
         username: "",
@@ -381,6 +383,7 @@ export default function SignupForm() {
 
             dispatch(setUser(fullUser));
             setShowOtpModal(false);
+            setRedirecting(true);
 
             toast.success("Account registered and email verified! Welcome to Orbix.", {
                 title: "Welcome to Orbix!",
@@ -395,6 +398,15 @@ export default function SignupForm() {
             setVerifyingAndRegistering(false);
         }
     };
+
+    if (redirecting) {
+        return (
+            <OrbixInitialLoader
+                message="Welcome to Orbix!"
+                subMessage="Your account has been created. Loading developer onboarding…"
+            />
+        );
+    }
 
     return (
         <>

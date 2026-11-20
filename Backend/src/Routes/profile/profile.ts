@@ -251,7 +251,7 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
         const userRow = result.rows[0];
 
         // Fetch user's connected platforms
-        const linksResult = await query(
+        const linksPromise = query(
             `SELECT
                 id,
                 portal,
@@ -271,29 +271,26 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             [userRow.username, userRow.gmail]
         );
 
-        let college = null;
-        if (userRow.collegeId) {
-            const collegeRes = await query(
-                `SELECT id, official_name AS "officialName", city, state, district,
-                        institution_type AS "institutionType", aishe_code AS "aisheCode",
-                        verification_status AS "verificationStatus"
-                 FROM institutions WHERE id = $1 LIMIT 1;`,
-                [userRow.collegeId]
-            );
-            if (collegeRes.rows[0]) {
-                college = collegeRes.rows[0];
-            }
-        }
+        const collegePromise = userRow.collegeId ? query(
+            `SELECT id, official_name AS "officialName", city, state, district,
+                    institution_type AS "institutionType", aishe_code AS "aisheCode",
+                    verification_status AS "verificationStatus"
+             FROM institutions WHERE id = $1 LIMIT 1;`, [userRow.collegeId]
+        ) : Promise.resolve({ rows: [] });
+        const verificationPromise = userRow.collegeId ? query(
+            'SELECT id, status, college_id FROM college_verifications WHERE user_id = $1 ORDER BY created_at DESC;',
+            [userRow.id]
+        ).catch((error) => {
+            console.warn('College verification status resolution error:', error);
+            return { rows: [] };
+        }) : Promise.resolve({ rows: [] });
+        const [linksResult, collegeRes, cvRes] = await Promise.all([linksPromise, collegePromise, verificationPromise]);
+        const college = collegeRes.rows[0] || null;
 
-        
         let isCollegeVerified = false;
         let collegeVerificationStatus = 'NOT_VERIFIED';
         if (userRow.collegeId) {
             try {
-                const cvRes = await query(
-                    'SELECT id, status, college_id FROM college_verifications WHERE user_id = $1 ORDER BY created_at DESC;',
-                    [userRow.id]
-                );
                 const appRows = cvRes.rows;
                 const approved = appRows.find(r => r.status === 'APPROVED' && r.college_id === userRow.collegeId);
                 if (approved) {

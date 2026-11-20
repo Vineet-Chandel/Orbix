@@ -22,6 +22,7 @@ if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test'
 }
 import pg from "pg";
 import { performance } from "node:perf_hooks";
+import { recordDatabaseQuery } from "../middlewares/apiPerformance.middleware.js";
 
 const { Pool } = pg;
 
@@ -33,14 +34,18 @@ import {
 
 // Centralized, fail-closed database identity validation
 export const activeDbConfig: ResolvedDatabaseConfig = resolveDatabaseConfig();
+const dbPoolMax = Number(process.env.DB_POOL_MAX || 20);
+if (!Number.isInteger(dbPoolMax) || dbPoolMax < 1 || dbPoolMax > 100) {
+    throw new Error("DB_POOL_MAX must be an integer between 1 and 100.");
+}
 
 export const pool = new Pool({
     connectionString: activeDbConfig.connectionString,
-    connectionTimeoutMillis: 20000,
+    connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 60000,
-    max: 20,
+    max: dbPoolMax,
     keepAlive: true,
-    keepAliveInitialDelayMillis: 10000,
+    keepAliveInitialDelayMillis: 5000,
     ssl: activeDbConfig.ssl,
 });
 
@@ -69,6 +74,12 @@ export const testDatabaseConnection = async () => {
             "Database time:",
             result.rows[0].now
         );
+
+        // Production schema changes belong in the migration/release step. Running
+        // thousands of DDL statements on every web replica can lock live tables.
+        const syncSchema = process.env.DB_SCHEMA_SYNC_ON_STARTUP === "true" ||
+            (process.env.NODE_ENV !== "production" && process.env.DB_SCHEMA_SYNC_ON_STARTUP !== "false");
+        if (!syncSchema) return;
 
         // Ensure user_links table and profile columns exist
         await pool.query(`
@@ -1654,24 +1665,29 @@ const isRetryableError = (error: any): boolean => {
 export const query = async (
     text: string,
     params?: any[],
-    maxRetries = 2
+    // Retrying an arbitrary SQL statement can execute a committed mutation twice.
+    // Callers may explicitly opt in for reads that are safe to retry.
+    maxRetries = 0
 ): Promise<pg.QueryResult<any>> => {
+    const started = performance.now();
     let attempt = 0;
-    while (true) {
-        try {
-            return await pool.query(text, params);
-        } catch (error: any) {
-            attempt++;
-            if (attempt <= maxRetries && isRetryableError(error)) {
-                const delayMs = attempt * 500;
-                console.warn(
-                    `[Database] Transient query error (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying in ${delayMs}ms...`
-                );
-                await new Promise((res) => setTimeout(res, delayMs));
-                continue;
+    try {
+        while (true) {
+            try {
+                return await pool.query(text, params);
+            } catch (error: any) {
+                attempt++;
+                if (attempt <= maxRetries && isRetryableError(error)) {
+                    const delayMs = attempt * 500;
+                    console.warn(
+                        `[Database] Transient query error (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying in ${delayMs}ms...`
+                    );
+                    await new Promise((res) => setTimeout(res, delayMs));
+                    continue;
+                }
+                throw error;
             }
-            throw error;
         }
-    }
+    } finally { recordDatabaseQuery(performance.now() - started); }
 };
 

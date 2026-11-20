@@ -246,7 +246,7 @@ export const EventTrackerPage: React.FC = () => {
 
     // Initial background fetch & revalidation
     useEffect(() => {
-        dispatch(fetchEvents({ refresh: true }));
+        dispatch(fetchEvents({}));
     }, [dispatch]);
 
     // Dynamic 7-day rolling window algorithm: calculates upcoming contests and participating platforms in [nowMs, nowMs + 7 days]

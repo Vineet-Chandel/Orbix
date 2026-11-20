@@ -39,6 +39,10 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
     const [errors, setErrors] = useState<{ identity?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
+    const [redirectMeta, setRedirectMeta] = useState({
+        message: "Opening Club Portal…",
+        subMessage: "Your sign-in is complete. Loading your club workspace.",
+    });
     const [slowConnection, setSlowConnection] = useState(false);
     const requestLock = useRef(false);
     const lifetime = useRef(new AbortController());
@@ -131,18 +135,30 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
         // Route based on account type and club verification status
         if (resultData?.user?.clubStatus === "approved" || resultData?.user?.verifiedClub) {
+            setRedirectMeta({
+                message: "Opening Club Dashboard…",
+                subMessage: "Welcome back! Connecting to your verified club workspace.",
+            });
             toast.success("Welcome back! Redirecting to verified club dashboard...", { title: "Club Signed In" });
             navigate("/club/dashboard");
             return;
         }
 
         if (resultData?.user?.clubStatus && resultData?.user?.clubStatus !== "none") {
+            setRedirectMeta({
+                message: "Loading Club Status…",
+                subMessage: "Opening your club application review status.",
+            });
             toast.info("Welcome back! Loading your club verification status...", { title: "Application Under Review" });
             navigate("/club/status");
             return;
         }
 
         // Seamless onboarding: If account doesn't have an approved club or pending request yet
+        setRedirectMeta({
+            message: "Starting Club Setup…",
+            subMessage: "Opening club verification registration.",
+        });
         toast.info("Signed in! Let's get your club verified.", { title: "Club Setup" });
         navigate("/auth/signup?tab=club");
     };
@@ -447,7 +463,7 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
         }
     };
 
-    if (redirecting) return <OrbixInitialLoader message="Opening your workspace…" subMessage="Your sign-in is complete. Loading the dashboard." />;
+    if (redirecting) return <OrbixInitialLoader message={redirectMeta.message} subMessage={redirectMeta.subMessage} />;
 
     if (step === "2fa") {
         return (

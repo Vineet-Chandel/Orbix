@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts src/app/Club/eventScopePoolSize.test.ts src/app/Club/ApplicationsRoster/teamReadinessFilterSort.test.ts",
     "preview": "vite preview",
-    "test:forms": "npx tsx --test src/api/clubEventFormApi.test.ts src/app/Club/FormBuilder/draftSaveQueue.test.ts"
+    "test:forms": "npx tsx --test src/api/clubEventFormApi.test.ts src/app/Club/FormBuilder/draftSaveQueue.test.ts",
+    "test:announcements": "npx tsx --tsconfig tsconfig.app.json --test src/api/clubAnnouncementsApi.test.ts src/app/Club/Announcements/announcementRendering.test.tsx"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",
@@ -32,7 +33,13 @@
     "rehype-raw": "^7.0.0",
     "remark-emoji": "^5.0.2",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "@tiptap/react": "3.34.0",
+    "@tiptap/pm": "3.34.0",
+    "@tiptap/starter-kit": "3.34.0",
+    "@tiptap/extension-text-style": "3.34.0",
+    "@tiptap/extension-text-align": "3.34.0",
+    "@tiptap/extension-highlight": "3.34.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

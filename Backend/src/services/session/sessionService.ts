@@ -1,5 +1,6 @@
 // Backend/src/services/session/sessionService.ts
 import crypto from "crypto";
+import { withCacheBudget } from "../../redis/cache/withCacheBudget.js";
 import type { Request } from "express";
 import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
@@ -569,11 +570,12 @@ export async function isSessionRevoked(sessionId: string): Promise<boolean> {
     // Fast O(1) Redis check
     try {
         if (redis && redis.status === "ready") {
-            const isRevoked = await redis.get(`session:revoked:${sessionId}`);
-            if (isRevoked) return true;
-
-            const isActive = await redis.get(`session:active:${sessionId}`);
-            if (isActive) return false;
+            const state = await withCacheBudget(() => redis.mget(
+                `session:revoked:${sessionId}`, `session:active:${sessionId}`
+            ));
+            // One atomic read; a revocation always wins over an active marker.
+            if (state?.[0]) return true;
+            if (state?.[1]) return false;
         }
     } catch {
         // Fallback to Postgres

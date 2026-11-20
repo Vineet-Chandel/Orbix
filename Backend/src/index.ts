@@ -3,6 +3,7 @@ if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test'
         process.loadEnvFile();
     } catch { }
 }
+import { startAnnouncementWorker, stopAnnouncementWorker } from './workers/announcementWorker.js';
 import express, { type Express, type Request, type Response } from 'express';
 import cookieParser from 'cookie-parser';
 import authRouter from './Routes/auth/auth.js';
@@ -43,34 +44,12 @@ import { startCampaignFanoutWorker, stopCampaignFanoutWorker } from './workers/e
 import { startEmailOutboxDispatcher, stopEmailOutboxDispatcher } from './workers/emailOutboxDispatcher.js';
 import { EmailQueueService } from './services/email/emailQueueService.js';
 import redis from './redis/client.js';
+import { apiPerformance } from './middlewares/apiPerformance.middleware.js';
+import { createCorsMiddleware } from './middlewares/cors.middleware.js';
 
 const app: Express = express();
 
-app.use((req: Request, res: Response, next: express.NextFunction) => {
-    const origin = req.headers.origin;
-    if (origin) {
-        res.setHeader("Access-Control-Allow-Origin", origin);
-        res.setHeader("Access-Control-Allow-Credentials", "true");
-    }
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-
-    const requestedHeaders = req.headers["access-control-request-headers"];
-    if (requestedHeaders) {
-        res.setHeader("Access-Control-Allow-Headers", requestedHeaders);
-    } else {
-        res.setHeader(
-            "Access-Control-Allow-Headers",
-            "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-orbix-device-id, X-Orbix-Device-Id"
-        );
-    }
-    res.setHeader("Access-Control-Expose-Headers", "Authorization, Set-Cookie");
-
-    if (req.method === "OPTIONS") {
-        res.sendStatus(200);
-        return;
-    }
-    next();
-});
+app.use(createCorsMiddleware());
 
 app.use(cookieParser());
 app.use(express.json({ limit: "25mb" }));
@@ -87,6 +66,7 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 // CENTRALIZED API ROUTE ARCHITECTURE (EVERY BACKEND ENDPOINT PREFIXED WITH /api)
 // ============================================================================
 const apiRouter = express.Router();
+apiRouter.use(apiPerformance);
 
 // System Health & Root Status Endpoints
 apiRouter.get('/health', (req: Request, res: Response) => {
@@ -229,11 +209,14 @@ const startServer = async () => {
             console.error("Failed to initialize account purge worker:", workerErr);
         }
 
+        startAnnouncementWorker();
+
         // Initialize production fault-tolerant email infrastructure & workers
         try {
             startEmailWorkers();
             startCampaignFanoutWorker();
             startEmailOutboxDispatcher();
+
         } catch (emailWorkerErr: any) {
             console.warn("⚠️ Failed to initialize email delivery workers:", emailWorkerErr.message);
         }
@@ -246,6 +229,7 @@ const gracefulShutdown = async (signal: string) => {
     console.log(`[Orbix Server] Received ${signal}. Performing graceful shutdown...`);
     try {
         stopEmailOutboxDispatcher();
+        stopAnnouncementWorker();
         await Promise.allSettled([
             stopEmailWorkers(),
             stopCampaignFanoutWorker(),

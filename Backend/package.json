@@ -4,14 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tsx --test src/validators/ClubRegistrationValidator.test.ts",
+    "test": "tsx --test src/validators/ClubRegistrationValidator.test.ts src/services/announcements/*.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate:institutions": "tsx src/database/run_migration.ts",
     "seed:institutions": "tsx data/seed_institutions.ts",
     "seed:leaderboard": "tsx seed_leaderboard.ts",
     "db:init-schema": "tsx scripts/apply_production_schema.ts",
-    "db:ingest-colleges": "tsx data/ingest_comprehensive_directory.ts"
+    "db:ingest-colleges": "tsx data/ingest_comprehensive_directory.ts",
+    "audit:api": "node scripts/audit_api_routes.mjs",
+    "test:performance": "node --import tsx --test src/redis/cache/*.test.ts src/middlewares/cors.middleware.test.ts src/middlewares/apiPerformance.middleware.test.ts ../Frontend/src/store/personalDataApi.test.ts ../Frontend/src/store/authExploreRequests.test.ts"
   },
   "keywords": [],
   "author": "",

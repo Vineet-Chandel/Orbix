@@ -38,6 +38,7 @@ import {
 import { useToast } from "../../context/ToastContext";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ClubSidebar, type ClubTab } from "./ClubSidebar";
+const ClubAnnouncementsSection = lazyWithRetry(() => import("./ClubAnnouncementsSection").then(m => ({ default: m.ClubAnnouncementsSection })));
 const ClubInboxModal = lazyWithRetry(() => import("./ClubInboxModal"));
 const ClubEventModal = lazyWithRetry(() => import("./ClubEventModal").then((m) => ({ default: m.ClubEventModal })));
 const ClubEventAnalyticsSection = lazyWithRetry(() => import("./ClubEventAnalyticsSection").then((m) => ({ default: m.ClubEventAnalyticsSection })));
@@ -606,7 +607,7 @@ export default function ClubDashboardPage() {
                                                 <Megaphone className="w-4 h-4 stroke-[2.5]" />
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                                Announcement
+                                                Announcements
                                             </h1>
                                         </div>
                                     )}
@@ -1208,22 +1209,9 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: ANNOUNCEMENTS */}
                         {activeTab === "announcements" && (
-                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
-                                <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mx-auto text-black">
-                                    <Megaphone className="w-7 h-7 stroke-[2.2]" />
-                                </div>
-                                <div className="space-y-1.5 max-w-md mx-auto">
-                                    <h3 className="font-black text-lg sm:text-xl text-black">
-                                        Campus Announcements
-                                    </h3>
-                                    <p className="text-xs sm:text-sm font-medium text-neutral-600">
-                                        Campus-wide club broadcasts, bulletin updates, and notification feeds will be managed here.
-                                    </p>
-                                </div>
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-600 text-xs font-bold font-mono">
-                                    Module in development
-                                </div>
-                            </div>
+                            <Suspense fallback={<DashboardRouteSkeleton />}>
+                                <ClubAnnouncementsSection clubId={club.id} clubName={club.name} />
+                            </Suspense>
                         )}
 
                         {/* TAB: CAMPUS CLUBS & DIRECTORY */}

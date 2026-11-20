@@ -29,7 +29,7 @@ export const RecentContestsCard: React.FC<RecentContestsCardProps> = ({
     const authUser = useAppSelector((state) => state.user.user);
     const effectiveUser = (username || authUser?.username || "").trim();
     const remoteData = useAppSelector((state) => (effectiveUser ? state.contests.dataByUser[effectiveUser] : undefined));
-    const isLoading = useAppSelector((state) => (effectiveUser ? state.contests.loadingByUser[effectiveUser] || false : false));
+    const isLoading = useAppSelector((state) => (effectiveUser ? (state.contests.loadingByUser[effectiveUser] && !state.contests.dataByUser[effectiveUser]) || false : false));
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [selectedPortal, setSelectedPortal] = useState<string>("all");

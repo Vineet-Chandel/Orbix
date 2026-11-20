@@ -20,7 +20,7 @@ export const RecentlySolvedTrendsCard: React.FC<RecentlySolvedTrendsCardProps> =
         effectiveUser ? state.practiceAnalytics.dataByUser[effectiveUser] : undefined
     );
     const isLoading = useAppSelector((state) =>
-        effectiveUser ? state.practiceAnalytics.loadingByUser[effectiveUser] || false : false
+        effectiveUser ? (state.practiceAnalytics.loadingByUser[effectiveUser] && !state.practiceAnalytics.dataByUser[effectiveUser]) || false : false
     );
 
     const [difficultyFilter, setDifficultyFilter] = useState<"All" | "Easy" | "Medium" | "Hard">("All");

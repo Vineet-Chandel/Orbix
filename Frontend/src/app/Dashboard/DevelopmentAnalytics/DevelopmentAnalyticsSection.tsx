@@ -45,7 +45,7 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
 
     const reduxData = useAppSelector((state) => (effectiveUser ? state.developmentAnalytics.dataByUser[effectiveUser] : undefined));
     const reduxLoading = useAppSelector(
-        (state) => (effectiveUser ? state.developmentAnalytics.loadingByUser[effectiveUser] || false : false)
+        (state) => (effectiveUser ? (state.developmentAnalytics.loadingByUser[effectiveUser] && !state.developmentAnalytics.dataByUser[effectiveUser]) || false : false)
     );
     const data = isDemo ? demoDevelopmentAnalytics : reduxData;
     const isLoading = isDemo ? false : reduxLoading;

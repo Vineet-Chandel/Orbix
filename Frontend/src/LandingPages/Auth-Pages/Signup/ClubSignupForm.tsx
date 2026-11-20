@@ -27,6 +27,7 @@ import { NeoSelect } from "../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { CollegeAutocomplete } from "../../../components/CollegeAutocomplete";
 import { getInstitutionById, searchInstitutions, type InstitutionItem } from "../../../utils/profileApi";
+import { OrbixInitialLoader } from "../../../components/ui/loader";
 
 interface ClubSignupFormProps {
     onSwitchToPersonal?: () => void;
@@ -133,6 +134,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     const toast = useToast();
     const dispatch = useAppDispatch();
     const { user: authUser, isAuthenticated } = useAppSelector((state) => state.user);
+    const [redirecting, setRedirecting] = useState(false);
 
     const [formStep, setFormStep] = useState<"details" | "verification">("details");
 
@@ -628,6 +630,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             };
 
             dispatch(setUser(clubUser));
+            setRedirecting(true);
 
             toast.success("Contact verified & club application received successfully!", {
                 title: "Application Received",
@@ -642,6 +645,15 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             setLoading(false);
         }
     };
+
+    if (redirecting) {
+        return (
+            <OrbixInitialLoader
+                message="Submitting Application…"
+                subMessage="Opening your verified club review dashboard…"
+            />
+        );
+    }
 
     return (
         <form onSubmit={formStep === "details" ? handleProceedToVerification : (e) => { e.preventDefault(); executeFinalSubmission(); }} className="space-y-6" noValidate>

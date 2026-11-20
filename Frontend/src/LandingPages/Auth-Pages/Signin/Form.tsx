@@ -34,6 +34,10 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     const [errors, setErrors] = useState<{ gmail?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
+    const [redirectMeta, setRedirectMeta] = useState({
+        message: "Opening your workspace…",
+        subMessage: "Your sign-in is complete. Loading the dashboard.",
+    });
     const [slowConnection, setSlowConnection] = useState(false);
     const requestLock = useRef(false);
     const lifetime = useRef(new AbortController());
@@ -163,9 +167,17 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
         const destination = resolvePostLoginRedirect();
         if (destination !== "/dashboard") {
             const isBlog = destination.startsWith("/blog") || destination.startsWith("/blogs");
+            setRedirectMeta({
+                message: isBlog ? "Returning to publication…" : "Opening destination…",
+                subMessage: "Your sign-in is complete. Loading page.",
+            });
             toast.success(isBlog ? "Welcome back! Returning to publication..." : "Welcome back! Redirecting...", { title: "Signed In" });
             navigate(destination);
         } else {
+            setRedirectMeta({
+                message: "Opening your workspace…",
+                subMessage: "Your sign-in is complete. Loading the dashboard.",
+            });
             toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
             navigate("/dashboard");
         }
@@ -462,7 +474,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     };
 
     // If in 2FA Mode, render 2FA verification card
-    if (redirecting) return <OrbixInitialLoader message="Opening your workspace…" subMessage="Your sign-in is complete. Loading the dashboard." />;
+    if (redirecting) return <OrbixInitialLoader message={redirectMeta.message} subMessage={redirectMeta.subMessage} />;
 
     if (step === "2fa") {
         return (

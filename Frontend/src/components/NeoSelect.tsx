@@ -30,6 +30,7 @@ export interface NeoSelectProps {
     size?: "sm" | "md" | "lg";
     portal?: boolean;
     placement?: "bottom" | "top" | "auto";
+    dropdownWidth?: number | string;
 }
 
 /**
@@ -57,6 +58,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
     size = "md",
     placement = "auto",
     portal = false,
+    dropdownWidth,
 }) => {
     const generatedId = useId();
     const id = propId || generatedId;
@@ -110,9 +112,20 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
             const below = window.innerHeight - rect.bottom - 12;
             const above = rect.top - 12;
             const top = placement === "top" || (placement === "auto" && below < 240 && above > below);
-            const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 24);
+            const targetWidth = typeof dropdownWidth === "number"
+                ? dropdownWidth
+                : typeof dropdownWidth === "string"
+                    ? parseInt(dropdownWidth, 10) || rect.width
+                    : Math.max(rect.width, 160);
+            const width = Math.min(targetWidth, window.innerWidth - 24);
+            const fitsOnRight = rect.left + width <= window.innerWidth - 12;
+            const left = fitsOnRight
+                ? Math.max(12, rect.left)
+                : Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
             setMenuStyle({
-                position: "fixed", width, left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
+                position: "fixed",
+                width,
+                left,
                 top: top ? undefined : rect.bottom + 6,
                 bottom: top ? window.innerHeight - rect.top + 6 : undefined,
                 maxHeight: Math.max(0, Math.min(320, top ? above : below)),
@@ -126,7 +139,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
             window.removeEventListener("resize", position);
             window.removeEventListener("scroll", position, true);
         };
-    }, [isOpen, portal, placement]);
+    }, [isOpen, portal, placement, dropdownWidth]);
 
     // Compute dynamic placement
     useEffect(() => {

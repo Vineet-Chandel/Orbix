@@ -1,9 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { OrbixLoader } from "../../components/ui/loader";
+import { OrbixInitialLoader } from "../../components/ui/loader";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch, fetchUserProfile } from "../../store";
-import { OrbixLogo } from "../../components/OrbixLogo";
 
 export const OAuthCallbackPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -66,22 +65,10 @@ export const OAuthCallbackPage: React.FC = () => {
     }, [searchParams, navigate, toast, dispatch]);
 
     return (
-        <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex flex-col items-center justify-center p-6 text-black select-none">
-            <div className="w-full max-w-sm p-8 rounded-3xl bg-white border-3 border-black shadow-[8px_8px_0px_#000] text-center space-y-5 animate-in fade-in zoom-in-95 duration-150">
-                <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                    <OrbixLogo className="w-8 h-8 text-black" />
-                </div>
-                <div className="space-y-1.5">
-                    <h2 className="text-xl font-black text-black tracking-tight">Authenticating with Orbix</h2>
-                    <p className="text-xs font-bold text-neutral-600">
-                        Finalizing your secure session and setting up your workspace...
-                    </p>
-                </div>
-                <div className="pt-2 flex justify-center">
-                    <OrbixLoader size="sm" variant="minimal" />
-                </div>
-            </div>
-        </div>
+        <OrbixInitialLoader
+            message="Authenticating with Orbix…"
+            subMessage="Finalizing your secure session and setting up your workspace"
+        />
     );
 };
 
