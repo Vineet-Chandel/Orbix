@@ -225,76 +225,6 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         [cleanUser, u.email || cleanUser, userId]
     );
 
-    // If user has no user_links entries but already has a precomputed orbix_score > 0 in users table, preserve it
-    if (linksRes.rows.length === 0 && u.orbix_score && Number(u.orbix_score) > 0) {
-        const score = Number(u.orbix_score);
-        const scoreBreakdown = u.orbix_score_breakdown || {};
-        const finalSolved = Number(u.total_solved || 0);
-        const finalContests = Number(u.total_contests || 0);
-        const streak = Number(u.streak || 0);
-        const platRatings = parseRatingsSafe(u.platform_ratings, scoreBreakdown);
-
-        const upsertRes = await query(
-            `INSERT INTO leaderboard_entries (
-                user_id, username, display_name, avatar_url, college, college_id, is_verified,
-                score, score_breakdown, total_solved, total_contests, platform_ratings,
-                streak, is_public, updated_at
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
-             ON CONFLICT (user_id) DO UPDATE SET
-                username = EXCLUDED.username,
-                display_name = EXCLUDED.display_name,
-                avatar_url = EXCLUDED.avatar_url,
-                college = EXCLUDED.college,
-                college_id = EXCLUDED.college_id,
-                is_verified = EXCLUDED.is_verified,
-                score = EXCLUDED.score,
-                score_breakdown = EXCLUDED.score_breakdown,
-                total_solved = EXCLUDED.total_solved,
-                total_contests = EXCLUDED.total_contests,
-                platform_ratings = EXCLUDED.platform_ratings,
-                streak = EXCLUDED.streak,
-                is_public = EXCLUDED.is_public,
-                updated_at = CURRENT_TIMESTAMP
-             RETURNING *;`,
-            [
-                userId,
-                cleanUser,
-                displayName,
-                avatarUrl,
-                college,
-                collegeId,
-                isVerified,
-                score,
-                JSON.stringify(scoreBreakdown),
-                finalSolved,
-                finalContests,
-                JSON.stringify(platRatings),
-                streak,
-                isPublic,
-            ]
-        );
-
-        await cacheLeaderboard.invalidate({ collegeId: collegeId || undefined });
-        const row = upsertRes.rows[0];
-        return {
-            rank: row.global_rank || 1,
-            userId: row.user_id,
-            username: row.username,
-            displayName: row.display_name,
-            avatarUrl: row.avatar_url,
-            college: row.college,
-            collegeId: row.college_id,
-            isVerified: row.is_verified,
-            score: row.score,
-            scoreBreakdown: row.score_breakdown,
-            totalSolved: row.total_solved,
-            totalContests: row.total_contests,
-            platformRatings: parseRatingsSafe(row.platform_ratings, row.score_breakdown),
-            streak: row.streak,
-            updatedAt: row.updated_at,
-        };
-    }
-
     const portalsMap: Record<string, any> = {};
     const platformRatings: Record<string, { rating: number; tier?: string; color?: string; badge?: string }> = {};
 
@@ -325,7 +255,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
                     stats = liveData.stats || [];
                     query(
                         `UPDATE user_links
-                         SET snapshot = $1::jsonb, stats = $2::jsonb, verified = true, updated_at = CURRENT_TIMESTAMP
+                         SET snapshot = $1::jsonb, stats = $2::jsonb, updated_at = CURRENT_TIMESTAMP
                          WHERE (LOWER(username) = LOWER($3) OR user_id = $4) AND LOWER(portal) = LOWER($5);`,
                         [JSON.stringify(liveData), JSON.stringify(stats), cleanUser, userId, portal]
                     ).catch(() => null);
@@ -419,8 +349,8 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
     }
 
     // Extract maximum verified active days and streak from links and user record
-    let maxActiveDays = Number(u.streak || 0);
-    let maxStreak = Number(u.streak || 0);
+    let maxActiveDays = 0;
+    let maxStreak = 0;
 
     for (const link of linksRes.rows) {
         let stats = link.stats;
@@ -583,7 +513,7 @@ async function getCollegesRepresentedCount(): Promise<number> {
         const res = await query(`
             SELECT COUNT(DISTINCT college_id)::int as count 
             FROM leaderboard_entries 
-            WHERE is_public = true AND college_id IS NOT NULL;
+            WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()}) AND college_id IS NOT NULL;
         `);
         return parseInt(res.rows[0]?.count || "0", 10);
     } catch {
@@ -616,7 +546,7 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
                     user_id,
                     DENSE_RANK() OVER (ORDER BY score DESC, total_solved DESC, username ASC) as rank
                 FROM leaderboard_entries
-                WHERE is_public = true
+                WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()})
             ) ranked
             JOIN leaderboard_entries le ON le.user_id = ranked.user_id
             LEFT JOIN institutions i ON i.id = le.college_id
@@ -638,7 +568,7 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
                         user_id,
                         DENSE_RANK() OVER (ORDER BY score DESC, total_solved DESC, username ASC) as rank
                     FROM leaderboard_entries
-                    WHERE is_public = true
+                    WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()})
                 ) ranked
                 JOIN leaderboard_entries le ON le.user_id = ranked.user_id
                 LEFT JOIN institutions i ON i.id = le.college_id
@@ -661,7 +591,7 @@ async function getUserRank(username: string, collegeIdContext?: string | null): 
                         user_id,
                         DENSE_RANK() OVER (ORDER BY score DESC, total_solved DESC, username ASC) as rank
                     FROM leaderboard_entries
-                    WHERE is_public = true AND college_id = $1
+                    WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()}) AND college_id = $1
                 ) col_ranked
                 WHERE user_id = $2
                 LIMIT 1;
@@ -974,7 +904,7 @@ leaderboardRouter.get(["/colleges/participating", "/colleges/represented"], asyn
                 MAX(le.score)::int as "topScore"
             FROM institutions i
             INNER JOIN leaderboard_entries le ON le.college_id = i.id
-            WHERE le.is_public = true
+            WHERE le.is_public = true AND le.user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()})
             GROUP BY i.id, i.official_name, i.city, i.state, i.district, i.institution_type, i.aishe_code
             ORDER BY "totalCoders" DESC, "topScore" DESC, i.official_name ASC;
         `);
@@ -1069,7 +999,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
 
         // 3. Total Eligible Coders in this College
         const countParams: any[] = [rawCollegeId];
-        let countWhere = "WHERE is_public = true AND college_id = $1";
+        let countWhere = `WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()}) AND college_id = $1`;
         if (filter === "verified") {
             countWhere += " AND is_verified = true";
         }
@@ -1124,7 +1054,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
                     DENSE_RANK() OVER (ORDER BY score DESC, total_solved DESC, username ASC) as rank,
                     updated_at
                 FROM leaderboard_entries
-                WHERE is_public = true AND college_id = $1
+                WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()}) AND college_id = $1
             ) ranked
             WHERE rank <= 3
             ORDER BY rank ASC;
@@ -1153,7 +1083,7 @@ leaderboardRouter.get("/colleges/:collegeId", optionalAuthenticate, async (req: 
         // 5. Paginated College Standings
         const offset = (page - 1) * limit;
         const queryParams: any[] = [rawCollegeId];
-        let whereClause = "WHERE is_public = true AND college_id = $1";
+        let whereClause = `WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()}) AND college_id = $1`;
 
         if (filter === "verified") {
             whereClause += " AND is_verified = true";
@@ -1301,7 +1231,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
 
         // 2. Query Total Count
         const countParams: any[] = [];
-        let countWhere = "WHERE is_public = true";
+        let countWhere = `WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()})`;
         if (filter === "verified") {
             countWhere += " AND is_verified = true";
         }
@@ -1354,7 +1284,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
                     user_id,
                     DENSE_RANK() OVER (ORDER BY score DESC, total_solved DESC, username ASC) as rank
                 FROM leaderboard_entries
-                WHERE is_public = true
+                WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()})
             ) ranked
             JOIN leaderboard_entries le ON le.user_id = ranked.user_id
             LEFT JOIN institutions i ON i.id = le.college_id
@@ -1385,7 +1315,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
         // 5. Paginated Ranking Query
         const offset = (page - 1) * limit;
         const queryParams: any[] = [];
-        let whereClause = "WHERE le.is_public = true";
+        let whereClause = `WHERE le.is_public = true AND le.user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()})`;
 
         if (filter === "verified") {
             whereClause += " AND le.is_verified = true";
@@ -1411,7 +1341,7 @@ leaderboardRouter.get(["/", "/global"], optionalAuthenticate, async (req: Reques
                     user_id,
                     DENSE_RANK() OVER (ORDER BY score DESC, total_solved DESC, username ASC) as rank
                 FROM leaderboard_entries
-                WHERE is_public = true
+                WHERE is_public = true AND user_id IN (SELECT user_id FROM user_links WHERE ${await getVerifiedLinksCondition()})
             ) ranked
             JOIN leaderboard_entries le ON le.user_id = ranked.user_id
             LEFT JOIN institutions i ON i.id = le.college_id

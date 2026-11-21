@@ -20,12 +20,12 @@ export function invalidateConnectedPlatformCaches(dispatch?: any, username?: str
         if (cleanUser) {
             // Remove specific user entries from localStorage caches
             for (const key of [
-                "orbix_unified_submissions",
-                "orbix_unified_development",
-                "orbix_unified_contests",
-                "orbix_unified_badges",
-                "orbix_practice_analytics",
-                "orbix_development_analytics",
+                "orbix_unified_submissions_connected_v2",
+                "orbix_unified_development_connected_v2",
+                "orbix_unified_contests_connected_v2",
+                "orbix_unified_badges_connected_v2",
+                "orbix_practice_analytics_connected_v2",
+                "orbix_development_analytics_connected_v2",
             ]) {
                 try {
                     const raw = localStorage.getItem(key);
@@ -41,12 +41,12 @@ export function invalidateConnectedPlatformCaches(dispatch?: any, username?: str
             }
         } else {
             // Clear entire cache buckets if user is unspecified
-            localStorage.removeItem("orbix_unified_submissions");
-            localStorage.removeItem("orbix_unified_development");
-            localStorage.removeItem("orbix_unified_contests");
-            localStorage.removeItem("orbix_unified_badges");
-            localStorage.removeItem("orbix_practice_analytics");
-            localStorage.removeItem("orbix_development_analytics");
+            localStorage.removeItem("orbix_unified_submissions_connected_v2");
+            localStorage.removeItem("orbix_unified_development_connected_v2");
+            localStorage.removeItem("orbix_unified_contests_connected_v2");
+            localStorage.removeItem("orbix_unified_badges_connected_v2");
+            localStorage.removeItem("orbix_practice_analytics_connected_v2");
+            localStorage.removeItem("orbix_development_analytics_connected_v2");
         }
     } catch {
         // Safe fallback

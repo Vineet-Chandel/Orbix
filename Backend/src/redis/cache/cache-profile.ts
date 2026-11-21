@@ -136,12 +136,12 @@ export const invalidateAllUserCaches = async (user: { id?: string | undefined; u
             for (const keyVar of variants) {
                 promises.push(redis.del(`profile:public:${keyVar}`));
                 promises.push(redis.del(`user:portals:${keyVar}`));
-                promises.push(redis.del(`user:submissions:unified:${keyVar}`));
-                promises.push(redis.del(`user:development:unified:${keyVar}`));
-                promises.push(redis.del(`user:contests:unified:${keyVar}`));
-                promises.push(redis.del(`user:badges:unified:${keyVar}`));
-                promises.push(redis.del(`user:practice:analytics:${keyVar}`));
-                promises.push(redis.del(`user:development:analytics:${keyVar}`));
+                promises.push(redis.del(`user:submissions:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:development:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:contests:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:badges:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:practice:analytics:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:development:analytics:connected-v2:${keyVar}`));
                 promises.push(redis.del(`resume:private:${keyVar}`));
                 promises.push(redis.del(`resume:public:${keyVar}`));
             }
@@ -150,12 +150,12 @@ export const invalidateAllUserCaches = async (user: { id?: string | undefined; u
         if (user.id) {
             promises.push(redis.del(`profile:private:${user.id}`));
             promises.push(redis.del(`user:portals:${user.id}`));
-            promises.push(redis.del(`user:submissions:unified:${user.id}`));
-            promises.push(redis.del(`user:development:unified:${user.id}`));
-            promises.push(redis.del(`user:contests:unified:${user.id}`));
-            promises.push(redis.del(`user:badges:unified:${user.id}`));
-            promises.push(redis.del(`user:practice:analytics:${user.id}`));
-            promises.push(redis.del(`user:development:analytics:${user.id}`));
+            promises.push(redis.del(`user:submissions:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:development:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:contests:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:badges:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:practice:analytics:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:development:analytics:connected-v2:${user.id}`));
             promises.push(redis.del(`resume:private:${user.id}`));
         }
 

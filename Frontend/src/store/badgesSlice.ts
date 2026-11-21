@@ -33,7 +33,7 @@ export interface BadgesState {
 
 const getStoredBadges = (): Record<string, UnifiedBadgesData> => {
     try {
-        const stored = localStorage.getItem("orbix_unified_badges");
+        const stored = localStorage.getItem("orbix_unified_badges_connected_v2");
         if (!stored) return {};
         const parsed = JSON.parse(stored);
         for (const user in parsed) {
@@ -54,7 +54,7 @@ const getStoredBadges = (): Record<string, UnifiedBadgesData> => {
 
 const saveStoredBadges = (data: Record<string, UnifiedBadgesData>) => {
     try {
-        localStorage.setItem("orbix_unified_badges", JSON.stringify(data));
+        localStorage.setItem("orbix_unified_badges_connected_v2", JSON.stringify(data));
     } catch {
         // Safe fallback if quota exceeded
     }

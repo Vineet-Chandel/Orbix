@@ -14,7 +14,7 @@ import {
 } from "../../redis/cache/cache-profile.js";
 import { verifyAndFetchPortal, extractPortalUsername } from "../portals/portals.js";
 import { syncLeaderboardForUser } from "../leaderboard/leaderboard.js";
-import { checkVerificationSchemaStatus, getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
+import { checkVerificationSchemaStatus } from "../../services/verification/schemaCompatibility.js";
 import photoRouter from "./photo.js";
 import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
 import { getBlockState } from "../../services/relationship/blockService.js";
@@ -1616,9 +1616,8 @@ export const handlePrivacyAudit = async (req: Request, res: Response) => {
         const u = userRes.rows[0];
         const isPublic = u.is_public !== false;
 
-        const verifiedCondition = await getVerifiedLinksCondition();
         const linksRes = await query(
-            `SELECT portal, portal_username, verified, stats FROM user_links WHERE LOWER(username) = $1 AND ${verifiedCondition};`,
+            `SELECT portal, portal_username, verified, stats FROM user_links WHERE LOWER(username) = $1;`,
             [username]
         );
 

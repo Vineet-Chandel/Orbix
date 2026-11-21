@@ -29,7 +29,7 @@ export interface SubmissionsState {
 // Local storage caching for zero-flicker rehydration across page refreshes
 const getStoredSubmissions = (): Record<string, UnifiedSubmissionsData> => {
     try {
-        const stored = localStorage.getItem("orbix_unified_submissions");
+        const stored = localStorage.getItem("orbix_unified_submissions_connected_v2");
         return stored ? JSON.parse(stored) : {};
     } catch {
         return {};
@@ -38,7 +38,7 @@ const getStoredSubmissions = (): Record<string, UnifiedSubmissionsData> => {
 
 const saveStoredSubmissions = (data: Record<string, UnifiedSubmissionsData>) => {
     try {
-        localStorage.setItem("orbix_unified_submissions", JSON.stringify(data));
+        localStorage.setItem("orbix_unified_submissions_connected_v2", JSON.stringify(data));
     } catch {
         // Safe fallback if quota exceeded
     }
@@ -103,12 +103,12 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
                 hasPortalMismatch = true;
                 // Invalidate local storage cache entry when platform count/handles differ
                 try {
-                    const raw = localStorage.getItem("orbix_unified_submissions");
+                    const raw = localStorage.getItem("orbix_unified_submissions_connected_v2");
                     if (raw) {
                         const parsed = JSON.parse(raw);
                         delete parsed[effectiveUser];
                         delete parsed[effectiveUser.toLowerCase()];
-                        localStorage.setItem("orbix_unified_submissions", JSON.stringify(parsed));
+                        localStorage.setItem("orbix_unified_submissions_connected_v2", JSON.stringify(parsed));
                     }
                 } catch {
                     // Safe fallback

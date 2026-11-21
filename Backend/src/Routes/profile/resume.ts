@@ -31,7 +31,6 @@ import {
     type ResumePayload,
 } from "../../redis/cache/cache-resume.js";
 import intelligenceRouter from "./resumeIntelligence.js";
-import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 import { parseUploadedDocument } from "../../services/resume/documentParser.js";
 import { analyzeResumeWithGemini, type GeminiAnalysisReport } from "../../services/resume/geminiResumeAnalyzer.js";
 
@@ -573,17 +572,17 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
         let geminiReport: GeminiAnalysisReport | null = null;
         try {
             const parsedDoc = await parseUploadedDocument(file.buffer, originalName, file.mimetype);
-            const verifiedCondition = await getVerifiedLinksCondition();
+
             const platformsRes = await query(
                 `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
-                 FROM user_links WHERE (username = $1 OR username = $2) AND ${verifiedCondition};`,
+                 FROM user_links WHERE (username = $1 OR username = $2);`,
                 [authUser.username, authUser.gmail]
             );
             const verifiedPlatforms = (platformsRes.rows || []).map((row: any) => ({
                 portal: row.portal,
                 username: row.portalUsername,
                 url: row.url,
-                verified: true,
+                verified: Boolean(row.verified),
                 lastSyncAt: row.lastSyncAt,
                 lastSyncStatus: row.lastSyncStatus,
             }));
@@ -996,17 +995,17 @@ export const handleReAnalyzeResume = async (req: Request, res: Response) => {
         }
 
         const parsedDoc = await parseUploadedDocument(fileBuffer, row.resumeFilename || "resume.pdf", "application/pdf");
-        const verifiedCondition = await getVerifiedLinksCondition();
+
         const platformsRes = await query(
             `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
-             FROM user_links WHERE (username = $1 OR username = $2) AND ${verifiedCondition};`,
+             FROM user_links WHERE (username = $1 OR username = $2);`,
             [authUser.username, authUser.gmail]
         );
         const verifiedPlatforms = (platformsRes.rows || []).map((p: any) => ({
             portal: p.portal,
             username: p.portalUsername,
             url: p.url,
-            verified: true,
+            verified: Boolean(p.verified),
             lastSyncAt: p.lastSyncAt,
             lastSyncStatus: p.lastSyncStatus,
         }));
