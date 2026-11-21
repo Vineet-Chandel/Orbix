@@ -1,3 +1,4 @@
+import { fetchCollegeVerificationStatus, refreshEnrollmentVerification } from "../../api/collegeVerificationApi";
 import React, { useState, useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
 import { CollegeVerificationModal } from "./CollegeVerificationModal";
@@ -44,6 +45,33 @@ export const GlobalCollegeVerificationModal: React.FC = () => {
         }
         previousUserIdRef.current = user?.id;
     }, [user?.id]);
+
+    // Reconcile while the modal is closed too, including return from the hosted flow.
+    useEffect(() => {
+        if (!user?.id || user.accountType === "club" || isOpen) return;
+        let cancelled = false;
+        let inFlight = false;
+        let lastCheck = 0;
+        const check = async () => {
+            if (inFlight || document.visibilityState !== "visible" || Date.now() - lastCheck < 15000) return;
+            inFlight = true; lastCheck = Date.now();
+            try {
+                let result = await fetchCollegeVerificationStatus();
+                if (result.status === "PENDING" || result.status === "PROCESSING") result = await refreshEnrollmentVerification();
+                if (!cancelled && (result.isCollegeVerified !== Boolean(user.isCollegeVerified) || result.status !== (user.collegeVerificationStatus || "NOT_VERIFIED"))) {
+                    void dispatch(fetchUserProfile({ force: true }));
+                    emitCollegeVerificationUpdated();
+                }
+            } catch { /* Keep the profile usable during a provider outage. */ }
+            finally { inFlight = false; }
+        };
+        void check();
+        const timer = window.setInterval(() => void check(), 60000);
+        const onFocus = () => void check();
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onFocus);
+        return () => { cancelled = true; clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
+    }, [user?.id, user?.accountType, user?.isCollegeVerified, user?.collegeVerificationStatus, dispatch, isOpen]);
 
     // Do not mount modal if user is not signed in or is a club account
     if (!user || user.accountType === "club") return null;

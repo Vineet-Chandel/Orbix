@@ -150,7 +150,7 @@ export class CollegeVerificationService {
         // 3. Determine authoritative state
         // A user is APPROVED if and only if there is an APPROVED record matching their CURRENT college
         const approvedRecord = allApplications.find(
-            (a: any) => a.status === "APPROVED" && currentCollege && a.college_id === currentCollege.id
+            (a: any) => a.status === "APPROVED" && a.expires_at && new Date(a.expires_at).getTime() > Date.now() && currentCollege && a.college_id === currentCollege.id
         );
 
         let logicalStatus: "NOT_VERIFIED" | "PENDING" | "PROCESSING" | "APPROVED" | "REJECTED" | "INVALIDATED" = "NOT_VERIFIED";
@@ -1304,6 +1304,7 @@ export class CollegeVerificationService {
             is_email_verified: Boolean(row.email_verified_at),
             email_verified_at: row.email_verified_at,
             phone_number: row.phone_number,
+            expires_at: row.expires_at,
             is_phone_verified: Boolean(row.phone_verified_at),
             phone_verified_at: row.phone_verified_at,
             ocr_confidence: Number(row.ocr_confidence || 0),

@@ -1,53 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import {
-    GraduationCap,
-    UploadCloud,
-        CheckCircle2,
-    XCircle,
-    Clock,
-    AlertTriangle,
-    ShieldCheck,
-    X,
-    Sparkles,
-    Mail,
-    Phone,
-    ArrowRight,
-    ArrowLeft,
-    RotateCcw,
-    Check,
-    RefreshCw,
-} from "lucide-react";
-import { OrbixButton } from "../OrbixButton";
-import { useModalDismiss } from "../../hooks/useModalDismiss";
-import { useToast } from "../../context/ToastContext";
-import { ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT } from "../../utils/collegeVerificationModalEvents";
-import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
-import { updateProfile, type InstitutionItem } from "../../utils/profileApi";
-import { CollegeAutocomplete } from "../CollegeAutocomplete";
-import { OrbixLoader } from "../ui/loader";
-
-function phoneMatchesCanonical(input: string, canonical: string | null): boolean {
-    if (!input || !canonical) return false;
-    const digitsInput = input.replace(/\D/g, "");
-    const digitsCanonical = canonical.replace(/\D/g, "");
-    if (!digitsInput || !digitsCanonical) return false;
-    if (digitsInput === digitsCanonical) return true;
-    // Match 10-digit Indian mobile numbers against canonical +91 format
-    const tailInput = digitsInput.length > 10 ? digitsInput.slice(-10) : digitsInput;
-    const tailCanonical = digitsCanonical.length > 10 ? digitsCanonical.slice(-10) : digitsCanonical;
-    return tailInput.length === 10 && tailInput === tailCanonical;
-}
-import {
-    fetchCollegeVerificationStatus,
-    previewDocumentOcr,
-    submitCollegeVerification,
-    sendInstitutionalEmail,
-    sendCollegePhoneOtp,
-    verifyCollegePhoneOtp,
-    type CollegeVerificationRecord,
-    type OcrExtractedFields,
-} from "../../api/collegeVerificationApi";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { GraduationCap, ShieldCheck, X, ExternalLink, CheckCircle2, Clock, RefreshCw, Mail } from 'lucide-react';
+import { OrbixButton } from '../OrbixButton';
+import { CollegeAutocomplete } from '../CollegeAutocomplete';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
+import { useAppDispatch, useAppSelector, updateUserProfile } from '../../store';
+import { updateProfile, type InstitutionItem } from '../../utils/profileApi';
+import { fetchCollegeVerificationStatus, refreshEnrollmentVerification, startEnrollmentVerification, type VerificationStatusResponse } from '../../api/collegeVerificationApi';
 
 export interface CollegeVerificationModalProps {
     isOpen: boolean;
@@ -57,1416 +16,148 @@ export interface CollegeVerificationModalProps {
     onVerificationSubmitted?: () => void;
 }
 
-type WizardStep = "DOCUMENT" | "OCR_REVIEW" | "CONTACT_INFO" | "FINAL_SUBMIT" | "STATUS_VIEW";
-
-export const CollegeVerificationModal: React.FC<CollegeVerificationModalProps> = ({
-    isOpen,
-    onClose,
-    currentCollegeName,
-    currentCollegeId,
-    onVerificationSubmitted,
-}) => {
-    const toast = useToast();
+export function CollegeVerificationModal({ isOpen, onClose, currentCollegeName, currentCollegeId, onVerificationSubmitted }: CollegeVerificationModalProps) {
+    const { user } = useAppSelector(state => state.user);
     const dispatch = useAppDispatch();
-    const { user } = useAppSelector((state) => state.user);
+    const [status, setStatus] = useState<VerificationStatusResponse | null>(null);
+    const [selected, setSelected] = useState<InstitutionItem | null>(null);
+    const [changing, setChanging] = useState(false);
+    const [name, setName] = useState('');
+    const [consent, setConsent] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const currentRequest = useRef(0);
+    const changedRef = useRef(onVerificationSubmitted);
+    const stateRef = useRef('');
+    const polling = useRef(false);
+    changedRef.current = onVerificationSubmitted;
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+    const apply = useCallback((result: VerificationStatusResponse) => {
+        setStatus(result);
+        const version = `${result.status}:${result.latestApplication?.updated_at || ''}`;
+        if (stateRef.current && stateRef.current !== version) changedRef.current?.();
+        stateRef.current = version;
+    }, []);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const backFileInputRef = useRef<HTMLInputElement>(null);
-
-    // Flow & loading states
-    const [step, setStep] = useState<WizardStep>("DOCUMENT");
-    const [isLoadingStatus, setIsLoadingStatus] = useState(true);
-    const [isScanningOcr, setIsScanningOcr] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Dynamic College Selection state (when no college is set in profile)
-    const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(null);
-    const [isSavingCollege, setIsSavingCollege] = useState(false);
-    const [isChangingCollege, setIsChangingCollege] = useState(false);
-
-    // Existing active/latest application
-    const [activeApp, setActiveApp] = useState<CollegeVerificationRecord | null>(null);
-    const [latestApp, setLatestApp] = useState<CollegeVerificationRecord | null>(null);
-    const [currentVerificationState, setCurrentVerificationState] = useState<string>("NOT_VERIFIED");
-    const [serverCollege, setServerCollege] = useState<{ id: string; officialName: string } | null>(null);
-
-    // Document Upload Form
-    const [documentType, setDocumentType] = useState<"student_id" | "erp_profile" | "student_id_both_sides">("student_id");
-    const [frontFile, setFrontFile] = useState<File | null>(null);
-    const [frontPreview, setFrontPreview] = useState<string | null>(null);
-    const [backFile, setBackFile] = useState<File | null>(null);
-    const [backPreview, setBackPreview] = useState<string | null>(null);
-
-    // OCR extraction details & corrections
-    const [ocrConfidence, setOcrConfidence] = useState<number>(0);
-    const [rawOcrData, setRawOcrData] = useState<OcrExtractedFields>({
-        studentName: null,
-        collegeName: null,
-        enrollmentNumber: null,
-        courseName: null,
-        academicYear: null,
-        institutionEmail: null,
-        phoneNumber: null,
-    });
-
-    const [studentName, setStudentName] = useState("");
-    const [enrollmentNumber, setEnrollmentNumber] = useState("");
-    const [courseName, setCourseName] = useState("");
-    const [academicYear, setAcademicYear] = useState("");
-    const [collegeNameInput, setCollegeNameInput] = useState("");
-
-    const effectiveCollegeId = selectedCollege?.id || currentCollegeId || serverCollege?.id || user?.collegeId || activeApp?.college_id || null;
-    const effectiveCollegeName = selectedCollege?.officialName || currentCollegeName || serverCollege?.officialName || user?.college?.officialName || collegeNameInput || "";
-    const hasValidAffiliatedCollege = Boolean(
-        effectiveCollegeId &&
-        effectiveCollegeName &&
-        effectiveCollegeName.trim().length > 0 &&
-        !effectiveCollegeName.toLowerCase().includes("no college")
-    );
-
-    // Contact verification channels
-    const [institutionEmail, setInstitutionEmail] = useState("");
-    const [isEmailSent, setIsEmailSent] = useState(false);
-    const [isEmailSending, setIsEmailSending] = useState(false);
-    const [emailCooldown, setEmailCooldown] = useState(0);
-    const [emailDomainMatched, setEmailDomainMatched] = useState<boolean | null>(null);
-    const [serverVerifiedEmail, setServerVerifiedEmail] = useState<string | null>(null);
-    const [isRefreshingChannels, setIsRefreshingChannels] = useState(false);
-
-    const [phoneNumber, setPhoneNumber] = useState("");
-    const [isPhoneSending, setIsPhoneSending] = useState(false);
-    const [phoneCooldown, setPhoneCooldown] = useState(0);
-    const [phoneOtp, setPhoneOtp] = useState("");
-    const [localPhoneVerified, setLocalPhoneVerified] = useState(false);
-    const [serverVerifiedPhone, setServerVerifiedPhone] = useState<string | null>(null);
-    const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
-
-    // Authoritative verified status derived strictly from server confirmation matching current input values
-    const isEmailVerified = Boolean(
-        serverVerifiedEmail &&
-            institutionEmail.trim().length > 0 &&
-            institutionEmail.trim().toLowerCase() === serverVerifiedEmail.trim().toLowerCase()
-    );
-    const isPhoneVerified = Boolean(
-        (localPhoneVerified && phoneMatchesCanonical(phoneNumber, serverVerifiedPhone || phoneNumber)) ||
-            (serverVerifiedPhone && phoneMatchesCanonical(phoneNumber, serverVerifiedPhone))
-    );
-
-    // Background scroll lock
-    useEffect(() => {
-        if (isOpen) {
-            const originalOverflow = document.body.style.overflow;
-            document.body.style.overflow = "hidden";
-            return () => {
-                document.body.style.overflow = originalOverflow;
-            };
-        }
-    }, [isOpen]);
-
-    // Clean up temporary image object URLs on unmount or close
-    useEffect(() => {
-        if (!isOpen) {
-            if (frontPreview) {
-                try { URL.revokeObjectURL(frontPreview); } catch {}
-                setFrontPreview(null);
-            }
-            if (backPreview) {
-                try { URL.revokeObjectURL(backPreview); } catch {}
-                setBackPreview(null);
-            }
-            setFrontFile(null);
-            setBackFile(null);
-            setPhoneOtp("");
-            setLocalPhoneVerified(false);
-            setServerVerifiedPhone(null);
-            setServerVerifiedEmail(null);
-            setIsEmailSent(false);
-        }
-    }, [isOpen]);
-
-    // Cooldown countdown timers
-    useEffect(() => {
-        let interval: any;
-        if (emailCooldown > 0) {
-            interval = setInterval(() => setEmailCooldown((c) => Math.max(0, c - 1)), 1000);
-        }
-        return () => clearInterval(interval);
-    }, [emailCooldown]);
-
-    useEffect(() => {
-        let interval: any;
-        if (phoneCooldown > 0) {
-            interval = setInterval(() => setPhoneCooldown((c) => Math.max(0, c - 1)), 1000);
-        }
-        return () => clearInterval(interval);
-    }, [phoneCooldown]);
-
-    // Sync verification status and pre-submission verified channels from server
-    const loadVerificationStatus = async (options?: { updateStep?: boolean; silent?: boolean }) => {
-        const updateStep = options?.updateStep !== false;
-        const silent = options?.silent === true;
-        if (!silent) {
-            setIsLoadingStatus(true);
-        } else {
-            setIsRefreshingChannels(true);
-        }
-        try {
-            const data = await fetchCollegeVerificationStatus();
-            setCurrentVerificationState(data.status);
-            setActiveApp(data.activeApplication);
-            setLatestApp(data.latestApplication);
-            if (data.currentCollege) {
-                setServerCollege({
-                    id: data.currentCollege.id,
-                    officialName: data.currentCollege.officialName,
-                });
-                if (!collegeNameInput) {
-                    setCollegeNameInput(data.currentCollege.officialName);
-                }
-                setSelectedCollege((prev) => prev || (data.currentCollege as any));
-            }
-
-            if (data.verifiedChannels?.email && data.verifiedChannels?.emailVerifiedAt) {
-                setServerVerifiedEmail(data.verifiedChannels.email);
-                setInstitutionEmail((prev) => (prev.trim() ? prev : data.verifiedChannels!.email || ""));
-            } else {
-                setServerVerifiedEmail(null);
-            }
-
-            if (data.verifiedChannels?.phone && data.verifiedChannels?.phoneVerifiedAt) {
-                setServerVerifiedPhone(data.verifiedChannels.phone);
-                setPhoneNumber((prev) => (prev.trim() ? prev : data.verifiedChannels!.phone || ""));
-                setLocalPhoneVerified(true);
-            } else if (!localPhoneVerified) {
-                setServerVerifiedPhone(null);
-            }
-
-            if (updateStep) {
-                if (data.status === "PENDING" || data.status === "PROCESSING" || data.status === "APPROVED" || data.status === "REJECTED" || data.status === "INVALIDATED") {
-                    setStep("STATUS_VIEW");
-                } else {
-                    setStep("DOCUMENT");
-                }
-            }
-        } catch (err: any) {
-            console.error("Failed to load verification status:", err);
-        } finally {
-            if (!silent) {
-                setIsLoadingStatus(false);
-            } else {
-                setIsRefreshingChannels(false);
-            }
-        }
-    };
-
-    useEffect(() => {
-        if (isOpen) {
-            loadVerificationStatus({ updateStep: true });
-            if (currentCollegeName) {
-                setCollegeNameInput(currentCollegeName);
-            }
-            if (user?.college) {
-                setSelectedCollege(user.college);
-            }
-        } else {
-            setIsChangingCollege(false);
-            setIsSavingCollege(false);
-        }
-    }, [isOpen, currentCollegeName, user?.college]);
-
-    // Authoritative Handler: Selects college and immediately persists it to backend database
-    const handleCollegeSelectAndSave = async (inst: InstitutionItem | null) => {
-        if (!inst) {
-            setSelectedCollege(null);
-            return;
-        }
-
-        setSelectedCollege(inst);
-        setIsSavingCollege(true);
-
-        try {
-            // Save to backend database via PUT /api/profile
-            const updated = await updateProfile({ collegeId: inst.id });
-            dispatch(updateUserProfile(updated));
-            setServerCollege({ id: inst.id, officialName: inst.officialName });
-            setCollegeNameInput(inst.officialName);
-            setIsChangingCollege(false);
-            window.dispatchEvent(new Event("orbix_profile_updated"));
-
-            toast.success(`College affiliation set to "${inst.officialName}".`, {
-                title: "College Affiliated",
-            });
-        } catch (err: any) {
-            toast.error(err?.message || "Failed to save college affiliation. Please try again.", {
-                title: "Save Failed",
-            });
-            setSelectedCollege(null);
-        } finally {
-            setIsSavingCollege(false);
-        }
-    };
-
-    // Synchronize verified email/phone state across tabs (e.g. clicking email link in another tab)
     useEffect(() => {
         if (!isOpen) return;
+        const generation = ++currentRequest.current;
+        setLoading(true); setBusy(false); setError(''); setStatus(null); setConsent(false); setChanging(false); setSelected(null);
+        setName([user?.firstName, user?.middleName, user?.lastName].filter(Boolean).join(' '));
+        stateRef.current = '';
+        void fetchCollegeVerificationStatus().then(result => { if (generation === currentRequest.current) apply(result); })
+            .catch(err => { if (generation === currentRequest.current) setError(err.message); })
+            .finally(() => { if (generation === currentRequest.current) setLoading(false); });
+        const previousFocus = document.activeElement as HTMLElement | null;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        dialogRef.current?.focus();
+        return () => { currentRequest.current++; document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
+    }, [isOpen, user?.id, user?.firstName, user?.middleName, user?.lastName, apply]);
 
-        const handleSync = () => {
-            if (step === "CONTACT_INFO" || step === "FINAL_SUBMIT") {
-                loadVerificationStatus({ updateStep: false, silent: true });
-            }
-        };
-
-        window.addEventListener("focus", handleSync);
-        window.addEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleSync);
-
-        let channel: BroadcastChannel | null = null;
+    const refresh = useCallback(async (silent = false) => {
+        if (polling.current) return;
+        polling.current = true;
+        const generation = currentRequest.current;
+        if (!silent) { setBusy(true); setError(''); }
         try {
-            if (typeof BroadcastChannel !== "undefined") {
-                channel = new BroadcastChannel("orbix_college_verification");
-                channel.onmessage = () => handleSync();
+            const result = await refreshEnrollmentVerification();
+            if (generation === currentRequest.current) apply(result);
+        } catch (err) {
+            if (generation === currentRequest.current) setError(err instanceof Error ? err.message : 'Could not check verification.');
+        } finally { polling.current = false; if (generation === currentRequest.current && !silent) setBusy(false); }
+    }, [apply]);
+
+    const pending = status?.status === 'PENDING' || status?.status === 'PROCESSING';
+    useEffect(() => {
+        if (!isOpen || !pending) return;
+        const check = () => { if (document.visibilityState === 'visible') void refresh(true); };
+        const timer = window.setInterval(check, 20000);
+        window.addEventListener('focus', check);
+        document.addEventListener('visibilitychange', check);
+        return () => { clearInterval(timer); window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', check); };
+    }, [isOpen, pending, refresh]);
+
+    const saveCollege = async () => {
+        if (!selected) return;
+        const generation = currentRequest.current;
+        setBusy(true); setError('');
+        try {
+            const result = await updateProfile({ collegeId: selected.id });
+            if (generation !== currentRequest.current) return;
+            dispatch(updateUserProfile(result));
+            apply(await fetchCollegeVerificationStatus()); setChanging(false); setConsent(false);
+            changedRef.current?.();
+        } catch (err) { setError(err instanceof Error ? err.message : 'Could not save college.'); }
+        finally { if (generation === currentRequest.current) setBusy(false); }
+    };
+    const start = async () => {
+        const collegeId = status?.currentCollege?.id;
+        if (!collegeId) return;
+        const generation = currentRequest.current;
+        setBusy(true); setError('');
+        try {
+            const result = await startEnrollmentVerification({ collegeId, studentName: name.trim(), consent });
+            if (generation !== currentRequest.current) return;
+            // Navigate only to the known hosted provider. Returning never grants a badge.
+            if (result.resumeUrl) {
+                const url = new URL(result.resumeUrl);
+                if (url.origin !== 'https://services.sheerid.com') throw new Error('Invalid verification destination.');
+                window.open(url.href, '_blank', 'noopener,noreferrer');
             }
-        } catch {}
-
-        return () => {
-            window.removeEventListener("focus", handleSync);
-            window.removeEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleSync);
-            if (channel) {
-                try { channel.close(); } catch {}
-            }
-        };
-    }, [isOpen, step]);
-
-    // Handle modal backdrop dismissal
-    const { handleBackdropClick } = useModalDismiss({
-        isOpen,
-        onClose: () => {
-            if (!isScanningOcr && !isSubmitting) onClose();
-        },
-        disableEscape: isScanningOcr || isSubmitting,
-        disableBackdrop: isScanningOcr || isSubmitting,
-    });
-
+            apply(await fetchCollegeVerificationStatus());
+        } catch (err) { setError(err instanceof Error ? err.message : 'Could not start verification.'); }
+        finally { if (generation === currentRequest.current) setBusy(false); }
+    };
+    const trapFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== 'Tab') return;
+        const elements = dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]');
+        const first = elements?.[0], last = elements?.[elements.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
     if (!isOpen) return null;
-    if (typeof document === "undefined") return null;
-
-    // File handlers
-    const handleFrontFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (file.size > 10 * 1024 * 1024) {
-            toast.error("Document exceeds 10MB limit. Please upload a smaller JPG, PNG, or WebP image.", {
-                title: "File Too Large",
-            });
-            return;
-        }
-
-        setFrontFile(file);
-        setFrontPreview(URL.createObjectURL(file));
-    };
-
-    const handleBackFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (file.size > 10 * 1024 * 1024) {
-            toast.error("Document exceeds 10MB limit. Please upload a smaller image.", {
-                title: "File Too Large",
-            });
-            return;
-        }
-
-        setBackFile(file);
-        setBackPreview(URL.createObjectURL(file));
-    };
-
-    // Run OCR Scanning
-    const handleRunOcr = async () => {
-        if (!effectiveCollegeId) {
-            toast.error("Please search and select your college or university above first.", {
-                title: "College Affiliation Required",
-            });
-            return;
-        }
-
-        if (!frontFile) {
-            toast.error("Please choose a document image first.", { title: "Document Missing" });
-            return;
-        }
-
-        if (documentType === "student_id_both_sides" && !backFile) {
-            toast.error("Please upload the back side of your student ID card as well.", { title: "Back Side Missing" });
-            return;
-        }
-
-        setIsScanningOcr(true);
-        try {
-            const ocrResult = await previewDocumentOcr(frontFile, effectiveCollegeName);
-
-            setOcrConfidence(ocrResult.confidence);
-            setRawOcrData(ocrResult.extractedFields);
-
-            // Populate form inputs with extracted data or existing values
-            if (ocrResult.extractedFields.studentName) {
-                setStudentName(ocrResult.extractedFields.studentName);
-            }
-            if (ocrResult.extractedFields.enrollmentNumber) {
-                setEnrollmentNumber(ocrResult.extractedFields.enrollmentNumber);
-            }
-            if (ocrResult.extractedFields.courseName) {
-                setCourseName(ocrResult.extractedFields.courseName);
-            }
-            if (ocrResult.extractedFields.academicYear) {
-                setAcademicYear(ocrResult.extractedFields.academicYear);
-            }
-            if (ocrResult.extractedFields.institutionEmail) {
-                setInstitutionEmail(ocrResult.extractedFields.institutionEmail);
-            }
-            if (ocrResult.extractedFields.phoneNumber) {
-                setPhoneNumber(ocrResult.extractedFields.phoneNumber);
-            }
-            if (ocrResult.extractedFields.collegeName && !currentCollegeName) {
-                setCollegeNameInput(ocrResult.extractedFields.collegeName);
-            }
-
-            toast.success("Document analyzed! Review and verify the extracted details.", {
-                title: `OCR Complete (${ocrResult.confidence}% confidence)`,
-            });
-            setStep("OCR_REVIEW");
-        } catch (err: any) {
-            console.error("OCR preview error:", err);
-            toast.warning(
-                "Automated text extraction was unable to cleanly parse this document. You can still proceed by filling in the details manually for founder review.",
-                { title: "Manual Review Fallback" }
-            );
-            // Move to review anyway with empty fields so student isn't blocked!
-            setStep("OCR_REVIEW");
-        } finally {
-            setIsScanningOcr(false);
-        }
-    };
-
-    // Send institutional email verification
-    const handleSendEmailLink = async () => {
-        if (!institutionEmail.trim() || !institutionEmail.includes("@")) {
-            toast.error("Please enter a valid institutional email address.", { title: "Invalid Email" });
-            return;
-        }
-
-        if (!effectiveCollegeId) {
-            toast.error("Please save your college in Profile before requesting institutional email verification.", {
-                title: "College Affiliation Required",
-            });
-            return;
-        }
-
-        setIsEmailSending(true);
-        try {
-            const res = await sendInstitutionalEmail(institutionEmail.trim(), effectiveCollegeId);
-            setIsEmailSent(true);
-            setEmailCooldown(res.cooldownSeconds || 60);
-            setEmailDomainMatched(res.domainMatched);
-
-            toast.success(res.message, { title: "Verification Link Sent" });
-        } catch (err: any) {
-            toast.error(err.message || "Failed to send verification email.", { title: "Email Delivery Error" });
-        } finally {
-            setIsEmailSending(false);
-        }
-    };
-
-    // Send Phone OTP
-    const handleSendPhoneOtp = async () => {
-        if (!phoneNumber.trim()) {
-            toast.error("Please enter a valid 10-digit mobile number.", { title: "Invalid Phone" });
-            return;
-        }
-
-        setIsPhoneSending(true);
-        try {
-            const res = await sendCollegePhoneOtp(phoneNumber.trim());
-            setPhoneCooldown(res.cooldownSeconds || 60);
-            toast.success(res.message, { title: "SMS Code Sent" });
-        } catch (err: any) {
-            toast.error(err.message || "Failed to send SMS code.", { title: "SMS Error" });
-        } finally {
-            setIsPhoneSending(false);
-        }
-    };
-
-    // Verify Phone OTP
-    const handleVerifyPhoneOtp = async () => {
-        if (phoneOtp.trim().length !== 6) {
-            toast.error("Please enter all 6 digits of the SMS verification code.", { title: "Invalid Code" });
-            return;
-        }
-
-        setIsVerifyingPhone(true);
-        try {
-            const res = await verifyCollegePhoneOtp(phoneNumber.trim(), phoneOtp.trim());
-            setServerVerifiedPhone(res.canonical || phoneNumber.trim());
-            setLocalPhoneVerified(true);
-            toast.success(res.message, { title: "Phone Verified" });
-        } catch (err: any) {
-            toast.error(err.message || "Failed to verify phone code.", { title: "Verification Error" });
-        } finally {
-            setIsVerifyingPhone(false);
-        }
-    };
-
-    // Final Application Submit
-    const handleSubmitApplication = async () => {
-        if (!effectiveCollegeId) {
-            toast.error("No verified institution selected in profile.", { title: "Institution Missing" });
-            return;
-        }
-
-        if (!frontFile) {
-            toast.error("Document image is required.", { title: "Document Missing" });
-            return;
-        }
-
-        if (!isEmailVerified) {
-            toast.error("Institutional email verification is required before submitting your application.", {
-                title: "Email Verification Required",
-            });
-            setStep("CONTACT_INFO");
-            return;
-        }
-
-        if (!isPhoneVerified) {
-            toast.error("Mobile phone OTP verification is required before submitting your application.", {
-                title: "Phone Verification Required",
-            });
-            setStep("CONTACT_INFO");
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            const formData = new FormData();
-            formData.append("collegeId", effectiveCollegeId);
-            formData.append("documentType", documentType);
-            formData.append("documents", frontFile);
-            if (backFile && documentType === "student_id_both_sides") {
-                formData.append("documents", backFile);
-            }
-
-            formData.append("studentName", studentName.trim());
-            formData.append("enrollmentNumber", enrollmentNumber.trim());
-            formData.append("courseName", courseName.trim());
-            formData.append("academicYear", academicYear.trim());
-            formData.append("institutionEmail", institutionEmail.trim());
-            formData.append("phoneNumber", phoneNumber.trim());
-            formData.append("ocrConfidence", String(ocrConfidence));
-            formData.append("extractedData", JSON.stringify(rawOcrData));
-
-            const res = await submitCollegeVerification(formData);
-
-            toast.success(res.message, { title: "Application Submitted" });
-            setActiveApp(res.application);
-            setCurrentVerificationState("PENDING");
-            setStep("STATUS_VIEW");
-
-            if (onVerificationSubmitted) {
-                onVerificationSubmitted();
-            }
-        } catch (err: any) {
-            console.error("Submission failed:", err);
-            toast.error(err.message || "Failed to submit verification application.", { title: "Submission Failed" });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    // Resubmit reset handler
-    const handleStartResubmission = () => {
-        setFrontFile(null);
-        setFrontPreview(null);
-        setBackFile(null);
-        setBackPreview(null);
-        setPhoneOtp("");
-        setPhoneCooldown(0);
-        setLocalPhoneVerified(false);
-        setServerVerifiedPhone(null);
-        setIsEmailSent(false);
-        setEmailCooldown(0);
-        setServerVerifiedEmail(null);
-        setStep("DOCUMENT");
-        loadVerificationStatus({ updateStep: false, silent: true });
-    };
-
+    const verified = status?.isCollegeVerified;
+    const application = status?.activeApplication || status?.latestApplication;
+    const collegeName = status?.currentCollege?.officialName || currentCollegeName;
+    const hasCollege = Boolean(status?.currentCollege?.id || currentCollegeId);
+    const resumeUrl = status?.provider?.resumeUrl;
+    const reviewing = status?.status === 'PROCESSING';
     return createPortal(
-        <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="collegeVerificationModalTitle"
-            onClick={handleBackdropClick}
-            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
-        >
-            <div
-                className="w-full max-w-2xl bg-white border-2 border-black rounded-2xl p-5 sm:p-6 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 my-auto max-h-[92vh] flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3 shrink-0 pb-3 border-b-2 border-black/10">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
-                            <GraduationCap className="w-6 h-6 text-black stroke-[2.5]" />
-                        </div>
-                        <div className="min-w-0">
-                            <h3
-                                id="collegeVerificationModalTitle"
-                                className="text-base sm:text-lg font-black tracking-tight text-black truncate"
-                            >
-                                College Enrollment Verification
-                            </h3>
-                            <p className="text-xs text-neutral-600 font-bold truncate">
-                                {effectiveCollegeName ? effectiveCollegeName : "Verify authentic institutional enrollment"}
-                            </p>
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={isScanningOcr || isSubmitting}
-                        className="p-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer shrink-0 transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
-                        aria-label="Close dialog"
-                    >
-                        <X className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                </div>
-
-                {/* Wizard Body (Scrollable) */}
-                <div className="overflow-y-auto pr-1 space-y-4 flex-1">
-                    {isLoadingStatus ? (
-                        <div className="py-16 text-center space-y-4">
-                            <OrbixLoader size="md" />
-                            <p className="text-xs font-black uppercase tracking-wider text-neutral-600">
-                                Checking verification records...
-                            </p>
-                        </div>
-                    ) : step === "STATUS_VIEW" ? (
-                        /* ========================================================================= */
-                        /* STEP: STATUS VIEW (Existing active, approved, or rejected application) */
-                        /* ========================================================================= */
-                        <div className="space-y-4">
-                            {currentVerificationState === "APPROVED" ? (
-                                <div className="p-4 sm:p-5 rounded-xl bg-emerald-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-emerald-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
-                                            <CheckCircle2 className="w-6 h-6 text-black stroke-[2.5]" />
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
-                                                Official Status
-                                            </span>
-                                            <h4 className="text-sm sm:text-base font-black text-black">
-                                                College Affiliation Verified
-                                            </h4>
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
-                                        Your enrollment at <strong className="text-black font-black">{effectiveCollegeName || currentCollegeName}</strong> has been officially verified by Orbix founders. The <span className="font-black">College Verified badge</span> is active on your public profile and seasonal leaderboards.
-                                    </p>
-                                    {activeApp?.reviewed_at && (
-                                        <p className="text-[11px] text-neutral-500 font-bold">
-                                            Verified on: {new Date(activeApp.reviewed_at).toLocaleDateString(undefined, { dateStyle: "long" })}
-                                        </p>
-                                    )}
-                                </div>
-                            ) : currentVerificationState === "PENDING" || currentVerificationState === "PROCESSING" ? (
-                                <div className="p-4 sm:p-5 rounded-xl bg-[#FFE566]/20 border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
-                                            <Clock className="w-6 h-6 text-black stroke-[2.5] animate-pulse" />
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-700 block">
-                                                Under Review
-                                            </span>
-                                            <h4 className="text-sm sm:text-base font-black text-black">
-                                                Verification Application in Queue
-                                            </h4>
-                                        </div>
-                                    </div>
-
-                                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
-                                        Your student document and enrollment details for <strong className="text-black font-black">{effectiveCollegeName || currentCollegeName}</strong> have been securely submitted. Orbix founders manually review every college verification application to preserve platform integrity.
-                                    </p>
-
-                                    {/* Timeline progress indicator */}
-                                    <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-2.5">
-                                        <div className="flex items-center gap-2 text-xs font-black text-black">
-                                            <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
-                                            <span>Document Upload & OCR Extraction Complete</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-xs font-black text-black">
-                                            <Clock className="w-4 h-4 text-amber-600 stroke-[3] animate-spin" />
-                                            <span>Founder Document Inspection (Typical: 24–48 hours)</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-400">
-                                            <ShieldCheck className="w-4 h-4 stroke-[2]" />
-                                            <span>College Verified Badge Activated</span>
-                                        </div>
-                                    </div>
-
-                                    {activeApp?.created_at && (
-                                        <p className="text-[11px] text-neutral-500 font-bold">
-                                            Submitted on: {new Date(activeApp.created_at).toLocaleString()}
-                                        </p>
-                                    )}
-                                </div>
-                            ) : currentVerificationState === "REJECTED" ? (
-                                <div className="p-4 sm:p-5 rounded-xl bg-rose-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-rose-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
-                                            <XCircle className="w-6 h-6 text-black stroke-[2.5]" />
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 block">
-                                                Decision Notice
-                                            </span>
-                                            <h4 className="text-sm sm:text-base font-black text-black">
-                                                Application Not Approved
-                                            </h4>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-1.5">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
-                                            Founder Reviewer Reason
-                                        </span>
-                                        <p className="text-xs font-bold text-rose-950 leading-relaxed">
-                                            {latestApp?.rejection_reason || "The submitted document could not be authenticated as matching your selected institution."}
-                                        </p>
-                                    </div>
-
-                                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
-                                        You may upload a clearer photo of your physical student ID card or an official ERP profile screenshot to resubmit your verification.
-                                    </p>
-
-                                    <OrbixButton
-                                        onClick={handleStartResubmission}
-                                        className="w-full bg-[#FFE566] text-black font-black uppercase text-xs"
-                                    >
-                                        <RotateCcw className="w-4 h-4 mr-2" />
-                                        Resubmit Verification Application
-                                    </OrbixButton>
-                                </div>
-                            ) : currentVerificationState === "INVALIDATED" ? (
-                                <div className="p-4 sm:p-5 rounded-xl bg-amber-50 border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-amber-300 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
-                                            <AlertTriangle className="w-6 h-6 text-black stroke-[2.5]" />
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 block">
-                                                Affiliation Changed
-                                            </span>
-                                            <h4 className="text-sm sm:text-base font-black text-black">
-                                                Re-Verification Required
-                                            </h4>
-                                        </div>
-                                    </div>
-
-                                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
-                                        Your college affiliation was recently updated. In accordance with Orbix fair-play rules, any verification under your previous college has been invalidated. Please submit a new verification application matching your current institution.
-                                    </p>
-
-                                    <OrbixButton
-                                        onClick={handleStartResubmission}
-                                        className="w-full bg-[#FFE566] text-black font-black uppercase text-xs"
-                                    >
-                                        <RotateCcw className="w-4 h-4 mr-2" />
-                                        Start New College Verification
-                                    </OrbixButton>
-                                </div>
-                            ) : null}
-                        </div>
-                    ) : step === "DOCUMENT" ? (
-                        /* ========================================================================= */
-                        /* STEP 1: DOCUMENT UPLOAD */
-                        /* ========================================================================= */
-                        <div className="space-y-4">
-                            {/* Current College Banner or In-Modal College Search Selector */}
-                            {!hasValidAffiliatedCollege || isChangingCollege ? (
-                                <div className="p-4 rounded-xl bg-amber-50/70 border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
-                                                <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
-                                            </div>
-                                            <div>
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-950 block">
-                                                    College Affiliation Required
-                                                </span>
-                                                <h4 className="text-xs sm:text-sm font-black text-black">
-                                                    Choose Your College or University
-                                                </h4>
-                                            </div>
-                                        </div>
-                                        {isChangingCollege && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsChangingCollege(false)}
-                                                className="text-xs font-bold text-neutral-600 hover:text-black underline cursor-pointer"
-                                            >
-                                                Cancel
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
-                                        No college is currently chosen in your profile. Please search and select your institution to verify authentic enrollment:
-                                    </p>
-
-                                    <div className="space-y-1.5">
-                                        <CollegeAutocomplete
-                                            value={selectedCollege?.id}
-                                            selectedCollege={selectedCollege}
-                                            onChange={handleCollegeSelectAndSave}
-                                            canChangeCollege={user?.canChangeCollege}
-                                            collegeUpdatedAt={user?.collegeUpdatedAt}
-                                            collegeLockRemainingMs={user?.collegeLockRemainingMs}
-                                            nextAllowedCollegeChangeAt={user?.nextAllowedCollegeChangeAt}
-                                            placeholder="Search verified Indian colleges, IITs, NITs, universities..."
-                                            disabled={isSavingCollege}
-                                        />
-                                        {isSavingCollege && (
-                                            <div className="flex items-center gap-2 text-xs font-bold text-neutral-600 pt-1">
-                                                <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
-                                                <span>Saving college affiliation to your profile...</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
-                                            Verifying Affiliation For
-                                        </span>
-                                        <h4 className="text-xs sm:text-sm font-black text-black truncate">
-                                            {effectiveCollegeName}
-                                        </h4>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        {user?.canChangeCollege !== false && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsChangingCollege(true)}
-                                                className="text-[11px] font-black text-neutral-700 hover:text-black underline cursor-pointer px-1 py-0.5"
-                                            >
-                                                Change
-                                            </button>
-                                        )}
-                                        <span className="px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000] shrink-0">
-                                            Unverified
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Document Type Selector */}
-                            <div className="space-y-1.5">
-                                <label className="block text-xs font-black uppercase tracking-wider text-black">
-                                    Document Type
-                                </label>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    {[
-                                        { id: "student_id", label: "Student ID (Front)" },
-                                        { id: "student_id_both_sides", label: "Student ID (Both Sides)" },
-                                        { id: "erp_profile", label: "Official ERP Profile" },
-                                    ].map((t) => (
-                                        <button
-                                            key={t.id}
-                                            type="button"
-                                            onClick={() => setDocumentType(t.id as any)}
-                                            className={`px-3 py-2.5 rounded-xl border-2 border-black text-xs font-black text-left transition-all cursor-pointer ${
-                                                documentType === t.id
-                                                    ? "bg-[#FFE566] shadow-[3px_3px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
-                                                    : "bg-white hover:bg-neutral-50 shadow-[1.5px_1.5px_0px_#000]"
-                                            }`}
-                                        >
-                                            {t.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Front Document Upload Box */}
-                            <div className="space-y-1.5">
-                                <label className="block text-xs font-black uppercase tracking-wider text-black">
-                                    {documentType === "erp_profile" ? "ERP Profile Screenshot" : "Front Side of Student ID Card"}
-                                </label>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    accept="image/jpeg,image/png,image/webp"
-                                    onChange={handleFrontFileSelected}
-                                    className="hidden"
-                                />
-
-                                {frontPreview ? (
-                                    <div className="p-3 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <img
-                                                src={frontPreview}
-                                                alt="Front document preview"
-                                                className="w-14 h-14 object-cover rounded-lg border-2 border-black shadow-[1px_1px_0px_#000] shrink-0"
-                                            />
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-black text-black truncate">
-                                                    {frontFile?.name}
-                                                </p>
-                                                <p className="text-[11px] text-neutral-600 font-semibold">
-                                                    {frontFile ? `${Math.round(frontFile.size / 1024)} KB` : ""}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFrontFile(null);
-                                                setFrontPreview(null);
-                                            }}
-                                            className="px-2.5 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 border border-black text-xs font-black shadow-[1px_1px_0px_#000] cursor-pointer"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="p-6 rounded-xl border-2 border-dashed border-black bg-[#FAF6EE]/50 hover:bg-[#FAF6EE] text-center cursor-pointer transition-colors space-y-2"
-                                    >
-                                        <UploadCloud className="w-8 h-8 text-black mx-auto stroke-[2]" />
-                                        <p className="text-xs font-black text-black">
-                                            Click to browse or drop document image here
-                                        </p>
-                                        <p className="text-[10px] text-neutral-600 font-bold uppercase tracking-wider">
-                                            Supports JPG, PNG, WebP up to 10MB
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Back Document Upload Box (if two-sided) */}
-                            {documentType === "student_id_both_sides" && (
-                                <div className="space-y-1.5">
-                                    <label className="block text-xs font-black uppercase tracking-wider text-black">
-                                        Back Side of Student ID Card
-                                    </label>
-                                    <input
-                                        type="file"
-                                        ref={backFileInputRef}
-                                        accept="image/jpeg,image/png,image/webp"
-                                        onChange={handleBackFileSelected}
-                                        className="hidden"
-                                    />
-
-                                    {backPreview ? (
-                                        <div className="p-3 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <img
-                                                    src={backPreview}
-                                                    alt="Back document preview"
-                                                    className="w-14 h-14 object-cover rounded-lg border-2 border-black shadow-[1px_1px_0px_#000] shrink-0"
-                                                />
-                                                <div className="min-w-0">
-                                                    <p className="text-xs font-black text-black truncate">
-                                                        {backFile?.name}
-                                                    </p>
-                                                    <p className="text-[11px] text-neutral-600 font-semibold">
-                                                        {backFile ? `${Math.round(backFile.size / 1024)} KB` : ""}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setBackFile(null);
-                                                    setBackPreview(null);
-                                                }}
-                                                className="px-2.5 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 border border-black text-xs font-black shadow-[1px_1px_0px_#000] cursor-pointer"
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            onClick={() => backFileInputRef.current?.click()}
-                                            className="p-6 rounded-xl border-2 border-dashed border-black bg-[#FAF6EE]/50 hover:bg-[#FAF6EE] text-center cursor-pointer transition-colors space-y-2"
-                                        >
-                                            <UploadCloud className="w-8 h-8 text-black mx-auto stroke-[2]" />
-                                            <p className="text-xs font-black text-black">
-                                                Click to upload back side of student card
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Privacy Notice */}
-                            <div className="p-3 rounded-xl bg-neutral-50 border border-black/20 text-[11px] text-neutral-600 font-semibold leading-relaxed flex items-start gap-2">
-                                <ShieldCheck className="w-4 h-4 text-black shrink-0 mt-0.5" />
-                                <span>
-                                    Orbix uses private document storage and automated OCR extraction to assist reading your credentials. No Aadhaar numbers or biometric faces are scanned or retained.
-                                </span>
-                            </div>
-
-                            {/* Action Button */}
-                            <div className="pt-2">
-                                <OrbixButton
-                                    onClick={handleRunOcr}
-                                    disabled={!hasValidAffiliatedCollege || !frontFile || isScanningOcr || isSavingCollege}
-                                    loading={isScanningOcr}
-                                    loadingLabel="Extracting Information via OCR..."
-                                    icon={
-                                        !hasValidAffiliatedCollege ? (
-                                            <GraduationCap className="w-4 h-4 shrink-0" />
-                                        ) : (
-                                            <Sparkles className="w-4 h-4 shrink-0" />
-                                        )
-                                    }
-                                    fullWidth
-                                    variant="yellow"
-                                    size="md"
-                                    className="text-xs uppercase font-black"
-                                >
-                                    {!hasValidAffiliatedCollege
-                                        ? "Select College Above to Continue"
-                                        : "Scan & Extract Document Details"}
-                                </OrbixButton>
-                            </div>
-                        </div>
-                    ) : step === "OCR_REVIEW" ? (
-                        /* ========================================================================= */
-                        /* STEP 2: REVIEW & CORRECT OCR EXTRACTIONS */
-                        /* ========================================================================= */
-                        <div className="space-y-4">
-                            {/* Confidence Banner */}
-                            <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
-                                    <Sparkles className="w-5 h-5 text-amber-500 stroke-[2.5]" />
-                                    <div>
-                                        <h4 className="text-xs font-black text-black">
-                                            OCR Document Extraction
-                                        </h4>
-                                        <p className="text-[11px] text-neutral-600 font-semibold">
-                                            Review and correct any details before submitting
-                                        </p>
-                                    </div>
-                                </div>
-                                <span className="px-2.5 py-1 rounded-full bg-[#FFE566] border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000]">
-                                    {ocrConfidence}% Confidence
-                                </span>
-                            </div>
-
-                            {/* Editable Fields */}
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                        Student Full Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={studentName}
-                                        onChange={(e) => setStudentName(e.target.value)}
-                                        placeholder="e.g. John Doe"
-                                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000]"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                        Enrollment / Roll / Registration Number
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={enrollmentNumber}
-                                        onChange={(e) => setEnrollmentNumber(e.target.value)}
-                                        placeholder="e.g. 21BCSE045 or 20210045"
-                                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000]"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                            Course / Department
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={courseName}
-                                            onChange={(e) => setCourseName(e.target.value)}
-                                            placeholder="e.g. B.Tech Computer Science"
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                            Academic Year / Validity
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={academicYear}
-                                            onChange={(e) => setAcademicYear(e.target.value)}
-                                            placeholder="e.g. 2022-2026 or Valid 2026"
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000]"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Navigation */}
-                            <div className="flex items-center justify-between gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setStep("DOCUMENT")}
-                                    className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                >
-                                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5 inline" />
-                                    Back
-                                </button>
-                                <OrbixButton
-                                    onClick={() => setStep("CONTACT_INFO")}
-                                    className="bg-[#FFE566] text-black font-black uppercase text-xs"
-                                >
-                                    <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                                        <span>Continue to Contact Verification</span>
-                                        <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-                                    </span>
-                                </OrbixButton>
-                            </div>
-                        </div>
-                    ) : step === "CONTACT_INFO" ? (
-                        /* ========================================================================= */
-                        /* STEP 3: CONTACT CHANNELS (Mandatory Institutional Email & Phone OTP) */
-                        /* ========================================================================= */
-                        <div className="space-y-4">
-                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
-                                <p className="text-xs font-black text-black">
-                                    Mandatory Institutional Email & Phone Verification
-                                </p>
-                                <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
-                                    You must verify BOTH your institutional email link and your mobile phone OTP before submitting your application. Ownership of email and phone alongside official document review is required for founder approval.
-                                </p>
-                            </div>
-
-                            {/* Institutional Email Card */}
-                            <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                                <div className="flex items-center justify-between gap-2 flex-wrap">
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="w-4 h-4 text-black stroke-[2.5]" />
-                                        <label className="text-xs font-black uppercase tracking-wider text-black">
-                                            Institutional Email <span className="text-rose-600">*</span>
-                                        </label>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        {emailDomainMatched && (
-                                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-black text-[10px] font-black text-emerald-900 uppercase">
-                                                Domain Matched
-                                            </span>
-                                        )}
-                                        {isEmailVerified ? (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-900 uppercase inline-flex items-center gap-1">
-                                                <Check className="w-3 h-3 stroke-[3]" />
-                                                Email Verified
-                                            </span>
-                                        ) : (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-950 uppercase">
-                                                Required
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <input
-                                        type="email"
-                                        value={institutionEmail}
-                                        onChange={(e) => {
-                                            setInstitutionEmail(e.target.value);
-                                            if (serverVerifiedEmail && e.target.value.trim().toLowerCase() !== serverVerifiedEmail.trim().toLowerCase()) {
-                                                setIsEmailSent(false);
-                                            }
-                                        }}
-                                        disabled={isEmailVerified}
-                                        placeholder="e.g. yourname@institution.edu"
-                                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] disabled:opacity-75"
-                                    />
-                                    {!isEmailVerified ? (
-                                        <button
-                                            type="button"
-                                            onClick={handleSendEmailLink}
-                                            disabled={isEmailSending || emailCooldown > 0 || !institutionEmail.trim()}
-                                            className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
-                                        >
-                                            {isEmailSending ? "Sending..." : emailCooldown > 0 ? `Resend (${emailCooldown}s)` : "Send Link"}
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setServerVerifiedEmail(null);
-                                                setIsEmailSent(false);
-                                                setEmailCooldown(0);
-                                            }}
-                                            className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-[11px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                        >
-                                            Change
-                                        </button>
-                                    )}
-                                </div>
-
-                                {!isEmailVerified && isEmailSent && (
-                                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-between gap-2 flex-wrap">
-                                        <p className="text-[11px] text-amber-950 font-bold">
-                                            Verification link dispatched! Click the confirmation link in your email, then verify status here.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => loadVerificationStatus({ updateStep: false, silent: true })}
-                                            disabled={isRefreshingChannels}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FFE566] hover:bg-[#ffe043] text-black text-[11px] font-black uppercase border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer disabled:opacity-50"
-                                        >
-                                            <RefreshCw className={`w-3 h-3 stroke-[2.5] ${isRefreshingChannels ? "animate-spin" : ""}`} />
-                                            {isRefreshingChannels ? "Checking..." : "Check Status"}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Phone Verification Card */}
-                            <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                                <div className="flex items-center justify-between gap-2 flex-wrap">
-                                    <div className="flex items-center gap-2">
-                                        <Phone className="w-4 h-4 text-black stroke-[2.5]" />
-                                        <label className="text-xs font-black uppercase tracking-wider text-black">
-                                            Mobile Phone OTP <span className="text-rose-600">*</span>
-                                        </label>
-                                    </div>
-                                    {isPhoneVerified ? (
-                                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-900 uppercase inline-flex items-center gap-1">
-                                            <Check className="w-3 h-3 stroke-[3]" />
-                                            Phone Verified
-                                        </span>
-                                    ) : (
-                                        <span className="px-2.5 py-0.5 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-950 uppercase">
-                                            Required
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <input
-                                        type="tel"
-                                        value={phoneNumber}
-                                        onChange={(e) => setPhoneNumber(e.target.value)}
-                                        disabled={isPhoneVerified}
-                                        placeholder="10-digit mobile number"
-                                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] disabled:opacity-75"
-                                    />
-                                    {!isPhoneVerified ? (
-                                        <button
-                                            type="button"
-                                            onClick={handleSendPhoneOtp}
-                                            disabled={isPhoneSending || phoneCooldown > 0 || !phoneNumber.trim()}
-                                            className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
-                                        >
-                                            {isPhoneSending ? "Sending..." : phoneCooldown > 0 ? `Resend (${phoneCooldown}s)` : "Send OTP"}
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setLocalPhoneVerified(false);
-                                                setServerVerifiedPhone(null);
-                                                setPhoneOtp("");
-                                                setPhoneCooldown(0);
-                                            }}
-                                            className="px-3 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-[11px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                        >
-                                            Change
-                                        </button>
-                                    )}
-                                </div>
-
-                                {!isPhoneVerified && phoneCooldown > 0 && (
-                                    <div className="flex gap-2 pt-1">
-                                        <input
-                                            type="text"
-                                            maxLength={6}
-                                            value={phoneOtp}
-                                            onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, ""))}
-                                            placeholder="Enter 6-digit OTP"
-                                            className="w-36 px-3.5 py-2 rounded-xl bg-white border-2 border-black text-xs font-black tracking-widest text-center shadow-[2px_2px_0px_#000]"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleVerifyPhoneOtp}
-                                            disabled={isVerifyingPhone || phoneOtp.length !== 6}
-                                            className="px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
-                                        >
-                                            {isVerifyingPhone ? "Verifying..." : "Verify"}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Explicit Checklist of Incomplete Requirements */}
-                            {(!isEmailVerified || !isPhoneVerified) && (
-                                <div className="p-3 rounded-xl bg-rose-50 border-2 border-rose-300 text-rose-950 text-xs font-bold space-y-1">
-                                    <p className="text-[11px] font-black uppercase tracking-wider text-rose-900">
-                                        Complete Both Verification Steps to Continue:
-                                    </p>
-                                    {!isEmailVerified && (
-                                        <p className="text-[11px] flex items-center gap-1.5">
-                                            <Clock className="w-3.5 h-3.5 text-rose-700 shrink-0" />
-                                            Incomplete: Institutional email verification link must be clicked and confirmed.
-                                        </p>
-                                    )}
-                                    {!isPhoneVerified && (
-                                        <p className="text-[11px] flex items-center gap-1.5">
-                                            <Clock className="w-3.5 h-3.5 text-rose-700 shrink-0" />
-                                            Incomplete: 6-digit mobile phone SMS OTP must be verified.
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Navigation */}
-                            <div className="flex items-center justify-between gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setStep("OCR_REVIEW")}
-                                    className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                >
-                                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5 inline" />
-                                    Back
-                                </button>
-                                <OrbixButton
-                                    onClick={() => {
-                                        if (!isEmailVerified) {
-                                            toast.error("Please complete institutional email verification first.", {
-                                                title: "Email Verification Incomplete",
-                                            });
-                                            return;
-                                        }
-                                        if (!isPhoneVerified) {
-                                            toast.error("Please verify your mobile phone OTP first.", {
-                                                title: "Phone Verification Incomplete",
-                                            });
-                                            return;
-                                        }
-                                        setStep("FINAL_SUBMIT");
-                                    }}
-                                    disabled={!isEmailVerified || !isPhoneVerified}
-                                    className="bg-[#FFE566] text-black font-black uppercase text-xs disabled:opacity-50"
-                                >
-                                    <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                                        <span>Review Application Summary</span>
-                                        <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-                                    </span>
-                                </OrbixButton>
-                            </div>
-                        </div>
-                    ) : step === "FINAL_SUBMIT" ? (
-                        /* ========================================================================= */
-                        /* STEP 4: FINAL SUMMARY & SUBMISSION */
-                        /* ========================================================================= */
-                        <div className="space-y-4">
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Application Summary
-                                </h4>
-
-                                <div className="space-y-2 text-xs divide-y divide-black/10">
-                                    <div className="flex justify-between py-1">
-                                        <span className="text-neutral-600 font-bold">College / Institution</span>
-                                        <span className="font-black text-black text-right">{effectiveCollegeName || currentCollegeName}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1">
-                                        <span className="text-neutral-600 font-bold">Student Name</span>
-                                        <span className="font-black text-black">{studentName || "Not specified"}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1">
-                                        <span className="text-neutral-600 font-bold">Enrollment / Roll No</span>
-                                        <span className="font-black text-black">{enrollmentNumber || "Not specified"}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1">
-                                        <span className="text-neutral-600 font-bold">Course / Department</span>
-                                        <span className="font-black text-black">{courseName || "Not specified"}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1">
-                                        <span className="text-neutral-600 font-bold">Academic Year</span>
-                                        <span className="font-black text-black">{academicYear || "Not specified"}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center py-1 gap-2">
-                                        <span className="text-neutral-600 font-bold">Institutional Email</span>
-                                        <span className="font-black text-black flex items-center gap-1.5">
-                                            {institutionEmail}
-                                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[9px] font-black text-emerald-900 uppercase">
-                                                Verified
-                                            </span>
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center py-1 gap-2">
-                                        <span className="text-neutral-600 font-bold">Phone Number</span>
-                                        <span className="font-black text-black flex items-center gap-1.5">
-                                            {phoneNumber}
-                                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 border border-black text-[9px] font-black text-emerald-900 uppercase">
-                                                Verified
-                                            </span>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs font-semibold leading-relaxed flex items-start gap-2.5">
-                                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                                <span>
-                                    Submitting official documents creates an immutable verification audit record. Applications are reviewed manually by Orbix founders to safeguard inter-university contest integrity.
-                                </span>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center justify-between gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setStep("CONTACT_INFO")}
-                                    disabled={isSubmitting}
-                                    className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                >
-                                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5 inline" />
-                                    Back
-                                </button>
-                                <OrbixButton
-                                    onClick={handleSubmitApplication}
-                                    disabled={isSubmitting}
-                                    className="bg-[#FFE566] text-black font-black uppercase text-xs"
-                                >
-                                    {isSubmitting ? (
-                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
-                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
-                                            <span>Submitting Application...</span>
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
-                                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                                            <span>Submit for Founder Review</span>
-                                        </span>
-                                    )}
-                                </OrbixButton>
-                            </div>
-                        </div>
-                    ) : null}
-                </div>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-3 sm:p-6" onClick={handleBackdropClick}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="college-verification-title" tabIndex={-1} onKeyDown={trapFocus}
+                className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-3xl border-[3px] border-black bg-white p-5 shadow-[6px_6px_0_0_#000] outline-none sm:p-7">
+                <header className="flex items-start gap-3 border-b-2 border-black/10 pb-5">
+                    <div className="rounded-2xl border-2 border-black bg-[#FFE34A] p-3"><GraduationCap size={26} /></div>
+                    <div className="min-w-0 flex-1"><h2 id="college-verification-title" className="text-xl font-black sm:text-2xl">Verify your college</h2><p className="mt-1 text-sm font-medium text-neutral-600">Confirm your current student enrollment.</p></div>
+                    <button aria-label="Close verification" onClick={onClose} className="rounded-xl border-2 border-black p-2 hover:bg-neutral-100"><X size={20} /></button>
+                </header>
+                {loading ? <p className="py-10 text-center font-bold" role="status">Loading verification…</p> : <div className="space-y-5 pt-5">
+                    <section className="rounded-2xl border-2 border-black bg-[#FAF8F0] p-4">
+                        <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Your institution</p><p className="mt-1 font-bold">{collegeName || 'Select your college'}</p></div>
+                            {!pending && !verified && <button onClick={() => setChanging(!changing)} className="text-sm font-bold underline">{changing ? 'Cancel' : 'Change'}</button>}</div>
+                        {(changing || !hasCollege) && <div className="mt-4 space-y-3"><CollegeAutocomplete selectedCollege={selected} onChange={setSelected} disabled={busy} /><OrbixButton onClick={() => void saveCollege()} loading={busy} disabled={!selected} size="sm">Confirm college</OrbixButton></div>}
+                    </section>
+                    {verified ? <section className="rounded-2xl border-2 border-black bg-lime-100 p-5" role="status"><CheckCircle2 className="mb-2" /><h3 className="text-xl font-black">You’re verified</h3><p className="mt-2 text-sm">Your college badge has been saved automatically.</p>{application?.expires_at && <p className="mt-2 text-sm">Renew by {new Date(application.expires_at).toLocaleDateString()}.</p>}</section> : pending ? <section className="space-y-4" aria-live="polite">
+                        <div className="flex items-center gap-2 font-black">{reviewing ? <Clock size={22} /> : <ShieldCheck size={22} />}<h3>{reviewing ? 'Under review' : 'Action needed'}</h3></div>
+                        <p className="text-sm leading-relaxed text-neutral-700">{reviewing ? 'Your enrollment is being reviewed. You can close this window; your result will be saved automatically.' : application?.rejection_reason || 'Continue your secure verification to finish the required checks.'}</p>
+                        {resumeUrl && <a href={resumeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-[#FFE34A] p-3 font-bold shadow-[3px_3px_0_0_#000]">Continue verification <ExternalLink size={17} /></a>}
+                        <OrbixButton variant="white" fullWidth loading={busy} onClick={() => void refresh()} icon={RefreshCw}>Check status</OrbixButton>
+                    </section> : <>
+                        {application?.rejection_reason && <p className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm" role="status">{application.rejection_reason}</p>}
+                        <div className="space-y-3 text-sm leading-relaxed"><p>We use SheerID to check current enrollment. Continue securely to complete your institution’s available checks.</p><p className="text-neutral-600">Only if needed, provide one document showing your name, college and current enrollment date. A dated student ID, current ERP enrollment page, fee receipt or timetable may be used when accepted by the verification provider.</p></div>
+                        <label className="block text-sm font-bold">Full name as shown on your student records<input value={name} onChange={e => setName(e.target.value)} maxLength={255} autoComplete="name" className="mt-2 w-full rounded-xl border-2 border-black p-3 font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400" /></label>
+                        <p className="flex items-start gap-2 text-sm text-neutral-600"><Mail size={18} className="mt-0.5 shrink-0" /><span>Use your verified Orbix email ({user?.gmail}) in the hosted flow. Gmail is supported. No phone OTP is required.</span></p>
+                        <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-black" /><span>I confirm my name and college, and consent to sharing the details needed for SheerID to verify my enrollment. <a href="https://www.sheerid.com/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline">Privacy policy</a></span></label>
+                        {status && !status.provider?.available && <p className="rounded-xl bg-amber-50 p-3 text-sm">Enrollment verification is not available for this college yet. Please contact support or try again later.</p>}
+                        <OrbixButton fullWidth loading={busy} loadingLabel="Starting verification…" disabled={!status?.provider?.available || !hasCollege || changing || !consent || name.trim().length < 2} onClick={() => void start()} iconRight={ExternalLink}>Continue with SheerID</OrbixButton>
+                    </>}
+                    {!status && !loading && <OrbixButton variant="white" fullWidth loading={busy} onClick={() => void refresh()}>Try again</OrbixButton>}
+                    {error && <p role="alert" className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+                    <footer className="border-t-2 border-black/10 pt-4 text-xs leading-relaxed text-neutral-500"><p className="flex items-start gap-2"><ShieldCheck size={17} className="shrink-0" />Documents are submitted directly to SheerID. Orbix stores the verification result and renewal date. Results save automatically.</p><a href="https://support.sheerid.com/" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block font-bold text-black underline">Need help or want to appeal?</a></footer>
+                </div>}
             </div>
-        </div>,
-        document.body
-    );
-};
+        </div>, document.body);
+}

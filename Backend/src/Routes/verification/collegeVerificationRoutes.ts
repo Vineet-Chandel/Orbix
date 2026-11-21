@@ -1,11 +1,17 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
+import { checkVerificationRateLimit } from "../../services/verification/verificationRateLimiter.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { CollegeVerificationService } from "../../services/verification/collegeVerificationService.js";
+import { SheerIdVerificationService } from "../../services/verification/sheerIdVerificationService.js";
 import { CollegeOcrService } from "../../services/verification/collegeOcrService.js";
 
 const upload = multer({
     storage: multer.memoryStorage(),
+    fileFilter: (_req, file, callback) => {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) return callback(new Error("Use a JPG, PNG or WEBP image."));
+        callback(null, true);
+    },
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB per document
         files: 2, // At most 2 files (front and back)
@@ -30,6 +36,20 @@ const requireStudentAccount = (req: Request, res: Response, next: NextFunction) 
 
 export const studentCollegeVerificationRouter = Router();
 
+const limitVerification = (action: string, maximum: number): ((req: Request, res: Response, next: NextFunction) => Promise<void>) => async (req, res, next) => {
+    try {
+        const limit = await checkVerificationRateLimit(`college:${action}:${req.user!.id}`, 'confirm', maximum, 60);
+        if (!limit.allowed) {
+            res.setHeader('Retry-After', limit.resetInSeconds);
+            res.status(limit.code === 'SERVICE_UNAVAILABLE' ? 503 : 429).json({ success: false,
+                message: limit.code === 'SERVICE_UNAVAILABLE' ? 'Verification is temporarily unavailable.' : 'Please wait a moment before trying again.' });
+            return;
+        }
+        next();
+    } catch (error) { next(error); }
+};
+
+
 // =========================================================================
 // STUDENT COLLEGE VERIFICATION ROUTES
 // =========================================================================
@@ -41,13 +61,13 @@ export const studentCollegeVerificationRouter = Router();
 studentCollegeVerificationRouter.get("/status", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
-        const result = await CollegeVerificationService.getStatus(userId);
+        const result = await SheerIdVerificationService.status(userId);
         return res.status(200).json(result);
     } catch (err: any) {
         console.error("[CollegeVerification] Status fetch error:", err);
         return res.status(500).json({
             success: false,
-            message: err.message || "Failed to retrieve college verification status",
+            message: "Could not load verification. Please try again later.",
         });
     }
 });
@@ -60,6 +80,7 @@ studentCollegeVerificationRouter.post(
     "/ocr-preview",
     authenticate,
     requireStudentAccount,
+    limitVerification("ocr", 3),
     upload.single("document"),
     async (req: Request, res: Response) => {
         try {
@@ -95,128 +116,26 @@ studentCollegeVerificationRouter.post(
     }
 );
 
-/**
- * POST /api/verification/college/submit
- * Submits an official college verification application with documents.
- */
-studentCollegeVerificationRouter.post(
-    "/submit",
-    authenticate,
-    requireStudentAccount,
-    upload.array("documents", 2),
-    async (req: Request, res: Response) => {
+// Legacy clients cannot bypass provider verification with OCR confidence or uploaded fields.
+studentCollegeVerificationRouter.post("/submit", authenticate, requireStudentAccount, (_req, res) =>
+    res.status(410).json({ success: false, message: "Please use the new enrollment verification flow." }));
+studentCollegeVerificationRouter.post("/email/send", authenticate, requireStudentAccount, (_req, res) =>
+    res.status(410).json({ success: false, message: "Continue enrollment verification to complete any required email checks." }));
+
+for (const action of ["session", "refresh"] as const) {
+    studentCollegeVerificationRouter.post(`/${action}`, authenticate, requireStudentAccount, limitVerification(action, action === "session" ? 6 : 4), async (req, res) => {
         try {
-            const userId = req.user!.id;
-
-            const rawFiles = req.files as Express.Multer.File[] | undefined;
-            if (!rawFiles || rawFiles.length === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: "At least one document image is required.",
-                });
-            }
-
-            const {
-                collegeId,
-                documentType = "student_id",
-                studentName,
-                enrollmentNumber,
-                courseName,
-                academicYear,
-                institutionEmail,
-                phoneNumber,
-                ocrConfidence = 0,
-                extractedData: rawExtractedData,
-            } = req.body;
-
-            if (!collegeId) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Selected college ID is required.",
-                });
-            }
-
-            let parsedExtractedData: any = {};
-            if (rawExtractedData) {
-                try {
-                    parsedExtractedData = typeof rawExtractedData === "string" ? JSON.parse(rawExtractedData) : rawExtractedData;
-                } catch {
-                    parsedExtractedData = {};
-                }
-            }
-
-            const files = rawFiles.map((f) => ({
-                buffer: f.buffer,
-                originalname: f.originalname,
-                mimetype: f.mimetype,
-                size: f.size,
-            }));
-
-            const result = await CollegeVerificationService.submitApplication({
-                userId,
-                collegeId,
-                documentType,
-                files,
-                extractedData: parsedExtractedData,
-                studentName: studentName ? String(studentName).trim() : null,
-                enrollmentNumber: enrollmentNumber ? String(enrollmentNumber).trim() : null,
-                courseName: courseName ? String(courseName).trim() : null,
-                academicYear: academicYear ? String(academicYear).trim() : null,
-                institutionEmail: institutionEmail ? String(institutionEmail).trim() : null,
-                phoneNumber: phoneNumber ? String(phoneNumber).trim() : null,
-                ocrConfidence: Number(ocrConfidence) || 0,
-            });
-
-            return res.status(201).json(result);
-        } catch (err: any) {
-            console.error("[CollegeVerification] Submission error:", err);
-            const statusCode = err.statusCode || 500;
-            return res.status(statusCode).json({
-                success: false,
-                message: err.message || "Failed to submit college verification application.",
-            });
+            const result = action === "session"
+                ? await SheerIdVerificationService.start(req.user!.id, req.body || {})
+                : await SheerIdVerificationService.refresh(req.user!.id);
+            return res.json(result);
+        } catch (error: any) {
+            if (!error.statusCode) console.error("[CollegeVerification] Provider operation failed");
+            return res.status(error.statusCode || 503).json({ success: false,
+                message: error.statusCode ? error.message : "Verification is temporarily unavailable. Please try again." });
         }
-    }
-);
-
-/**
- * POST /api/verification/college/email/send
- * Dispatches an institutional email verification link with domain matching.
- */
-studentCollegeVerificationRouter.post("/email/send", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
-    try {
-        const userId = req.user!.id;
-
-        const { email, collegeId } = req.body;
-        if (!email || !collegeId) {
-            return res.status(400).json({
-                success: false,
-                message: "Both email address and collegeId are required.",
-            });
-        }
-
-        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
-        const userAgent = req.headers["user-agent"] || "unknown";
-
-        const result = await CollegeVerificationService.sendInstitutionalEmailToken({
-            userId,
-            email,
-            collegeId,
-            ipAddress: ip,
-            userAgent,
-        });
-
-        return res.status(200).json(result);
-    } catch (err: any) {
-        console.error("[CollegeVerification] Send email error:", err);
-        const statusCode = err.statusCode || 500;
-        return res.status(statusCode).json({
-            success: false,
-            message: err.message || "Failed to send institutional verification email.",
-            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
-        });
-    }
-});
+    });
+}
 
 /**
  * GET & POST /api/verification/college/email/verify
@@ -247,67 +166,8 @@ const handleEmailTokenVerification = async (req: Request, res: Response) => {
 studentCollegeVerificationRouter.get("/email/verify", authenticate, requireStudentAccount, handleEmailTokenVerification);
 studentCollegeVerificationRouter.post("/email/verify", authenticate, requireStudentAccount, handleEmailTokenVerification);
 
-/**
- * POST /api/verification/college/phone/send-otp
- * Dispatches an SMS verification OTP to the student's phone.
- */
-studentCollegeVerificationRouter.post("/phone/send-otp", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
-    try {
-        const userId = req.user!.id;
-
-        const { phone } = req.body;
-        if (!phone) {
-            return res.status(400).json({ success: false, message: "Phone number is required." });
-        }
-
-        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
-        const userAgent = req.headers["user-agent"] || "unknown";
-
-        const result = await CollegeVerificationService.sendPhoneOtp({
-            userId,
-            phone,
-            ipAddress: ip,
-            userAgent,
-        });
-
-        return res.status(200).json(result);
-    } catch (err: any) {
-        console.error("[CollegeVerification] Phone send OTP error:", err);
-        const statusCode = err.statusCode || 500;
-        return res.status(statusCode).json({
-            success: false,
-            message: err.message || "Failed to send SMS verification code.",
-            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
-        });
-    }
-});
-
-/**
- * POST /api/verification/college/phone/verify-otp
- * Verifies the 6-digit SMS OTP.
- */
-studentCollegeVerificationRouter.post("/phone/verify-otp", authenticate, requireStudentAccount, async (req: Request, res: Response) => {
-    try {
-        const userId = req.user!.id;
-
-        const { phone, otp } = req.body;
-        if (!phone || !otp) {
-            return res.status(400).json({ success: false, message: "Phone number and 6-digit OTP code are required." });
-        }
-
-        const result = await CollegeVerificationService.verifyPhoneOtp({
-            userId,
-            phone,
-            otp,
-        });
-
-        return res.status(200).json(result);
-    } catch (err: any) {
-        console.error("[CollegeVerification] Phone verify OTP error:", err);
-        const statusCode = err.statusCode || 400;
-        return res.status(statusCode).json({
-            success: false,
-            message: err.message || "Failed to verify phone OTP.",
-        });
-    }
-});
+// Mobile verification is not supported. Keep explicit retirement responses for older clients.
+for (const path of ["/phone/send-otp", "/phone/verify-otp"]) {
+    studentCollegeVerificationRouter.post(path, authenticate, requireStudentAccount, (_req, res) =>
+        res.status(410).json({ success: false, message: "Phone verification has been removed. Use email verification." }));
+}

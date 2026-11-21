@@ -27,6 +27,9 @@ export interface CollegeVerificationRecord {
     user_id: string;
     college_id: string;
     status: "NOT_VERIFIED" | "PENDING" | "PROCESSING" | "APPROVED" | "REJECTED" | "INVALIDATED";
+    provider_step?: string | null;
+    verified_at?: string | null;
+    expires_at?: string | null;
     document_type: string;
     student_name: string | null;
     enrollment_number: string | null;
@@ -79,6 +82,7 @@ export interface VerificationStatusResponse {
     activeApplication: CollegeVerificationRecord | null;
     latestApplication: CollegeVerificationRecord | null;
     history: CollegeVerificationRecord[];
+    provider?: { available: boolean; resumeUrl: string | null };
     verifiedChannels?: {
         email: string | null;
         emailVerifiedAt: string | null;
@@ -186,47 +190,18 @@ export async function verifyInstitutionalEmailToken(token: string): Promise<{
     return data;
 }
 
-/**
- * Send phone verification SMS code.
- */
-export async function sendCollegePhoneOtp(phone: string): Promise<{
-    success: boolean;
-    message: string;
-    phone: string;
-    cooldownSeconds?: number;
-}> {
-    const res = await fetch("/api/verification/college/phone/send-otp", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-        throw new Error(data?.message || "Failed to send SMS verification code.");
-    }
-    return data;
-}
 
-/**
- * Authoritatively verify phone OTP code.
- */
-export async function verifyCollegePhoneOtp(phone: string, otp: string): Promise<{
-    success: boolean;
-    message: string;
-    phone: string;
-    canonical?: string;
-    verifiedAt?: string;
-}> {
-    const res = await fetch("/api/verification/college/phone/verify-otp", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, otp }),
+export async function startEnrollmentVerification(payload: { collegeId: string; studentName: string; consent: boolean }): Promise<{ success: boolean; resumeUrl: string | null; alreadyVerified: boolean }> {
+    return enrollmentRequest("session", payload);
+}
+export async function refreshEnrollmentVerification(): Promise<VerificationStatusResponse> {
+    return enrollmentRequest("refresh", {});
+}
+async function enrollmentRequest<T>(action: string, payload: object): Promise<T> {
+    const response = await fetch(`/api/verification/college/${action}`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-        throw new Error(data?.message || "Failed to verify phone code.");
-    }
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.message || "Verification is temporarily unavailable. Please try again.");
     return data;
 }

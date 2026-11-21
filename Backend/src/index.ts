@@ -1,3 +1,4 @@
+import { sheerIdWebhook } from "./Routes/verification/sheerIdWebhook.js";
 if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
     try {
         process.loadEnvFile();
@@ -52,6 +53,8 @@ const app: Express = express();
 app.use(createCorsMiddleware());
 
 app.use(cookieParser());
+// Signature verification needs original bytes, before the global JSON parser.
+app.post('/api/verification/college/webhook/sheerid', express.raw({ type: 'application/json', limit: '32kb' }), sheerIdWebhook);
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
