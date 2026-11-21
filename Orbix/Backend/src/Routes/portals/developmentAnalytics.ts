@@ -1,4 +1,5 @@
 import { query } from "../../database/client.js";
+import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 
 export interface LanguageItem {
     name: string;
@@ -136,51 +137,29 @@ export async function calculateUserDevelopmentAnalytics(
             timestamp: new Date().toISOString(),
         };
     }
-    let githubHandle = (directHandle || "").trim();
+    let githubHandle = "";
 
-    // 1. Resolve GitHub handle from clientPortals if not provided
-    if (!githubHandle && clientPortals) {
-        const gh = clientPortals.github || clientPortals.GitHub || clientPortals.Github;
-        if (typeof gh === "object" && gh) {
-            githubHandle = (gh.username || gh.portal_username || gh.handle || "").trim();
-        } else if (typeof gh === "string") {
-            githubHandle = gh.trim();
+    // 1. Resolve strictly from server-authorized verified user_links
+    // Invariant: clientPortals and directHandle overrides are neutralized to prevent identity injection
+    try {
+        const verifiedCondition = await getVerifiedLinksCondition();
+        const dbRes = await query(
+            `SELECT portal_username 
+             FROM user_links 
+             WHERE (
+                LOWER(username) = LOWER($1)
+                OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
+             ) 
+               AND LOWER(TRIM(portal)) = 'github'
+               AND ${verifiedCondition}
+             LIMIT 1`,
+            [cleanUsername]
+        );
+        if (dbRes.rows && dbRes.rows.length > 0) {
+            githubHandle = (dbRes.rows[0].portal_username || "").trim();
         }
-    }
-
-    // 2. Resolve from database if still missing (check user_links)
-    if (!githubHandle) {
-        try {
-            const dbRes = await query(
-                `SELECT portal, portal_username 
-                 FROM user_links 
-                 WHERE LOWER(username) = LOWER($1) AND portal ILIKE '%github%' 
-                 LIMIT 1`,
-                [cleanUsername]
-            );
-            if (dbRes.rows && dbRes.rows.length > 0) {
-                const row = dbRes.rows[0];
-                githubHandle = (row.portal_username || "").trim();
-            }
-        } catch {
-            // DB non-fatal
-        }
-    }
-
-    // 3. Resolve from users table if still missing (github column)
-    if (!githubHandle) {
-        try {
-            const userRes = await query(
-                `SELECT github FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
-                [cleanUsername]
-            );
-            if (userRes.rows && userRes.rows.length > 0 && userRes.rows[0].github) {
-                const raw = String(userRes.rows[0].github).trim();
-                githubHandle = raw.replace(/https?:\/\/(www\.)?github\.com\//i, "").replace(/\/.*$/, "").trim();
-            }
-        } catch {
-            // DB non-fatal
-        }
+    } catch {
+        // DB non-fatal
     }
 
     // Clean githubHandle if someone provided a full URL

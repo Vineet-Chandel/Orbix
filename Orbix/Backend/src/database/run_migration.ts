@@ -169,6 +169,21 @@ export const MIGRATION_SIGNATURES: Record<string, { tables?: string[]; columns?:
     "065_club_event_shares_account_type.sql": {
         columns: ["club_event_shares.account_type"],
     },
+    "068_club_announcements.sql": {
+        tables: ["club_announcements", "club_announcement_assets", "club_announcement_likes", "club_announcement_limits", "club_announcement_jobs", "club_announcement_audit"],
+    },
+    "069_platform_account_ownership_verification.sql": {
+        tables: ["platform_verification_challenges", "user_links_orphaned_archive"],
+        columns: [
+            "user_links.ownership_status",
+            "user_links.sync_status",
+            "user_links.legacy_unverified_at",
+            "user_links.verified_at",
+            "user_links.verified_handle",
+            "user_links.verification_method",
+            "user_links.verification_metadata",
+        ],
+    },
 };
 
 /**

@@ -195,11 +195,19 @@ export function syncConnectedPortalsStorage(platforms?: any[]) {
             const handle = (p.portalUsername || p.portal_username || p.username || "").trim();
             const profileUrl = (p.link || p.profileUrl || p.url || "").trim();
 
+            const isOwnershipVerified = p.ownershipStatus === "VERIFIED" || p.ownership_status === "VERIFIED";
+            const canonicalOwnershipStatus = isOwnershipVerified
+                ? "VERIFIED"
+                : (p.ownershipStatus || p.ownership_status || "CONNECTED_UNVERIFIED");
+
             nextPortals[portalKey] = {
                 portal: portalKey,
                 username: handle,
                 profileUrl,
-                verified: p.verified !== false,
+                verified: isOwnershipVerified,
+                ownershipStatus: canonicalOwnershipStatus,
+                verificationMethod: p.verificationMethod || p.verification_method || null,
+                verifiedAt: p.verifiedAt || p.verified_at || null,
                 displayName: p.displayName || p.display_name || handle,
                 avatarUrl: p.avatarUrl || p.avatar_url,
                 stats: p.stats,

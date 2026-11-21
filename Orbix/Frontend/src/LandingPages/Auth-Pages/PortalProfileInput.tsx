@@ -1,8 +1,10 @@
 import { useState, useId } from "react";
-import { AlertCircle, Check } from "lucide-react";
+import { AlertCircle, Check, ShieldCheck } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { PortalProfileCard, type PortalProfileData } from "./PortalProfileCard";
+import { OwnershipStatusBadge } from "../../components/verification/OwnershipStatusBadge";
+import { isPlatformVerificationSupported } from "../../utils/platformVerificationSupport";
 
 interface PortalProfileInputProps {
     portalId: string;
@@ -13,6 +15,7 @@ interface PortalProfileInputProps {
     onChange: (portalId: string, raw: string, judgment: JudgmentResult) => void;
     onConnectProfile?: (portalId: string, data: PortalProfileData) => void;
     onDisconnectProfile?: (portalId: string) => void;
+    onVerifyOwnership?: (portalId: string, username: string) => void;
 }
 
 // Sub-component for rendering Connected Profile Avatar with Platform SVG Fallback
@@ -81,9 +84,11 @@ export const PortalProfileInput = ({
     onChange,
     onConnectProfile,
     onDisconnectProfile,
+    onVerifyOwnership,
 }: PortalProfileInputProps) => {
     const inputId = useId();
     const config = PORTALS[portalId];
+    const isSupported = isPlatformVerificationSupported(portalId);
     const [isFocused, setIsFocused] = useState(false);
     const [fetchState, setFetchState] = useState<{
         loading: boolean;
@@ -110,6 +115,10 @@ export const PortalProfileInput = ({
             (connectedProfile as any).display_name ||
             connectedProfile.username;
 
+        const effectiveOwnershipStatus =
+            connectedProfile.ownershipStatus ||
+            (connectedProfile.verified ? "VERIFIED" : "CONNECTED_UNVERIFIED");
+
         return (
             <div className="w-full rounded-xl border-2 border-black bg-[#FAF6EE] p-4 text-black shadow-[4px_4px_0px_#000] transition-all duration-200 animate-fadeIn">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
@@ -135,6 +144,11 @@ export const PortalProfileInput = ({
                                     </svg>
                                     Connected
                                 </span>
+                                <OwnershipStatusBadge
+                                    status={effectiveOwnershipStatus}
+                                    isSupported={isSupported}
+                                    size="xs"
+                                />
                             </div>
 
                             <div className="flex items-center gap-2 flex-wrap mt-0.5">
@@ -160,8 +174,19 @@ export const PortalProfileInput = ({
                         </div>
                     </div>
 
-                    {/* Right: Disconnect Action Button */}
-                    <div className="flex items-center justify-end gap-2 flex-shrink-0 pt-2 sm:pt-0 border-t-2 border-black/10 sm:border-t-0">
+                    {/* Right: Actions (Verify Ownership + Disconnect) */}
+                    <div className="flex items-center justify-end gap-2 flex-shrink-0 pt-2 sm:pt-0 border-t-2 border-black/10 sm:border-t-0 flex-wrap">
+                        {isSupported && effectiveOwnershipStatus !== "VERIFIED" && (
+                            <button
+                                type="button"
+                                onClick={() => onVerifyOwnership?.(portalId, connectedProfile.username)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-black bg-[#FFE566] hover:bg-[#ffd93d] text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                title={`Verify ownership of ${config.name} account`}
+                            >
+                                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Verify Ownership</span>
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => onDisconnectProfile?.(portalId)}

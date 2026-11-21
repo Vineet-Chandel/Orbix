@@ -62,11 +62,15 @@ export function usePlatformSync(): UsePlatformSyncReturn {
                 for (const p of user.platforms) {
                     const k = (p.portal || "").toLowerCase().trim();
                     if (!k) continue;
+                    const isVerified = p.ownershipStatus === "VERIFIED" || p.ownership_status === "VERIFIED";
                     currentPortals[k] = {
                         portal: k,
                         username: p.portalUsername || p.portal_username || p.username || "",
                         profileUrl: p.link || p.profileUrl || "",
-                        verified: p.verified !== false,
+                        verified: isVerified,
+                        ownershipStatus: isVerified ? "VERIFIED" : (p.ownershipStatus || p.ownership_status || "CONNECTED_UNVERIFIED"),
+                        verificationMethod: p.verificationMethod || p.verification_method || null,
+                        verifiedAt: p.verifiedAt || p.verified_at || null,
                     };
                 }
             }
@@ -143,7 +147,6 @@ export function usePlatformSync(): UsePlatformSyncReturn {
                     detectedBroken.push(r.portal);
                     updatedPortals[key] = {
                         ...updatedPortals[key],
-                        verified: false,
                         syncStatus: "broken",
                         syncError: r.message || `Account '@${r.username}' no longer exists on ${PORTALS[key]?.name || key}`,
                         lastSyncAt: r.lastSyncAt,
@@ -153,7 +156,6 @@ export function usePlatformSync(): UsePlatformSyncReturn {
                         ...updatedPortals[key],
                         ...(r.profileData || {}),
                         username: r.username,
-                        verified: true,
                         syncStatus: "valid",
                         syncError: undefined,
                         lastSyncAt: r.lastSyncAt,

@@ -1,11 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, ChevronUp } from "lucide-react";
+import { ChevronUp, ShieldCheck } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { PortalProfileInput } from "../PortalProfileInput";
 import type { PortalProfileData } from "../PortalProfileCard";
-import { useAppDispatch, useAppSelector, setPortalProfiles } from "../../../store";
+import { useAppDispatch, useAppSelector, setPortalProfiles, fetchUserProfile } from "../../../store";
 import { useToast } from "../../../context/ToastContext";
 import { Sidebar } from "../../../app/Dashboard/Sidebar";
 import { disconnectPlatform } from "../../../utils/profileApi";
@@ -13,6 +13,9 @@ import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
 import { SectionBottomIllustration } from "../../../app/common/SectionBottomIllustration";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import { buildApiUrl } from "../../../api/apiClient";
+import { OwnershipVerificationModal } from "../../../components/verification/OwnershipVerificationModal";
+import { OwnershipStatusBadge } from "../../../components/verification/OwnershipStatusBadge";
+import { isPlatformVerificationSupported } from "../../../utils/platformVerificationSupport";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -212,6 +215,11 @@ export default function ProfilesOnboardingPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [isMobileBucketOpen, setIsMobileBucketOpen] = useState(false);
+    const [verificationModalState, setVerificationModalState] = useState<{
+        isOpen: boolean;
+        portalId: string;
+        username: string;
+    } | null>(null);
 
     const { handleBackdropClick: handleMobileBucketBackdropClick } = useModalDismiss({
         isOpen: isMobileBucketOpen,
@@ -274,6 +282,7 @@ export default function ProfilesOnboardingPage() {
                         const pUsername = link.portal_username || link.username || "";
                         const pName = link.display_name || pUsername;
 
+                        const isOwnershipVerified = link.ownershipStatus === "VERIFIED" || link.ownership_status === "VERIFIED";
                         loadedProfiles[pId] = {
                             success: true,
                             portal: pId,
@@ -282,7 +291,10 @@ export default function ProfilesOnboardingPage() {
                             avatar: link.avatar_url || link.avatarUrl || link.avatar || "",
                             stats: parsedStats,
                             profileUrl: link.link || "",
-                            verified: link.verified !== false,
+                            verified: isOwnershipVerified,
+                            ownershipStatus: isOwnershipVerified ? "VERIFIED" : (link.ownershipStatus || link.ownership_status || "CONNECTED_UNVERIFIED"),
+                            verificationMethod: link.verificationMethod || link.verification_method || null,
+                            verifiedAt: link.verifiedAt || link.verified_at || null,
                         };
                     }
 
@@ -389,7 +401,13 @@ export default function ProfilesOnboardingPage() {
         userInteractedRef.current = true;
         deletedPortalsRef.current.delete(portalId);
 
-        setRecentProfilesHistory((prev) => ({ ...prev, [portalId]: data }));
+        const connectedData: PortalProfileData = {
+            ...data,
+            verified: false,
+            ownershipStatus: "CONNECTED_UNVERIFIED",
+        };
+
+        setRecentProfilesHistory((prev) => ({ ...prev, [portalId]: connectedData }));
 
         const currentInput = portalValues[portalId]?.trim();
         const effectiveInput = currentInput || data.profileUrl || data.username;
@@ -397,7 +415,7 @@ export default function ProfilesOnboardingPage() {
         setJudgments((prev) => ({ ...prev, [portalId]: judgePortalInput(portalId, effectiveInput) }));
 
         setConnectedProfiles((prev) => {
-            const next = { ...prev, [portalId]: data };
+            const next = { ...prev, [portalId]: connectedData };
             try {
                 localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
             } catch {
@@ -799,6 +817,7 @@ export default function ProfilesOnboardingPage() {
                                                     onChange={handleInputChange}
                                                     onConnectProfile={handleConnectProfile}
                                                     onDisconnectProfile={handleDisconnectProfile}
+                                                    onVerifyOwnership={(pId, u) => setVerificationModalState({ isOpen: true, portalId: pId, username: u })}
                                                 />
                                             </div>
                                         ))}
@@ -881,13 +900,16 @@ export default function ProfilesOnboardingPage() {
                                                                     size="md"
                                                                 />
                                                                 <div className="min-w-0">
-                                                                    <div className="flex items-center gap-1.5">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
                                                                         <span className="text-xs font-black text-black uppercase truncate">
                                                                             {portalConf?.name || pId}
                                                                         </span>
-                                                                        <span className="inline-flex items-center justify-center p-0.5 text-black bg-[#a2ff86] border border-black rounded" title="Verified">
-                                                                            <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                                                        </span>
+                                                                        <OwnershipStatusBadge
+                                                                            status={profile.ownershipStatus || (profile.verified ? "VERIFIED" : "CONNECTED_UNVERIFIED")}
+                                                                            isSupported={isPlatformVerificationSupported(pId)}
+                                                                            size="xs"
+                                                                            showLabel={false}
+                                                                        />
                                                                     </div>
                                                                     <p className="text-[11px] text-neutral-600 font-mono font-bold truncate">
                                                                         @{profile.username}
@@ -895,17 +917,30 @@ export default function ProfilesOnboardingPage() {
                                                                 </div>
                                                             </div>
 
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDisconnectProfile(pId)}
-                                                                className="p-1.5 text-black hover:bg-rose-100 rounded-md border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
-                                                                title={`Disconnect ${portalConf?.name || pId}`}
-                                                                aria-label={`Disconnect ${portalConf?.name || pId}`}
-                                                            >
-                                                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                                </svg>
-                                                            </button>
+                                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                                {isPlatformVerificationSupported(pId) && (profile.ownershipStatus !== "VERIFIED" && !profile.verified) && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setVerificationModalState({ isOpen: true, portalId: pId, username: profile.username })}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-black uppercase text-black bg-[#FFE566] hover:bg-[#ffd93d] border-2 border-black rounded-md shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                                                        title={`Verify ownership of ${portalConf?.name || pId}`}
+                                                                    >
+                                                                        <ShieldCheck className="w-3 h-3 stroke-[2.5]" />
+                                                                        <span>Verify</span>
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDisconnectProfile(pId)}
+                                                                    className="p-1.5 text-black hover:bg-rose-100 rounded-md border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                                                    title={`Disconnect ${portalConf?.name || pId}`}
+                                                                    aria-label={`Disconnect ${portalConf?.name || pId}`}
+                                                                >
+                                                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}
@@ -1065,13 +1100,16 @@ export default function ProfilesOnboardingPage() {
                                                 size="md"
                                             />
                                             <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="text-xs font-black text-black uppercase truncate">
                                                         {portalConf?.name || pId}
                                                     </span>
-                                                    <span className="inline-flex items-center justify-center p-0.5 text-black bg-[#a2ff86] border border-black rounded" title="Verified">
-                                                        <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                                    </span>
+                                                    <OwnershipStatusBadge
+                                                        status={profile.ownershipStatus || (profile.verified ? "VERIFIED" : "CONNECTED_UNVERIFIED")}
+                                                        isSupported={isPlatformVerificationSupported(pId)}
+                                                        size="xs"
+                                                        showLabel={false}
+                                                    />
                                                 </div>
                                                 <p className="text-xs text-neutral-900 font-bold truncate">
                                                     {profile.name}
@@ -1082,16 +1120,32 @@ export default function ProfilesOnboardingPage() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDisconnectProfile(pId)}
-                                            className="px-3 py-1.5 text-xs font-black text-black bg-white hover:bg-rose-100 border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer flex items-center gap-1.5"
-                                        >
-                                            <svg className="w-3.5 h-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                            <span>Disconnect</span>
-                                        </button>
+                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                            {isPlatformVerificationSupported(pId) && (profile.ownershipStatus !== "VERIFIED" && !profile.verified) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsMobileBucketOpen(false);
+                                                        setVerificationModalState({ isOpen: true, portalId: pId, username: profile.username });
+                                                    }}
+                                                    className="px-2.5 py-1 text-[11px] font-black uppercase text-black bg-[#FFE566] hover:bg-[#ffd93d] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1"
+                                                    title={`Verify ownership of ${portalConf?.name || pId}`}
+                                                >
+                                                    <ShieldCheck className="w-3 h-3 stroke-[2.5]" />
+                                                    <span>Verify</span>
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDisconnectProfile(pId)}
+                                                className="px-3 py-1.5 text-xs font-black text-black bg-white hover:bg-rose-100 border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer flex items-center gap-1.5"
+                                            >
+                                                <svg className="w-3.5 h-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                                <span>Disconnect</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -1119,6 +1173,39 @@ export default function ProfilesOnboardingPage() {
                         </div>
                     </div>
                 </div>
+            )}
+            {/* Ownership Verification Challenge Modal */}
+            {verificationModalState?.isOpen && (
+                <OwnershipVerificationModal
+                    isOpen={verificationModalState.isOpen}
+                    portalId={verificationModalState.portalId}
+                    username={verificationModalState.username}
+                    onClose={() => setVerificationModalState(null)}
+                    onVerifiedSuccess={(res) => {
+                        const pId = res.portal.toLowerCase();
+                        setConnectedProfiles((prev) => {
+                            const existing = prev[pId];
+                            if (!existing) return prev;
+                            const updated = {
+                                ...prev,
+                                [pId]: {
+                                    ...existing,
+                                    verified: true,
+                                    ownershipStatus: "VERIFIED" as const,
+                                    verificationMethod: res.verificationMethod,
+                                    verifiedAt: res.verifiedAt,
+                                },
+                            };
+                            try {
+                                localStorage.setItem("orbix_connected_portals", JSON.stringify(updated));
+                            } catch {
+                                // ignore
+                            }
+                            return updated;
+                        });
+                        dispatch(fetchUserProfile({ force: true }));
+                    }}
+                />
             )}
         </div>
     );

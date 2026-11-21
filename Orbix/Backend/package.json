@@ -4,7 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tsx --test src/validators/ClubRegistrationValidator.test.ts",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test:crypto": "tsx --test src/services/verification/challengeCryptoService.test.ts",
+    "test:verification": "tsx --test src/services/verification/platformVerificationService.test.ts",
+    "test:ratelimit": "tsx --test src/services/verification/verificationRateLimiter.test.ts",
+    "test:migration": "tsx --test src/services/verification/migrationIntegration.test.ts",
+    "test:github-link": "tsx --test src/services/auth/githubAccountLinking.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate:institutions": "tsx src/database/run_migration.ts",

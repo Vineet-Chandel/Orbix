@@ -5,6 +5,7 @@ import { authenticate } from "../../middlewares/auth.middleware.js";
 import { parseUploadedDocument } from "../../services/resume/documentParser.js";
 import { analyzeResumeWithGemini } from "../../services/resume/geminiResumeAnalyzer.js";
 import { ProfileSyncService } from "../../services/resume/profileSyncService.js";
+import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 import {
     invalidatePublicProfileCache,
     invalidatePrivateProfileCache,
@@ -53,10 +54,13 @@ intelligenceRouter.post(
                 req.file.mimetype
             );
 
-            // Fetch verified platforms from database for ground-truth comparison
+            // Fetch strictly verified platforms from database for ground-truth comparison
+            const verifiedCondition = await getVerifiedLinksCondition();
             const platformsRes = await query(
                 `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
-                 FROM user_links WHERE username = $1 OR username = $2;`,
+                 FROM user_links 
+                 WHERE (username = $1 OR username = $2)
+                   AND ${verifiedCondition};`,
                 [authUser.username, authUser.gmail]
             );
 
@@ -64,7 +68,7 @@ intelligenceRouter.post(
                 portal: row.portal,
                 username: row.portalUsername,
                 url: row.url,
-                verified: row.verified !== false && row.lastSyncStatus === "valid",
+                verified: true,
                 lastSyncAt: row.lastSyncAt,
                 lastSyncStatus: row.lastSyncStatus,
             }));
@@ -117,10 +121,13 @@ intelligenceRouter.post("/analyze", authenticate, async (req: Request, res: Resp
             return res.status(400).json({ success: false, message: "Resume raw text is required for analysis." });
         }
 
-        // Fetch verified platforms from database for ground-truth comparison
+        // Fetch strictly verified platforms from database for ground-truth comparison
+        const verifiedCondition = await getVerifiedLinksCondition();
         const platformsRes = await query(
             `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
-             FROM user_links WHERE username = $1 OR username = $2;`,
+             FROM user_links 
+             WHERE (username = $1 OR username = $2)
+               AND ${verifiedCondition};`,
             [authUser.username, authUser.gmail]
         );
 
@@ -128,7 +135,7 @@ intelligenceRouter.post("/analyze", authenticate, async (req: Request, res: Resp
             portal: row.portal,
             username: row.portalUsername,
             url: row.url,
-            verified: row.verified !== false && row.lastSyncStatus === "valid",
+            verified: true,
             lastSyncAt: row.lastSyncAt,
             lastSyncStatus: row.lastSyncStatus,
         }));

@@ -11,6 +11,7 @@ import {
 } from "../../redis/cache/cache-profile.js";
 import { verifyAndFetchPortal, extractPortalUsername } from "../portals/portals.js";
 import { syncLeaderboardForUser } from "../leaderboard/leaderboard.js";
+import { checkVerificationSchemaStatus, getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 import photoRouter from "./photo.js";
 import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
 import { getBlockState } from "../../services/relationship/blockService.js";
@@ -247,6 +248,11 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
         const userRow = result.rows[0];
 
         // Fetch user's connected platforms
+        const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
+        const ownershipSelect = hasOwnershipStatusColumn
+            ? `, ownership_status AS "ownershipStatus", verification_method AS "verificationMethod", verified_at AS "verifiedAt"`
+            : `, 'CONNECTED_UNVERIFIED' AS "ownershipStatus", NULL AS "verificationMethod", NULL AS "verifiedAt"`;
+
         const linksResult = await query(
             `SELECT
                 id,
@@ -261,6 +267,7 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 is_public AS "isPublic",
                 last_sync_status AS "lastSyncStatus",
                 last_sync_at AS "lastSyncAt"
+                ${ownershipSelect}
             FROM user_links
             WHERE username = $1 OR username = $2
             ORDER BY created_at ASC;`,
@@ -1198,6 +1205,11 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
         }
 
         // Query all verified/connected platforms for showcase
+        const { hasOwnershipStatusColumn: hasColPub } = await checkVerificationSchemaStatus();
+        const pubOwnershipSelect = hasColPub
+            ? `, ownership_status AS "ownershipStatus", verification_method AS "verificationMethod", verified_at AS "verifiedAt"`
+            : `, 'CONNECTED_UNVERIFIED' AS "ownershipStatus", NULL AS "verificationMethod", NULL AS "verifiedAt"`;
+
         const linksResult = await query(
             `SELECT
                 portal,
@@ -1209,6 +1221,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 stats,
                 last_sync_status AS "lastSyncStatus",
                 last_sync_at AS "lastSyncAt"
+                ${pubOwnershipSelect}
             FROM user_links
             WHERE (LOWER(username) = $1)
             ORDER BY portal ASC;`,
@@ -1609,8 +1622,9 @@ export const handlePrivacyAudit = async (req: Request, res: Response) => {
         const u = userRes.rows[0];
         const isPublic = u.is_public !== false;
 
+        const verifiedCondition = await getVerifiedLinksCondition();
         const linksRes = await query(
-            `SELECT portal, portal_username, verified, stats FROM user_links WHERE LOWER(username) = $1;`,
+            `SELECT portal, portal_username, verified, stats FROM user_links WHERE LOWER(username) = $1 AND ${verifiedCondition};`,
             [username]
         );
 
@@ -1951,67 +1965,149 @@ profileRouter.put("/platforms/:portal", authenticate, async (req: Request, res: 
         const finalDisplayName = verifiedData?.name || authUser.firstName;
         const finalAvatar = verifiedData?.avatar || null;
         const finalStats = verifiedData?.stats || [];
-        const isVerified = verifiedData ? verifiedData.verified !== false : true;
-
-        const upsertResult = await query(
-            `INSERT INTO user_links (
-                user_id,
-                username,
-                portal,
-                portal_username,
-                link,
-                raw_input,
-                verified,
-                display_name,
-                avatar_url,
-                stats,
-                snapshot,
-                last_sync_status,
-                last_sync_at,
-                updated_at
-            ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, 'valid', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-            )
-            ON CONFLICT (username, portal)
-            DO UPDATE SET
-                user_id = COALESCE(EXCLUDED.user_id, user_links.user_id),
-                portal_username = EXCLUDED.portal_username,
-                link = EXCLUDED.link,
-                raw_input = EXCLUDED.raw_input,
-                verified = EXCLUDED.verified,
-                display_name = COALESCE(EXCLUDED.display_name, user_links.display_name),
-                avatar_url = COALESCE(EXCLUDED.avatar_url, user_links.avatar_url),
-                stats = EXCLUDED.stats,
-                snapshot = EXCLUDED.snapshot,
-                last_sync_status = 'valid',
-                last_sync_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            RETURNING
-                id,
-                portal,
-                portal_username AS "portalUsername",
-                link,
-                verified,
-                display_name AS "displayName",
-                avatar_url AS "avatarUrl",
-                stats,
-                is_public AS "isPublic",
-                last_sync_status AS "lastSyncStatus",
-                last_sync_at AS "lastSyncAt";`,
-            [
-                authUser.id,
-                authUser.username,
-                portal,
-                finalHandle,
-                finalLink,
-                rawCandidate,
-                isVerified,
-                finalDisplayName,
-                finalAvatar,
-                JSON.stringify(finalStats),
-                JSON.stringify(verifiedData || {}),
-            ]
+        // Check existing record to determine if handle changed
+        const { hasOwnershipStatusColumn: hasColUpsert } = await checkVerificationSchemaStatus();
+        const existingRes = await query(
+            `SELECT portal_username, verified ${hasColUpsert ? ', ownership_status' : ''}
+             FROM user_links
+             WHERE (username = $1 OR username = $2) AND LOWER(portal) = $3
+             LIMIT 1;`,
+            [authUser.username, authUser.gmail, portal]
         );
+        const existingRow = existingRes.rows[0];
+        const isHandleChanged = !existingRow || existingRow.portal_username?.toLowerCase() !== finalHandle.toLowerCase();
+
+        // Ownership verification is only retained if the handle is completely unchanged AND was already verified.
+        // Fetching or editing a handle NEVER grants ownership verification.
+        const finalVerified = isHandleChanged ? false : Boolean(existingRow?.verified);
+        const finalOwnershipStatus = isHandleChanged ? 'CONNECTED_UNVERIFIED' : (existingRow?.ownership_status || (finalVerified ? 'VERIFIED' : 'CONNECTED_UNVERIFIED'));
+
+        let upsertResult;
+        if (hasColUpsert) {
+            upsertResult = await query(
+                `INSERT INTO user_links (
+                    user_id,
+                    username,
+                    portal,
+                    portal_username,
+                    link,
+                    raw_input,
+                    verified,
+                    ownership_status,
+                    display_name,
+                    avatar_url,
+                    stats,
+                    snapshot,
+                    last_sync_status,
+                    last_sync_at,
+                    updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, 'valid', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                ON CONFLICT (username, portal)
+                DO UPDATE SET
+                    user_id = COALESCE(EXCLUDED.user_id, user_links.user_id),
+                    portal_username = EXCLUDED.portal_username,
+                    link = EXCLUDED.link,
+                    raw_input = EXCLUDED.raw_input,
+                    verified = EXCLUDED.verified,
+                    ownership_status = EXCLUDED.ownership_status,
+                    display_name = COALESCE(EXCLUDED.display_name, user_links.display_name),
+                    avatar_url = COALESCE(EXCLUDED.avatar_url, user_links.avatar_url),
+                    stats = EXCLUDED.stats,
+                    snapshot = EXCLUDED.snapshot,
+                    last_sync_status = 'valid',
+                    last_sync_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING
+                    id,
+                    portal,
+                    portal_username AS "portalUsername",
+                    link,
+                    verified,
+                    ownership_status AS "ownershipStatus",
+                    display_name AS "displayName",
+                    avatar_url AS "avatarUrl",
+                    stats,
+                    is_public AS "isPublic",
+                    last_sync_status AS "lastSyncStatus",
+                    last_sync_at AS "lastSyncAt";`,
+                [
+                    authUser.id,
+                    authUser.username,
+                    portal,
+                    finalHandle,
+                    finalLink,
+                    rawCandidate,
+                    finalVerified,
+                    finalOwnershipStatus,
+                    finalDisplayName,
+                    finalAvatar,
+                    JSON.stringify(finalStats),
+                    JSON.stringify(verifiedData || {}),
+                ]
+            );
+        } else {
+            upsertResult = await query(
+                `INSERT INTO user_links (
+                    user_id,
+                    username,
+                    portal,
+                    portal_username,
+                    link,
+                    raw_input,
+                    verified,
+                    display_name,
+                    avatar_url,
+                    stats,
+                    snapshot,
+                    last_sync_status,
+                    last_sync_at,
+                    updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, 'valid', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                ON CONFLICT (username, portal)
+                DO UPDATE SET
+                    user_id = COALESCE(EXCLUDED.user_id, user_links.user_id),
+                    portal_username = EXCLUDED.portal_username,
+                    link = EXCLUDED.link,
+                    raw_input = EXCLUDED.raw_input,
+                    verified = EXCLUDED.verified,
+                    display_name = COALESCE(EXCLUDED.display_name, user_links.display_name),
+                    avatar_url = COALESCE(EXCLUDED.avatar_url, user_links.avatar_url),
+                    stats = EXCLUDED.stats,
+                    snapshot = EXCLUDED.snapshot,
+                    last_sync_status = 'valid',
+                    last_sync_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING
+                    id,
+                    portal,
+                    portal_username AS "portalUsername",
+                    link,
+                    verified,
+                    display_name AS "displayName",
+                    avatar_url AS "avatarUrl",
+                    stats,
+                    is_public AS "isPublic",
+                    last_sync_status AS "lastSyncStatus",
+                    last_sync_at AS "lastSyncAt";`,
+                [
+                    authUser.id,
+                    authUser.username,
+                    portal,
+                    finalHandle,
+                    finalLink,
+                    rawCandidate,
+                    finalVerified,
+                    finalDisplayName,
+                    finalAvatar,
+                    JSON.stringify(finalStats),
+                    JSON.stringify(verifiedData || {}),
+                ]
+            );
+        }
 
         // Invalidate Redis caches
         await invalidateAllUserCaches({

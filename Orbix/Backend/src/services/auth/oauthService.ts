@@ -2,12 +2,13 @@
 import crypto from "crypto";
 import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { query } from "../../database/client.js";
+import { query, pool } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { userDetailsCache } from "../../redis/cache/cache-auth.js";
 import { createSession } from "../session/sessionService.js";
 import { OnboardingEmailService } from "../email/onboardingEmailService.js";
 import { checkHandleAvailabilityAcrossPlatform } from "../../validators/usernamePolicy.js";
+import { platformVerificationService } from "../verification/platformVerificationService.js";
 
 const DEFAULT_AVATAR_URL = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
 const ACCESS_TOKEN_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -15,9 +16,25 @@ const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const STATE_COOKIE_NAME = "orbix_oauth_state";
 const STATE_TTL_SECONDS = 600; // 10 minutes
 
+/**
+ * Universal atomic GET-and-DEL Lua script for single-use OAuth CSRF state tokens.
+ * Guarantees that concurrent callbacks attempting to consume the same state cannot both succeed.
+ */
+export const ATOMIC_GET_DEL_LUA = `
+local val = redis.call('GET', KEYS[1])
+if val then
+    redis.call('DEL', KEYS[1])
+end
+return val
+`;
+
 export interface OAuthStatePayload {
     state: string;
     provider: "google" | "github";
+    action?: "login" | "link";
+    userId?: string;
+    sessionId?: string;
+    targetUsername?: string;
     returnTo?: string | undefined;
     deviceId?: string | undefined;
     createdAt: number;
@@ -103,34 +120,132 @@ export class OAuthService {
     }
 
     /**
-     * Validate incoming state parameter against stored state cookie and Redis.
+     * Generate cryptographically secure state token bound strictly to an authenticated user ID for account linking.
+     * Enforces fail-closed requirement: distributed Redis storage MUST be operational to ensure single-use guarantees.
      */
-    public static async validateState(
-        req: Request,
+    public static async generateLinkState(
         res: Response,
-        incomingState: string,
-        expectedProvider: "google" | "github"
-    ): Promise<OAuthStatePayload> {
-        if (!incomingState || typeof incomingState !== "string") {
-            throw new Error("Missing or invalid OAuth state parameter");
+        userId: string,
+        returnTo?: string,
+        targetUsername?: string,
+        deviceId?: string,
+        sessionId?: string
+    ): Promise<string> {
+        const cleanUserId = userId ? String(userId).trim() : "";
+        if (!cleanUserId) {
+            const err: any = new Error("Cannot generate account-linking OAuth state without authenticated userId");
+            err.statusCode = 401;
+            err.code = "AUTH_REQUIRED";
+            throw err;
         }
 
-        let statePayload: OAuthStatePayload | null = null;
+        const cleanSessionId = sessionId ? String(sessionId).trim() : "";
+        if (!cleanSessionId) {
+            const err: any = new Error("Cannot generate account-linking OAuth state without active sessionId");
+            err.statusCode = 401;
+            err.code = "SESSION_REQUIRED";
+            throw err;
+        }
 
-        // 1. Check Redis first
+        // Fail-closed invariant: Distributed atomic storage is strictly required for account linking
+        if (!redis || redis.status !== "ready") {
+            const err: any = new Error(
+                "Distributed session store (Redis) is unavailable. Secure account linking cannot be initiated without atomic single-use guarantees."
+            );
+            err.statusCode = 503;
+            err.code = "SERVICE_UNAVAILABLE";
+            throw err;
+        }
+
+        const state = crypto.randomBytes(32).toString("hex");
+        const payload: OAuthStatePayload = {
+            state,
+            action: "link",
+            provider: "github",
+            userId: cleanUserId,
+            sessionId: cleanSessionId,
+            targetUsername: targetUsername || undefined,
+            returnTo: returnTo || "/dashboard",
+            deviceId: deviceId || undefined,
+            createdAt: Date.now(),
+        };
+
+        // 1. Store in Redis with TTL using atomic SET
+        try {
+            await redis.set(
+                `oauth:state:${state}`,
+                JSON.stringify(payload),
+                "EX",
+                STATE_TTL_SECONDS
+            );
+        } catch (err: any) {
+            console.error("Failed to store OAuth link state in Redis:", err);
+            const failure: any = new Error("Failed to persist secure OAuth state in distributed storage.");
+            failure.statusCode = 503;
+            failure.code = "SERVICE_UNAVAILABLE";
+            throw failure;
+        }
+
+        // 2. Set signed/serialized state in an HTTPOnly cookie as reference
+        res.cookie(STATE_COOKIE_NAME, JSON.stringify(payload), {
+            ...this.getAuthCookieOptions(),
+            maxAge: STATE_TTL_SECONDS * 1000,
+        });
+
+        return state;
+    }
+
+    /**
+     * Inspect incoming state without mutating or deleting it (for cancellation/error routing).
+     */
+    public static async peekState(
+        req: Request,
+        incomingState: string
+    ): Promise<OAuthStatePayload | null> {
+        if (!incomingState || typeof incomingState !== "string") return null;
         try {
             if (redis && redis.status === "ready") {
                 const redisData = await redis.get(`oauth:state:${incomingState}`);
-                if (redisData) {
+                if (redisData) return JSON.parse(redisData);
+            }
+        } catch {}
+        const rawCookie = req.cookies?.[STATE_COOKIE_NAME];
+        if (rawCookie) {
+            try {
+                const parsed = typeof rawCookie === "string" ? JSON.parse(rawCookie) : rawCookie;
+                if (parsed && parsed.state === incomingState) return parsed;
+            } catch {}
+        }
+        return null;
+    }
+
+    /**
+     * Invalidate and consume state safely upon cancellation or failure.
+     * Guarantees a cancelled or failed transaction cannot leave a reusable authorization state.
+     */
+    public static async invalidateState(
+        req: Request,
+        res: Response,
+        incomingState: string
+    ): Promise<OAuthStatePayload | null> {
+        if (!incomingState || typeof incomingState !== "string") return null;
+        let statePayload: OAuthStatePayload | null = null;
+
+        try {
+            if (redis && redis.status === "ready") {
+                const redisData = await redis.eval(
+                    ATOMIC_GET_DEL_LUA,
+                    1,
+                    `oauth:state:${incomingState}`
+                );
+                if (redisData && typeof redisData === "string") {
                     statePayload = JSON.parse(redisData);
-                    await redis.del(`oauth:state:${incomingState}`);
                 }
             }
         } catch (err) {
-            console.warn("⚠️ Redis state lookup warning:", err);
+            console.warn("⚠️ Redis state invalidation warning:", err);
         }
 
-        // 2. Fallback to HTTPOnly cookie
         if (!statePayload) {
             const rawCookie = req.cookies?.[STATE_COOKIE_NAME];
             if (rawCookie) {
@@ -139,8 +254,123 @@ export class OAuthService {
                     if (parsed && parsed.state === incomingState) {
                         statePayload = parsed;
                     }
-                } catch {
-                    // Invalid cookie json
+                } catch {}
+            }
+        }
+
+        // Clear the state cookie
+        res.clearCookie(STATE_COOKIE_NAME, this.getAuthCookieOptions());
+        return statePayload;
+    }
+
+    /**
+     * Strictly validates session and user binding between initiating OAuth state and incoming callback session.
+     * Enforces fail-closed rules: both userId and sessionId are mandatory on state AND callback.
+     * Rejects missing, mismatched, expired, or replaced sessions.
+     */
+    public static validateCallbackSessionBinding(
+        statePayload: { userId?: string | null; sessionId?: string | null; returnTo?: string },
+        authOutcome: { ok: boolean; user?: { id: string } | null; sessionId?: string | null }
+    ): { ok: true } | { ok: false; code: string; message: string } {
+        const stateUserId = statePayload.userId ? String(statePayload.userId).trim() : "";
+        const stateSessionId = statePayload.sessionId ? String(statePayload.sessionId).trim() : "";
+
+        if (!stateUserId || !stateSessionId) {
+            return {
+                ok: false,
+                code: "INVALID_LINKING_STATE",
+                message: "Invalid linking state: missing bound user ID or session ID. Account linking rejected.",
+            };
+        }
+
+        if (!authOutcome.ok || !authOutcome.user?.id) {
+            return {
+                ok: false,
+                code: "SESSION_EXPIRED_OR_INVALID",
+                message: "Your active Orbix session has expired or is invalid. Account linking rejected.",
+            };
+        }
+
+        const currentUserId = String(authOutcome.user.id).trim();
+        const currentSessionId = authOutcome.sessionId ? String(authOutcome.sessionId).trim() : "";
+
+        if (!currentSessionId) {
+            return {
+                ok: false,
+                code: "CALLBACK_SESSION_ID_MISSING",
+                message: "Session validation failed: active session ID missing from current session. Account linking rejected.",
+            };
+        }
+
+        if (currentUserId !== stateUserId) {
+            return {
+                ok: false,
+                code: "USER_MISMATCH",
+                message: "Session mismatch: active authenticated user does not match the account that initiated GitHub linking.",
+            };
+        }
+
+        if (currentSessionId !== stateSessionId) {
+            return {
+                ok: false,
+                code: "SESSION_MISMATCH",
+                message: "Session mismatch: active authenticated session was replaced or modified during linking. Account linking rejected.",
+            };
+        }
+
+        return { ok: true };
+    }
+
+    /**
+     * Atomically validate and consume incoming state parameter against Redis and cookie.
+     * Uses atomic Lua GETDEL to ensure concurrent callbacks cannot both succeed.
+     * For account linking ('link'), cookie fallback is strictly rejected (fail closed).
+     */
+    public static async validateState(
+        req: Request,
+        res: Response,
+        incomingState: string,
+        expectedProvider: "google" | "github",
+        expectedAction?: "login" | "link"
+    ): Promise<OAuthStatePayload> {
+        if (!incomingState || typeof incomingState !== "string") {
+            throw new Error("Missing or invalid OAuth state parameter");
+        }
+
+        let statePayload: OAuthStatePayload | null = null;
+
+        // 1. Check Redis first using atomic get-and-delete
+        try {
+            if (redis && redis.status === "ready") {
+                const redisData = await redis.eval(
+                    ATOMIC_GET_DEL_LUA,
+                    1,
+                    `oauth:state:${incomingState}`
+                );
+                if (redisData && typeof redisData === "string") {
+                    statePayload = JSON.parse(redisData);
+                }
+            }
+        } catch (err) {
+            console.warn("⚠️ Redis state lookup warning:", err);
+        }
+
+        // 2. Cookie fallback ONLY for standard public login/signup (action !== "link")
+        // Client-controlled cookies cannot guarantee single-use concurrency without server state
+        if (!statePayload) {
+            const rawCookie = req.cookies?.[STATE_COOKIE_NAME];
+            if (rawCookie) {
+                try {
+                    const parsed = typeof rawCookie === "string" ? JSON.parse(rawCookie) : rawCookie;
+                    if (parsed && parsed.state === incomingState) {
+                        // Fail-closed invariant: Reject cookie fallback for account linking
+                        if (parsed.action === "link") {
+                            throw new Error("OAuth session state expired or invalid. Please try signing in again.");
+                        }
+                        statePayload = parsed;
+                    }
+                } catch (e: any) {
+                    if (e.message?.includes("OAuth session state expired")) throw e;
                 }
             }
         }
@@ -154,6 +384,10 @@ export class OAuthService {
 
         if (statePayload.provider !== expectedProvider) {
             throw new Error(`Provider mismatch: expected ${expectedProvider}, got ${statePayload.provider}`);
+        }
+
+        if (expectedAction && (statePayload.action || "login") !== expectedAction) {
+            throw new Error(`OAuth action mismatch: expected ${expectedAction}, got ${statePayload.action || "login"}`);
         }
 
         return statePayload;
@@ -376,6 +610,185 @@ export class OAuthService {
             avatarUrl: userData.avatar_url || null,
             usernameCandidate: candidateUsername,
         };
+    }
+
+    /**
+     * Authenticated Account Linking:
+     * Links an immutable GitHub provider ID to an existing authenticated Orbix user.
+     * Enforces:
+     * - Atomic database transaction (all-or-nothing rollback on failure)
+     * - Row-level locking (FOR UPDATE) to prevent concurrency races
+     * - Database-level unique constraint handling (idx_users_github_id, unique_verified_portal_account)
+     * - No email matching
+     * - No new user creation
+     * - No session switching
+     * - No silent replacement of an existing different GitHub ID
+     * - Rejection if GitHub ID is already bound to another Orbix user
+     * - Rejection if GitHub handle is already verified by another Orbix user
+     * - Automatic verified ownership recording in user_links within same transaction
+     */
+    public static async linkGitHubAccount(
+        userId: string,
+        profile: NormalizedOAuthProfile,
+        targetUsername?: string,
+        externalClient?: any
+    ): Promise<{ success: boolean; linkedUser: any; verifiedHandle: string }> {
+        if (!userId) {
+            throw new Error("Missing authenticated user ID for account linking");
+        }
+
+        const numericProviderId = String(profile.providerId).trim();
+        if (!numericProviderId) {
+            throw new Error("Missing immutable GitHub provider ID from provider profile");
+        }
+
+        const client = externalClient || (await pool.connect());
+        const shouldManageTransaction = externalClient?.manageTransaction !== undefined
+            ? Boolean(externalClient.manageTransaction)
+            : !externalClient;
+
+        try {
+            if (shouldManageTransaction) {
+                await client.query("BEGIN;");
+            }
+
+            // 1. Fetch authenticated user from database with row lock FOR UPDATE
+            const userRes = await client.query(
+                `SELECT id, username, email, account_type AS "accountType", github_id AS "githubId"
+                 FROM public.users
+                 WHERE id = $1
+                 FOR UPDATE;`,
+                [userId]
+            );
+
+            if (userRes.rows.length === 0) {
+                const err: any = new Error("Authenticated Orbix user account not found");
+                err.statusCode = 404;
+                err.code = "USER_NOT_FOUND";
+                throw err;
+            }
+
+            const currentUser = userRes.rows[0];
+
+            // 2. Reject silent replacement if user already has a different GitHub ID linked
+            if (currentUser.githubId && String(currentUser.githubId).trim() !== numericProviderId) {
+                const err: any = new Error(
+                    `Your Orbix account is already linked to a different GitHub account (ID: ${currentUser.githubId}). Please unlink it before linking a new account.`
+                );
+                err.statusCode = 409;
+                err.code = "CANNOT_REPLACE_EXISTING_LINK";
+                throw err;
+            }
+
+            // 3. Reject if this GitHub numeric ID is already bound to another Orbix user
+            const conflictRes = await client.query(
+                `SELECT id, username
+                 FROM public.users
+                 WHERE github_id = $1 AND id != $2
+                 LIMIT 1;`,
+                [numericProviderId, userId]
+            );
+
+            if (conflictRes.rows.length > 0) {
+                const err: any = new Error(
+                    "This GitHub account is already linked to another Orbix user account."
+                );
+                err.statusCode = 409;
+                err.code = "ACCOUNT_ALREADY_BOUND";
+                throw err;
+            }
+
+            // 4. Resolve the handle to bind (priority: targetUsername claim -> GitHub login handle -> candidate)
+            const resolvedHandle = (targetUsername || profile.usernameCandidate || profile.name || "github").trim();
+
+            // 5. Ensure external handle is not verified by another user in user_links
+            const handleConflictRes = await client.query(
+                `SELECT user_id
+                 FROM public.user_links
+                 WHERE LOWER(TRIM(portal)) = 'github'
+                   AND LOWER(TRIM(portal_username)) = LOWER(TRIM($1))
+                   AND ownership_status = 'VERIFIED'
+                   AND user_id != $2
+                 LIMIT 1;`,
+                [resolvedHandle, userId]
+            );
+
+            if (handleConflictRes.rows.length > 0) {
+                const err: any = new Error(
+                    `The GitHub handle '${resolvedHandle}' is already verified by another Orbix user.`
+                );
+                err.statusCode = 409;
+                err.code = "HANDLE_ALREADY_VERIFIED";
+                throw err;
+            }
+
+            // 6. Bind immutable numeric GitHub ID to user
+            await client.query(
+                `UPDATE public.users
+                 SET github_id = $1,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $2;`,
+                [numericProviderId, userId]
+            );
+
+            // 7. Authoritative ownership recording in user_links within same transaction
+            await platformVerificationService.recordVerifiedOwnership(
+                userId,
+                "github",
+                resolvedHandle,
+                "oauth",
+                {
+                    githubId: numericProviderId,
+                    githubUsername: profile.usernameCandidate || resolvedHandle,
+                    linkedAt: new Date().toISOString(),
+                },
+                client
+            );
+
+            if (shouldManageTransaction) {
+                await client.query("COMMIT;");
+            }
+
+            // 8. Update Redis details cache after successful commit
+            await userDetailsCache({
+                id: currentUser.id,
+                gmail: currentUser.email,
+                username: currentUser.username,
+                accountType: currentUser.accountType || "personal",
+            }).catch(() => {});
+
+            return {
+                success: true,
+                linkedUser: currentUser,
+                verifiedHandle: resolvedHandle,
+            };
+        } catch (err: any) {
+            if (shouldManageTransaction) {
+                await client.query("ROLLBACK;").catch(() => {});
+            }
+
+            // Cleanly normalize PostgreSQL database unique constraint violations
+            if (err?.code === "23505") {
+                if (err.constraint === "idx_users_github_id" || err.detail?.includes("github_id") || err.message?.includes("idx_users_github_id")) {
+                    const boundErr: any = new Error("This GitHub account is already linked to another Orbix user account.");
+                    boundErr.statusCode = 409;
+                    boundErr.code = "ACCOUNT_ALREADY_BOUND";
+                    throw boundErr;
+                }
+                if (err.constraint === "unique_verified_portal_account" || err.detail?.includes("portal_username") || err.message?.includes("unique_verified_portal_account")) {
+                    const handleErr: any = new Error(`The GitHub handle '${targetUsername || profile.usernameCandidate || "github"}' is already verified by another Orbix user.`);
+                    handleErr.statusCode = 409;
+                    handleErr.code = "HANDLE_ALREADY_VERIFIED";
+                    throw handleErr;
+                }
+            }
+
+            throw err;
+        } finally {
+            if (!externalClient && client && typeof client.release === "function") {
+                client.release();
+            }
+        }
     }
 
     /**
