@@ -273,9 +273,9 @@ const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
                 last_sync_at AS "lastSyncAt"
                 ${ownershipSelect}
             FROM user_links
-            WHERE username = $1 OR username = $2
+            WHERE username = $1 OR username = $2 OR user_id = $3
             ORDER BY created_at ASC;`,
-            [userRow.username, userRow.gmail]
+            [userRow.username, userRow.gmail, userRow.id]
         );
 
         const collegePromise = userRow.collegeId ? query(

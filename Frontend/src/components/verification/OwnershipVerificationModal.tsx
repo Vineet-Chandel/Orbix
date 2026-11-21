@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
     Copy,
@@ -57,6 +57,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
         clearChallenge,
     } = usePlatformVerification({
         onSuccess: (res) => {
+            setIsSuccess(true);
             onVerifiedSuccess?.(res);
             setTimeout(() => {
                 onClose();
@@ -67,13 +68,17 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     const [isSuccess, setIsSuccess] = useState(false);
     const [oauthRedirecting, setOauthRedirecting] = useState(false);
     const [oauthError, setOauthError] = useState<string | null>(null);
+    const initiatedIdentity = useRef<string | null>(null);
 
     // Initial initiation when modal opens
     useEffect(() => {
-        if (isOpen && portalId && username && !isGitHub && !challenge && !isInitiating) {
+        if (!isOpen) { initiatedIdentity.current = null; return; }
+        const identity = `${portalId}:${username}`;
+        if (portalId && username && !isGitHub && initiatedIdentity.current !== identity) {
+            initiatedIdentity.current = identity;
             startVerification(portalId, username);
         }
-    }, [isOpen, portalId, username, isGitHub, challenge, isInitiating, startVerification]);
+    }, [isOpen, portalId, username, isGitHub, startVerification]);
 
     const handleCloseModal = () => {
         if (isConfirming || isCancelling || oauthRedirecting) return;

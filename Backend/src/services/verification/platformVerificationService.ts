@@ -15,6 +15,7 @@
  *    service errors without consuming verification attempts.
  */
 
+import { invalidateAllUserCaches } from "../../redis/cache/cache-profile.js";
 import { query } from "../../database/client.js";
 import { generateChallengeToken, verifyCandidateMatch } from "./challengeCryptoService.js";
 import { platformAdapterRegistry } from "./adapters/adapterRegistry.js";
@@ -35,6 +36,8 @@ export interface InitiateVerificationResult {
     profileSettingsUrl?: string | undefined;
     expiresAt?: Date | string;
     alreadyVerified?: boolean;
+    verificationMethod?: string;
+    verifiedAt?: Date | string;
     requiresOAuth?: boolean;
     oauthUrl?: string;
     error?: string;
@@ -103,7 +106,7 @@ export class PlatformVerificationService {
 
         // 3. Check if handle is already verified by another user
         const existingVerifiedRes = await query(`
-            SELECT id, user_id, portal_username 
+            SELECT id, user_id, portal_username, verification_method, verified_at
             FROM public.user_links 
             WHERE LOWER(TRIM(portal)) = $1 
               AND LOWER(TRIM(portal_username)) = LOWER(TRIM($2)) 
@@ -114,11 +117,14 @@ export class PlatformVerificationService {
         if (existingVerifiedRes.rows.length > 0) {
             const ownerId = existingVerifiedRes.rows[0].user_id;
             if (ownerId === userId) {
+                await this.refreshOwnershipAfterCommit(userId);
                 return {
                     success: true,
                     portal: cleanPortal,
                     portalUsername: cleanUsername,
                     alreadyVerified: true,
+                    verificationMethod: existingVerifiedRes.rows[0].verification_method,
+                    verifiedAt: existingVerifiedRes.rows[0].verified_at,
                     error: `You have already verified ownership of ${adapter.displayName} handle '${cleanUsername}'.`,
                 };
             } else {
@@ -536,12 +542,7 @@ export class PlatformVerificationService {
 
                 await query('COMMIT;');
 
-                // Invalidate profile cache and trigger leaderboard recalculation asynchronously
-                try {
-                    syncLeaderboardForUser(userId).catch(() => {});
-                } catch {
-                    // Non-blocking
-                }
+                await this.refreshOwnershipAfterCommit(userId);
 
                 return {
                     success: true,
@@ -659,10 +660,17 @@ export class PlatformVerificationService {
             ]);
         }
 
-        if (!dbClient) this.refreshOwnershipAfterCommit(userId);
+        if (!dbClient) await this.refreshOwnershipAfterCommit(userId);
     }
 
-    public refreshOwnershipAfterCommit(userId: string): void {
+    public async refreshOwnershipAfterCommit(userId: string): Promise<void> {
+        // Finish invalidation before returning success, so immediate profile reads see the commit.
+        try {
+            const user = await query('SELECT username, email FROM public.users WHERE id = $1;', [userId]);
+            await invalidateAllUserCaches({ id: userId, username: user.rows[0]?.username, email: user.rows[0]?.email });
+        } catch {
+            await invalidateAllUserCaches({ id: userId });
+        }
         try { void syncLeaderboardForUser(userId).catch(() => {}); } catch { /* Best effort after commit. */ }
     }
 }

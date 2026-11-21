@@ -780,7 +780,7 @@ export class OAuthService {
 
             if (shouldManageTransaction) {
                 await client.query("COMMIT;");
-                platformVerificationService.refreshOwnershipAfterCommit(userId);
+                await platformVerificationService.refreshOwnershipAfterCommit(userId);
             }
 
             // 8. Update Redis details cache after successful commit

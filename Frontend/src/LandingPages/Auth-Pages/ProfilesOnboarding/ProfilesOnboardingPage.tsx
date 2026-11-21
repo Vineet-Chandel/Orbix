@@ -1175,6 +1175,10 @@ export default function ProfilesOnboardingPage() {
                                     verifiedAt: res.verifiedAt,
                                 },
                             };
+                            // Verification commits this one connection on the server; other drafts remain pending.
+                            initialConnectedProfilesRef.current[pId] = updated[pId];
+                            initialPortalValuesRef.current[pId] = portalValues[pId] || "";
+                            deletedPortalsRef.current.delete(pId);
                             try {
                                 localStorage.setItem("orbix_connected_portals", JSON.stringify(updated));
                             } catch {
@@ -1182,6 +1186,9 @@ export default function ProfilesOnboardingPage() {
                             }
                             return updated;
                         });
+                        setSavedRevision((revision) => revision + 1);
+                        window.dispatchEvent(new Event("orbix_portals_updated"));
+                        invalidateConnectedPlatformCaches(dispatch, user?.username);
                         dispatch(fetchUserProfile({ force: true }));
                     }}
                 />

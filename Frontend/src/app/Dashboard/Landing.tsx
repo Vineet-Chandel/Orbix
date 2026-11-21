@@ -89,13 +89,17 @@ export default function Dashboard() {
                     const k = (p.portal || "").toLowerCase().trim();
                     if (!k) continue;
                     const handle = (p.portalUsername || p.portal_username || p.username || "").trim();
-                    if (!next[k] || !next[k].username || next[k].username !== handle) {
+                    const ownershipStatus = p.ownershipStatus || p.ownership_status || "CONNECTED_UNVERIFIED";
+                    if (!next[k] || !next[k].username || next[k].username !== handle || next[k].ownershipStatus !== ownershipStatus || next[k].verificationMethod !== (p.verificationMethod || p.verification_method || null)) {
                         next[k] = {
                             ...(prev[k] || {}),
                             portal: k,
                             username: handle,
                             profileUrl: p.link || p.profileUrl || prev[k]?.profileUrl || "",
-                            verified: p.verified !== false,
+                            verified: ownershipStatus === "VERIFIED",
+                            ownershipStatus,
+                            verificationMethod: p.verificationMethod || p.verification_method || null,
+                            verifiedAt: p.verifiedAt || p.verified_at || null,
                             displayName: p.displayName || p.display_name || handle,
                             avatarUrl: p.avatarUrl || p.avatar_url || prev[k]?.avatarUrl,
                             stats: p.stats || prev[k]?.stats,

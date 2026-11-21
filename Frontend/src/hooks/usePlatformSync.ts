@@ -136,12 +136,18 @@ export function usePlatformSync(): UsePlatformSyncReturn {
             }
 
             const results: ResyncResultItem[] = resData.results;
-            const updatedPortals = { ...currentPortals };
+            // Verification or a handle edit may finish while this health request is in flight.
+            let latestPortals = currentPortals;
+            try {
+                const raw = localStorage.getItem("orbix_connected_portals");
+                if (raw) latestPortals = JSON.parse(raw);
+            } catch { /* Keep the initial snapshot when storage is unavailable. */ }
+            const updatedPortals = { ...latestPortals };
             const detectedBroken: string[] = [];
 
             for (const r of results) {
                 const key = r.portal.toLowerCase();
-                if (!updatedPortals[key]) continue;
+                if (!updatedPortals[key] || updatedPortals[key].username?.toLowerCase() !== r.username.toLowerCase()) continue;
 
                 if (r.status === "broken") {
                     detectedBroken.push(r.portal);
@@ -155,6 +161,11 @@ export function usePlatformSync(): UsePlatformSyncReturn {
                     updatedPortals[key] = {
                         ...updatedPortals[key],
                         ...(r.profileData || {}),
+                        // A profile fetch reports sync health, never new or revoked ownership.
+                        verified: updatedPortals[key].verified,
+                        ownershipStatus: updatedPortals[key].ownershipStatus,
+                        verificationMethod: updatedPortals[key].verificationMethod,
+                        verifiedAt: updatedPortals[key].verifiedAt,
                         username: r.username,
                         syncStatus: "valid",
                         syncError: undefined,

@@ -434,7 +434,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     const brokenCount = useMemo(() => {
         return DASHBOARD_PLATFORMS_ORDER.filter((id) => {
             const prof = portalsState[id];
-            return prof && (prof.verified === false || prof.syncStatus === "broken");
+            return prof && prof.syncStatus === "broken";
         }).length;
     }, [portalsState]);
 
@@ -1561,7 +1561,11 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                     verifiedAt: res.verifiedAt,
                                 },
                             };
-                            persistPortals(next);
+                            // Proof is already persisted; do not re-save every connection from a stale snapshot.
+                            setPortalsState(next);
+                            try { localStorage.setItem("orbix_connected_portals", JSON.stringify(next)); } catch { /* Storage may be unavailable. */ }
+                            window.dispatchEvent(new Event("orbix_portals_updated"));
+                            invalidateConnectedPlatformCaches(dispatch, user?.username);
                         }
                         dispatch(fetchUserProfile({ force: true }));
                     }}

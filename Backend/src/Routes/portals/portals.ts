@@ -3779,24 +3779,12 @@ export const handleGetSavedPortals = async (req: Request, res: Response) => {
             });
         }
 
-        // Check Redis cache first
-        try {
-            if (redis && redis.status === "ready") {
-                const cached = await redis.get(`user:portals:${username}`);
-                if (cached) {
-                    const links = JSON.parse(cached);
-                    return res.status(200).json({
-                        success: true,
-                        username,
-                        links,
-                        count: links.length,
-                        source: "cache",
-                    });
-                }
-            }
-        } catch {
-            // Fall through to DB
-        }
+        // Ownership is authoritative database state; legacy portal caches omit proof metadata.
+        res.setHeader("Cache-Control", "no-store");
+        const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
+        const ownershipSelect = hasOwnershipStatusColumn
+            ? `, ownership_status, verification_method, verified_at`
+            : `, 'CONNECTED_UNVERIFIED' AS ownership_status, NULL AS verification_method, NULL AS verified_at`;
 
         // Query Postgres
         const result = await query(
@@ -3815,10 +3803,11 @@ export const handleGetSavedPortals = async (req: Request, res: Response) => {
                 last_sync_at,
                 created_at,
                 updated_at
+                ${ownershipSelect}
             FROM user_links
-            WHERE username = $1
+            WHERE username = $1 OR user_id = $2
             ORDER BY portal ASC;`,
-            [username]
+            [username, authUser?.id || null]
         );
 
         return res.status(200).json({
@@ -4167,6 +4156,8 @@ portalsRouter.post("/verification/initiate", authenticate, async (req: Request, 
             profileSettingsUrl: result.profileSettingsUrl,
             expiresAt: result.expiresAt,
             alreadyVerified: result.alreadyVerified,
+            verificationMethod: result.verificationMethod,
+            verifiedAt: result.verifiedAt,
         });
     } catch (err: any) {
         console.error("[VerificationInitiate] Error:", err);
