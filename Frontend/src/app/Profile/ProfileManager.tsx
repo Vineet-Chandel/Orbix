@@ -152,12 +152,16 @@ export default function ProfileManager() {
                     const k = (p.portal || "").toLowerCase().trim();
                     if (!k) continue;
                     const handle = (p.portalUsername || p.portal_username || p.username || "").trim();
-                    if (!next[k] || !next[k].username || next[k].username !== handle) {
+                    if (!next[k] || !next[k].username || next[k].username !== handle || next[k].ownershipStatus !== p.ownershipStatus) {
+                        const isOwnershipVerified = p.ownershipStatus === "VERIFIED" || p.ownership_status === "VERIFIED";
                         next[k] = {
                             portal: k,
                             username: handle,
                             profileUrl: p.link || p.profileUrl || "",
-                            verified: p.verified !== false,
+                            verified: isOwnershipVerified,
+                            ownershipStatus: isOwnershipVerified ? "VERIFIED" : (p.ownershipStatus || p.ownership_status || "CONNECTED_UNVERIFIED"),
+                            verificationMethod: p.verificationMethod || p.verification_method || null,
+                            verifiedAt: p.verifiedAt || p.verified_at || null,
                             displayName: p.displayName || p.display_name || handle,
                             avatarUrl: p.avatarUrl || p.avatar_url,
                             stats: p.stats,

@@ -1,5 +1,6 @@
 import { query } from "../../database/client.js";
 import { calculateUserContestPerformance } from "./contestAnalytics.js";
+import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 
 export interface DifficultyBreakdown {
     easy: number;
@@ -285,13 +286,15 @@ export async function calculateUserPracticeAnalytics(
         };
     }
 
-    // 1. Resolve connected portals from Database with clientPortals fallback
+    // 1. Resolve connected portals from Database - restricted strictly to verified accounts
+    const verifiedCondition = await getVerifiedLinksCondition();
     let portalRows: Array<{ portal: string; portal_username: string; stats?: any; snapshot?: any }> = [];
     try {
         const res = await query(
             `SELECT portal, portal_username, stats, snapshot
              FROM user_links
              WHERE LOWER(username) = LOWER($1)
+               AND ${verifiedCondition}
              ORDER BY id ASC;`,
             [cleanUser]
         );
@@ -307,13 +310,13 @@ export async function calculateUserPracticeAnalytics(
         if (p && u) portalsMap[p] = u;
     }
 
-    // Merge client portals if provided
+    // Neutralize clientPortals injection: clientPortals must NEVER synthesize new accounts
+    // or override server-verified accounts. Only server-verified records from the DB are trusted.
     if (clientPortals && typeof clientPortals === "object") {
         for (const [k, v] of Object.entries(clientPortals)) {
             const p = k.toLowerCase().trim();
             if (p.startsWith("_") || p === "theme" || p === "github") continue;
-            const u = (typeof v === "object" ? v?.username || v?.portal_username || "" : String(v || "")).trim();
-            if (p && u) portalsMap[p] = u;
+            // Never insert into portalsMap if not already present from verified DB records
         }
     }
 

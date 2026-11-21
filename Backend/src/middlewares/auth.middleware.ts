@@ -26,7 +26,7 @@ function extractToken(req: Request): string | undefined {
  * Resolves and validates JWT + session + PostgreSQL/Redis identity with strict
  * separation between 'personal'/'admin' accounts and 'club' accounts.
  */
-async function resolveAuthenticatedUser(req: Request): Promise<ResolvedAuthOutcome> {
+export async function resolveAuthenticatedUser(req: Request): Promise<ResolvedAuthOutcome> {
     if (!JWT_SECRET) {
         console.error("FATAL: JWT_SECRET is not configured");
         return { ok: false, status: 500, message: "Internal server error" };

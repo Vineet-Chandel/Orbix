@@ -1,6 +1,7 @@
 // Backend/src/Routes/auth/oauthRoutes.ts
 import express, { type Request, type Response } from "express";
 import { OAuthService } from "../../services/auth/oauthService.js";
+import { authenticate, resolveAuthenticatedUser } from "../../middlewares/auth.middleware.js";
 
 export const oauthRouter = express.Router();
 
@@ -131,11 +132,66 @@ oauthRouter.get("/github", async (req: Request, res: Response) => {
 });
 
 /**
- * 4. GITHUB OAUTH CALLBACK
- * Route: GET /api/auth/github/callback
+ * 4. INITIATE AUTHENTICATED GITHUB ACCOUNT LINKING
+ * Route: GET & POST /api/auth/github/link
+ * Requires authenticated Orbix user. Binds OAuth transaction to req.user.id.
  */
-oauthRouter.get("/github/callback", async (req: Request, res: Response) => {
+oauthRouter.all("/github/link", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        if (!authUser?.id) {
+            return res.status(401).json({ success: false, code: "AUTH_REQUIRED", message: "Authentication required to link GitHub account" });
+        }
+
+        const sessionId = (req as any).sessionId ? String((req as any).sessionId).trim() : "";
+        if (!sessionId) {
+            return res.status(401).json({
+                success: false,
+                code: "SESSION_REQUIRED",
+                message: "Valid active session required to link GitHub account",
+            });
+        }
+
+        const returnTo = (req.body?.returnTo || req.query.returnTo as string) || "/dashboard";
+        const portalUsername = (req.body?.portalUsername || req.query.portalUsername as string) || undefined;
+        const deviceId =
+            (req.headers["x-orbix-device-id"] as string) ||
+            (req.query.deviceId as string) ||
+            undefined;
+
+        const state = await OAuthService.generateLinkState(
+            res,
+            authUser.id,
+            returnTo,
+            portalUsername,
+            deviceId,
+            sessionId
+        );
+        const authUrl = OAuthService.getGitHubAuthUrl(state);
+
+        if (req.method === "POST" || req.query.redirect === "false" || req.headers.accept?.includes("application/json")) {
+            return res.json({ success: true, url: authUrl });
+        }
+
+        return res.redirect(authUrl);
+    } catch (err: any) {
+        console.error("Initiate GitHub Account Link error:", err);
+        const frontendUrl = OAuthService.getFrontendUrl();
+        return res.redirect(
+            `${frontendUrl}/dashboard?error=${encodeURIComponent(
+                err.message || "Failed to initiate GitHub account linking"
+            )}`
+        );
+    }
+});
+
+/**
+ * 5. GITHUB OAUTH CALLBACK (Dual-mode: Normal Login vs Authenticated Linking)
+ * Route: GET /api/auth/github/callback and GET /api/auth/github/link/callback
+ */
+oauthRouter.get(["/github/callback", "/github/link/callback"], async (req: Request, res: Response) => {
     const frontendUrl = OAuthService.getFrontendUrl();
+    let statePayload: any = null;
 
     try {
         const code = req.query.code as string;
@@ -143,6 +199,24 @@ oauthRouter.get("/github/callback", async (req: Request, res: Response) => {
         const providerError = req.query.error as string;
 
         if (providerError) {
+            if (incomingState) {
+                try {
+                    // Atomically invalidate the state so cancellation does not leave a reusable token
+                    statePayload = await OAuthService.invalidateState(req, res, incomingState);
+                } catch {
+                    // ignore
+                }
+            }
+
+            if (statePayload?.action === "link" && statePayload?.returnTo) {
+                const sep = statePayload.returnTo.includes("?") ? "&" : "?";
+                return res.redirect(
+                    `${statePayload.returnTo}${sep}status=cancelled&error=${encodeURIComponent(
+                        "GitHub account linking was cancelled on GitHub"
+                    )}&portal=github`
+                );
+            }
+
             return res.redirect(
                 `${frontendUrl}/auth/signin?error=${encodeURIComponent(
                     `GitHub sign-in was cancelled or denied: ${providerError}`
@@ -158,16 +232,47 @@ oauthRouter.get("/github/callback", async (req: Request, res: Response) => {
             );
         }
 
-        // 1. Verify CSRF state token
-        const statePayload = await OAuthService.validateState(req, res, incomingState, "github");
+        // 1. Verify and atomically consume CSRF state token via Redis Lua GETDEL
+        statePayload = await OAuthService.validateState(req, res, incomingState, "github");
 
         // 2. Exchange authorization code for user profile
         const profile = await OAuthService.exchangeGitHubCode(code);
 
-        // 3. Link existing user or create a new user account
+        // 3. ISOLATED ACCOUNT-LINKING TRANSACTION:
+        if (statePayload.action === "link") {
+            const targetDestination = statePayload.returnTo || "/dashboard";
+            const separator = targetDestination.includes("?") ? "&" : "?";
+
+            // CRITICAL: Verify that the incoming callback request is from an active authenticated session
+            // that strictly matches the initiating user ID and exact session ID (fail closed)
+            const authOutcome = await resolveAuthenticatedUser(req);
+            const bindingCheck = OAuthService.validateCallbackSessionBinding(statePayload, authOutcome);
+            if (!bindingCheck.ok) {
+                return res.redirect(
+                    `${targetDestination}${separator}status=error&error=${encodeURIComponent(
+                        bindingCheck.message
+                    )}&portal=github`
+                );
+            }
+
+            // Safe to execute atomic database transaction binding
+            await OAuthService.linkGitHubAccount(
+                statePayload.userId,
+                profile,
+                statePayload.targetUsername
+            );
+
+            return res.redirect(
+                `${targetDestination}${separator}status=success&portal=github&action=linked&username=${encodeURIComponent(
+                    profile.usernameCandidate || profile.name || ""
+                )}`
+            );
+        }
+
+        // 4. Standard Login/Registration Flow (Completely untouched!)
         const { user, isNewUser } = await OAuthService.findOrCreateOAuthUser(profile);
 
-        // 4. Finalize session, issue JWTs & set HTTPOnly cookies
+        // 5. Finalize session, issue JWTs & set HTTPOnly cookies
         const { token } = await OAuthService.finalizeOAuthSession(
             user,
             "github",
@@ -186,6 +291,14 @@ oauthRouter.get("/github/callback", async (req: Request, res: Response) => {
         );
     } catch (err: any) {
         console.error("GitHub OAuth callback error:", err);
+        if (statePayload?.action === "link" && statePayload?.returnTo) {
+            const sep = statePayload.returnTo.includes("?") ? "&" : "?";
+            return res.redirect(
+                `${statePayload.returnTo}${sep}status=error&error=${encodeURIComponent(
+                    err.message || "Failed to link GitHub account"
+                )}&portal=github`
+            );
+        }
         return res.redirect(
             `${frontendUrl}/auth/signin?error=${encodeURIComponent(
                 err.message || "Failed to authenticate with GitHub"

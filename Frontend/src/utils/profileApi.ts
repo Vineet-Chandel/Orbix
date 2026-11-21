@@ -1,11 +1,15 @@
 import { demoPublicProfile, isDemoProfileUsername } from "../data/demoProfileData";
 import type { ProjectItem } from "../types/project";
+import type { OwnershipStatus } from "../types/platformVerification";
 
 export interface PublicProfilePlatform {
     portal: string;
     portalUsername: string;
     link: string;
     verified: boolean;
+    ownershipStatus?: OwnershipStatus;
+    verificationMethod?: string | null;
+    verifiedAt?: string | null;
     displayName?: string;
     avatarUrl?: string;
     stats: Array<{ label: string; value: string }>;

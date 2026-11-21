@@ -12,6 +12,7 @@ import {
     getAtCoderTier,
 } from "../../utils/ratingSystems.js";
 import cacheLeaderboard from "../../redis/cache/cache-leaderboard.js";
+import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 
 const leaderboardRouter = express.Router();
 
@@ -213,12 +214,14 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         await query("UPDATE users SET college = $1, college_id = $2 WHERE id = $3;", [college, collegeId, userId]).catch(() => null);
     }
 
-    // 2. Fetch all linked portals for this user (robust matching by username, email, or user_id)
+    // 2. Fetch all ownership-verified linked portals for this user (robust matching by username, email, or user_id)
+    const verifiedCondition = await getVerifiedLinksCondition();
     const linksRes = await query(
         `SELECT portal, portal_username, display_name, avatar_url, stats, snapshot, verified, last_sync_status
          FROM user_links
          WHERE (LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2) OR user_id = $3)
-           AND (is_public IS NULL OR is_public = true);`,
+           AND (is_public IS NULL OR is_public = true)
+           AND ${verifiedCondition};`,
         [cleanUser, u.email || cleanUser, userId]
     );
 

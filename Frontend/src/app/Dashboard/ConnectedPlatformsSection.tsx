@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Check, X, AlertCircle, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, Check, X, AlertCircle, ArrowUpRight, ShieldCheck } from "lucide-react";
 import { PORTALS, DASHBOARD_PLATFORMS_ORDER, judgePortalInput } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { useToast } from "../../context/ToastContext";
 import { usePlatformSync, type UsePlatformSyncReturn } from "../../hooks/usePlatformSync";
 import { editPlatformHandle, disconnectPlatform } from "../../utils/profileApi";
 import { PlatformDifficultyGauge, type DifficultyBreakdown } from "./PlatformDifficultyGauge";
-import { useAppDispatch, useAppSelector } from "../../store";
+import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
 import { invalidateConnectedPlatformCaches } from "../../utils/cacheManager";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { buildApiUrl } from "../../api/apiClient";
+import { OwnershipStatusBadge } from "../../components/verification/OwnershipStatusBadge";
+import { OwnershipVerificationModal } from "../../components/verification/OwnershipVerificationModal";
+import { isPlatformVerificationSupported } from "../../utils/platformVerificationSupport";
+import type { OwnershipStatus } from "../../types/platformVerification";
 
 export interface PortalProfileData {
     success: boolean;
@@ -21,6 +25,9 @@ export interface PortalProfileData {
     stats: Array<{ label: string; value: string }>;
     profileUrl: string;
     verified: boolean;
+    ownershipStatus?: OwnershipStatus;
+    verificationMethod?: string | null;
+    verifiedAt?: string | null;
     syncStatus?: "valid" | "broken" | "error" | "pending";
     lastSyncAt?: string;
     syncError?: string;
@@ -399,6 +406,11 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     // Modal state for Viewing/Managing a connected account
     const [viewingPortalId, setViewingPortalId] = useState<string | null>(null);
     const [isSingleVerifying, setIsSingleVerifying] = useState(false);
+    const [verificationModalState, setVerificationModalState] = useState<{
+        isOpen: boolean;
+        portalId: string;
+        username: string;
+    } | null>(null);
 
     const { handleBackdropClick: handleConnectBackdropClick } = useModalDismiss({
         isOpen: Boolean(connectingPortalId),
@@ -599,11 +611,19 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
             // non-fatal
         }
 
+        const existingAccount = portalsState[connectingPortalId];
+        const isSameHandle = existingAccount && existingAccount.username?.toLowerCase() === profile.username.toLowerCase();
+        const existingVerified = Boolean(isSameHandle && existingAccount.verified);
+        const existingOwnershipStatus = isSameHandle && existingAccount.ownershipStatus
+            ? existingAccount.ownershipStatus
+            : (existingVerified ? "VERIFIED" : "CONNECTED_UNVERIFIED");
+
         const next = {
             ...portalsState,
             [connectingPortalId]: {
                 ...profile,
-                verified: true,
+                verified: existingVerified,
+                ownershipStatus: existingOwnershipStatus,
                 syncStatus: "valid" as const,
                 lastSyncAt: new Date().toISOString(),
                 syncError: undefined,
@@ -668,22 +688,22 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                 [portalId]: {
                     ...portalsState[portalId],
                     ...fetched,
-                    verified: true,
+                    verified: portalsState[portalId].verified,
+                    ownershipStatus: portalsState[portalId].ownershipStatus,
                     syncStatus: "valid" as const,
                     lastSyncAt: now,
                     syncError: undefined,
                 },
             };
             persistPortals(next);
-            toast.success(`@${profile.username} verified active on ${config.name}!`, {
-                title: "Health Verified",
+            toast.success(`@${profile.username} profile is active and reachable on ${config.name}!`, {
+                title: "Sync Healthy",
             });
         } else if (is404) {
             const next = {
                 ...portalsState,
                 [portalId]: {
                     ...portalsState[portalId],
-                    verified: false,
                     syncStatus: "broken" as const,
                     lastSyncAt: now,
                     syncError: `Account '@${profile.username}' no longer exists on ${config.name}.`,
@@ -930,7 +950,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                             </span>
                                         </div>
                                     ) : isConnected ? (
-                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
                                             <span
                                                 className="text-[11px] font-semibold text-emerald-700 font-mono truncate"
@@ -938,6 +958,12 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                             >
                                                 @{profile.username}
                                             </span>
+                                            <OwnershipStatusBadge
+                                                status={profile.ownershipStatus || (profile.verified ? "VERIFIED" : "CONNECTED_UNVERIFIED")}
+                                                isSupported={isPlatformVerificationSupported(portalId)}
+                                                size="xs"
+                                                showLabel={false}
+                                            />
                                         </div>
                                     ) : (
                                         <p className="text-[11px] text-neutral-400 font-medium leading-none mt-1">
@@ -1327,21 +1353,66 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                 </div>
                             </div>
                         ) : (
-                            <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-2 text-emerald-800 font-semibold">
+                            <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/80 flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2 text-neutral-800 font-semibold">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                    <span>Account verified on {activeViewingConfig.name}</span>
+                                    <span>Sync reachable on {activeViewingConfig.name}</span>
                                 </div>
                                 <button
                                     type="button"
                                     disabled={isSingleVerifying}
                                     onClick={() => handleSingleReverify(viewingPortalId)}
-                                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer disabled:opacity-50"
+                                    className="text-[11px] font-bold text-neutral-700 hover:text-black underline cursor-pointer disabled:opacity-50"
                                 >
-                                    {isSingleVerifying ? "Verifying..." : "Re-verify"}
+                                    {isSingleVerifying ? "Syncing..." : "Re-sync"}
                                 </button>
                             </div>
                         )}
+
+                        {/* Ownership Verification Status Callout */}
+                        <div className="p-3.5 rounded-xl border-2 border-black bg-white shadow-[3px_3px_0px_#000] space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-black uppercase tracking-wider text-black">
+                                    Ownership Verification
+                                </span>
+                                <OwnershipStatusBadge
+                                    status={activeViewingProfile.ownershipStatus || (activeViewingProfile.verified ? "VERIFIED" : "CONNECTED_UNVERIFIED")}
+                                    isSupported={isPlatformVerificationSupported(viewingPortalId)}
+                                    size="sm"
+                                />
+                            </div>
+
+                            {activeViewingProfile.ownershipStatus === "VERIFIED" || activeViewingProfile.verified ? (
+                                <p className="text-xs font-bold text-neutral-700">
+                                    Account ownership is cryptographically verified
+                                    {activeViewingProfile.verificationMethod ? ` via ${activeViewingProfile.verificationMethod}` : ""}.
+                                    This platform is authenticated for verified profile and leaderboard scoring.
+                                </p>
+                            ) : isPlatformVerificationSupported(viewingPortalId) ? (
+                                <div className="space-y-2 pt-1">
+                                    <p className="text-xs font-bold text-neutral-600 leading-relaxed">
+                                        Cryptographic ownership has not been proven. Verification is required before scores from this account can be officially credited.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const pid = viewingPortalId;
+                                            const uname = activeViewingProfile.username;
+                                            setViewingPortalId(null);
+                                            setVerificationModalState({ isOpen: true, portalId: pid, username: uname });
+                                        }}
+                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border-2 border-black bg-[#FFE566] hover:bg-[#ffd93d] text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                    >
+                                        <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Verify Ownership</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <p className="text-xs font-bold text-neutral-500 italic">
+                                    Cryptographic ownership verification is not currently supported for {activeViewingConfig.name}.
+                                </p>
+                            )}
+                        </div>
 
                         {/* Profile Card Preview */}
                         <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/80 flex items-center gap-3.5">
@@ -1467,6 +1538,34 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Ownership Verification Challenge Modal */}
+            {verificationModalState?.isOpen && (
+                <OwnershipVerificationModal
+                    isOpen={verificationModalState.isOpen}
+                    portalId={verificationModalState.portalId}
+                    username={verificationModalState.username}
+                    onClose={() => setVerificationModalState(null)}
+                    onVerifiedSuccess={(res) => {
+                        const pId = res.portal.toLowerCase();
+                        const existing = portalsState[pId];
+                        if (existing) {
+                            const next = {
+                                ...portalsState,
+                                [pId]: {
+                                    ...existing,
+                                    verified: true,
+                                    ownershipStatus: "VERIFIED" as const,
+                                    verificationMethod: res.verificationMethod,
+                                    verifiedAt: res.verifiedAt,
+                                },
+                            };
+                            persistPortals(next);
+                        }
+                        dispatch(fetchUserProfile({ force: true }));
+                    }}
+                />
             )}
         </section>
     );

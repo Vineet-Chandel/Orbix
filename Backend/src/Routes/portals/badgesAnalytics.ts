@@ -1,4 +1,5 @@
 import { pool } from "../../database/client.js";
+import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 
 export interface UnifiedBadgeRecord {
     id: string;
@@ -193,8 +194,11 @@ export async function calculateUserBadges(
     const connectedPortals: Record<string, string> = {};
 
     try {
+        const verifiedCondition = await getVerifiedLinksCondition();
         const dbResult = await pool.query(
-            "SELECT portal, portal_username FROM user_links WHERE username = $1 AND verified = true",
+            `SELECT portal, portal_username FROM user_links 
+             WHERE (LOWER(username) = LOWER($1) OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1))
+               AND ${verifiedCondition}`,
             [cleanUser]
         );
         for (const row of dbResult.rows) {
@@ -206,14 +210,15 @@ export async function calculateUserBadges(
         console.error("Error reading user_links for badges:", err);
     }
 
-    // Merge client-provided handles if present
+    // Invariant: clientPortals can never inject unverified handles.
+    // At most, it may request a subset of already-verified portals.
     if (clientPortals && typeof clientPortals === "object") {
-        for (const [k, v] of Object.entries(clientPortals)) {
-            if (v && typeof v === "string") {
-                const lower = k.toLowerCase().trim();
-                if (!connectedPortals[lower]) {
-                    connectedPortals[lower] = v.trim();
-                }
+        const requestedKeys = new Set(
+            Object.keys(clientPortals).map((k) => k.toLowerCase().trim())
+        );
+        for (const key of Object.keys(connectedPortals)) {
+            if (!requestedKeys.has(key)) {
+                delete connectedPortals[key];
             }
         }
     }

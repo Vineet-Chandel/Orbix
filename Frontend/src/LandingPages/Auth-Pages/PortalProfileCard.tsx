@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { PORTALS } from "../../utils/portalParser";
 import { buildApiUrl } from "../../api/apiClient";
+import type { OwnershipStatus } from "../../types/platformVerification";
 
 export interface PortalProfileData {
     success: boolean;
@@ -13,6 +14,9 @@ export interface PortalProfileData {
     stats: Array<{ label: string; value: string }>;
     profileUrl: string;
     verified: boolean;
+    ownershipStatus?: OwnershipStatus;
+    verificationMethod?: string | null;
+    verifiedAt?: string | null;
 }
 
 interface PortalProfileCardProps {
@@ -227,7 +231,13 @@ export const PortalProfileCard = ({
                             </span>
                             <button
                                 type="button"
-                                onClick={() => onConnect(profile)}
+                                onClick={() =>
+                                    onConnect({
+                                        ...profile,
+                                        verified: false,
+                                        ownershipStatus: "CONNECTED_UNVERIFIED",
+                                    })
+                                }
                                 className="flex items-center gap-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#92f574] px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-black uppercase tracking-wide text-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none cursor-pointer transition-all"
                             >
                                 <svg className="h-4 w-4 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

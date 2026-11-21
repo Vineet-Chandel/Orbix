@@ -1,4 +1,5 @@
 import { query } from "../../database/client.js";
+import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 import {
     getCodeforcesTier as getCfTierOfficial,
     getLeetCodeTier as getLtTierOfficial,
@@ -1243,9 +1244,10 @@ export async function calculateUserContestPerformance(
 ): Promise<UnifiedContestResponse> {
     const cleanUsername = username.trim();
 
-    // Query Postgres for user's connected platforms
+    // Query Postgres for user's verified connected platforms
     let rows: any[] = [];
     try {
+        const verifiedCondition = await getVerifiedLinksCondition();
         const result = await query(
             `SELECT portal, portal_username, verified, display_name
              FROM user_links
@@ -1254,6 +1256,7 @@ export async function calculateUserContestPerformance(
                 OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
                 OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) LIMIT 1)
              )
+               AND ${verifiedCondition}
              ORDER BY portal ASC;`,
             [cleanUsername]
         );
@@ -1263,7 +1266,7 @@ export async function calculateUserContestPerformance(
     }
 
     const connectedMap = new Map<string, string>();
-    // First, populate from database rows
+    // Populate from verified database rows only
     for (const row of rows) {
         const portal = (row.portal || "").toLowerCase().trim();
         const portalUsername = (row.portal_username || "").trim();
@@ -1271,13 +1274,16 @@ export async function calculateUserContestPerformance(
             connectedMap.set(portal, portalUsername);
         }
     }
-    // Then merge with client-supplied portals (clientPortals may have newer links or local sessions)
+
+    // Invariant: clientPortals cannot inject unverified accounts or override handles.
+    // At most, it may request a subset of verified portals.
     if (clientPortals && typeof clientPortals === "object") {
-        for (const [k, v] of Object.entries(clientPortals)) {
-            const portalKey = k.toLowerCase().trim();
-            const portalUsername = (typeof v === "string" ? v : (v as any)?.username || (v as any)?.portalUsername || "").trim();
-            if (portalKey && portalUsername && portalKey !== "github" && !portalKey.startsWith("_") && portalKey !== "theme") {
-                connectedMap.set(portalKey, portalUsername);
+        const requestedKeys = new Set(
+            Object.keys(clientPortals).map((k) => k.toLowerCase().trim())
+        );
+        for (const portalKey of Array.from(connectedMap.keys())) {
+            if (!requestedKeys.has(portalKey)) {
+                connectedMap.delete(portalKey);
             }
         }
     }
