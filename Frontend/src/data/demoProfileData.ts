@@ -28,7 +28,6 @@ export function isDemoProfileUsername(username?: string | null): boolean {
     if (clean === "vineet-chandel" || clean === "demo" || clean === "demo-profile") return true;
     const collapsed = clean.replace(/[-_.\s]/g, "");
     return (
-        collapsed === "vineetchandel" ||
         collapsed === "demoprofile" ||
         collapsed === "demouser" ||
         collapsed === "demoaccount" ||

@@ -106,7 +106,7 @@ export function diagnoseProfileError(err: any, rawUsername?: string): ProfileDia
     const cleanUser = (rawUsername || "").trim();
 
     let suggestedHandle: string | undefined;
-    if (cleanUser.toLowerCase() === "vineetchandel" || cleanUser.toLowerCase() === "demo") {
+    if (cleanUser.toLowerCase() === "demo" || cleanUser.toLowerCase() === "demo-profile") {
         suggestedHandle = "Vineet-Chandel";
     }
 

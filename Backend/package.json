@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tsx --test src/validators/ClubRegistrationValidator.test.ts src/services/announcements/*.test.ts",
+    "test": "tsx --test src/validators/ClubRegistrationValidator.test.ts src/validators/usernamePolicy.test.ts src/services/announcements/*.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate:institutions": "tsx src/database/run_migration.ts",

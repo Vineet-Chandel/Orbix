@@ -9,8 +9,8 @@ import { query as defaultQuery } from "../database/client.js";
  * Enforces:
  * 1. Demo Profile Immunity:
  *    Prevents any user or club from registering or updating to the demo profile
- *    handle ("vineet-chandel", "demo", "demo-profile") or any delimiter/spacing
- *    variants ("vineet_chandel", "vineetchandel", "vineet.chandel").
+ *    handle ("vineet-chandel", "demo", "demo-profile") or demo variants
+ *    ("demo-vineet-chandel", "vineet-chandel-demo").
  *
  * 2. Demo Club Immunity:
  *    Prevents any club or user from registering or updating to the demo club
@@ -30,9 +30,6 @@ import { query as defaultQuery } from "../database/client.js";
 // 1. Exact match protected lists
 export const DEMO_PROFILE_EXACT = new Set([
     "vineet-chandel",
-    "vineet_chandel",
-    "vineetchandel",
-    "vineet.chandel",
     "demo",
     "demo-profile",
     "demoprofile",
@@ -78,7 +75,6 @@ export const DEMO_CLUB_EXACT = new Set([
 
 // 2. Collapsed roots (stripped of '.', '-', '_') to catch all permutations
 export const DEMO_PROFILE_COLLAPSED_ROOTS = [
-    "vineetchandel",
     "demoprofile",
     "demouser",
     "demoaccount",

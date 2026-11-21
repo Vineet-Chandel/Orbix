@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts src/app/Club/eventScopePoolSize.test.ts src/app/Club/ApplicationsRoster/teamReadinessFilterSort.test.ts",
+    "test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts src/app/Club/eventScopePoolSize.test.ts src/app/Club/ApplicationsRoster/teamReadinessFilterSort.test.ts src/data/demoProfileData.test.ts",
     "preview": "vite preview",
     "test:forms": "npx tsx --test src/api/clubEventFormApi.test.ts src/app/Club/FormBuilder/draftSaveQueue.test.ts",
     "test:announcements": "npx tsx --tsconfig tsconfig.app.json --test src/api/clubAnnouncementsApi.test.ts src/app/Club/Announcements/announcementRendering.test.tsx"
