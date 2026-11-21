@@ -39,6 +39,7 @@ describe('GitHub OAuth Account-Linking Final Security Closure', () => {
     const originalRedisSet = (redis as any).set?.bind(redis);
     const originalRedisDel = (redis as any).del?.bind(redis);
     const originalRedisEval = (redis as any).eval?.bind(redis);
+    const originalRedisMget = (redis as any).mget?.bind(redis);
 
     beforeEach(() => {
         executedQueries = [];
@@ -138,6 +139,10 @@ describe('GitHub OAuth Account-Linking Final Security Closure', () => {
         (redis as any).hset = async () => 1;
         (redis as any).hgetall = async () => ({});
         (redis as any).expire = async () => 1;
+        (redis as any).mget = async (...keys: any[]) => {
+            const flattened = Array.isArray(keys[0]) ? keys[0] : keys;
+            return flattened.map((k: string) => redisStore.get(k) || null);
+        };
     });
 
     afterEach(() => {
@@ -151,6 +156,7 @@ describe('GitHub OAuth Account-Linking Final Security Closure', () => {
         if (originalRedisSet) (redis as any).set = originalRedisSet;
         if (originalRedisDel) (redis as any).del = originalRedisDel;
         if (originalRedisEval) (redis as any).eval = originalRedisEval;
+        if (originalRedisMget) (redis as any).mget = originalRedisMget;
 
         try {
             if (redis && typeof redis.disconnect === 'function') {
