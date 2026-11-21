@@ -348,7 +348,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
         }
     }
 
-    // Extract maximum verified active days and streak from links and user record
+    // Extract active days and streak only from ownership-verified links.
     let maxActiveDays = 0;
     let maxStreak = 0;
 

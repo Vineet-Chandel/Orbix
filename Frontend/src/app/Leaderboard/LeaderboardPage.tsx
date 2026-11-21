@@ -16,6 +16,7 @@ import {
 } from "../../store/leaderboardSlice";
 import { useToast } from "../../context/ToastContext";
 import { Sidebar } from "../Dashboard/Sidebar";
+import { LeaderboardVerificationPrompt } from "./LeaderboardVerificationPrompt";
 import { LeaderboardHeader } from "./LeaderboardHeader";
 import { CollegeSelector } from "./CollegeSelector";
 import { LeaderboardPodium } from "./LeaderboardPodium";
@@ -276,6 +277,8 @@ export const LeaderboardPage: React.FC = () => {
                             onCounterClick={() => handleTabChange("college")}
                             onOpenAlgorithm={() => setIsAlgorithmModalOpen(true)}
                         />
+
+                        {user && <LeaderboardVerificationPrompt key={user.id || currentUsername} onVerified={handleSyncNow} />}
 
                         {/* ========================================================================= */}
                         {/* COLLEGE LEAGUE CONTROLS: Autocomplete Selector */}

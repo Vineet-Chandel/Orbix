@@ -3841,7 +3841,6 @@ export interface ResyncPortalResult {
     portal: string;
     username: string;
     status: "valid" | "broken" | "error";
-    verified: boolean;
     message?: string;
     profileData?: PortalProfileData;
     lastSyncAt: string;
@@ -3851,6 +3850,7 @@ export interface ResyncPortalResult {
 export const handleResyncPortals = async (req: Request, res: Response) => {
     try {
         const authUser = (req as any).user;
+        const userId = authUser?.id || null;
         const body = req.body || {};
         const userIdentifier =
             authUser?.username ||
@@ -4014,7 +4014,6 @@ export const handleResyncPortals = async (req: Request, res: Response) => {
                     portal: item.portal,
                     username: item.username,
                     status: "error",
-                    verified: false,
                     message: `Service error checking ${item.portal}: ${err?.message || "Request timed out"}`,
                     lastSyncAt: nowIso,
                 };
