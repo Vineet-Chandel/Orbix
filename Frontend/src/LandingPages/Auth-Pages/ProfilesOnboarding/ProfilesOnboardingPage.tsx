@@ -1,6 +1,6 @@
 import { persistCodingProfiles } from "./saveCodingProfiles";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronUp, ShieldCheck } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
@@ -16,6 +16,16 @@ import { buildApiUrl } from "../../../api/apiClient";
 import { OwnershipVerificationModal } from "../../../components/verification/OwnershipVerificationModal";
 import { OwnershipStatusBadge } from "../../../components/verification/OwnershipStatusBadge";
 import { isPlatformVerificationSupported } from "../../../utils/platformVerificationSupport";
+
+interface CodingProfilesOAuthDraft {
+    userId: string;
+    profiles: Record<string, PortalProfileData>;
+    values: Record<string, string>;
+    savedProfiles: Record<string, PortalProfileData>;
+    savedValues: Record<string, string>;
+    deleted: string[];
+}
+const OAUTH_DRAFT_KEY = "orbix_coding_profiles_oauth_draft";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -132,13 +142,25 @@ const MobilePillAvatar = ({
 
 export default function ProfilesOnboardingPage() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const dispatch = useAppDispatch();
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+    const [oauthDraft] = useState<CodingProfilesOAuthDraft | null>(() => {
+        try {
+            if (searchParams.get("portal") !== "github" || !searchParams.has("status")) return null;
+            const draft = JSON.parse(sessionStorage.getItem(OAUTH_DRAFT_KEY) || "null");
+            return draft?.userId === user?.id && draft?.profiles && draft?.values && draft?.savedProfiles && draft?.savedValues && Array.isArray(draft?.deleted) ? draft : null;
+        } catch { return null; }
+    });
+    const handledOAuthReturn = useRef(false);
+    const linkedGitHubOnReturn = useRef(searchParams.get("status") === "success" && searchParams.get("action") === "linked" && searchParams.get("portal") === "github");
+
     // Connected profiles with rich crawled details (avatar, name, stats, verified)
     const [connectedProfiles, setConnectedProfiles] = useState<Record<string, PortalProfileData>>(() => {
+        if (oauthDraft) return oauthDraft.profiles;
         try {
             const saved = localStorage.getItem("orbix_connected_portals");
             if (saved) {
@@ -166,6 +188,7 @@ export default function ProfilesOnboardingPage() {
 
     // Raw input values for each portal
     const [portalValues, setPortalValues] = useState<Record<string, string>>(() => {
+        if (oauthDraft) return oauthDraft.values;
         try {
             const saved = localStorage.getItem("orbix_portals");
             if (saved) {
@@ -227,10 +250,27 @@ export default function ProfilesOnboardingPage() {
     });
 
     // Refs for dirty state tracking (production-level change detection)
-    const initialConnectedProfilesRef = useRef<Record<string, PortalProfileData>>({ ...connectedProfiles });
-    const initialPortalValuesRef = useRef<Record<string, string>>({ ...portalValues });
-    const deletedPortalsRef = useRef<Set<string>>(new Set());
+    const initialConnectedProfilesRef = useRef<Record<string, PortalProfileData>>({ ...(oauthDraft?.savedProfiles || connectedProfiles) });
+    const initialPortalValuesRef = useRef<Record<string, string>>({ ...(oauthDraft?.savedValues || portalValues) });
+    const deletedPortalsRef = useRef<Set<string>>(new Set(oauthDraft?.deleted || []));
     const userInteractedRef = useRef<boolean>(false);
+
+    // OAuth only reports the result here; ownership is refreshed from the server.
+    useEffect(() => {
+        if (handledOAuthReturn.current || searchParams.get("portal") !== "github" || !searchParams.has("status")) return;
+        handledOAuthReturn.current = true;
+        try { sessionStorage.removeItem(OAUTH_DRAFT_KEY); } catch { /* Storage may be disabled. */ }
+        const status = searchParams.get("status");
+        if (status === "success" && searchParams.get("action") === "linked") {
+            dispatch(fetchUserProfile({ force: true }));
+            toast.success("Your GitHub account ownership is verified.");
+        } else if (status === "error" || status === "cancelled") {
+            toast.error(searchParams.get("error") || "GitHub verification was cancelled. You can try again.");
+        }
+        const cleaned = new URLSearchParams(searchParams);
+        for (const key of ["status", "portal", "action", "username", "error"]) cleaned.delete(key);
+        setSearchParams(cleaned, { replace: true });
+    }, [searchParams, setSearchParams, dispatch, toast]);
 
     // Fetch initial saved links from backend on mount if authenticated and user hasn't interacted
     useEffect(() => {
@@ -300,8 +340,17 @@ export default function ProfilesOnboardingPage() {
 
                     if (Object.keys(loadedProfiles).length > 0) {
                         setConnectedProfiles((prev) => {
-                            const merged = { ...loadedProfiles, ...prev };
-                            initialConnectedProfilesRef.current = { ...merged };
+                            const merged = oauthDraft ? { ...loadedProfiles, ...prev } : { ...prev, ...loadedProfiles };
+                            if (oauthDraft) {
+                                for (const deleted of oauthDraft.deleted) delete merged[deleted];
+                                if (linkedGitHubOnReturn.current && loadedProfiles.github) merged.github = loadedProfiles.github;
+                                initialConnectedProfilesRef.current = {
+                                    ...oauthDraft.savedProfiles,
+                                    ...(linkedGitHubOnReturn.current && loadedProfiles.github ? { github: loadedProfiles.github } : {}),
+                                };
+                            } else {
+                                initialConnectedProfilesRef.current = { ...merged };
+                            }
                             try {
                                 localStorage.setItem("orbix_connected_portals", JSON.stringify(merged));
                             } catch {
@@ -507,6 +556,7 @@ export default function ProfilesOnboardingPage() {
 
         // 3. New valid unconnected inputs that differ from initial
         for (const [key, val] of Object.entries(portalValues)) {
+            if (connectedProfiles[key]) continue;
             const initialVal = initialPortalValuesRef.current[key] || "";
             if (val.trim() && val.trim() !== initialVal.trim()) {
                 const j = judgments[key];
@@ -1103,6 +1153,13 @@ export default function ProfilesOnboardingPage() {
                     portalId={verificationModalState.portalId}
                     username={verificationModalState.username}
                     onClose={() => setVerificationModalState(null)}
+                    onBeforeOAuthRedirect={() => {
+                        sessionStorage.setItem(OAUTH_DRAFT_KEY, JSON.stringify({
+                            userId: user?.id, profiles: connectedProfiles, values: portalValues,
+                            savedProfiles: initialConnectedProfilesRef.current, savedValues: initialPortalValuesRef.current,
+                            deleted: Array.from(deletedPortalsRef.current),
+                        }));
+                    }}
                     onVerifiedSuccess={(res) => {
                         const pId = res.portal.toLowerCase();
                         setConnectedProfiles((prev) => {

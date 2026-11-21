@@ -32,7 +32,7 @@ export interface InitiateVerificationResult {
     token?: string; // Plaintext token returned ONLY once to caller
     tokenDisplayPrefix?: string;
     instructions?: string;
-    profileSettingsUrl?: string;
+    profileSettingsUrl?: string | undefined;
     expiresAt?: Date | string;
     alreadyVerified?: boolean;
     requiresOAuth?: boolean;
@@ -659,11 +659,11 @@ export class PlatformVerificationService {
             ]);
         }
 
-        try {
-            syncLeaderboardForUser(userId).catch(() => {});
-        } catch {
-            // Non-blocking
-        }
+        if (!dbClient) this.refreshOwnershipAfterCommit(userId);
+    }
+
+    public refreshOwnershipAfterCommit(userId: string): void {
+        try { void syncLeaderboardForUser(userId).catch(() => {}); } catch { /* Best effort after commit. */ }
     }
 }
 

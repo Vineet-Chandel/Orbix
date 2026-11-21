@@ -16,7 +16,7 @@ import { getPortalIcon } from "../../utils/portalIcons";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { usePlatformVerification } from "../../hooks/usePlatformVerification";
 import { OrbixLoader } from "../ui/loader";
-import { buildApiUrl } from "../../api/apiClient";
+import { startGitHubOwnershipVerification } from "../../api/platformVerificationApi";
 import type { ConfirmVerificationSuccessResponse } from "../../types/platformVerification";
 
 export interface OwnershipVerificationModalProps {
@@ -25,6 +25,7 @@ export interface OwnershipVerificationModalProps {
     username: string;
     onClose: () => void;
     onVerifiedSuccess?: (res: ConfirmVerificationSuccessResponse) => void;
+    onBeforeOAuthRedirect?: () => void;
 }
 
 export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProps> = ({
@@ -33,6 +34,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     username,
     onClose,
     onVerifiedSuccess,
+    onBeforeOAuthRedirect,
 }) => {
     const config = PORTALS[portalId];
     const isGitHub = portalId.toLowerCase() === "github";
@@ -64,6 +66,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
 
     const [isSuccess, setIsSuccess] = useState(false);
     const [oauthRedirecting, setOauthRedirecting] = useState(false);
+    const [oauthError, setOauthError] = useState<string | null>(null);
 
     // Initial initiation when modal opens
     useEffect(() => {
@@ -73,7 +76,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     }, [isOpen, portalId, username, isGitHub, challenge, isInitiating, startVerification]);
 
     const handleCloseModal = () => {
-        if (isConfirming || isCancelling) return;
+        if (isConfirming || isCancelling || oauthRedirecting) return;
         if (challenge && !isSuccess) {
             cancelChallenge(portalId);
         }
@@ -85,8 +88,8 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     const { handleBackdropClick } = useModalDismiss({
         isOpen,
         onClose: handleCloseModal,
-        disableEscape: isConfirming || isCancelling,
-        disableBackdrop: isConfirming || isCancelling,
+        disableEscape: isConfirming || isCancelling || oauthRedirecting,
+        disableBackdrop: isConfirming || isCancelling || oauthRedirecting,
     });
 
     if (!isOpen || typeof document === "undefined") return null;
@@ -105,47 +108,17 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     };
 
     const handleGitHubOAuth = async () => {
+        if (oauthRedirecting) return;
         setOauthRedirecting(true);
-        const currentPath = window.location.pathname + window.location.search;
-        const token = (() => {
-            try {
-                return localStorage.getItem("orbix_token") || "";
-            } catch {
-                return "";
-            }
-        })();
-
+        setOauthError(null);
         try {
-            const linkEndpoint = buildApiUrl("/api/auth/github/link");
-            const res = await fetch(linkEndpoint, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                credentials: "include",
-                body: JSON.stringify({
-                    returnTo: currentPath,
-                    portalUsername: username,
-                }),
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                if (data.url) {
-                    window.location.href = data.url;
-                    return;
-                }
-            }
-        } catch {
-            // ignore
+            const url = await startGitHubOwnershipVerification(username, window.location.href);
+            onBeforeOAuthRedirect?.();
+            window.location.assign(url);
+        } catch (error) {
+            setOauthError(error instanceof Error ? error.message : "Could not start GitHub verification. Please retry.");
+            setOauthRedirecting(false);
         }
-
-        const fallbackUrl = buildApiUrl(
-            `/api/auth/github/link?returnTo=${encodeURIComponent(currentPath)}&portalUsername=${encodeURIComponent(username)}`
-        );
-        window.location.href = fallbackUrl;
     };
 
     return createPortal(
@@ -169,11 +142,11 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                         <div className="min-w-0">
                             <h3
                                 id="ownershipVerificationTitle"
-                                className="text-base sm:text-lg font-black tracking-tight text-black truncate"
+                                className="text-base sm:text-lg font-black tracking-tight text-black leading-snug break-words"
                             >
                                 Verify {config?.name || portalId} Ownership
                             </h3>
-                            <p className="text-xs font-mono font-bold text-neutral-600 truncate">
+                            <p className="text-xs font-mono font-bold text-neutral-600 break-all">
                                 @{username}
                             </p>
                         </div>
@@ -182,7 +155,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                     <button
                         type="button"
                         onClick={handleCloseModal}
-                        disabled={isConfirming}
+                        disabled={isConfirming || oauthRedirecting}
                         className="p-1 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer disabled:opacity-50"
                         aria-label="Close modal"
                     >
@@ -210,68 +183,34 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                             <div className="flex items-center gap-2">
                                 {getPortalIcon("github", "w-5 h-5 text-black")}
                                 <span className="text-xs font-black uppercase tracking-wider text-black">
-                                    OAuth Identity Binding
+                                    Verify with GitHub
                                 </span>
                             </div>
                             <p className="text-xs font-bold text-neutral-700 leading-relaxed">
-                                GitHub account ownership is cryptographically bound using your immutable numeric GitHub user ID via GitHub OAuth.
+                                Verify will open GitHub so you can authorize Orbix.
                             </p>
                             <p className="text-xs font-bold text-neutral-700 leading-relaxed">
-                                Click the button below to authorize GitHub. Once authenticated, your account will be instantly verified.
+                                Sign in with the GitHub account shown above. You’ll return here after verification.
                             </p>
                         </div>
 
-                        {hookError && (
+                        {(oauthError || hookError) && (
                             <div className="p-3 rounded-lg border-2 border-black bg-rose-50 text-rose-900 text-xs font-bold flex items-center gap-2 shadow-[2px_2px_0px_#dc2626]">
                                 <AlertCircle className="w-4 h-4 stroke-[2.5] shrink-0 text-rose-700" />
-                                <span>{hookError}</span>
+                                <span role="alert">{oauthError || hookError}</span>
                             </div>
                         )}
 
-                        <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-2">
-                            <button
-                                type="button"
-                                onClick={handleCloseModal}
-                                disabled={isConfirming || isCancelling}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black uppercase shadow-[2px_2px_0px_#000] cursor-pointer transition-all"
-                            >
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                            <button type="button" onClick={handleCloseModal} disabled={oauthRedirecting}
+                                className="min-h-11 min-w-0 px-3 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 whitespace-nowrap">
                                 Cancel
                             </button>
-                            <button
-                                type="button"
-                                onClick={handleGitHubOAuth}
-                                disabled={oauthRedirecting || isConfirming}
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black uppercase tracking-wide shadow-[2px_2px_0px_#000] cursor-pointer transition-all"
-                            >
-                                {oauthRedirecting ? (
-                                    <>
-                                        <OrbixLoader size="xs" variant="minimal" />
-                                        <span>Redirecting...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        {getPortalIcon("github", "w-4 h-4 text-black")}
-                                        <span>Authorize OAuth</span>
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleConfirm}
-                                disabled={isConfirming || cooldownSeconds > 0}
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] text-black hover:bg-[#ffd93d] text-xs font-black uppercase tracking-wide shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none cursor-pointer transition-all"
-                            >
-                                {isConfirming ? (
-                                    <>
-                                        <OrbixLoader size="xs" variant="minimal" />
-                                        <span>Verifying...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Verify Ownership</span>
-                                    </>
-                                )}
+                            <button type="button" onClick={handleGitHubOAuth} disabled={oauthRedirecting} aria-busy={oauthRedirecting}
+                                className="min-h-11 min-w-0 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ffd93d] text-xs font-black shadow-[3px_3px_0px_#000] cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap">
+                                {oauthRedirecting ? <span aria-hidden="true" className="w-4 h-4 shrink-0 border-2 border-black border-t-transparent rounded-full animate-spin" /> :
+                                    <span className="w-4 h-4 shrink-0 flex items-center justify-center" aria-hidden="true">{getPortalIcon("github", "w-4 h-4")}</span>}
+                                <span>{oauthRedirecting ? "Opening…" : "Verify"}</span>
                             </button>
                         </div>
                     </div>

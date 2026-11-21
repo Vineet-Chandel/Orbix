@@ -1,3 +1,4 @@
+import { resolveGitHubLinkReturnTo, assertGitHubLinkIdentity } from "./githubLinkFlow.js";
 // Backend/src/services/auth/oauthService.ts
 import crypto from "crypto";
 import type { Request, Response } from "express";
@@ -9,6 +10,7 @@ import { createSession } from "../session/sessionService.js";
 import { OnboardingEmailService } from "../email/onboardingEmailService.js";
 import { checkHandleAvailabilityAcrossPlatform } from "../../validators/usernamePolicy.js";
 import { platformVerificationService } from "../verification/platformVerificationService.js";
+import { assertVerificationSchemaReady, resetSchemaStateCache, verificationSchemaRequiredError } from "../verification/schemaCompatibility.js";
 
 const DEFAULT_AVATAR_URL = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
 const ACCESS_TOKEN_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -34,9 +36,10 @@ export interface OAuthStatePayload {
     action?: "login" | "link";
     userId?: string;
     sessionId?: string;
-    targetUsername?: string;
+    targetUsername?: string | undefined;
     returnTo?: string | undefined;
     deviceId?: string | undefined;
+    redirectUri?: string | undefined;
     createdAt: number;
 }
 
@@ -61,11 +64,29 @@ export class OAuthService {
     }
 
     public static getFrontendUrl(): string {
-        return process.env.FRONTEND_URL || "http://localhost:5173";
+        const raw = process.env.FRONTEND_URL || "http://localhost:5173";
+        return raw.trim().replace(/\/+$/, "");
     }
 
     public static getBackendUrl(): string {
-        return process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`;
+        const raw = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`;
+        return raw.trim().replace(/\/+$/, "");
+    }
+
+    public static getGitHubCallbackUrl(): string {
+        const raw = process.env.GITHUB_CALLBACK_URL;
+        if (raw && typeof raw === "string" && raw.trim().length > 0) {
+            return raw.trim().replace(/\/+$/, "");
+        }
+        return `${this.getBackendUrl()}/api/auth/github/callback`;
+    }
+
+    public static getGoogleCallbackUrl(): string {
+        const raw = process.env.GOOGLE_CALLBACK_URL;
+        if (raw && typeof raw === "string" && raw.trim().length > 0) {
+            return raw.trim().replace(/\/+$/, "");
+        }
+        return `${this.getBackendUrl()}/api/auth/google/callback`;
     }
 
     private static getAuthCookieOptions() {
@@ -88,11 +109,13 @@ export class OAuthService {
         deviceId?: string
     ): Promise<string> {
         const state = crypto.randomBytes(32).toString("hex");
+        const redirectUri = provider === "github" ? this.getGitHubCallbackUrl() : this.getGoogleCallbackUrl();
         const payload: OAuthStatePayload = {
             state,
             provider,
             returnTo: returnTo || "/dashboard",
             deviceId: deviceId || undefined,
+            redirectUri,
             createdAt: Date.now(),
         };
 
@@ -158,6 +181,7 @@ export class OAuthService {
         }
 
         const state = crypto.randomBytes(32).toString("hex");
+        const redirectUri = this.getGitHubCallbackUrl();
         const payload: OAuthStatePayload = {
             state,
             action: "link",
@@ -165,8 +189,9 @@ export class OAuthService {
             userId: cleanUserId,
             sessionId: cleanSessionId,
             targetUsername: targetUsername || undefined,
-            returnTo: returnTo || "/dashboard",
+            returnTo: resolveGitHubLinkReturnTo(returnTo, this.getFrontendUrl()),
             deviceId: deviceId || undefined,
+            redirectUri,
             createdAt: Date.now(),
         };
 
@@ -396,18 +421,16 @@ export class OAuthService {
     /**
      * Build Google OAuth Authorization URL
      */
-    public static getGoogleAuthUrl(state: string): string {
+    public static getGoogleAuthUrl(state: string, customRedirectUri?: string): string {
         const clientId = process.env.GOOGLE_CLIENT_ID;
         if (!clientId) {
             throw new Error("GOOGLE_CLIENT_ID is not configured in backend environment variables");
         }
 
-        const callbackUrl =
-            process.env.GOOGLE_CALLBACK_URL ||
-            `${this.getBackendUrl()}/api/auth/google/callback`;
+        const callbackUrl = customRedirectUri || this.getGoogleCallbackUrl();
 
         const params = new URLSearchParams({
-            client_id: clientId,
+            client_id: clientId.trim(),
             redirect_uri: callbackUrl,
             response_type: "code",
             scope: "openid email profile",
@@ -422,18 +445,16 @@ export class OAuthService {
     /**
      * Build GitHub OAuth Authorization URL
      */
-    public static getGitHubAuthUrl(state: string): string {
+    public static getGitHubAuthUrl(state: string, customRedirectUri?: string): string {
         const clientId = process.env.GITHUB_CLIENT_ID;
         if (!clientId) {
             throw new Error("GITHUB_CLIENT_ID is not configured in backend environment variables");
         }
 
-        const callbackUrl =
-            process.env.GITHUB_CALLBACK_URL ||
-            `${this.getBackendUrl()}/api/auth/github/callback`;
+        const callbackUrl = customRedirectUri || this.getGitHubCallbackUrl();
 
         const params = new URLSearchParams({
-            client_id: clientId,
+            client_id: clientId.trim(),
             redirect_uri: callbackUrl,
             scope: "read:user user:email",
             state,
@@ -445,12 +466,10 @@ export class OAuthService {
     /**
      * Exchange Google authorization code and fetch verified profile
      */
-    public static async exchangeGoogleCode(code: string): Promise<NormalizedOAuthProfile> {
+    public static async exchangeGoogleCode(code: string, customRedirectUri?: string): Promise<NormalizedOAuthProfile> {
         const clientId = process.env.GOOGLE_CLIENT_ID;
         const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-        const callbackUrl =
-            process.env.GOOGLE_CALLBACK_URL ||
-            `${this.getBackendUrl()}/api/auth/google/callback`;
+        const callbackUrl = customRedirectUri || this.getGoogleCallbackUrl();
 
         if (!clientId || !clientSecret) {
             throw new Error("Google OAuth credentials are not properly configured");
@@ -462,8 +481,8 @@ export class OAuthService {
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
                 code,
-                client_id: clientId,
-                client_secret: clientSecret,
+                client_id: clientId.trim(),
+                client_secret: clientSecret.trim(),
                 redirect_uri: callbackUrl,
                 grant_type: "authorization_code",
             }),
@@ -511,12 +530,10 @@ export class OAuthService {
     /**
      * Exchange GitHub authorization code and fetch verified profile & primary email
      */
-    public static async exchangeGitHubCode(code: string): Promise<NormalizedOAuthProfile> {
+    public static async exchangeGitHubCode(code: string, customRedirectUri?: string): Promise<NormalizedOAuthProfile> {
         const clientId = process.env.GITHUB_CLIENT_ID;
         const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-        const callbackUrl =
-            process.env.GITHUB_CALLBACK_URL ||
-            `${this.getBackendUrl()}/api/auth/github/callback`;
+        const callbackUrl = customRedirectUri || this.getGitHubCallbackUrl();
 
         if (!clientId || !clientSecret) {
             throw new Error("GitHub OAuth credentials are not properly configured");
@@ -524,22 +541,23 @@ export class OAuthService {
 
         // 1. Exchange code for access token
         const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+            signal: AbortSignal.timeout(10_000),
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Accept: "application/json",
             },
             body: JSON.stringify({
-                client_id: clientId,
-                client_secret: clientSecret,
-                code,
+                client_id: clientId.trim(),
+                client_secret: clientSecret.trim(),
+                code: code.trim(),
                 redirect_uri: callbackUrl,
             }),
         });
 
         const tokenData = await tokenRes.json().catch(() => null);
         if (!tokenRes.ok || !tokenData?.access_token) {
-            console.error("GitHub token exchange error:", tokenData);
+            console.error("GitHub token exchange failed:", { status: tokenRes.status, code: tokenData?.error });
             throw new Error(tokenData?.error_description || tokenData?.error || "Failed to exchange GitHub authorization code");
         }
 
@@ -547,6 +565,7 @@ export class OAuthService {
 
         // 2. Fetch User Profile
         const userRes = await fetch("https://api.github.com/user", {
+            signal: AbortSignal.timeout(10_000),
             headers: {
                 Authorization: `Bearer ${accessToken}`,
                 "User-Agent": "Orbix-OAuth-Platform",
@@ -568,6 +587,7 @@ export class OAuthService {
 
         try {
             const emailsRes = await fetch("https://api.github.com/user/emails", {
+                signal: AbortSignal.timeout(5_000),
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                     "User-Agent": "Orbix-OAuth-Platform",
@@ -637,6 +657,9 @@ export class OAuthService {
             throw new Error("Missing authenticated user ID for account linking");
         }
 
+        assertGitHubLinkIdentity(targetUsername, profile.usernameCandidate);
+        await assertVerificationSchemaReady();
+
         const numericProviderId = String(profile.providerId).trim();
         if (!numericProviderId) {
             throw new Error("Missing immutable GitHub provider ID from provider profile");
@@ -654,7 +677,8 @@ export class OAuthService {
 
             // 1. Fetch authenticated user from database with row lock FOR UPDATE
             const userRes = await client.query(
-                `SELECT id, username, email, account_type AS "accountType", github_id AS "githubId"
+                `SELECT id, username, email, firstname AS "firstName", lastname AS "lastName",
+                        termsaccepted AS "termsAccepted", account_type AS "accountType", github_id AS "githubId"
                  FROM public.users
                  WHERE id = $1
                  FOR UPDATE;`,
@@ -731,6 +755,15 @@ export class OAuthService {
                 [numericProviderId, userId]
             );
 
+            // The selected identity was proven by GitHub. Update its saved handle
+            // before recording proof, so identity-reset triggers run before verification.
+            await client.query(
+                `UPDATE public.user_links SET portal_username = $1, link = $2, updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = $3 AND LOWER(TRIM(portal)) = 'github'
+                   AND LOWER(TRIM(portal_username)) IS DISTINCT FROM LOWER(TRIM($1));`,
+                [resolvedHandle, `https://github.com/${resolvedHandle}`, userId]
+            );
+
             // 7. Authoritative ownership recording in user_links within same transaction
             await platformVerificationService.recordVerifiedOwnership(
                 userId,
@@ -747,6 +780,7 @@ export class OAuthService {
 
             if (shouldManageTransaction) {
                 await client.query("COMMIT;");
+                platformVerificationService.refreshOwnershipAfterCommit(userId);
             }
 
             // 8. Update Redis details cache after successful commit
@@ -755,6 +789,9 @@ export class OAuthService {
                 gmail: currentUser.email,
                 username: currentUser.username,
                 accountType: currentUser.accountType || "personal",
+                firstName: currentUser.firstName || "",
+                lastName: currentUser.lastName || "",
+                termsAccepted: Boolean(currentUser.termsAccepted),
             }).catch(() => {});
 
             return {
@@ -765,6 +802,11 @@ export class OAuthService {
         } catch (err: any) {
             if (shouldManageTransaction) {
                 await client.query("ROLLBACK;").catch(() => {});
+            }
+
+            if (err?.code === "42703" || err?.code === "42P01") {
+                resetSchemaStateCache();
+                throw verificationSchemaRequiredError();
             }
 
             // Cleanly normalize PostgreSQL database unique constraint violations

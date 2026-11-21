@@ -82,7 +82,8 @@ SELECT
     END,
     id, user_id, username, portal, portal_username, link, raw_input,
     verified, display_name, avatar_url, stats, is_public, last_sync_status,
-    last_sync_at, created_at, updated_at, last_error, snapshot, retry_count
+    last_sync_at, created_at, updated_at, to_jsonb(ul)->>'last_error', to_jsonb(ul)->'snapshot',
+    (to_jsonb(ul)->>'retry_count')::INT
 FROM public.user_links ul
 WHERE ul.user_id IS NULL OR ul.user_id NOT IN (SELECT id FROM public.users);
 

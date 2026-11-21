@@ -2,6 +2,8 @@
 import express, { type Request, type Response } from "express";
 import { OAuthService } from "../../services/auth/oauthService.js";
 import { authenticate, resolveAuthenticatedUser } from "../../middlewares/auth.middleware.js";
+import { assertVerificationSchemaReady } from "../../services/verification/schemaCompatibility.js";
+import { checkVerificationRateLimit } from "../../services/verification/verificationRateLimiter.js";
 
 export const oauthRouter = express.Router();
 
@@ -152,7 +154,18 @@ oauthRouter.all("/github/link", authenticate, async (req: Request, res: Response
             });
         }
 
-        const returnTo = (req.body?.returnTo || req.query.returnTo as string) || "/dashboard";
+        const limit = await checkVerificationRateLimit(authUser.id, "initiate", 10, 15 * 60);
+        if (!limit.allowed) {
+            if (limit.code === "RATE_LIMIT_EXCEEDED") res.setHeader("Retry-After", String(limit.resetInSeconds));
+            return res.status(limit.code === "RATE_LIMIT_EXCEEDED" ? 429 : 503).json({
+                success: false, code: limit.code,
+                message: limit.error || "GitHub verification is temporarily unavailable. Please retry.",
+                resetInSeconds: limit.resetInSeconds,
+            });
+        }
+        await assertVerificationSchemaReady();
+
+        const returnTo = (req.body?.returnTo || req.query.returnTo as string) || "/onboarding";
         const portalUsername = (req.body?.portalUsername || req.query.portalUsername as string) || undefined;
         const deviceId =
             (req.headers["x-orbix-device-id"] as string) ||
@@ -176,6 +189,13 @@ oauthRouter.all("/github/link", authenticate, async (req: Request, res: Response
         return res.redirect(authUrl);
     } catch (err: any) {
         console.error("Initiate GitHub Account Link error:", err);
+        if (req.method === "POST" || req.query.redirect === "false" || req.headers.accept?.includes("application/json")) {
+            return res.status(err.statusCode || 503).json({
+                success: false,
+                code: err.code || "GITHUB_LINK_FAILED",
+                message: err.message || "Could not start GitHub verification. Please retry.",
+            });
+        }
         const frontendUrl = OAuthService.getFrontendUrl();
         return res.redirect(
             `${frontendUrl}/dashboard?error=${encodeURIComponent(
@@ -197,6 +217,8 @@ oauthRouter.get(["/github/callback", "/github/link/callback"], async (req: Reque
         const code = req.query.code as string;
         const incomingState = req.query.state as string;
         const providerError = req.query.error as string;
+        const providerErrorDescription = req.query.error_description as string;
+        const errorMessage = providerErrorDescription || providerError;
 
         if (providerError) {
             if (incomingState) {
@@ -212,14 +234,14 @@ oauthRouter.get(["/github/callback", "/github/link/callback"], async (req: Reque
                 const sep = statePayload.returnTo.includes("?") ? "&" : "?";
                 return res.redirect(
                     `${statePayload.returnTo}${sep}status=cancelled&error=${encodeURIComponent(
-                        "GitHub account linking was cancelled on GitHub"
+                        errorMessage || "GitHub account linking was cancelled on GitHub"
                     )}&portal=github`
                 );
             }
 
             return res.redirect(
                 `${frontendUrl}/auth/signin?error=${encodeURIComponent(
-                    `GitHub sign-in was cancelled or denied: ${providerError}`
+                    `GitHub sign-in was cancelled or denied: ${errorMessage}`
                 )}`
             );
         }
@@ -236,7 +258,7 @@ oauthRouter.get(["/github/callback", "/github/link/callback"], async (req: Reque
         statePayload = await OAuthService.validateState(req, res, incomingState, "github");
 
         // 2. Exchange authorization code for user profile
-        const profile = await OAuthService.exchangeGitHubCode(code);
+        const profile = await OAuthService.exchangeGitHubCode(code, statePayload.redirectUri);
 
         // 3. ISOLATED ACCOUNT-LINKING TRANSACTION:
         if (statePayload.action === "link") {

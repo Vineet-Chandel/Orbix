@@ -161,6 +161,9 @@ apiRouter.use('/', authRouter);
 // Mount centralized apiRouter exclusively under /api
 app.use('/api', apiRouter);
 
+// Fallback alias for OAuth callbacks in case external providers or proxies omit /api prefix
+app.use('/auth', oauthRouter);
+
 // Root health and service check (for ELB, reverse proxies & process managers)
 app.get('/health', (req: Request, res: Response) => {
     res.status(200).json({
