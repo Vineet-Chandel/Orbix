@@ -1,7 +1,7 @@
 import { beginSignOut } from "../../api/authRequests";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, GraduationCap, Award, UserPlus } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, Briefcase, Settings, Compass, GraduationCap, UserPlus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
@@ -38,7 +38,7 @@ export type SidebarTab =
     | "workspace"
     | "settings";
 
-export type CollapsibleSection = "events" | "documentation" | "workspaces";
+export type CollapsibleSection = "events" | "workspaces";
 
 interface SidebarProps {
     activeTab?: SidebarTab;
@@ -66,7 +66,7 @@ export const Sidebar = ({
     const [isHovered, setIsHovered] = useState(false);
     const isExpanded = isOpen || isHovered || isProfileMenuOpen;
 
-    // Collapsible accordion dropdown state: only one section can be open at a time ("events" | "documentation" | "workspaces" | null)
+    // Collapsible accordion dropdown state: only one section can be open at a time ("events" | "workspaces" | null)
     const [openSection, setOpenSection] = useState<CollapsibleSection | null>(() => {
         if (
             location.pathname.startsWith("/events") ||
@@ -78,13 +78,6 @@ export const Sidebar = ({
             location.pathname.startsWith("/activity")
         ) {
             return "events";
-        }
-        if (
-            location.pathname.startsWith("/blogs") ||
-            location.pathname.startsWith("/blog") ||
-            location.pathname.startsWith("/docs")
-        ) {
-            return "documentation";
         }
         if (location.pathname.startsWith("/workspace")) {
             return "workspaces";
@@ -118,14 +111,6 @@ export const Sidebar = ({
             location.pathname.startsWith("/activity")
         ) {
             setOpenSection("events");
-        } else if (
-            activeTab === "docs" ||
-            activeTab === "blogs" ||
-            location.pathname.startsWith("/docs") ||
-            location.pathname.startsWith("/blog") ||
-            location.pathname.startsWith("/blogs")
-        ) {
-            setOpenSection("documentation");
         } else if (
             activeTab === "codexa" ||
             activeTab === "evolexa" ||
@@ -375,47 +360,7 @@ export const Sidebar = ({
             path: "/activity",
             isComingSoon: false,
         },
-        {
-            id: "wallet" as SidebarTab,
-            label: "Certificates",
-            icon: (
-                <Award className="w-5 h-5 flex-shrink-0" />
-            ),
-            path: "/wallet",
-            isComingSoon: false,
-        },
     ];
-
-    // Documentation Items: Blogs, Docs
-    const documentationItems = [
-        {
-            id: "blogs" as SidebarTab,
-            label: "Blogs",
-            icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-            ),
-            path: "/blogs",
-        },
-        {
-            id: "docs" as SidebarTab,
-            label: "Docs",
-            icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <line x1="10" y1="9" x2="8" y2="9" />
-                </svg>
-            ),
-            path: "/docs",
-        },
-    ];
-
-
 
     const renderNavItem = (item: {
         id: SidebarTab;
@@ -428,9 +373,15 @@ export const Sidebar = ({
         const isCurrentActive =
             activeTab === item.id ||
             (item.path && location.pathname === item.path) ||
-            (item.id === "activity" && (location.pathname.startsWith("/activity") || location.pathname.startsWith("/applications") || activeTab === "applications")) ||
-            (item.id === "docs" && location.pathname.startsWith("/docs")) ||
-            (item.id === "blogs" && (location.pathname.startsWith("/blogs") || location.pathname.startsWith("/blog")));
+            (item.id === "activity" && (
+                location.pathname.startsWith("/activity") ||
+                location.pathname.startsWith("/applications") ||
+                location.pathname.startsWith("/wallet") ||
+                location.pathname.startsWith("/certificates") ||
+                activeTab === "applications" ||
+                activeTab === "wallet" ||
+                activeTab === "certificates"
+            ));
 
         return (
             <Link
@@ -848,60 +799,7 @@ export const Sidebar = ({
                     </AnimatePresence>
                 </div>
 
-                {/* Divider between Workspaces & Documentation */}
-                <div className={`my-1.5 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
-                {/* Section 4: Documentation Dropdown Accordion (Blogs, Docs) */}
-                <div className="space-y-1 overflow-x-hidden">
-                    {(!isExpanded && openSection === "documentation") ? null : (
-                        <button
-                            type="button"
-                            onClick={() => handleToggleSection("documentation")}
-                            className={`flex items-center transition-all group select-none cursor-pointer ${
-                                isExpanded
-                                    ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
-                                    : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
-                            } ${openSection === "documentation" ? "bg-black/[0.04]" : ""}`}
-                            title={!isExpanded ? "Documentation" : undefined}
-                            aria-expanded={openSection === "documentation"}
-                        >
-                            <div className={`flex items-center min-w-0 ${isExpanded ? "" : "justify-center"}`}>
-                                {!isExpanded && openSection !== "documentation" && (
-                                    <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                        <BookOpen className="w-4.5 h-4.5 text-neutral-700 group-hover:text-black stroke-[2.2] flex-shrink-0" />
-                                    </span>
-                                )}
-                                {isExpanded && (
-                                    <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
-                                        Documentation
-                                    </span>
-                                )}
-                            </div>
-                            {isExpanded && (
-                                <ChevronDown
-                                    className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
-                                        openSection === "documentation" ? "rotate-180" : ""
-                                    }`}
-                                />
-                            )}
-                        </button>
-                    )}
-
-                    <AnimatePresence initial={false}>
-                        {openSection === "documentation" && (
-                            <motion.div
-                                key="documentation-items"
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                                className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
-                            >
-                                {documentationItems.map(renderNavItem)}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
             </div>
 
             {/* Bottom Section: Profile Card (DEAD CENTER avatar when collapsed) */}
@@ -1023,7 +921,7 @@ export const Sidebar = ({
                             <svg className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
-                            <span className="truncate">Developer Profile</span>
+                            <span className="truncate">Profile</span>
                         </Link>
 
                         {/* College Verification Shortcut (Students only) */}

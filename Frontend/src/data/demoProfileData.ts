@@ -1388,7 +1388,7 @@ export const demoDevelopmentAnalytics: DevelopmentAnalyticsData = {
     topRepositories: [
         {
             name: "orbix-core",
-            description: "High-performance developer profile analytics engine and multi-platform aggregator.",
+            description: "High-performance profile analytics engine and multi-platform aggregator.",
             stars: 680,
             forks: 124,
             language: "TypeScript",

@@ -173,7 +173,7 @@ export const ProfilePrivacyDocumentary: React.FC = () => {
                 </h1>
 
                 <p className="text-base sm:text-lg font-bold text-neutral-700 leading-relaxed max-w-4xl">
-                    An exhaustive architectural analysis of developer profile visibility in Orbix. Explores deterministic data gating, zero-lag cascading deactivations, multi-tier cache invalidation, and digital card ownership isolation.
+                    An exhaustive architectural analysis of profile visibility in Orbix. Explores deterministic data gating, zero-lag cascading deactivations, multi-tier cache invalidation, and digital card ownership isolation.
                 </p>
 
                 {/* Hero Banner Visual */}

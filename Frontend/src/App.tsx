@@ -18,6 +18,7 @@ import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
 import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
 import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
 import { ScrollToTop } from "./components/ScrollToTop";
+import NotFoundPage from "./pages/NotFoundPage";
 
 const AnnouncementPermalinkPage = lazyWithRetry(() => import("./app/Club/Announcements/AnnouncementPermalinkPage"));
 const MemberAnnouncementsPage = lazyWithRetry(() => import("./app/Club/Announcements/MemberAnnouncementsPage"));
@@ -30,7 +31,6 @@ const SignUpPage = lazyWithRetry(() => import('./LandingPages/Auth-Pages/Signup/
 const OAuthCallbackPage = lazyWithRetry(() => import('./LandingPages/Auth-Pages/OAuthCallbackPage'));
 const CustomersPage = lazyWithRetry(() => import("./LandingPages/Customers/Landing"));
 const PricingPage = lazyWithRetry(() => import("./LandingPages/Pricing/Landing"));
-const SupportPage = lazyWithRetry(() => import("./LandingPages/Support/Landing"));
 const PlatformPage = lazyWithRetry(() => import("./LandingPages/Platform/Landing"));
 const BlogLanding = lazyWithRetry(() => import("./LandingPages/Blog/Landing"));
 const BlogCollectionPage = lazyWithRetry(() => import("./LandingPages/Blog/BlogCollectionPage"));
@@ -138,7 +138,6 @@ const App = () => {
                 <Route path="/clubs" element={<AuthenticatedClubRedirect />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
-                <Route path="/support" element={<SupportPage />} />
 
                 {/* Legal & Minor Attendee Consent Routes */}
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
@@ -262,12 +261,13 @@ const App = () => {
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/resume" element={<Dashboard />} />
                   <Route path="/projects" element={<Dashboard />} />
-                  <Route path="/wallet" element={<Dashboard />} />
-                  <Route path="/certificates" element={<Dashboard />} />
+                  <Route path="/wallet" element={<Navigate to="/activity?tab=certificates" replace />} />
+                  <Route path="/certificates" element={<Navigate to="/activity?tab=certificates" replace />} />
                   <Route path="/workspace" element={<Dashboard />} />
                   <Route path="/workspace/:clubId" element={<Dashboard />} />
                   <Route path="/workspace/:clubId/:section" element={<Dashboard />} />
                 </Route>
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
           </OrbixErrorBoundary>

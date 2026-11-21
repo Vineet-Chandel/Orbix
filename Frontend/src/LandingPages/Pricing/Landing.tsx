@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
 
 export default function PricingPage() {
@@ -206,12 +206,13 @@ export default function PricingPage() {
                         </div>
 
                         <div className="pt-8">
-                            <Link
-                                to="/support"
-                                className="w-full h-11 flex items-center justify-center rounded-full border border-slate-300 font-semibold text-slate-800 text-xs sm:text-sm hover:bg-slate-50 transition-all active:scale-98 shadow-sm"
+                            <button
+                                type="button"
+                                onClick={() => handleSelectPlan('enterprise')}
+                                className="w-full h-11 flex items-center justify-center rounded-full border border-slate-300 font-semibold text-slate-800 text-xs sm:text-sm hover:bg-slate-50 transition-all active:scale-98 shadow-sm cursor-pointer"
                             >
                                 Talk to Enterprise Sales
-                            </Link>
+                            </button>
                         </div>
                     </div>
                 </div>

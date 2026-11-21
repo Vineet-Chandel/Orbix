@@ -53,7 +53,6 @@ export const ScrollToTop: React.FC = () => {
             "/club/status": "Club Status — Orbix",
             "/customers": "Customers — Orbix",
             "/pricing": "Pricing — Orbix",
-            "/support": "Support — Orbix",
             "/platform": "Platform — Orbix",
             "/platforms": "Platform Integrations — Orbix",
             "/blogs": "Blogs — Orbix",

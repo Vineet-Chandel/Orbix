@@ -25,7 +25,7 @@ import {
     Copy,
     WifiOff,
 } from "lucide-react";
-import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
+import { OrbixLoader, OrbixLoaderIcon, OrbixButton } from "../../components/ui/loader";
 import { type ExploreDeveloper } from "../../utils/profileApi";
 import { lazyWithRetry } from "../../utils/lazyWithRetry";
 const PublicProfilePage = lazyWithRetry(() => import("../Profile/PublicProfilePage"));
@@ -386,7 +386,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
         dispatch(clearExploreError());
         if (activeTab === "explore") {
             await fetchPage(1, true);
-            toast.success("Public developer profiles updated", { title: "Refreshed" });
+            toast.success("Public profiles updated", { title: "Refreshed" });
         } else if (activeTab === "connections") {
             await dispatch(fetchConnectionsThunk({ limit: 50, isInitial: true }));
             toast.success("Connections list updated", { title: "Refreshed" });
@@ -773,7 +773,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                             )}
                         </div>
                         <p className="text-xs sm:text-sm font-bold text-neutral-700">
-                            Discover public developer profiles, review verified multi-platform analytics, and manage peer connections.
+                            Discover public profiles, review verified multi-platform analytics, and manage peer connections.
                         </p>
                     </div>
 
@@ -781,11 +781,18 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                         <button
                             type="button"
                             onClick={handleRefresh}
-                            disabled={isRefreshing}
-                            className="p-2.5 rounded-xl bg-white text-black hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
-                            title="Refresh developer list"
+                            disabled={isRefreshing || (activeTab === "explore" && explore.isLoading)}
+                            className="p-2.5 rounded-xl bg-white text-black hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-70 transition-all flex items-center justify-center"
+                            title={isRefreshing || (activeTab === "explore" && explore.isLoading) ? "Updating developers..." : "Refresh developer list"}
+                            aria-label={isRefreshing || (activeTab === "explore" && explore.isLoading) ? "Updating developers" : "Refresh developer list"}
                         >
-                            <RefreshCw className={`w-4 h-4 stroke-[2.5] ${isRefreshing ? "animate-spin" : ""}`} />
+                            <div className="w-4 h-4 flex items-center justify-center">
+                                {isRefreshing || (activeTab === "explore" && explore.isLoading) ? (
+                                    <OrbixLoaderIcon size={16} />
+                                ) : (
+                                    <RefreshCw className="w-4 h-4 stroke-[2.5]" />
+                                )}
+                            </div>
                         </button>
                     </div>
                 </header>
@@ -848,7 +855,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
 
                         {/* Public Profile View Component */}
                         <div className="rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000] bg-white overflow-hidden">
-                            <React.Suspense fallback={<div role="status" className="p-12 flex justify-center"><OrbixLoader size="lg" /><span className="sr-only">Loading developer profile…</span></div>}>
+                            <React.Suspense fallback={<div role="status" className="p-12 flex justify-center"><OrbixLoader size="lg" /><span className="sr-only">Loading profile…</span></div>}>
                             <PublicProfilePage
                                 overrideUsername={selectedUsername}
                                 isEmbedded={true}
@@ -1007,7 +1014,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                     </div>
                                 </div>
 
-                                {explore.isLoading && filteredDevelopers.length > 0 && <div role="status" className="flex items-center gap-2 py-2 text-xs font-bold"><OrbixLoader size="xs" /> Updating developers…</div>}
                                 {/* Developers Cards Grid */}
                                 {explore.isLoading && filteredDevelopers.length === 0 ? (
                                     <div className="py-24 flex items-center justify-center text-black">
@@ -1024,8 +1030,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                             </h3>
                                             <p className="text-xs text-neutral-600 font-medium leading-relaxed">
                                                 {!isOnline
-                                                    ? "Your device appears to be offline. Reconnect to the internet to explore developer profiles."
-                                                    : explore.error || "A network error occurred while retrieving public developer profiles."}
+                                                    ? "Your device appears to be offline. Reconnect to the internet to explore profiles."
+                                                    : explore.error || "A network error occurred while retrieving public profiles."}
                                             </p>
                                         </div>
                                         <button

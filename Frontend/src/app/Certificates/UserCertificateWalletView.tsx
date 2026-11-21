@@ -34,16 +34,21 @@ import { NeoSelect } from "../../components/NeoSelect";
 interface UserCertificateWalletViewProps {
     onOpenMobileSidebar?: () => void;
     compact?: boolean;
+    onStatsChange?: (stats: { total: number; valid: number; teamAwards: number; uniqueClubs: number }) => void;
+    refreshTrigger?: number;
 }
 
 export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps> = ({
     onOpenMobileSidebar,
     compact = false,
+    onStatsChange,
+    refreshTrigger,
 }) => {
     const toast = useToast();
 
     // Data State
     const [loading, setLoading] = useState(true);
+    const [walletError, setWalletError] = useState<string | null>(null);
     const [certificates, setCertificates] = useState<UserWalletItem[]>([]);
     const [stats, setStats] = useState({
         total: 0,
@@ -72,20 +77,27 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
     // Load Wallet Data
     const loadWallet = useCallback(async () => {
         setLoading(true);
+        setWalletError(null);
         try {
             const data = await fetchUserCertificateWallet();
             setCertificates(data.certificates || []);
-            setStats(data.stats || { total: 0, valid: 0, teamAwards: 0, uniqueClubs: 0 });
+            const newStats = data.stats || { total: 0, valid: 0, teamAwards: 0, uniqueClubs: 0 };
+            setStats(newStats);
+            if (onStatsChange) {
+                onStatsChange(newStats);
+            }
         } catch (err: any) {
-            toast.error(err.message || "Failed to load certificates from wallet.");
+            const msg = err.message || "Failed to load certificates from wallet.";
+            setWalletError(msg);
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [toast, onStatsChange]);
 
     useEffect(() => {
         loadWallet();
-    }, [loadWallet]);
+    }, [loadWallet, refreshTrigger]);
 
     // Unique filter options extracted from user certificates
     const availableClubs = useMemo(() => {
@@ -226,7 +238,7 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
     };
 
     return (
-        <div className={`w-full ${compact ? "p-0" : "p-4 sm:p-6 lg:p-8 space-y-6"}`}>
+        <div className={`w-full space-y-6 ${compact ? "p-0" : "p-4 sm:p-6 lg:p-8"}`}>
             {/* Wallet Header & Title */}
             {!compact && (
                 <div className="pb-6 border-b-3 border-black flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -423,24 +435,37 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                         </button>
                     </div>
 
-                    {/* Reset Filters */}
-                    {(searchQuery || selectedClub !== "all" || selectedEvent !== "all" || selectedStatus !== "all" || selectedType !== "all" || selectedCategory !== "all") && (
+                    {/* Action buttons: Refresh and Reset */}
+                    <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => {
-                                setSearchQuery("");
-                                setSelectedClub("all");
-                                setSelectedEvent("all");
-                                setSelectedStatus("all");
-                                setSelectedType("all");
-                                setSelectedCategory("all");
-                            }}
-                            className="text-xs font-black text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
+                            onClick={loadWallet}
+                            disabled={loading}
+                            className="px-3 py-1 rounded-lg text-xs font-black border-2 border-black bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1px_1px_0px_#000] flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                            title="Refresh Certificates"
                         >
-                            <X className="w-3.5 h-3.5" />
-                            <span>Reset Filters</span>
+                            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                            <span>Refresh</span>
                         </button>
-                    )}
+
+                        {(searchQuery || selectedClub !== "all" || selectedEvent !== "all" || selectedStatus !== "all" || selectedType !== "all" || selectedCategory !== "all") && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchQuery("");
+                                    setSelectedClub("all");
+                                    setSelectedEvent("all");
+                                    setSelectedStatus("all");
+                                    setSelectedType("all");
+                                    setSelectedCategory("all");
+                                }}
+                                className="text-xs font-black text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reset Filters</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -449,6 +474,25 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                 <div className="p-16 text-center space-y-3 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000]">
                     <OrbixLoader size="md" />
                     <span className="text-xs font-black text-black">Decrypting & verifying wallet credentials...</span>
+                </div>
+            ) : walletError && certificates.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-rose-100 border-3 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000]">
+                        <AlertTriangle className="w-8 h-8 text-rose-600" />
+                    </div>
+                    <div className="space-y-1">
+                        <h3 className="text-xl font-black text-black">Unable to Load Certificates</h3>
+                        <p className="text-xs sm:text-sm font-semibold text-neutral-600 max-w-md mx-auto">
+                            {walletError}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={loadWallet}
+                        className="px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#fedb30] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] transition cursor-pointer"
+                    >
+                        Try Again
+                    </button>
                 </div>
             ) : filteredCertificates.length === 0 ? (
                 <div className="p-12 text-center rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] space-y-4">

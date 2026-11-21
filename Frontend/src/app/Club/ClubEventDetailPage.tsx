@@ -255,6 +255,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             toast.error(err?.message || "Failed to update event details.", {
                 title: "Update Error",
             });
+            throw err;
         }
     };
 

@@ -239,7 +239,7 @@ export async function fetchPublicProfile(username: string, force = false): Promi
             if (response.status === 404) {
                 throw new ProfileApiError(
                     "NOT_FOUND",
-                    serverMsg || `Developer profile '@${raw}' does not exist on Orbix.`,
+                    serverMsg || `Profile '@${raw}' does not exist on Orbix.`,
                     404,
                     "The username was not found in the Orbix database.",
                     endpoint
@@ -1078,7 +1078,7 @@ export interface PrivacyAuditResponse {
 }
 
 /**
- * Fetch discoverable public developer profiles with searching, filtering, and pagination
+ * Fetch discoverable public profiles with searching, filtering, and pagination
  */
 export async function fetchExploreProfiles(params: ExploreQueryParams = {}, signal?: AbortSignal): Promise<ExploreResponse> {
     if (typeof navigator !== "undefined" && !navigator.onLine) {

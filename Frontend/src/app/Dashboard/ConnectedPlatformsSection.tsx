@@ -1386,7 +1386,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                         </span>
                                     </div>
                                     <span className="text-[11px] font-bold text-neutral-400">
-                                        Developer Profile
+                                        Profile
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">

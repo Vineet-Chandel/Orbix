@@ -23,6 +23,7 @@ import {
     Lock,
     Sparkles,
     Eye,
+    RefreshCw,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -102,6 +103,26 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     useEffect(() => {
         if (appsError) toast.error("Failed to load your event applications.");
     }, [appsError]);
+
+    const [walletCertificatesCount, setWalletCertificatesCount] = useState<number | null>(null);
+    const [walletRefreshTrigger, setWalletRefreshTrigger] = useState<number>(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefreshAll = async () => {
+        setIsRefreshing(true);
+        try {
+            await Promise.allSettled([
+                loadApplications(),
+                loadInvitations(),
+            ]);
+            setWalletRefreshTrigger((prev) => prev + 1);
+            toast.success("Activity & credentials refreshed", { title: "Refreshed" });
+        } catch {
+            // ignore
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const [configuringTeamApp, setConfiguringTeamApp] = useState<StudentApplicationItem | null>(null);
     const [createTeamName, setCreateTeamName] = useState("");
@@ -287,32 +308,47 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
         >
             <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                 {/* Header Banner */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                        {onOpenMobileSidebar && (
-                            <button
-                                type="button"
-                                onClick={onOpenMobileSidebar}
-                                className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
-                                aria-label="Open sidebar"
-                            >
-                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <line x1="3" y1="12" x2="21" y2="12" />
-                                    <line x1="3" y1="6" x2="21" y2="6" />
-                                    <line x1="3" y1="18" x2="21" y2="18" />
-                                </svg>
-                            </button>
-                        )}
-                        <div className="orbix-page-heading-icon orbix-page-heading-icon--card-p5-b2 p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
-                            <Activity className="w-5 h-5 text-black stroke-[2.5]" />
+                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            {onOpenMobileSidebar && (
+                                <button
+                                    type="button"
+                                    onClick={onOpenMobileSidebar}
+                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                                    aria-label="Open sidebar"
+                                >
+                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <line x1="3" y1="12" x2="21" y2="12" />
+                                        <line x1="3" y1="6" x2="21" y2="6" />
+                                        <line x1="3" y1="18" x2="21" y2="18" />
+                                    </svg>
+                                </button>
+                            )}
+                            <div className="orbix-page-heading-icon orbix-page-heading-icon--card-p5-b2 p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                <Activity className="w-5 h-5 text-black stroke-[2.5]" />
+                            </div>
+                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
+                                Activity & Credentials
+                            </h1>
                         </div>
-                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
-                            Activity & Credentials
-                        </h1>
+                        <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
+                            Track your event registration applications, access active session passes, and view verified digital certificates issued by campus clubs.
+                        </p>
                     </div>
-                    <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
-                        Track your event registration applications, access active session passes, and view verified digital certificates issued by campus clubs.
-                    </p>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            type="button"
+                            onClick={handleRefreshAll}
+                            disabled={isRefreshing}
+                            className="px-3.5 py-2 rounded-xl bg-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:bg-neutral-100 flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer disabled:opacity-50"
+                            title="Refresh Activity & Credentials"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                            <span className="hidden sm:inline">Refresh</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Segment Switcher Navigation */}
@@ -379,7 +415,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                         <Award className="w-4 h-4" />
                         <span>Certificates</span>
                         <span className="px-1.5 py-0.2 rounded-md bg-white border border-black text-[10px] font-black">
-                            {certificates.length}
+                            {walletCertificatesCount !== null ? walletCertificatesCount : certificates.length}
                         </span>
                     </button>
                 </div>
@@ -945,7 +981,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 {/* SEGMENT 3: CERTIFICATES & CREDENTIAL WALLET */}
                 {/* ========================================================================= */}
                 {activeSegment === "certificates" && (
-                    <UserCertificateWalletView compact={true} />
+                    <UserCertificateWalletView
+                        compact={true}
+                        refreshTrigger={walletRefreshTrigger}
+                        onStatsChange={(stats) => setWalletCertificatesCount(stats.total)}
+                    />
                 )}
             </div>
 

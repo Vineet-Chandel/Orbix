@@ -37,8 +37,8 @@ import { clubCredibilityRouter } from './Routes/club/clubCredibilityRoutes.js';
 import projectRouter from './Routes/projects/projectRoutes.js';
 import { workspaceRouter } from './Routes/workspace/workspaceRoutes.js';
 import { emailMonitoringRouter } from './Routes/admin/emailMonitoringRoutes.js';
-import { testDatabaseConnection } from './database/client.js';
-import { startAccountPurgeWorker } from './services/account/accountPurgeService.js';
+import { testDatabaseConnection, pool } from './database/client.js';
+import { startAccountPurgeWorker, stopAccountPurgeWorker } from './services/account/accountPurgeService.js';
 import { startEmailWorkers, stopEmailWorkers } from './workers/emailWorker.js';
 import { startCampaignFanoutWorker, stopCampaignFanoutWorker } from './workers/emailCampaignFanoutWorker.js';
 import { startEmailOutboxDispatcher, stopEmailOutboxDispatcher } from './workers/emailOutboxDispatcher.js';
@@ -198,11 +198,12 @@ const startServer = async () => {
             console.log(`Server running on port ${PORT}`);
         });
 
-        testDatabaseConnection().catch((error) => {
+        // Initialize and verify primary database connection pool
+        await testDatabaseConnection().catch((error) => {
             console.warn("⚠️ Database connection check warning:", error.message || error);
         });
 
-        // Start automated 7-day account deletion purge worker
+        // Start background workers after database is responsive
         try {
             startAccountPurgeWorker();
         } catch (workerErr) {
@@ -230,10 +231,12 @@ const gracefulShutdown = async (signal: string) => {
     try {
         stopEmailOutboxDispatcher();
         stopAnnouncementWorker();
+        stopAccountPurgeWorker();
         await Promise.allSettled([
             stopEmailWorkers(),
             stopCampaignFanoutWorker(),
             EmailQueueService.closeAll(),
+            pool.end().catch(() => {}),
         ]);
     } catch (shutdownErr: any) {
         console.error("[Orbix Server] Error during shutdown:", shutdownErr.message);

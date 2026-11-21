@@ -184,7 +184,7 @@ const DEFAULT_FAQS: FAQItem[] = [
         category: "Platform Sync",
         question: "How often does Orbix refresh my platform stats (LeetCode, Codeforces, GitHub)?",
         answer:
-            "Orbix triggers automatic daily syncs for all connected profiles. You can also trigger an instant live refresh at any time by visiting your Developer Profile or Onboarding hub and clicking 'Sync'.",
+            "Orbix triggers automatic daily syncs for all connected profiles. You can also trigger an instant live refresh at any time by visiting your Profile or Onboarding hub and clicking 'Sync'.",
     },
     {
         id: "college-update-rule",

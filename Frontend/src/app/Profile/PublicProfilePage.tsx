@@ -137,8 +137,8 @@ export function diagnoseProfileError(err: any, rawUsername?: string): ProfileDia
             case "NOT_FOUND":
                 return {
                     kind: "NOT_FOUND",
-                    title: "Developer Profile Not Found",
-                    subtitle: `The developer handle '@${cleanUser}' is not registered on Orbix or does not exist.`,
+                    title: "Profile Not Found",
+                    subtitle: `The handle '@${cleanUser}' is not registered on Orbix or does not exist.`,
                     badgeText: "404 · HANDLE NOT REGISTERED",
                     badgeStyle: {
                         bg: "bg-neutral-100",
@@ -293,8 +293,8 @@ export function diagnoseProfileError(err: any, rawUsername?: string): ProfileDia
     if (status === 404 || msg.includes("not found") || msg.includes("does not exist")) {
         return {
             kind: "NOT_FOUND",
-            title: "Developer Profile Not Found",
-            subtitle: `The developer handle '@${cleanUser}' could not be found or does not exist.`,
+            title: "Profile Not Found",
+            subtitle: `The handle '@${cleanUser}' could not be found or does not exist.`,
             badgeText: "404 · PROFILE NOT FOUND",
             badgeStyle: {
                 bg: "bg-neutral-100",
@@ -516,8 +516,6 @@ export const ProfileFooter = () => (
             <Link to="/docs" className="hover:text-black transition-colors font-medium">Docs</Link>
             <span>·</span>
             <Link to="/events" className="hover:text-black transition-colors font-medium">Events</Link>
-            <span>·</span>
-            <Link to="/support" className="hover:text-black transition-colors font-medium">Support</Link>
             <span>·</span>
             <Link to="/profile/u/Vineet-Chandel" className="hover:text-black transition-colors font-medium">Demo Profile</Link>
         </div>
@@ -1191,7 +1189,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-mono font-black uppercase tracking-wider text-black">
                                 <span className="w-2 h-2 rounded-full bg-[#FFE566] border border-black" />
-                                <span>Developer Profile Card</span>
+                                <span>Profile Card</span>
                             </span>
                         </div>
 
@@ -1223,7 +1221,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         <div className="flex items-center gap-2">
                                             <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] border border-black animate-pulse" />
                                             <span className="text-xs font-black uppercase tracking-wider text-black">
-                                                Developer Profile (Private Mode)
+                                                Profile (Private Mode)
                                             </span>
                                         </div>
                                         {Boolean(profile.isEmailVerified || profile.isVerified || profile.isVerifiedCoder) ? (
@@ -1365,7 +1363,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                             onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
                                             role="button"
                                             tabIndex={0}
-                                            aria-label="Flip Developer Profile Card in 3D"
+                                            aria-label="Flip Profile Card in 3D"
                                             onKeyDown={(e) => {
                                                 if (e.key === "Enter" || e.key === " ") {
                                                     e.preventDefault();

@@ -183,10 +183,10 @@ export default function CustomersPage() {
                                 Get Started Free
                             </button>
                             <Link
-                                to="/support"
-                                className="h-11 px-6 rounded-full bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-all border border-white/20"
+                                to="/pricing"
+                                className="h-11 px-6 rounded-full bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-all border border-white/20 flex items-center justify-center"
                             >
-                                Contact Sales & Support
+                                Explore Pricing Plans
                             </Link>
                         </div>
                     </div>

@@ -182,7 +182,7 @@ export const MEDIA_PLACEMENTS: Record<string, MediaPlacementConfig> = {
     // -------------------------------------------------------------------------
     user_cover: {
         placementId: "user_cover",
-        title: "Developer Profile Cover",
+        title: "Profile Cover",
         subtitle: "Profile Showcase Hero Banner",
         description: "Choose and position your panoramic banner artwork behind your developer card.",
         aspectRatio: 3.0,

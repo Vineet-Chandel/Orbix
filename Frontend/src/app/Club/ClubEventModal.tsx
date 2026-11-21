@@ -58,7 +58,7 @@ import type {
 export interface ClubEventModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (eventData: CreateClubEventPayload, isEditing: boolean, eventId?: string) => void;
+    onSubmit: (eventData: CreateClubEventPayload, isEditing: boolean, eventId?: string) => Promise<any> | void;
     editingEvent?: ClubEvent | null;
     selectedScope?: "PAN_INDIA" | "CAMPUS";
     clubId?: string;
@@ -334,6 +334,9 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     const [isUploadingBanner, setIsUploadingBanner] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
+    // Form submission loading state
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     // Form builder state for Step 3
     const [formStructure, setFormStructure] = useState<FormStructure>({
         sections: [
@@ -471,19 +474,20 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             setTouched({});
             setIsUploadingBanner(false);
             setUploadProgress(null);
+            setIsSubmitting(false);
         }
     }, [isOpen, editingEvent, initialStatus]);
 
     // Close on Escape
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && isOpen && !isUploadingBanner) {
+            if (e.key === "Escape" && isOpen && !isUploadingBanner && !isSubmitting) {
                 onClose();
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, isUploadingBanner, onClose]);
+    }, [isOpen, isUploadingBanner, isSubmitting, onClose]);
 
     // Form builder helper methods
     const totalQuestions = formStructure.sections.reduce((acc, s) => acc + s.questions.length, 0);
@@ -524,6 +528,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
     // Centralized Step Navigation Guard (Sequential Forward & Unrestricted Backward)
     const handleNavigateToStep = (targetStep: 1 | 2 | 3 | 4 | 5 | 6): boolean => {
+        if (isSubmitting) return false;
         const result = evaluateStepNavigation(currentStep, targetStep, {
             form,
             stages,
@@ -576,8 +581,9 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     const handleGoToStep6 = () => handleNavigateToStep(6);
 
     // Final Submission Handler (Atomic Launch or Edit Save)
-    const handleSubmitFinal = (e?: React.FormEvent) => {
+    const handleSubmitFinal = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if (isSubmitting) return;
 
         // Validate all preceding steps before final launch
         const navCheck = evaluateStepNavigation(currentStep, 6, {
@@ -690,8 +696,14 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             initialStages: sanitizedStages,
         };
 
-        // Fire callback immediately for optimistic update
-        onSubmit(payload, Boolean(editingEvent), editingEvent?.id);
+        try {
+            setIsSubmitting(true);
+            await onSubmit(payload, Boolean(editingEvent), editingEvent?.id);
+        } catch (error) {
+            console.error("Failed to submit event:", error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -764,7 +776,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 {/* Center / Right: 6-Step Wizard Navigation Stepper */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Stepper Pills */}
-                    <div className="flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1 overflow-x-auto max-w-full">
+                    <div className={`flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1 overflow-x-auto max-w-full ${isSubmitting ? "pointer-events-none opacity-60" : ""}`}>
                         <button
                             type="button"
                             onClick={() => handleNavigateToStep(1)}
@@ -1746,7 +1758,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         <button
                             type="button"
                             onClick={() => setCurrentStep(5)}
-                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                            disabled={isSubmitting}
+                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                         >
                             <ArrowLeft className="w-3.5 h-3.5" />
                             <span>Back: Sponsors</span>
@@ -1755,7 +1768,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             type="button"
                             onClick={handleSubmitFinal}
                             variant="lime"
-                            iconRight={<Sparkles className="w-4 h-4" />}
+                            loading={isSubmitting}
+                            loadingLabel={editingEvent ? "Saving & Updating..." : "Publishing Event..."}
+                            disabled={isSubmitting}
+                            iconRight={!isSubmitting ? <Sparkles className="w-4 h-4" /> : undefined}
                             className="px-8 py-3 text-sm font-black shadow-[4px_4px_0px_#000] whitespace-nowrap shrink-0 cursor-pointer"
                         >
                             {editingEvent ? "Save & Update Event" : "Launch & Publish Event"}

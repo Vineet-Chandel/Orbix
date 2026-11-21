@@ -118,7 +118,7 @@ export const DOCS_FOLDERS: DocFolder[] = [
         badge: "Security & Showcase",
         icon: "Shield",
         color: "bg-[#FFE566]",
-        description: "Authoritative architectural specification of Public vs. Private developer profiles, data gating matrices, zero-lag state synchronization, and digital card ownership.",
+        description: "Authoritative architectural specification of Public vs. Private profiles, data gating matrices, zero-lag state synchronization, and digital card ownership.",
         files: [
             {
                 id: "public-vs-private-profile",

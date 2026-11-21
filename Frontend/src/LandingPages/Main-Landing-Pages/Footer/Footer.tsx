@@ -231,11 +231,6 @@ export const Footer: React.FC = () => {
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link to="/support" className="hover:text-black hover:underline transition-colors">
-                                        24/7 Support Hub
-                                    </Link>
-                                </li>
-                                <li>
                                     <Link to="/blogs" className="hover:text-black hover:underline transition-colors">
                                         Engineering Blog
                                     </Link>
@@ -266,11 +261,6 @@ export const Footer: React.FC = () => {
                                 <li>
                                     <Link to="/terms" className="hover:text-black hover:underline transition-colors">
                                         Terms of Service
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link to="/support" className="hover:text-black hover:underline transition-colors">
-                                        Security Disclosures
                                     </Link>
                                 </li>
                             </ul>

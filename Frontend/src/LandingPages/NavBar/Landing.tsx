@@ -599,7 +599,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                                 )}
                                             </div>
                                             <p className="text-[10px] text-neutral-600 font-medium">
-                                                Personal developer profile, portfolio & ratings
+                                                Personal profile, portfolio & ratings
                                             </p>
                                         </div>
                                     </div>
@@ -836,7 +836,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                                 Demo Profile Showcase
                                             </div>
                                             <p className="text-[10px] text-neutral-600 font-medium">
-                                                View sample public developer profile (@Vineet-Chandel)
+                                                View sample public profile (@Vineet-Chandel)
                                             </p>
                                         </div>
                                     </div>

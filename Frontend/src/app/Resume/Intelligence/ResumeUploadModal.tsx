@@ -180,7 +180,7 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
                 <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 text-xs text-neutral-700 flex items-start gap-2">
                     <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <span>
-                        This resume will automatically attach to your public Orbix developer profile, where recruiters can view and download it.
+                        This resume will automatically attach to your public Orbix profile, where recruiters can view and download it.
                     </span>
                 </div>
 

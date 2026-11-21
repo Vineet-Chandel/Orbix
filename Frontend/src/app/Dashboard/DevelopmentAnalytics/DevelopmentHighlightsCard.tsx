@@ -64,7 +64,7 @@ export const DevelopmentHighlightsCard: React.FC<DevelopmentHighlightsCardProps>
                     <p className="text-xs sm:text-sm text-neutral-600 font-medium">
                         {githubHandle
                             ? `No public repositories found for @${githubHandle}.`
-                            : "Connect GitHub in Developer Profile to showcase your repositories."}
+                            : "Connect GitHub in Profile to showcase your repositories."}
                     </p>
                 </div>
             ) : (

@@ -191,7 +191,7 @@ export const MemberRecognitionProfileModal: React.FC<MemberRecognitionProfileMod
                                 <Shield className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                                 <div>
                                     <span className="font-black">Club Workspace Isolation: </span>
-                                    Orbits reflect internal teamwork and contribution within this club workspace. They do not alter or expose the member's public developer profile or global Orbix Score.
+                                    Orbits reflect internal teamwork and contribution within this club workspace. They do not alter or expose the member's public profile or global Orbix Score.
                                 </div>
                             </div>
 

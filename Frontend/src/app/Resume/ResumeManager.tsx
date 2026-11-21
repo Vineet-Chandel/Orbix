@@ -288,7 +288,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                 </span>
                             </div>
                             <p className="text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
-                                Upload your resume for deep recruiter evaluation. Your resume is automatically linked to your public developer profile.
+                                Upload your resume for deep recruiter evaluation. Your resume is automatically linked to your public profile.
                             </p>
                         </div>
 
@@ -804,7 +804,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                         <strong className="text-black font-black">
                             {resumeData?.resumeFilename || "your resume"}
                         </strong>
-                        ? This will detach the file from your public developer profile and clear the analysis report.
+                        ? This will detach the file from your public profile and clear the analysis report.
                     </span>
                 }
                 confirmText={isDeleting ? "Removing..." : "Remove Resume"}

@@ -39,10 +39,13 @@ if (!Number.isInteger(dbPoolMax) || dbPoolMax < 1 || dbPoolMax > 100) {
     throw new Error("DB_POOL_MAX must be an integer between 1 and 100.");
 }
 
+const connectionTimeoutMillis = Number(process.env.DB_CONNECTION_TIMEOUT_MS || 30000);
+const idleTimeoutMillis = Number(process.env.DB_IDLE_TIMEOUT_MS || 30000);
+
 export const pool = new Pool({
     connectionString: activeDbConfig.connectionString,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 60000,
+    connectionTimeoutMillis,
+    idleTimeoutMillis,
     max: dbPoolMax,
     keepAlive: true,
     keepAliveInitialDelayMillis: 5000,
@@ -1662,6 +1665,24 @@ const isRetryableError = (error: any): boolean => {
     );
 };
 
+const isConnectionAcquisitionError = (error: any): boolean => {
+    if (!error) return false;
+    const msg = String(error.message || "").toLowerCase();
+    return (
+        msg.includes("timeout") ||
+        msg.includes("connection terminated") ||
+        msg.includes("connection reset") ||
+        msg.includes("unexpectedly") ||
+        msg.includes("econnreset") ||
+        msg.includes("etimedout")
+    );
+};
+
+const isReadOnlyQuery = (sql: string): boolean => {
+    const trimmed = sql.trim().toUpperCase();
+    return trimmed.startsWith("SELECT") || trimmed.startsWith("WITH");
+};
+
 export const query = async (
     text: string,
     params?: any[],
@@ -1677,10 +1698,15 @@ export const query = async (
                 return await pool.query(text, params);
             } catch (error: any) {
                 attempt++;
-                if (attempt <= maxRetries && isRetryableError(error)) {
+                // Connection checkout errors or idempotent reads can safely retry
+                const effectiveRetries = maxRetries > 0
+                    ? maxRetries
+                    : (isConnectionAcquisitionError(error) || isReadOnlyQuery(text) ? 2 : 0);
+
+                if (attempt <= effectiveRetries && isRetryableError(error)) {
                     const delayMs = attempt * 500;
                     console.warn(
-                        `[Database] Transient query error (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying in ${delayMs}ms...`
+                        `[Database] Transient query error (attempt ${attempt}/${effectiveRetries}): ${error.message}. Retrying in ${delayMs}ms...`
                     );
                     await new Promise((res) => setTimeout(res, delayMs));
                     continue;

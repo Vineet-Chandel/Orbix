@@ -2507,12 +2507,12 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ onOpenMobi
                                             </div>
                                         </div>
 
-                                        {/* Judging The Sender: Comprehensive Developer Profile Summary */}
+                                        {/* Judging The Sender: Comprehensive Profile Summary */}
                                         <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b-2 border-black/10">
                                                 <span className="text-[11px] font-black uppercase font-mono tracking-wider text-neutral-500 flex items-center gap-1.5">
                                                     <User className="w-3.5 h-3.5 text-black" />
-                                                    <span>Developer Profile Details</span>
+                                                    <span>Profile Details</span>
                                                 </span>
                                                 {senderUsername && (
                                                     <Link

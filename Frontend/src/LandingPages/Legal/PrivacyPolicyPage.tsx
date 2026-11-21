@@ -268,7 +268,7 @@ export const PrivacyPolicyPage: React.FC = () => {
                   <li><strong>Collegiate Chapters & Clubs:</strong> Authorized college representatives and student club leaders operating verified campus chapters.</li>
                   <li><strong>Event Attendees:</strong> Students registering for collegiate hackathons, coding workshops, and campus competitions.</li>
                   <li><strong>Parents & Legal Guardians:</strong> Guardians receiving verification notices and submitting electronic consent for attendees under 18.</li>
-                  <li><strong>Public Visitors:</strong> Unauthenticated users browsing developer profiles, college showcases, or technical articles.</li>
+                  <li><strong>Public Visitors:</strong> Unauthenticated users browsing profiles, college showcases, or technical articles.</li>
                 </ul>
               </div>
             </article>

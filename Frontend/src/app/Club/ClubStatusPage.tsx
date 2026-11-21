@@ -828,7 +828,7 @@ export default function ClubStatusPage() {
                             <div className="p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-[#FFE566]/30 border-2 border-black shadow-[2px_2px_0px_#000] text-xs text-black font-semibold flex items-center gap-2.5">
                                 <Shield className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
                                 <span>
-                                    <strong>Account Sovereignty:</strong> Club administrative accounts remain strictly isolated from individual developer profiles, contest histories, and personal resumes.
+                                    <strong>Account Sovereignty:</strong> Club administrative accounts remain strictly isolated from individual profiles, contest histories, and personal resumes.
                                 </span>
                             </div>
                         </div>
