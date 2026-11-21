@@ -1,0 +1,298 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import {
+    ArrowRight,
+    ShieldCheck,
+    Mail,
+    Heart,
+} from 'lucide-react';
+import { OrbixLogo } from '../../../components/OrbixLogo';
+
+export const Footer: React.FC = () => {
+    return (
+        <footer className="relative w-full bg-[#FAF6EE] text-neutral-900 pt-12 sm:pt-16 pb-0 overflow-hidden font-sans select-none flex flex-col items-center">
+            {/* Warm dot grid matching Orbix platform canvas */}
+            <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
+
+            {/* =========================================================================
+                1. HERO CTA BANNER: Exact reproduction of user's uploaded banner
+            ========================================================================= */}
+            <div className="w-[96%] sm:w-[94%] max-w-[1550px] mx-auto relative z-10 mb-16 sm:mb-20">
+                <div className="relative rounded-[24px] sm:rounded-[36px] bg-[#FFE566] border-2 border-black shadow-[8px_8px_0px_#000] p-8 sm:p-12 md:p-16 lg:p-20 overflow-hidden text-center flex flex-col items-center justify-center">
+                    {/* Decorative subtle background concentric arcs on bottom left */}
+                    <div className="absolute -left-16 -bottom-24 w-64 h-64 sm:w-80 sm:h-80 rounded-full border border-black/15 pointer-events-none" />
+                    <div className="absolute -left-28 -bottom-36 w-88 h-88 sm:w-[420px] sm:h-[420px] rounded-full border border-dashed border-black/20 pointer-events-none" />
+                    <div className="absolute -right-20 -top-24 w-72 h-72 rounded-full border border-dashed border-black/15 pointer-events-none" />
+
+                    {/* Orbix Brand Logo Badge */}
+                    <div className="relative md:absolute md:right-12 lg:right-16 md:top-1/2 md:-translate-y-1/2 z-10 mb-6 md:mb-0">
+                        <div
+                            className="w-16 h-16 sm:w-20 sm:h-20 md:w-36 md:h-36 lg:w-44 lg:h-44 rounded-full border-[3px] border-black bg-white p-3 sm:p-4 md:p-7 shadow-[4px_4px_0px_#000] md:shadow-[5px_5px_0px_#000] flex items-center justify-center hover:scale-105 hover:rotate-6 transition-all duration-300 cursor-pointer"
+                            title="Orbix"
+                        >
+                            <OrbixLogo className="w-full h-full text-black" />
+                        </div>
+                    </div>
+
+                    {/* Headline, Subtitle and Pill Button */}
+                    <div className="relative z-10 max-w-2xl mx-auto space-y-4 sm:space-y-5 px-2">
+                        <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-black tracking-tight leading-[1.08]">
+                            Ready to connect
+                            <br />
+                            your coding world?
+                        </h2>
+
+                        <p className="text-neutral-900 font-medium text-sm sm:text-base md:text-lg max-w-md mx-auto leading-relaxed pt-1">
+                            Turn scattered stats into one profile that speaks for you. Free to start.
+                        </p>
+
+                        <div className="pt-2 sm:pt-4">
+                            <Link
+                                to="/login"
+                                className="inline-flex items-center gap-2.5 px-8 sm:px-10 py-3.5 sm:py-4 rounded-full bg-black text-white hover:bg-neutral-900 font-black text-sm sm:text-base border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer group"
+                            >
+                                <span>Login / Sign up</span>
+                                <ArrowRight className="w-4 h-4 text-white group-hover:translate-x-1.5 transition-transform stroke-[2.5]" />
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* =========================================================================
+                2. MAIN NAVIGATION FOOTER: Comprehensive Neo-Brutalist Layout
+            ========================================================================= */}
+            <div className="w-[96%] sm:w-[94%] max-w-[1550px] mx-auto relative z-10 pb-12 sm:pb-16 border-t-2 border-black/15 pt-12 sm:pt-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
+                    {/* Brand Column (Spans 4 cols on Desktop) */}
+                    <div className="lg:col-span-4 space-y-6">
+                        {/* Logo & Title */}
+                        <Link to="/" className="inline-flex items-center gap-3 group hover:opacity-85 transition-opacity">
+                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                            <span className="text-3xl sm:text-4xl font-black tracking-tight text-black leading-none">
+                                Orbix
+                            </span>
+                        </Link>
+
+                        <p className="text-sm text-neutral-600 font-medium leading-relaxed max-w-sm">
+                            The single source of truth for competitive programmers and software engineers. Syncing 16+ platforms, automated ratings, and national league standings.
+                        </p>
+
+                        {/* Live Sync Status Pill */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 border border-black animate-pulse" />
+                            <span>16 Platforms Live Synced</span>
+                        </div>
+
+                        {/* Social Buttons */}
+                        <div className="flex items-center gap-2.5 pt-1">
+                            <a
+                                href="https://github.com/Vineet-Chandel"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-9 h-9 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 transition-all flex items-center justify-center text-black"
+                                title="GitHub"
+                            >
+                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                    <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                                </svg>
+                            </a>
+                            <a
+                                href="https://www.instagram.com/vineet_chandelk06/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-9 h-9 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 transition-all flex items-center justify-center text-black"
+                                title="Instagram"
+                            >
+                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
+                                </svg>
+                            </a>
+                            <a
+                                href="https://www.linkedin.com/in/vineet-singhk06/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-9 h-9 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 transition-all flex items-center justify-center text-black"
+                                title="LinkedIn"
+                            >
+                                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+                                </svg>
+                            </a>
+                            <a
+                                href="mailto:vineetsinghk06@gmail.com"
+                                className="w-9 h-9 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 transition-all flex items-center justify-center text-black"
+                                title="Email"
+                            >
+                                <Mail className="w-4 h-4" />
+                            </a>
+                        </div>
+                    </div>
+
+                    {/* Footer Nav Links: Responsive 2-column grid on mobile (eliminates dead space), 4-column on desktop */}
+                    <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-6 lg:gap-8 items-start">
+                        {/* Nav Links Column 1: Product */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#FFE566] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Product
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li>
+                                    <Link to="/profile/u/Vineet-Chandel" className="hover:text-black hover:underline transition-colors">
+                                        Live Public Profile
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/auth/profiles" className="hover:text-black hover:underline transition-colors">
+                                        Connect Platforms
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/events" className="hover:text-black hover:underline transition-colors">
+                                        Contest Radar
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/leaderboard" className="hover:text-black hover:underline transition-colors">
+                                        National CP League
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/card" className="hover:text-black hover:underline transition-colors">
+                                        Verified Cards
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {/* Nav Links Column 2: Documentation */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#a2ff86] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Documentation
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li>
+                                    <Link to="/docs/supported-platform-registry" className="hover:text-black hover:underline transition-colors">
+                                        Platform Registry
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/orbix-score-algorithm" className="hover:text-black hover:underline transition-colors">
+                                        Score Algorithm
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/club-credibility-algorithm" className="hover:text-black hover:underline transition-colors">
+                                        Club Credibility Engine
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/club-verification-protocol" className="hover:text-black hover:underline transition-colors">
+                                        Club Verification Standard
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs/college-chapters" className="hover:text-black hover:underline transition-colors">
+                                        College Chapter Standard
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs" className="hover:text-black hover:underline transition-colors">
+                                        Developer Docs Hub
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/leaderboard" className="hover:text-black hover:underline transition-colors">
+                                        AISHE Directory
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/docs" className="hover:text-black hover:underline transition-colors">
+                                        API & Webhooks
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {/* Nav Links Column 3: Company */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-[#c4b5fd] px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Company
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li>
+                                    <Link to="/customers" className="hover:text-black hover:underline transition-colors">
+                                        Customers
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/pricing" className="hover:text-black hover:underline transition-colors">
+                                        Pricing Plans
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/blogs" className="hover:text-black hover:underline transition-colors">
+                                        Engineering Blog
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/demo" className="hover:text-black hover:underline transition-colors">
+                                        Demo Profile
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {/* Nav Links Column 4: Trust & Security */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black bg-white px-2.5 py-1 rounded-md border-2 border-black shadow-[1.5px_1.5px_0px_#000] inline-block">
+                                Trust & Security
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm font-bold text-neutral-700">
+                                <li className="flex items-center gap-1.5 text-neutral-800">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                                    <span>Zero Password Sync</span>
+                                </li>
+                                <li>
+                                    <Link to="/privacy" className="hover:text-black hover:underline transition-colors">
+                                        Privacy Policy
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/terms" className="hover:text-black hover:underline transition-colors">
+                                        Terms of Service
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sub-footer Row */}
+                <div className="mt-12 pt-6 border-t-2 border-black/15 flex items-center justify-center text-xs font-bold text-neutral-600">
+                    <div className="flex items-center gap-2">
+                        <span>Crafted with</span>
+                        <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                        <span>for the global competitive programming community.</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* =========================================================================
+                3. FULL SCREEN WIDTH DESK IMAGE AT THE VERY BOTTOM OF THE PAGE
+            ========================================================================= */}
+            <div className="w-full relative mt-2 sm:mt-4 overflow-hidden bg-transparent select-none pointer-events-none">
+                <img
+                    src="/image.webp"
+                    alt="Orbix Developer Desk"
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    className="w-full h-auto min-h-[140px] sm:min-h-[220px] md:min-h-[280px] lg:min-h-[340px] xl:min-h-[400px] object-cover object-bottom block"
+                />
+            </div>
+        </footer>
+    );
+};
+
+export default Footer;

@@ -1,0 +1,949 @@
+@import "katex/dist/katex.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   GLOBAL TYPOGRAPHY (Poppins font everywhere by default)
+   ========================================================================== */
+html,
+body,
+#root {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* ==========================================================================
+   GLOBAL NEO-BRUTALIST CHECKBOXES
+   Transforms all native checkboxes across the entire platform into Orbix's
+   signature Neo-Brutalist design language.
+   ========================================================================== */
+@layer base {
+  input[type="checkbox"]:not(.sr-only) {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    border: 2px solid #000000;
+    border-radius: 5px;
+    background-color: #ffffff;
+    box-shadow: 2px 2px 0px #000000;
+    cursor: pointer;
+    display: inline-grid;
+    place-content: center;
+    vertical-align: middle;
+    position: relative;
+    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background-color 0.1s ease-out;
+  }
+
+  input[type="checkbox"]:not(.sr-only):hover:not(:disabled) {
+    background-color: #fafafa;
+    box-shadow: 2.5px 2.5px 0px #000000;
+    transform: translate(-0.5px, -0.5px);
+  }
+
+  input[type="checkbox"]:not(.sr-only):active:not(:disabled) {
+    box-shadow: 1px 1px 0px #000000;
+    transform: translate(1px, 1px);
+  }
+
+  input[type="checkbox"]:not(.sr-only):focus-visible {
+    outline: 2px solid #000000;
+    outline-offset: 2px;
+  }
+
+  input[type="checkbox"]:not(.sr-only):checked {
+    background-color: #a2ff86;
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='none' stroke='%23000000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M3.5 8.5l3 3 6-7'/%3e%3c/svg%3e");
+    background-size: 85% 85%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  input[type="checkbox"]:not(.sr-only):indeterminate {
+    background-color: #FFE566;
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='none' stroke='%23000000' stroke-width='3.2' stroke-linecap='round' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M3.5 8h9'/%3e%3c/svg%3e");
+    background-size: 85% 85%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  input[type="checkbox"]:not(.sr-only):disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background-color: #e5e5e5;
+  }
+}
+
+/* ==========================================================================
+   GLOBAL SCROLLBAR REMOVAL (Zero visible scrollbars across the entire web app)
+   Standard: scrollbar-width: none (Firefox, Chrome 121+, Safari 18.2+)
+   Legacy WebKit: ::-webkit-scrollbar { display: none; }
+   Legacy IE/Edge: -ms-overflow-style: none
+   ========================================================================== */
+
+html,
+body,
+#root,
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Any element where overflow or scrollable container is applied */
+[class*="overflow-"],
+[style*="overflow"] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[class*="overflow-"]::-webkit-scrollbar,
+[style*="overflow"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+@layer utilities {
+
+  .no-scrollbar::-webkit-scrollbar,
+  .scrollbar-none::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+  }
+
+  .no-scrollbar,
+  .scrollbar-none {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slideRight {
+  animation: slideRight 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@font-face {
+  font-family: "MyCustomFont3";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-bold.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Custom Font Utilities */
+.font-MyCustomFont3 {
+  font-family: "MyCustomFont3", sans-serif;
+}
+
+/* ==========================================================================
+   EMBEDDED PROFILE SHOWCASE (Clean Poppins & Monospace Isolation)
+   Strictly isolates all typography inside the embedded hero showcase,
+   guaranteeing no inheritance of demo/display fonts into metrics or text.
+   ========================================================================== */
+.embedded-showcase-container {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.embedded-showcase-container :where(h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, label) {
+  font-family: inherit;
+}
+
+.embedded-showcase-container .font-mono,
+.embedded-showcase-container .font-mono :where(span, div, p, code, pre) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+/* ==========================================================================
+   BLOG / AWS DOCS — Neo-Brutalist Styles (scoped to .blog-container)
+   ========================================================================== */
+
+/* Neo-Brutalist Dot Grid Background — applied to body, blog container, and neo-grid-bg elements */
+.neo-grid-bg,
+.blog-container,
+.blog-container.neo-grid-bg,
+.blog-container .neo-grid-bg,
+body:has(.blog-container) {
+  background-color: #f7f6f1 !important;
+  background-image: radial-gradient(#d5d2c8 1.15px, transparent 1.15px) !important;
+  background-size: 18px 18px !important;
+  background-attachment: fixed !important;
+}
+
+.dark .neo-grid-bg,
+.dark .blog-container,
+.dark .blog-container.neo-grid-bg,
+.dark .blog-container .neo-grid-bg,
+html.dark body:has(.blog-container) {
+  background-color: #0e0f12 !important;
+  background-image: radial-gradient(#27272a 1.15px, transparent 1.15px) !important;
+  background-size: 18px 18px !important;
+  background-attachment: fixed !important;
+}
+
+/* Neo-Brutalist Card Utility Classes for Blog */
+.blog-container .neo-box {
+  background-color: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 4px 4px 0px #000000;
+}
+
+.blog-container .neo-box-sm {
+  background-color: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 2.5px 2.5px 0px #000000;
+}
+
+.blog-container .neo-box-lg {
+  background-color: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 6px 6px 0px #000000;
+}
+
+.dark .blog-container .neo-box {
+  background-color: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 4px 4px 0px #ffffff;
+}
+
+.dark .blog-container .neo-box-sm {
+  background-color: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 2.5px 2.5px 0px #ffffff;
+}
+
+.dark .blog-container .neo-box-lg {
+  background-color: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 6px 6px 0px #ffffff;
+}
+
+/* Neo-Brutalist Universal Callouts for Blog */
+.blog-container [class*="border-l-4"] {
+  border-left-width: 5px !important;
+  border-top-width: 2px !important;
+  border-right-width: 2px !important;
+  border-bottom-width: 2px !important;
+  border-color: #000000 !important;
+  box-shadow: 4px 4px 0px #000000 !important;
+  border-radius: 0px !important;
+}
+
+.dark .blog-container [class*="border-l-4"] {
+  border-color: #ffffff !important;
+  box-shadow: 4px 4px 0px #ffffff !important;
+}
+
+.blog-container [class*="rounded-xl"][class*="border-workbook-border"],
+.blog-container [class*="rounded-2xl"][class*="border-workbook-border"],
+.blog-container [class*="rounded-xl"][class*="border-slate-200"],
+.blog-container [class*="rounded-2xl"][class*="border-slate-200"],
+.blog-container [class*="rounded-xl"][class*="border-slate-300"],
+.blog-container [class*="rounded-2xl"][class*="border-slate-300"],
+.blog-container [class*="overflow-x-auto"][class*="rounded-xl"] {
+  border: 2px solid #000000 !important;
+  box-shadow: 4px 4px 0px #000000 !important;
+  border-radius: 0px !important;
+}
+
+.dark .blog-container [class*="rounded-xl"][class*="border-workbook-border"],
+.dark .blog-container [class*="rounded-2xl"][class*="border-workbook-border"],
+.dark .blog-container [class*="rounded-xl"][class*="border-slate-200"],
+.dark .blog-container [class*="rounded-2xl"][class*="border-slate-200"],
+.dark .blog-container [class*="rounded-xl"][class*="border-slate-300"],
+.dark .blog-container [class*="rounded-2xl"][class*="border-slate-300"],
+.dark .blog-container [class*="overflow-x-auto"][class*="rounded-xl"] {
+  border: 2px solid #ffffff !important;
+  box-shadow: 4px 4px 0px #ffffff !important;
+}
+
+/* Neo-Brutalist Badges for Blog */
+.blog-container .neo-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1.5px solid #000000;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+/* Custom scrollbar for blog sidebar and search modal */
+.blog-container .custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.blog-container .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.blog-container .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(161, 161, 170, 0.3);
+  border-radius: 9999px;
+}
+
+.blog-container .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(161, 161, 170, 0.5);
+}
+
+.dark .blog-container .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(82, 82, 91, 0.4);
+}
+
+.dark .blog-container .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(82, 82, 91, 0.7);
+}
+
+/* Prism syntax highlighting theme for blog and markdown code blocks */
+.blog-container .token.comment,
+.blog-container .token.prolog,
+.blog-container .token.doctype,
+.blog-container .token.cdata,
+.markdown-code .token.comment,
+.markdown-code .token.prolog,
+.markdown-code .token.doctype,
+.markdown-code .token.cdata {
+  color: #71717a;
+  font-style: italic;
+}
+
+.blog-container .token.punctuation,
+.markdown-code .token.punctuation {
+  color: #a1a1aa;
+}
+
+.blog-container .token.namespace,
+.markdown-code .token.namespace {
+  opacity: 0.7;
+}
+
+.blog-container .token.property,
+.blog-container .token.tag,
+.blog-container .token.constant,
+.blog-container .token.symbol,
+.blog-container .token.deleted,
+.markdown-code .token.property,
+.markdown-code .token.tag,
+.markdown-code .token.constant,
+.markdown-code .token.symbol,
+.markdown-code .token.deleted {
+  color: #f87171;
+}
+
+.blog-container .token.boolean,
+.blog-container .token.number,
+.markdown-code .token.boolean,
+.markdown-code .token.number {
+  color: #fb923c;
+}
+
+.blog-container .token.selector,
+.blog-container .token.attr-name,
+.blog-container .token.string,
+.blog-container .token.char,
+.blog-container .token.builtin,
+.blog-container .token.inserted,
+.markdown-code .token.selector,
+.markdown-code .token.attr-name,
+.markdown-code .token.string,
+.markdown-code .token.char,
+.markdown-code .token.builtin,
+.markdown-code .token.inserted {
+  color: #34d399;
+}
+
+.blog-container .token.operator,
+.blog-container .token.entity,
+.blog-container .token.url,
+.blog-container .language-css .token.string,
+.blog-container .style .token.string,
+.markdown-code .token.operator,
+.markdown-code .token.entity,
+.markdown-code .token.url,
+.markdown-code .language-css .token.string,
+.markdown-code .style .token.string {
+  color: #38bdf8;
+}
+
+.blog-container .token.atrule,
+.blog-container .token.attr-value,
+.blog-container .token.keyword,
+.markdown-code .token.atrule,
+.markdown-code .token.attr-value,
+.markdown-code .token.keyword {
+  color: #a78bfa;
+}
+
+.blog-container .token.function,
+.blog-container .token.class-name,
+.markdown-code .token.function,
+.markdown-code .token.class-name {
+  color: #60a5fa;
+}
+
+.blog-container .token.regex,
+.blog-container .token.important,
+.blog-container .token.variable,
+.markdown-code .token.regex,
+.markdown-code .token.important,
+.markdown-code .token.variable {
+  color: #fbbf24;
+}
+
+.blog-container .token.important,
+.blog-container .token.bold,
+.markdown-code .token.important,
+.markdown-code .token.bold {
+  font-weight: bold;
+}
+
+.blog-container .token.italic,
+.markdown-code .token.italic {
+  font-style: italic;
+}
+
+.blog-container .token.entity,
+.markdown-code .token.entity {
+  cursor: help;
+}
+
+/* ==========================================================================
+   PERFORMANCE: Defer offscreen rendering (Modern Web Guidance)
+   Using content-visibility: auto + contain-intrinsic-size
+   ========================================================================== */
+.defer-offscreen {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 750px;
+}
+
+@supports not (content-visibility: auto) {
+  .defer-offscreen {
+    contain: layout paint;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE PLATFORM TABS & CHIPS (Modern Web Guidance: Container Queries)
+   Auto-collapse text labels to show only icons when space is constrained
+   ========================================================================== */
+.portal-header-container,
+.portal-filter-container {
+  container-type: inline-size;
+}
+
+@container (max-width: 600px) {
+  .portal-tab-label {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   EVENT APPLICATION PASS PRINT STYLES
+   Ensures that tapping "Print Pass Receipt" or Cmd+P prints exclusively
+   the clean, full registration pass with zero cutoffs, no backdrop overlays,
+   no browser buttons, and perfect A4 centering.
+   ========================================================================== */
+@media print {
+  @page {
+    size: auto;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    font-size: 12pt !important;
+  }
+
+  /* Hide background interface, sidebars, headers, and modal backdrops */
+  body > * {
+    visibility: hidden !important;
+  }
+
+  /* Allow portal root and modal content to remain visible */
+  #root,
+  [data-portal-root],
+  body > div:last-child {
+    visibility: visible !important;
+  }
+
+  /* Deactivate fixed modal overlays and dark backdrops */
+  .fixed.inset-0 {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* The actual application pass card and certificate frames */
+  #application-pass-card,
+  #orbix-printable-pass,
+  #notification-event-pass-card,
+  #official-certificate-frame {
+    visibility: visible !important;
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    border: 2px solid #000000 !important;
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #application-pass-card *,
+  #orbix-printable-pass *,
+  #notification-event-pass-card *,
+  #official-certificate-frame * {
+    visibility: visible !important;
+  }
+
+  /* Hide all action buttons, links, close buttons, and print triggers */
+  .print\:hidden,
+  .no-print,
+  [data-no-print="true"],
+  button,
+  a[href^="/applications"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* ==========================================================================
+   STICKY / FIXED MOBILE SIDEBAR TOGGLE
+   Anchors ONLY the top-left mobile sidebar hamburger toggle button at the
+   top-left of the mobile viewport across all pages and views while scrolling
+   vertically. Strictly isolates positioning to the button alone.
+   Preserves layout spacing so sibling header content never shifts or overlaps.
+   Guarantees opaque background, consistent Neo-Brutalist styling, and safe-area insets.
+   ========================================================================== */
+@media (max-width: 1023px) {
+  button[aria-label="Open sidebar"] {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 0px) + 1.625rem) !important;
+    left: calc(env(safe-area-inset-left, 0px) + 1.625rem) !important;
+    z-index: 40 !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 2px 2px 0px #000000 !important;
+    opacity: 1 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  button[aria-label="Open sidebar"] + * {
+    margin-left: 3rem !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  button[aria-label="Open sidebar"] {
+    top: calc(env(safe-area-inset-top, 0px) + 2.375rem) !important;
+    left: calc(env(safe-area-inset-left, 0px) + 2.375rem) !important;
+  }
+}
+
+/* ==========================================================================
+   MOBILE PAGE-HEADING ICON VERTICAL ALIGNMENT
+   Aligns the vertical center of each page's heading icon tile with the fixed
+   mobile sidebar toggle button (top: 1.625rem, size: p-2 + w-4 + border-2 =
+   2rem + 4px) at scroll position 0 on mobile viewports (< 640px).
+   Uses align-self: flex-start + transform so heading text, wrapping, and
+   sibling elements remain untouched, and tablet/desktop (>= 640px) stay
+   computed-style identical.
+   ========================================================================== */
+@media (max-width: 639px) {
+  .orbix-page-heading-icon {
+    --orbix-mobile-toggle-size: calc(2rem + 4px);
+    --orbix-heading-icon-size: calc(2.25rem + 4px);
+    --orbix-heading-extra-top: 0px;
+
+    align-self: flex-start;
+    transform: translateY(
+      calc(
+        ((var(--orbix-mobile-toggle-size) - var(--orbix-heading-icon-size)) / 2) -
+          var(--orbix-heading-extra-top)
+      )
+    );
+  }
+
+  .orbix-page-heading-icon--my-1 {
+    --orbix-heading-extra-top: 0.25rem;
+  }
+
+  .orbix-page-heading-icon--card-p4-b3 {
+    --orbix-heading-extra-top: calc(1rem + 3px);
+  }
+
+  .orbix-page-heading-icon--card-p5-b2 {
+    --orbix-heading-extra-top: calc(1.25rem + 2px);
+  }
+
+  .orbix-page-heading-icon--size-9 {
+    --orbix-heading-icon-size: 2.25rem;
+  }
+
+  .orbix-page-heading-icon--size-8 {
+    --orbix-heading-icon-size: 2rem;
+  }
+
+  .orbix-page-heading-icon--club-dashboard {
+    --orbix-heading-icon-size: 2rem;
+    --orbix-heading-extra-top: 1px;
+  }
+}
+
+/* ==========================================================================
+   MOBILE SIDEBAR DRAWER VIEWPORT HEIGHT, SCROLLING & SAFE-AREA FIX
+   Uses dynamic viewport height (100dvh with 100vh fallback) so the slide-over
+   drawer fits the actually visible mobile viewport with browser toolbars open
+   or retracted, prevents flex-child shrinking inside the scrollable nav area
+   (fixing clipped items like "Certificates"), isolates scroll chaining, and
+   preserves bottom safe-area clearance on the pinned profile block.
+   Strictly scoped to the mobile/drawer breakpoint (< 1024px); desktop sidebar
+   (>= 1024px) remains computed-style identical.
+   ========================================================================== */
+@media (max-width: 1023px) {
+  .orbix-mobile-sidebar {
+    height: calc(100vh - 1rem);
+    max-height: calc(100vh - 1rem);
+  }
+
+  @supports (height: 100dvh) {
+    .orbix-mobile-sidebar {
+      height: calc(100dvh - 1rem);
+      max-height: calc(100dvh - 1rem);
+    }
+  }
+
+  .orbix-mobile-sidebar-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+  }
+
+  .orbix-mobile-sidebar-scroll > * {
+    flex-shrink: 0;
+  }
+
+  .orbix-mobile-sidebar-profile {
+    padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .orbix-mobile-sidebar {
+    height: calc(100vh - 1.5rem);
+    max-height: calc(100vh - 1.5rem);
+  }
+
+  @supports (height: 100dvh) {
+    .orbix-mobile-sidebar {
+      height: calc(100dvh - 1.5rem);
+      max-height: calc(100dvh - 1.5rem);
+    }
+  }
+}
+
+/* ==========================================================================
+   PROFILE PHOTO VIEWER LIGHTBOX MODAL
+   Discord/Instagram-style full-screen circular photo viewer with dark blurred
+   backdrop, responsive vh/dvh circle sizing, safe-area insets, and reduced-
+   motion support. Scoped strictly to .orbix-photo-viewer-* classes.
+   ========================================================================== */
+@keyframes orbixPhotoViewerFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes orbixPhotoViewerScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.orbix-photo-viewer-backdrop {
+  background-color: rgba(0, 0, 0, 0.94);
+  padding:
+    max(1.25rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1.25rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+  overscroll-behavior: contain;
+  animation: orbixPhotoViewerFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .orbix-photo-viewer-backdrop {
+    background-color: rgba(0, 0, 0, 0.88);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}
+
+.orbix-photo-viewer-close {
+  position: fixed;
+  top: max(1rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+  right: max(1rem, calc(env(safe-area-inset-right, 0px) + 0.75rem));
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 9999px;
+  border: none;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.orbix-photo-viewer-close:hover,
+.orbix-photo-viewer-close:focus-visible {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.orbix-photo-viewer-close:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.orbix-photo-viewer-dialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  animation: orbixPhotoViewerScaleIn 0.2s ease-out forwards;
+}
+
+.orbix-photo-viewer-circle {
+  --orbix-viewer-diameter: min(
+    88vw,
+    calc(100vh - 200px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+    580px
+  );
+  width: var(--orbix-viewer-diameter);
+  height: var(--orbix-viewer-diameter);
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background-color: #1f1f23;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+@supports (height: 100dvh) {
+  .orbix-photo-viewer-circle {
+    --orbix-viewer-diameter: min(
+      88vw,
+      calc(100dvh - 200px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+      580px
+    );
+  }
+}
+
+.orbix-photo-viewer-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.orbix-photo-viewer-img.is-loaded {
+  opacity: 1;
+}
+
+.orbix-photo-viewer-meta {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 90vw;
+}
+
+.orbix-photo-viewer-name {
+  margin: 0;
+  max-width: 90vw;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orbix-photo-viewer-handle {
+  margin: 0.375rem 0 0;
+  max-width: 90vw;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #a0a0a0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 640px) {
+  .orbix-photo-viewer-name {
+    font-size: 1.4375rem;
+  }
+
+  .orbix-photo-viewer-handle {
+    font-size: 0.9375rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbix-photo-viewer-backdrop {
+    animation-duration: 0.01ms;
+  }
+
+  .orbix-photo-viewer-dialog {
+    animation: orbixPhotoViewerFadeIn 0.01ms linear forwards;
+  }
+
+  .orbix-photo-viewer-img,
+  .orbix-photo-viewer-close {
+    transition: none;
+  }
+}
+
+/* Enlargeable avatar tap/hover helpers */
+.orbix-avatar-trigger {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: none) {
+  .orbix-avatar-hover-overlay {
+    display: none;
+    pointer-events: none;
+  }
+}
+
+/* Notification bell modal mobile viewport height & safe-area containment (< 640px only) */
+@media (max-width: 639px) {
+  .orbix-notif-modal-overlay {
+    padding:
+      max(1rem, env(safe-area-inset-top, 0px))
+      max(1rem, env(safe-area-inset-right, 0px))
+      max(1rem, env(safe-area-inset-bottom, 0px))
+      max(1rem, env(safe-area-inset-left, 0px));
+  }
+
+  .orbix-notif-modal {
+    max-height: calc(100vh - 2rem);
+  }
+
+  @supports (height: 100dvh) {
+    .orbix-notif-modal {
+      max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    }
+  }
+}
+
+
+
+
+/* Public profile content must shrink inside the landing preview as well as on phones. */
+.public-profile-page,
+.public-club-profile-page {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.public-profile-page main > section,
+.public-profile-page main > div,
+.public-club-profile-page main > div {
+  min-width: 0;
+}
+.public-profile-page :where(img, video),
+.public-club-profile-page :where(img, video) {
+  max-width: 100%;
+}

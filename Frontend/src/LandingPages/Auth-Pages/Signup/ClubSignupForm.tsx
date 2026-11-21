@@ -1,0 +1,1308 @@
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { buildApiUrl } from "../../../api/apiClient";
+import { isDemoProfileUsername } from "../../../data/demoProfileData";
+import { isDemoClubSlug } from "../../../data/demoClubProfileData";
+import {
+    Building2,
+    UserCheck,
+    Globe,
+    Lock,
+    ShieldCheck,
+    MapPin,
+    Mail,
+    CheckCircle2,
+    ArrowRight,
+    ArrowLeft,
+    RotateCcw,
+    Sparkles,
+} from "lucide-react";
+import { FormInput } from "../FormInput";
+import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
+import { UsernameRulesIndicator } from "../UsernameRulesIndicator";
+import { evaluatePassword } from "../passwordValidator";
+import { useToast } from "../../../context/ToastContext";
+import { useAppDispatch, useAppSelector, setUser } from "../../../store";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { CollegeAutocomplete } from "../../../components/CollegeAutocomplete";
+import { getInstitutionById, searchInstitutions, type InstitutionItem } from "../../../utils/profileApi";
+import { OrbixInitialLoader } from "../../../components/ui/loader";
+
+interface ClubSignupFormProps {
+    onSwitchToPersonal?: () => void;
+}
+
+const CATEGORY_OPTIONS = [
+    { value: "coding", label: "Coding and Competitive Programming" },
+    { value: "technology", label: "Technology & Software Development" },
+    { value: "cloud_devops", label: "Cloud Computing & DevOps" },
+    { value: "ai_ml", label: "AI / Machine Learning & Data Science" },
+    { value: "robotics", label: "Robotics & Hardware Systems" },
+    { value: "entrepreneurship", label: "Entrepreneurship & Innovation" },
+    { value: "cultural", label: "Cultural" },
+    { value: "sports", label: "Sports" },
+    { value: "other", label: "Other" },
+];
+
+const ROLE_OPTIONS = [
+    "President",
+    "Vice President",
+    "Secretary",
+    "Faculty Coordinator",
+    "Lead Developer",
+    "Core Member",
+    "Other",
+];
+
+interface OtpSegmentedInputProps {
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+    onComplete?: (code: string) => void;
+}
+
+function OtpSegmentedInput({ value, onChange, disabled, onComplete }: OtpSegmentedInputProps) {
+    const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const digits = (value + "      ").slice(0, 6).split("");
+
+    const handleChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const char = e.target.value.replace(/\D/g, "").slice(-1);
+        const newDigits = [...digits];
+        newDigits[index] = char;
+        const nextVal = newDigits.join("").trim();
+        onChange(nextVal);
+
+        if (char && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
+        if (nextVal.length === 6 && onComplete) {
+            onComplete(nextVal);
+        }
+    };
+
+    const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Backspace") {
+            if (!digits[index].trim() && index > 0) {
+                inputRefs.current[index - 1]?.focus();
+            }
+        } else if (e.key === "ArrowLeft" && index > 0) {
+            inputRefs.current[index - 1]?.focus();
+        } else if (e.key === "ArrowRight" && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+        e.preventDefault();
+        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+        if (pasted) {
+            onChange(pasted);
+            const nextIdx = Math.min(pasted.length, 5);
+            inputRefs.current[nextIdx]?.focus();
+            if (pasted.length === 6 && onComplete) {
+                onComplete(pasted);
+            }
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 max-w-sm mx-auto">
+            {[0, 1, 2, 3, 4, 5].map((idx) => (
+                <input
+                    key={idx}
+                    ref={(el) => { inputRefs.current[idx] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]*"
+                    maxLength={1}
+                    disabled={disabled}
+                    value={digits[idx].trim()}
+                    onChange={(e) => handleChange(idx, e)}
+                    onKeyDown={(e) => handleKeyDown(idx, e)}
+                    onPaste={handlePaste}
+                    className="w-10 h-12 sm:w-12 sm:h-14 text-center font-mono text-xl sm:text-2xl font-black rounded-xl bg-[#FAF6EE] border-2 border-black text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:shadow-[3px_3px_0px_#000] focus:outline-none transition-all disabled:opacity-50"
+                />
+            ))}
+        </div>
+    );
+}
+
+export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal }: ClubSignupFormProps = {}) {
+    const navigate = useNavigate();
+    const toast = useToast();
+    const dispatch = useAppDispatch();
+    const { user: authUser, isAuthenticated } = useAppSelector((state) => state.user);
+    const [redirecting, setRedirecting] = useState(false);
+
+    const [formStep, setFormStep] = useState<"details" | "verification">("details");
+
+    const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(null);
+
+    const [formData, setFormData] = useState({
+        // Club info
+        clubName: "",
+        collegeId: "",
+        collegeName: "",
+        collegeCity: "",
+        collegeState: "",
+        collegeCountry: "India",
+        clubCategory: "coding",
+        clubDescription: "",
+
+        // Representative info
+        contactPersonName: "",
+        contactPersonRole: "President",
+        contactEmail: "",
+        collegeOfficialEmail: "",
+
+        // References
+        collegeWebsiteUrl: "",
+        clubWebsiteUrl: "",
+        clubSocialUrl: "",
+
+        // Credentials
+        username: "",
+        password: "",
+        passwordConfirm: "",
+
+        // Legal
+        termsAccepted: true,
+        privacyPolicyAccepted: true,
+    });
+
+    // Auto-populate ONLY optional representative name/email convenience fields if a personal user opens club registration.
+    // Never prefill username or mark email pre-verified: every Club Account is strictly isolated with its own credentials.
+    useEffect(() => {
+        if (isAuthenticated && authUser && authUser.accountType !== "club") {
+            const fullName = [authUser.firstName, authUser.lastName].filter(Boolean).join(" ");
+            setFormData((prev) => ({
+                ...prev,
+                contactPersonName: prev.contactPersonName || fullName || "",
+            }));
+        }
+    }, [isAuthenticated, authUser]);
+
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [loading, setLoading] = useState(false);
+    const [usernameFocused, setUsernameFocused] = useState(false);
+
+    // Verification state
+    const [emailOtp, setEmailOtp] = useState("");
+    const [emailVerified, setEmailVerified] = useState(false);
+    const [verifiedEmailAddress, setVerifiedEmailAddress] = useState<string | null>(null);
+    const [emailVerificationToken, setEmailVerificationToken] = useState<string | null>(null);
+
+    const [emailCooldown, setEmailCooldown] = useState(0);
+    const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+    const [verifyingEmail, setVerifyingEmail] = useState(false);
+
+    const passwordStrength = evaluatePassword(formData.password);
+
+    // Synchronized verification state tied directly to the currently entered email
+    const normalizedCurrentEmail = formData.contactEmail.trim().toLowerCase();
+
+    const isCurrentEmailVerified = Boolean(
+        emailVerified &&
+        emailVerificationToken &&
+        verifiedEmailAddress &&
+        verifiedEmailAddress === normalizedCurrentEmail
+    );
+
+    // Cooldown countdown timer
+    useEffect(() => {
+        if (emailCooldown <= 0) return;
+        const interval = setInterval(() => {
+            setEmailCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [emailCooldown]);
+
+    const handleCollegeSelect = (college: InstitutionItem | null) => {
+        setSelectedCollege(college);
+        if (college) {
+            setFormData((prev) => ({
+                ...prev,
+                collegeId: college.id,
+                collegeName: college.officialName,
+                collegeCity: college.city || college.district || "",
+                collegeState: college.state || "",
+                collegeCountry: "India",
+                collegeWebsiteUrl: college.website || prev.collegeWebsiteUrl || "",
+            }));
+            setErrors((prev) => {
+                const updated = { ...prev };
+                delete updated.collegeName;
+                delete updated.collegeId;
+                delete updated.collegeCity;
+                delete updated.collegeState;
+                delete updated.collegeCountry;
+                return updated;
+            });
+        } else {
+            setFormData((prev) => ({
+                ...prev,
+                collegeId: "",
+                collegeName: "",
+                collegeCity: "",
+                collegeState: "",
+                collegeCountry: "India",
+            }));
+        }
+    };
+
+    const [searchParams] = useSearchParams();
+    const isCampusInvite = searchParams.get("ref") === "campus-invite";
+    const invitedCollegeName = searchParams.get("college");
+    const invitedCollegeId = searchParams.get("collegeId");
+
+    // Auto-populate college if directed via campus invite link
+    useEffect(() => {
+        let isCancelled = false;
+        const autoSelectCollege = async () => {
+            if (invitedCollegeId) {
+                try {
+                    const inst = await getInstitutionById(invitedCollegeId);
+                    if (!isCancelled && inst) {
+                        handleCollegeSelect(inst);
+                        return;
+                    }
+                } catch {
+                    // fall back to search
+                }
+            }
+            if (invitedCollegeName && !selectedCollege) {
+                try {
+                    const results = await searchInstitutions(invitedCollegeName, { limit: 5 });
+                    if (!isCancelled && results.length > 0) {
+                        const match =
+                            results.find(
+                                (r) => r.officialName.toLowerCase() === invitedCollegeName.toLowerCase()
+                            ) || results[0];
+                        handleCollegeSelect(match);
+                    }
+                } catch {
+                    // silently fail
+                }
+            }
+        };
+
+        autoSelectCollege();
+        return () => {
+            isCancelled = true;
+        };
+    }, [invitedCollegeId, invitedCollegeName]);
+
+    const validate = () => {
+        const newErrors: Record<string, string> = {};
+
+        // Club info validation
+        const clubNameTrim = formData.clubName.trim();
+        if (!clubNameTrim) {
+            newErrors.clubName = "Club name is required";
+        } else if (clubNameTrim.length < 2 || clubNameTrim.length > 120) {
+            newErrors.clubName = "Must be between 2 and 120 characters";
+        }
+
+        if (!selectedCollege || !formData.collegeId) {
+            newErrors.collegeName = "Please search and select your institution from the verified directory";
+        }
+
+        // Representative info validation
+        const contactNameTrim = formData.contactPersonName.trim();
+        if (!contactNameTrim) {
+            newErrors.contactPersonName = "Representative full name is required";
+        } else if (contactNameTrim.length < 2) {
+            newErrors.contactPersonName = "Must be at least 2 characters";
+        }
+
+        if (!formData.contactPersonRole.trim()) {
+            newErrors.contactPersonRole = "Position in club is required";
+        }
+
+        const normalizedEmail = formData.contactEmail.trim().toLowerCase();
+        if (!normalizedEmail) {
+            newErrors.contactEmail = "Account email address is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            newErrors.contactEmail = "Please enter a valid email address";
+        }
+
+        if (formData.collegeOfficialEmail.trim()) {
+            const normalizedOfficial = formData.collegeOfficialEmail.trim().toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedOfficial)) {
+                newErrors.collegeOfficialEmail = "Please enter a valid official college email";
+            }
+        }
+
+        // URL format validation
+        const urlRegex = /^https?:\/\/.+/i;
+        if (formData.collegeWebsiteUrl.trim() && !urlRegex.test(formData.collegeWebsiteUrl.trim())) {
+            newErrors.collegeWebsiteUrl = "URL must start with http:// or https://";
+        }
+        if (formData.clubWebsiteUrl.trim() && !urlRegex.test(formData.clubWebsiteUrl.trim())) {
+            newErrors.clubWebsiteUrl = "URL must start with http:// or https://";
+        }
+        if (formData.clubSocialUrl.trim() && !urlRegex.test(formData.clubSocialUrl.trim())) {
+            newErrors.clubSocialUrl = "URL must start with http:// or https://";
+        }
+
+        // Username validation
+        const normalizedUsername = formData.username.trim().toLowerCase();
+        if (!normalizedUsername) {
+            newErrors.username = "Username is required";
+        } else if (!/^[a-z0-9._-]{3,20}$/.test(normalizedUsername)) {
+            newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
+        } else if (isDemoProfileUsername(normalizedUsername)) {
+            newErrors.username = "Clubs cannot use the username of the demo profile";
+        } else if (isDemoClubSlug(normalizedUsername)) {
+            newErrors.username = "This username is reserved for the official demo club showcase";
+        }
+
+        // Password validation (always required: every club receives an isolated Club Portal account)
+        if (!formData.password) {
+            newErrors.password = "Password is required";
+        } else if (!passwordStrength.isValid) {
+            newErrors.password = "Please satisfy all password conditions below";
+        }
+
+        // Password confirmation validation
+        if (formData.password !== formData.passwordConfirm) {
+            newErrors.passwordConfirm = "Passwords do not match";
+        }
+
+        // Legal acceptance validation
+        if (!formData.termsAccepted) {
+            newErrors.termsAccepted = "You must accept the Terms of Service";
+        }
+        if (!formData.privacyPolicyAccepted) {
+            newErrors.privacyPolicyAccepted = "You must accept the Privacy Policy";
+        }
+
+        setErrors(newErrors);
+        const isValid = Object.keys(newErrors).length === 0;
+        if (!isValid) {
+            const firstMsg = Object.values(newErrors)[0];
+            if (firstMsg) {
+                toast.error(firstMsg, { title: "Validation Error" });
+            }
+        }
+        return isValid;
+    };
+
+    // Live Unique Username and Email Checker
+    const checkAvailability = async (field: "username" | "email", value: string): Promise<boolean> => {
+        const clean = value.trim();
+        if (!clean) return true;
+        try {
+            let url = `/api/club/check-availability?${field}=${encodeURIComponent(clean)}`;
+            if (field === "username" && formData.contactEmail.trim()) {
+                url += `&email=${encodeURIComponent(formData.contactEmail.trim().toLowerCase())}`;
+            } else if (field === "email" && formData.username.trim()) {
+                url += `&username=${encodeURIComponent(formData.username.trim().toLowerCase())}`;
+            }
+            const res = await fetch(url, {
+                credentials: "include",
+            });
+            const data = await res.json().catch(() => null);
+            const errorKey = field === "username" ? "username" : "contactEmail";
+            if (data?.success && !data.available) {
+                setErrors((prev) => ({
+                    ...prev,
+                    [errorKey]: data.message,
+                }));
+                return false;
+            } else {
+                setErrors((prev) => {
+                    const updated = { ...prev };
+                    delete updated[errorKey];
+                    return updated;
+                });
+                return true;
+            }
+        } catch {
+            return true;
+        }
+    };
+
+    // Dispatch Email OTP
+    const handleSendEmailOtp = async () => {
+        const email = formData.contactEmail.trim().toLowerCase();
+        if (!email) return;
+
+        setSendingEmailOtp(true);
+        try {
+            // Pre-check uniqueness before sending email OTP
+            const isAvail = await checkAvailability("email", email);
+            if (!isAvail) {
+                return;
+            }
+
+            const res = await fetch(buildApiUrl("/api/club/verify/send-email-otp"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                    email,
+                    name: formData.contactPersonName.trim(),
+                    username: formData.username.trim().toLowerCase(),
+                }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Failed to dispatch email verification code.");
+            }
+
+            setEmailCooldown(data?.cooldownSeconds || 60);
+            toast.success(`Verification code sent to ${email}`, { title: "Email Code Sent" });
+        } catch (err: any) {
+            toast.error(err.message || "Failed to send email verification code");
+        } finally {
+            setSendingEmailOtp(false);
+        }
+    };
+
+    // Transition from details form to verification step
+    const handleProceedToVerification = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (sendingEmailOtp || formStep === "verification") return;
+        if (!validate()) return;
+
+        // Check if current email matches verified value
+        const emailNorm = formData.contactEmail.trim().toLowerCase();
+        const isEmailMatch = Boolean(
+            emailVerified &&
+            emailVerificationToken &&
+            verifiedEmailAddress &&
+            verifiedEmailAddress === emailNorm
+        );
+
+        setLoading(true);
+        try {
+            const checks: Promise<boolean>[] = [];
+            checks.push(checkAvailability("username", formData.username.trim().toLowerCase()));
+            if (!isEmailMatch) {
+                checks.push(checkAvailability("email", emailNorm));
+            }
+
+            const results = await Promise.all(checks);
+            if (results.some((avail) => avail === false)) {
+                toast.error("Please resolve registration conflicts before proceeding.", { title: "Pre-check Failed" });
+                return;
+            }
+        } finally {
+            setLoading(false);
+        }
+
+        // If email was modified, invalidate previous email verification
+        if (!isEmailMatch) {
+            setEmailVerified(false);
+            setEmailVerificationToken(null);
+            setVerifiedEmailAddress(null);
+            setEmailOtp("");
+        }
+
+        setFormStep("verification");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        if (!isEmailMatch) {
+            handleSendEmailOtp();
+        }
+    };
+
+    // Verify Email OTP
+    const handleVerifyEmail = async (codeToVerify?: string) => {
+        const code = (codeToVerify || emailOtp).trim();
+        if (code.length !== 6) {
+            toast.error("Please enter the complete 6-digit email verification code.");
+            return;
+        }
+
+        setVerifyingEmail(true);
+        try {
+            const res = await fetch(buildApiUrl("/api/club/verify/verify-email-otp"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: formData.contactEmail.trim().toLowerCase(),
+                    otp: code,
+                }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Invalid email verification code.");
+            }
+
+            setEmailVerified(true);
+            setEmailVerificationToken(data.token);
+            setVerifiedEmailAddress(formData.contactEmail.trim().toLowerCase());
+            toast.success("Primary email verified successfully!", { title: "Email Verified" });
+        } catch (err: any) {
+            toast.error(err.message || "Email verification failed");
+        } finally {
+            setVerifyingEmail(false);
+        }
+    };
+
+    // Final Submission after Email is verified
+    const executeFinalSubmission = async () => {
+        if (!isCurrentEmailVerified) {
+            toast.error("Please verify your primary email before submitting.");
+            return;
+        }
+
+        setLoading(true);
+
+        const payload = {
+            clubName: formData.clubName.trim(),
+            collegeId: selectedCollege?.id || undefined,
+            collegeName: (selectedCollege?.officialName || formData.collegeName).trim(),
+            collegeCity: (selectedCollege?.city || selectedCollege?.district || formData.collegeCity).trim(),
+            collegeState: (selectedCollege?.state || formData.collegeState).trim(),
+            collegeCountry: "India",
+            clubCategory: formData.clubCategory,
+            clubDescription: formData.clubDescription.trim() || undefined,
+
+            contactPersonName: formData.contactPersonName.trim(),
+            contactPersonRole: formData.contactPersonRole.trim(),
+            contactEmail: formData.contactEmail.trim().toLowerCase(),
+            collegeOfficialEmail: formData.collegeOfficialEmail.trim().toLowerCase() || undefined,
+
+            collegeWebsiteUrl: formData.collegeWebsiteUrl.trim() || undefined,
+            clubWebsiteUrl: formData.clubWebsiteUrl.trim() || undefined,
+            clubSocialUrl: formData.clubSocialUrl.trim() || undefined,
+
+            username: formData.username.trim().toLowerCase(),
+            password: formData.password,
+
+            emailVerificationToken: emailVerificationToken || undefined,
+
+            termsAccepted: formData.termsAccepted,
+            privacyPolicyAccepted: formData.privacyPolicyAccepted,
+        };
+
+        try {
+            const endpoints = [buildApiUrl("/api/club/register")];
+            let response: Response | null = null;
+            let resultData: any = null;
+
+            for (const url of endpoints) {
+                try {
+                    const res = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify(payload),
+                    });
+                    response = res;
+                    resultData = await res.json().catch(() => null);
+                    break;
+                } catch {
+                    continue;
+                }
+            }
+
+            if (!response) {
+                throw new Error("Unable to connect to the authentication server. Please check backend status.");
+            }
+
+            if (!response.ok) {
+                await toast.handleError(response, resultData?.message || "Registration failed. Please check your information.");
+                return;
+            }
+
+            if (resultData?.token) {
+                try {
+                    localStorage.setItem("orbix_token", resultData.token);
+                } catch {
+                    // ignore quota errors
+                }
+            }
+
+            const clubUser = resultData?.user || {
+                username: payload.username,
+                firstName: payload.clubName,
+                lastName: "Club",
+                gmail: payload.contactEmail,
+                accountType: "club",
+            };
+
+            dispatch(setUser(clubUser));
+            setRedirecting(true);
+
+            toast.success("Contact verified & club application received successfully!", {
+                title: "Application Received",
+            });
+
+            // Redirect immediately to standalone club application-status page
+            navigate("/club/status");
+        } catch (err: any) {
+            console.error("Club signup error:", err);
+            await toast.handleError(err, "An unexpected error occurred during registration.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (redirecting) {
+        return (
+            <OrbixInitialLoader
+                message="Submitting Application…"
+                subMessage="Opening your verified club review dashboard…"
+            />
+        );
+    }
+
+    return (
+        <form onSubmit={formStep === "details" ? handleProceedToVerification : (e) => { e.preventDefault(); executeFinalSubmission(); }} className="space-y-6" noValidate>
+            {formStep === "details" ? (
+                <>
+                    {/* Campus outreach invitation banner */}
+                    {isCampusInvite && (
+                        <div className="p-3.5 mb-3 rounded-2xl bg-[#a2ff86]/30 border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-[#a2ff86] border-2 border-black flex-shrink-0">
+                                <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="font-black text-black text-xs uppercase tracking-wider">
+                                    Campus Chapter Invitation
+                                </h4>
+                                <p className="text-xs font-semibold text-neutral-800">
+                                    You've been invited to register your official student club chapter at{" "}
+                                    <strong>{invitedCollegeName || "your college"}</strong>. Complete the details below to claim your verified campus hub!
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Signed-in user account & club status banner */}
+                    {isAuthenticated && authUser && (
+                        <div className="mb-2">
+                            {authUser.accountType === "club" && authUser.verifiedClub ? (
+                                <div className="p-4 sm:p-5 rounded-3xl bg-[#E8F5E9] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <Building2 className="w-7 h-7 text-emerald-700 shrink-0" />
+                                        <div>
+                                            <h4 className="font-black text-black text-sm">You Hold a Verified Club</h4>
+                                            <p className="text-xs font-semibold text-neutral-700">
+                                                You are signed in as the verified club <strong>{authUser.verifiedClub.name}</strong>.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate("/club/dashboard")}
+                                        className="px-4 py-2 font-black text-xs uppercase tracking-wider bg-black text-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 transition-all cursor-pointer whitespace-nowrap"
+                                    >
+                                        Go to Dashboard →
+                                    </button>
+                                </div>
+                            ) : authUser.accountType === "club" && (authUser.application || (authUser.clubStatus && authUser.clubStatus !== "none" && authUser.clubStatus !== "rejected")) ? (
+                                <div className="p-4 sm:p-5 rounded-3xl bg-[#FFF8E1] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <ShieldCheck className="w-7 h-7 text-amber-700 shrink-0" />
+                                        <div>
+                                            <h4 className="font-black text-black text-sm">Active Club Application Pending</h4>
+                                            <p className="text-xs font-semibold text-neutral-700">
+                                                Application for <strong>"{authUser.clubName || authUser.application?.clubName || 'Your Club'}"</strong> is currently <strong>{authUser.clubStatus || authUser.application?.status || 'under review'}</strong>.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate("/club/status")}
+                                        className="px-4 py-2 font-black text-xs uppercase tracking-wider bg-[#FFAE96] text-black rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#FF9B80] transition-all cursor-pointer whitespace-nowrap"
+                                    >
+                                        Track Progress →
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="p-3.5 sm:p-4 rounded-2xl bg-[#EFF6FF] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                                    <UserCheck className="w-5 h-5 text-blue-700 shrink-0" />
+                                    <p className="text-xs font-semibold text-neutral-800">
+                                        Currently signed into Personal Account <strong>@{authUser.username}</strong>. Submitting this form creates a <strong>separate institutional Club Account</strong> with its own dedicated Club Handle and password.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* SECTION A: CLUB INFORMATION */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <Building2 className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                1. Club & Institution Information
+                            </h3>
+                        </div>
+
+                        {/* Club Name */}
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                                Club Name *
+                            </label>
+                            <FormInput
+                                name="clubName"
+                                type="text"
+                                placeholder="Club Name (e.g. Google Developer Student Club)"
+                                hideLabel
+                                value={formData.clubName}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, clubName: e.target.value });
+                                    if (errors.clubName) setErrors({ ...errors, clubName: "" });
+                                }}
+                                error={errors.clubName}
+                            />
+                        </div>
+
+                        {/* Verified College / University Selector */}
+                        <div className="pb-1">
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                                College / University (Verified Directory) *
+                            </label>
+                            <CollegeAutocomplete
+                                value={selectedCollege?.id}
+                                selectedCollege={selectedCollege}
+                                onChange={handleCollegeSelect}
+                                canChangeCollege={true}
+                                showChangeWarningModal={false}
+                                placeholder="Search verified Indian colleges, IITs, NITs, universities..."
+                            />
+                            {errors.collegeName && (
+                                <p className="text-[11px] font-bold text-rose-600 mt-1">{errors.collegeName}</p>
+                            )}
+                        </div>
+
+                        {/* Auto-filled Verified Location Badges (Locked & Authoritative) */}
+                        {selectedCollege && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5 animate-in fade-in duration-200">
+                                <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                        <MapPin className="w-3 h-3 text-neutral-700" />
+                                        City (Auto-filled)
+                                    </span>
+                                    <p className="text-xs font-black text-black truncate">
+                                        {formData.collegeCity || "N/A"}
+                                    </p>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                        <MapPin className="w-3 h-3 text-neutral-700" />
+                                        State / UT (Auto-filled)
+                                    </span>
+                                    <p className="text-xs font-black text-black truncate">
+                                        {formData.collegeState || "N/A"}
+                                    </p>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                        <Lock className="w-3 h-3 text-neutral-700" />
+                                        Country
+                                    </span>
+                                    <p className="text-xs font-black text-black truncate">
+                                        {formData.collegeCountry || "India"}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Club Category Dropdown */}
+                        <NeoSelect
+                            label="Club Category"
+                            value={formData.clubCategory}
+                            onChange={(val) => setFormData({ ...formData, clubCategory: val })}
+                            options={CATEGORY_OPTIONS}
+                        />
+
+                        {/* Club Description */}
+                        <div>
+                            <textarea
+                                rows={2}
+                                placeholder="Short description of your club's purpose and activities (optional)"
+                                value={formData.clubDescription}
+                                onChange={(e) => setFormData({ ...formData, clubDescription: e.target.value })}
+                                className="w-full p-3 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-medium text-black placeholder:text-neutral-500 shadow-[2px_2px_0px_#000] focus:outline-none focus:bg-white resize-none"
+                            />
+                        </div>
+                    </div>
+
+                    {/* SECTION B: REPRESENTATIVE DETAILS */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <UserCheck className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                2. Representative Details
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                    Representative Full Name *
+                                </label>
+                                <FormInput
+                                    name="contactPersonName"
+                                    type="text"
+                                    placeholder="Representative's Full Name"
+                                    hideLabel
+                                    value={formData.contactPersonName}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, contactPersonName: e.target.value });
+                                        if (errors.contactPersonName) setErrors({ ...errors, contactPersonName: "" });
+                                    }}
+                                    error={errors.contactPersonName}
+                                    autoComplete="name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                    Position / Role in Club *
+                                </label>
+                                <NeoSelect
+                                    value={formData.contactPersonRole}
+                                    onChange={(val) => setFormData({ ...formData, contactPersonRole: val })}
+                                    options={ROLE_OPTIONS.map((r) => ({
+                                        value: r,
+                                        label: `Role: ${r}`,
+                                    }))}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Official College Email (Optional) */}
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                Official College Email (Optional)
+                            </label>
+                            <FormInput
+                                name="collegeOfficialEmail"
+                                type="email"
+                                placeholder="Official College Email (optional)"
+                                hideLabel
+                                value={formData.collegeOfficialEmail}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, collegeOfficialEmail: e.target.value });
+                                    if (errors.collegeOfficialEmail) setErrors({ ...errors, collegeOfficialEmail: "" });
+                                }}
+                                error={errors.collegeOfficialEmail}
+                            />
+                        </div>
+                    </div>
+
+                    {/* SECTION C: VERIFICATION REFERENCES */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <Globe className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                3. Verification References (Optional)
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <FormInput
+                                name="collegeWebsiteUrl"
+                                type="url"
+                                placeholder="College Website (e.g. https://college.edu.in)"
+                                hideLabel
+                                value={formData.collegeWebsiteUrl}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, collegeWebsiteUrl: e.target.value });
+                                    if (errors.collegeWebsiteUrl) setErrors({ ...errors, collegeWebsiteUrl: "" });
+                                }}
+                                error={errors.collegeWebsiteUrl}
+                            />
+
+                            <FormInput
+                                name="clubWebsiteUrl"
+                                type="url"
+                                placeholder="Club Website (e.g. https://gdsc-college.dev)"
+                                hideLabel
+                                value={formData.clubWebsiteUrl}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, clubWebsiteUrl: e.target.value });
+                                    if (errors.clubWebsiteUrl) setErrors({ ...errors, clubWebsiteUrl: "" });
+                                }}
+                                error={errors.clubWebsiteUrl}
+                            />
+                        </div>
+
+                        <FormInput
+                            name="clubSocialUrl"
+                            type="url"
+                            placeholder="Official Social Profile or Directory Listing URL"
+                            hideLabel
+                            value={formData.clubSocialUrl}
+                            onChange={(e) => {
+                                setFormData({ ...formData, clubSocialUrl: e.target.value });
+                                if (errors.clubSocialUrl) setErrors({ ...errors, clubSocialUrl: "" });
+                            }}
+                            error={errors.clubSocialUrl}
+                        />
+                    </div>
+
+                    {/* SECTION D: ACCOUNT CREDENTIALS */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <Lock className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                4. Account Credentials
+                            </h3>
+                        </div>
+
+                        {/* Primary Account Email */}
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                    Primary Contact & Account Email *
+                                </label>
+                                {isCurrentEmailVerified ? (
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-black flex items-center gap-1 shadow-[1px_1px_0px_#000]">
+                                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                                        <span>Verified</span>
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
+                                        Primary Verification Target
+                                    </span>
+                                )}
+                            </div>
+                            <FormInput
+                                name="contactEmail"
+                                type="email"
+                                placeholder="e.g. leader@college.edu or name@gmail.com"
+                                hideLabel
+                                value={formData.contactEmail}
+                                onChange={(e) => {
+                                    const nextVal = e.target.value;
+                                    setFormData((prev) => ({ ...prev, contactEmail: nextVal }));
+                                    if (errors.contactEmail) setErrors((prev) => ({ ...prev, contactEmail: "" }));
+                                    // Invalidate verified email state if user changes the address
+                                    if (verifiedEmailAddress && nextVal.trim().toLowerCase() !== verifiedEmailAddress) {
+                                        setEmailVerified(false);
+                                        setEmailVerificationToken(null);
+                                        setVerifiedEmailAddress(null);
+                                        setEmailOtp("");
+                                    }
+                                }}
+                                onBlur={() => {
+                                    if (formData.contactEmail.trim()) {
+                                        checkAvailability("email", formData.contactEmail);
+                                        if (formData.username.trim() && errors.username) {
+                                            checkAvailability("username", formData.username);
+                                        }
+                                    }
+                                }}
+                                error={errors.contactEmail}
+                                autoComplete="email"
+                            />
+                            <p className="text-[10px] text-neutral-500 font-semibold mt-1">
+                                A 6-digit one-time code will be dispatched to verify ownership.
+                            </p>
+                        </div>
+
+                        {/* Username Input with live rules indicator and public URL preview */}
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                Club Username *
+                            </label>
+                            <FormInput
+                                name="username"
+                                type="text"
+                                placeholder="Unique Club Username (e.g. gdsc_cu)"
+                                hideLabel
+                                value={formData.username}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s+/g, "_") });
+                                    if (errors.username) setErrors({ ...errors, username: "" });
+                                }}
+                                onFocus={() => setUsernameFocused(true)}
+                                onBlur={() => {
+                                    setUsernameFocused(false);
+                                    if (formData.username.trim()) {
+                                        checkAvailability("username", formData.username);
+                                    }
+                                }}
+                                error={errors.username}
+                                autoComplete="username"
+                            />
+
+                            <p className="text-[10px] text-neutral-500 font-semibold mt-1">
+                                Your unique club handle powers your public profile URL: <span className="font-mono font-bold text-black">/clubs/{formData.username || "<club-username>"}</span>
+                            </p>
+
+                            <UsernameRulesIndicator
+                                username={formData.username}
+                                hasInput={formData.username.length > 0}
+                                isFocused={usernameFocused}
+                            />
+                        </div>
+
+                        <div className="space-y-3.5">
+                            {/* Password Input */}
+                            <div>
+                                <FormInput
+                                    name="password"
+                                    isPassword
+                                    placeholder="Club Account Password"
+                                    hideLabel
+                                    value={formData.password}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, password: e.target.value });
+                                        if (errors.password) setErrors({ ...errors, password: "" });
+                                    }}
+                                    error={errors.password}
+                                    autoComplete="new-password"
+                                />
+
+                                <PasswordStrengthIndicator
+                                    result={passwordStrength}
+                                    hasInput={formData.password.length > 0}
+                                />
+                            </div>
+
+                            {/* Confirm Password */}
+                            <FormInput
+                                name="passwordConfirm"
+                                isPassword
+                                placeholder="Confirm Password"
+                                hideLabel
+                                value={formData.passwordConfirm}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, passwordConfirm: e.target.value });
+                                    if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
+                                }}
+                                error={errors.passwordConfirm}
+                                autoComplete="new-password"
+                            />
+                        </div>
+                    </div>
+
+                    {/* SECTION E: LEGAL CONSENT (ONE BY ONE, NOT PARALLEL) */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                        <div className="flex flex-col gap-3.5 pt-1">
+                            <div className="w-full">
+                                <NeoCheckbox
+                                    checked={formData.termsAccepted}
+                                    onCheckedChange={(checked) => {
+                                        setFormData({ ...formData, termsAccepted: checked });
+                                        if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                                    }}
+                                    size="sm"
+                                    className="w-full flex"
+                                    label={
+                                        <span className="leading-snug font-medium text-xs text-neutral-700">
+                                            I accept the{" "}
+                                            <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                                Terms of Service
+                                            </Link>
+                                            .
+                                        </span>
+                                    }
+                                />
+                                {errors.termsAccepted && (
+                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
+                                )}
+                            </div>
+
+                            <div className="w-full">
+                                <NeoCheckbox
+                                    checked={formData.privacyPolicyAccepted}
+                                    onCheckedChange={(checked) => {
+                                        setFormData({ ...formData, privacyPolicyAccepted: checked });
+                                        if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
+                                    }}
+                                    size="sm"
+                                    className="w-full flex"
+                                    label={
+                                        <span className="leading-snug font-medium text-xs text-neutral-700">
+                                            I accept the{" "}
+                                            <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                                Privacy Policy
+                                            </Link>
+                                            .
+                                        </span>
+                                    }
+                                />
+                                {errors.privacyPolicyAccepted && (
+                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Proceed Button */}
+                    <div className="pt-2">
+                        <button
+                            type="submit"
+                            disabled={!formData.termsAccepted || !formData.privacyPolicyAccepted}
+                            className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            <span className="inline-flex items-center gap-2">
+                                <span>Continue to Contact Verification</span>
+                                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                            </span>
+                        </button>
+                    </div>
+                </>
+            ) : (
+                /* STEP 2: EMAIL & PHONE VERIFICATION VIEW (ON SAME PAGE) */
+                <div className="space-y-5 animate-in fade-in slide-in-from-right duration-250">
+                    {/* Stepper Navigation */}
+                    <div className="p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-black">
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
+                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span className="hidden sm:inline">1. Application Details</span>
+                                <span className="sm:hidden">1. Details</span>
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span className="hidden sm:inline">2. Contact Verification</span>
+                                <span className="sm:hidden">2. Verify</span>
+                            </span>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setFormStep("details")}
+                            className="px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black border-2 border-black text-xs font-black transition-all flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>Edit Details</span>
+                        </button>
+                    </div>
+
+                    {/* Two-Factor Guidance Banner */}
+                    <div className="p-4 rounded-2xl bg-[#FFE566]/25 border-2 border-black shadow-[3px_3px_0px_#000] space-y-1">
+                        <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-black stroke-[2.5]" />
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                Mandatory Two-Factor Contact Verification
+                            </h4>
+                        </div>
+                        <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
+                            To ensure authentic student community leadership, verify both your primary email address and your primary mobile number. Both codes must be verified to complete submission.
+                        </p>
+                    </div>
+
+                    {/* CARD 1: PRIMARY EMAIL VERIFICATION */}
+                    <div className={`p-4 sm:p-5 rounded-3xl border-2 border-black shadow-[4px_4px_0px_#000] transition-all space-y-3.5 ${
+                        isCurrentEmailVerified ? "bg-[#a2ff86]/15 border-black" : "bg-white"
+                    }`}>
+                        <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/10 flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[1px_1px_0px_#000] flex-shrink-0">
+                                    <Mail className="w-4 h-4 stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                        Primary Email Verification
+                                    </span>
+                                    <span className="text-xs sm:text-sm font-black text-black truncate block">
+                                        {formData.contactEmail}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {isCurrentEmailVerified ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Email Verified</span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormStep("details")}
+                                        className="text-[11px] font-black text-neutral-600 hover:text-black underline underline-offset-2 cursor-pointer"
+                                    >
+                                        Change
+                                    </button>
+                                </div>
+                            ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-900">
+                                    <span>Awaiting Code</span>
+                                </span>
+                            )}
+                        </div>
+
+                        {!isCurrentEmailVerified ? (
+                            <div className="space-y-3 pt-1">
+                                <p className="text-xs text-neutral-600 font-semibold text-center">
+                                    Enter the 6-digit verification code sent to <strong className="text-black">{formData.contactEmail}</strong>
+                                </p>
+
+                                <OtpSegmentedInput
+                                    value={emailOtp}
+                                    onChange={(val) => setEmailOtp(val)}
+                                    disabled={verifyingEmail}
+                                    onComplete={(code) => handleVerifyEmail(code)}
+                                />
+
+                                <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={emailCooldown > 0 || sendingEmailOtp}
+                                        onClick={handleSendEmailOtp}
+                                        className="text-xs font-black text-black underline underline-offset-2 hover:text-neutral-700 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                                    >
+                                        <RotateCcw className={`w-3.5 h-3.5 stroke-[2.5] ${sendingEmailOtp ? "animate-spin" : ""}`} />
+                                        <span>{emailCooldown > 0 ? `Resend email code (${emailCooldown}s)` : "Resend Email Code"}</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={emailOtp.length !== 6 || verifyingEmail}
+                                        onClick={() => handleVerifyEmail(emailOtp)}
+                                        className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black uppercase tracking-wider shadow-[2px_2px_0px_#000] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
+                                    >
+                                        {verifyingEmail ? "Verifying..." : "Verify Email"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-2 text-xs font-bold text-emerald-900">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 stroke-[2.5]" />
+                                <span>Primary email address authenticated cryptographically.</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Final Submission Button */}
+                    <div className="pt-2 space-y-3">
+                        <button
+                            type="button"
+                            disabled={!isCurrentEmailVerified || loading}
+                            onClick={executeFinalSubmission}
+                            className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            {loading ? (
+                                <div className="flex items-center gap-2">
+                                    <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                    </svg>
+                                    <span>Submitting Verified Club Application...</span>
+                                </div>
+                            ) : (
+                                <span className="inline-flex items-center gap-2">
+                                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                                    <span>
+                                        {isCurrentEmailVerified
+                                            ? "Submit Verified Club Application"
+                                            : "Verify primary email to submit"}
+                                    </span>
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </form>
+    );
+}
