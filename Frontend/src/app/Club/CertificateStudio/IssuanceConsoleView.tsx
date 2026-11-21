@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { EligibilityRecipientsStep } from "./EligibilityRecipientsStep";
+import { getCertificateCategoryPolicy, normalizeCertificateCategoryFields } from "../../../../../shared/certificateCategoryPolicy";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
     Award,
     Calendar,
@@ -60,7 +62,8 @@ import {
     type CsvReconciliationResult,
 } from "../../../api/certificateStudioApi";
 import type { CertificateDesign } from "../../../types/certificateStudio";
-import { CertificateThumbnailPreview } from "./TemplateSelectionView";
+import { CertificateThumbnailPreview } from "./CertificateThumbnailPreview";
+import { hasCertificateContent } from "./templateContent";
 import { RecipientRosterTable, type RosterRecipientItem } from "./RecipientRosterTable";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
@@ -97,49 +100,49 @@ export const CERTIFICATE_CATEGORIES = [
         label: "First Place Winner",
         description: "Premier top-ranking honor for competitions and hackathons",
         badge: "COMPETITIVE",
-        ruleType: "Verified event attendee with verified competition result.",
+        ruleType: "Verified attendance required. Select recipients matching this competition result.",
     },
     {
         value: "first_runner_up",
         label: "First Runner-Up",
         description: "Second place competitive achievement honor",
         badge: "COMPETITIVE",
-        ruleType: "Verified event attendee with verified competition result.",
+        ruleType: "Verified attendance required. Select recipients matching this competition result.",
     },
     {
         value: "second_runner_up",
         label: "Second Runner-Up",
         description: "Third place competitive achievement honor",
         badge: "COMPETITIVE",
-        ruleType: "Verified event attendee with verified competition result.",
+        ruleType: "Verified attendance required. Select recipients matching this competition result.",
     },
     {
         value: "finalist",
         label: "Event Finalist",
         description: "Merit award for shortlisted final-round competitors",
         badge: "COMPETITIVE",
-        ruleType: "Shortlisted competitive attendee.",
+        ruleType: "Verified attendance required. Select shortlisted finalists.",
     },
     {
         value: "best_innovation",
         label: "Best Innovation",
         description: "Special honor for outstanding technical innovation or creative design",
         badge: "COMPETITIVE",
-        ruleType: "Verified event attendee with innovation distinction.",
+        ruleType: "Verified attendance required. Select recipients awarded Best Innovation.",
     },
     {
         value: "best_project",
         label: "Best Project",
         description: "Honor for premier team or individual project showcase",
         badge: "COMPETITIVE",
-        ruleType: "Verified event attendee with recognized project showcase.",
+        ruleType: "Verified attendance required. Select recipients awarded Best Project.",
     },
     {
         value: "best_performer",
         label: "Best Performer",
         description: "Recognizing outstanding individual contributor or presenter",
         badge: "COMPETITIVE",
-        ruleType: "Verified individual attendee recognition.",
+        ruleType: "Verified attendance required. Select recipients awarded Best Performer.",
     },
     {
         value: "speaker",
@@ -188,7 +191,6 @@ export const CERTIFICATE_CATEGORIES = [
 type WizardStep =
     | "category"
     | "eligibility"
-    | "recipients"
     | "template"
     | "mapping"
     | "preview"
@@ -232,6 +234,10 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     const [activeTemplateName, setActiveTemplateName] = useState<string>(propTemplateName || "Default Credential");
     const [availableTemplates, setAvailableTemplates] = useState<CertificateTemplateRecord[]>([]);
     const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+    const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+    const [templateLoadError, setTemplateLoadError] = useState(false);
+    const [templateReload, setTemplateReload] = useState(0);
+    const hasSelectedDesign = useRef(Boolean(propDesign));
 
     // Events State
     const [events, setEvents] = useState<CertificateEventItem[]>([]);
@@ -240,6 +246,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     // Phase 10: Event Eligibility Engine State
     const [eligibilityReport, setEligibilityReport] = useState<EventEligibilityReport | null>(null);
     const [loadingEligibility, setLoadingEligibility] = useState(false);
+    const [eligibilityReload, setEligibilityReload] = useState(0);
     const [showExclusionsModal, setShowExclusionsModal] = useState(false);
     const [showManualReviewModal, setShowManualReviewModal] = useState(false);
 
@@ -278,7 +285,6 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     const [showAddExternalModal, setShowAddExternalModal] = useState(false);
     const [extFormName, setExtFormName] = useState("");
     const [extFormEmail, setExtFormEmail] = useState("");
-    const [extFormPosition, setExtFormPosition] = useState("");
 
     // Phase 12: Team & Individual Issuance Modes & Frozen Roster Snapshot
     const [teamIssuanceMode, setTeamIssuanceMode] = useState<"individual_only" | "team_only" | "both">("both");
@@ -322,7 +328,19 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     const [description, setDescription] = useState("");
     const [signerName, setSignerName] = useState("");
     const [signerRole, setSignerRole] = useState("Lead Club Coordinator");
-    const [awardPosition, setAwardPosition] = useState("");
+    const [customAchievement, setCustomAchievement] = useState("");
+    const categoryPolicy = getCertificateCategoryPolicy(certType);
+    const awardPosition = categoryPolicy.customAchievement ? customAchievement : categoryPolicy.position || "";
+    const changeCertificateCategory = (category: string) => {
+        if (category === certType) return;
+        setCertType(category);
+        setCustomAchievement("");
+        setCustomOverrides({});
+        setSelectedUserIds(new Set());
+        setEligibilityReport(null);
+        const label = CERTIFICATE_CATEGORIES.find((item) => item.value === category)?.label || "Certificate";
+        setTitle(`${label}${activeEventTitle ? ` — ${activeEventTitle}` : ""}`);
+    };
 
     // Preview selection state (Step 6)
     const [previewScenario, setPreviewScenario] = useState<"first" | "longest" | "missing">("first");
@@ -346,24 +364,34 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     const [batchProgress, setBatchProgress] = useState<BatchProgressInfo | null>(null);
     const [isRetryingBatch, setIsRetryingBatch] = useState(false);
 
-    // Load available templates if design is not provided
+    // Load the catalog once; choosing a design must not fetch it again.
     useEffect(() => {
+        let cancelled = false;
         const loadTemplates = async () => {
+            setIsLoadingTemplates(true);
+            setTemplateLoadError(false);
             try {
                 const data = await fetchCertificateTemplates();
-                const all = [...(data.systemTemplates || []), ...(data.clubTemplates || [])];
+                const all = [...(data.systemTemplates || []), ...(data.clubTemplates || [])].filter((template) => hasCertificateContent(template.design));
+                if (cancelled) return;
                 setAvailableTemplates(all);
-                if (!activeDesign && all.length > 0) {
+                if (!hasSelectedDesign.current && all.length > 0) {
+                    hasSelectedDesign.current = true;
                     setActiveDesign(all[0].design);
                     setActiveTemplateId(all[0].id);
                     setActiveTemplateName(all[0].name);
                 }
             } catch (err) {
+                if (cancelled) return;
                 console.error("Failed to load templates for issuance:", err);
+                setTemplateLoadError(true);
+            } finally {
+                if (!cancelled) setIsLoadingTemplates(false);
             }
         };
         loadTemplates();
-    }, [activeDesign]);
+        return () => { cancelled = true; };
+    }, [templateReload]);
 
     // Load initial events
     useEffect(() => {
@@ -388,14 +416,19 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     useEffect(() => {
         if (!selectedEventId || sourceTab !== "event") return;
 
+        let cancelled = false;
         const loadReport = async () => {
             setLoadingEligibility(true);
+            setEligibilityReport(null);
             try {
                 const report = await fetchEventEligibilityReport(selectedEventId, certType);
+                if (cancelled) return;
                 setEligibilityReport(report);
 
                 // Default auto-selection
-                if (certType === "attendance") {
+                if (!getCertificateCategoryPolicy(certType).autoSelect) {
+                    setSelectedUserIds(new Set());
+                } else if (certType === "attendance") {
                     const verified = report.eligibleRecipients
                         .filter((r) => !r.alreadyHasCert && r.status === "attended" && r.checkedInAt)
                         .map((r) => r.userId);
@@ -409,20 +442,22 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
 
                 const cur = events.find((e) => e.id === selectedEventId);
                 const eventName = preselectedEventTitle || cur?.title || report.eventTitle;
-                if (eventName && (!title || title === "Certificate of Participation")) {
+                if (eventName) {
                     const catLabel = CERTIFICATE_CATEGORIES.find((c) => c.value === certType)?.label || "Certificate";
-                    setTitle(`${catLabel} — ${eventName}`);
+                    setTitle((previous) => !previous || previous === "Certificate of Participation" ? `${catLabel} — ${eventName}` : previous);
                 }
             } catch (err: any) {
+                if (cancelled) return;
                 console.error("Failed to load eligibility report:", err);
                 toast.error(err.message || "Failed to load event eligibility report.");
             } finally {
-                setLoadingEligibility(false);
+                if (!cancelled) setLoadingEligibility(false);
             }
         };
 
         loadReport();
-    }, [selectedEventId, certType, sourceTab, events, preselectedEventTitle, title]);
+        return () => { cancelled = true; };
+    }, [selectedEventId, certType, sourceTab, events, preselectedEventTitle, eligibilityReload]);
 
     // Load manual/network recipients
     useEffect(() => {
@@ -526,16 +561,6 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
             ids.forEach((id) => next.delete(id));
             return next;
         });
-    };
-
-    const handleUpdateCustomPosition = (id: string, position: string) => {
-        setCustomOverrides((prev) => ({
-            ...prev,
-            [id]: {
-                ...(prev[id] || {}),
-                customPosition: position.trim() || undefined,
-            },
-        }));
     };
 
     // Phase 14: Filtered CSV rows based on search and status tabs
@@ -856,6 +881,10 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
 
     // Pre-dispatch validation & manual override trigger
     const handleInitiateDispatch = () => {
+        if (categoryPolicy.customAchievement && !customAchievement.trim()) {
+            toast.error("Enter the achievement name for this custom certificate.");
+            return;
+        }
         const hasRecipients = selectedUserIds.size > 0 || externalRecipients.length > 0;
         const hasTeams = selectedTeamIds.size > 0;
 
@@ -865,8 +894,8 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
         }
 
         if (sourceTab === "event" && certType === "attendance" && eligibilityReport) {
-            const unverifiedSelected = eligibilityReport.eligibleRecipients.filter(
-                (r) => selectedUserIds.has(r.userId) && (r.status !== "attended" || !r.checkedInAt)
+            const unverifiedSelected = eventRosterItems.filter(
+                (r) => selectedUserIds.has(r.userId || r.id) && (r.status !== "attended" || !r.checkedInAt)
             );
 
             if (unverifiedSelected.length > 0) {
@@ -877,11 +906,23 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
             }
         }
 
+        if (sourceTab === "event" && eventRosterItems.some((recipient) => selectedUserIds.has(recipient.id) && recipient.isEligible === false)) {
+            toast.error("Remove excluded recipients or review their eligibility before issuing certificates.");
+            return;
+        }
         executeBatchDispatch(false, undefined);
     };
 
     // Authoritative batch dispatch execution
     const executeBatchDispatch = async (allowManualOverride = false, reason?: string) => {
+        if (categoryPolicy.customAchievement && !customAchievement.trim()) {
+            toast.error("Enter the achievement name for this custom certificate.");
+            return;
+        }
+        if (sourceTab === "event" && certType !== "attendance" && eventRosterItems.some((recipient) => selectedUserIds.has(recipient.id) && recipient.isEligible === false)) {
+            toast.error("Remove excluded recipients before issuing certificates.");
+            return;
+        }
         try {
             setIsIssuing(true);
 
@@ -896,8 +937,8 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
             }> = [];
 
             if (sourceTab === "event" && eligibilityReport) {
-                recipientsPayload = eligibilityReport.eligibleRecipients
-                    .filter((r) => selectedUserIds.has(r.userId))
+                recipientsPayload = eventRosterItems
+                    .filter((r) => selectedUserIds.has(r.id) && (r.isEligible || (certType === "attendance" && allowManualOverride)))
                     .map((r) => ({
                         userId: r.userId,
                         customName: r.name,
@@ -1023,7 +1064,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
             });
 
             const isAsync = recipientsPayload.length > 15;
-            const payload: BatchIssuancePayload = {
+            const payload: BatchIssuancePayload = normalizeCertificateCategoryFields({
                 templateId: activeTemplateId || undefined,
                 customDesign: !activeTemplateId ? activeDesign : undefined,
                 title: title.trim() || "Certificate of Participation",
@@ -1045,7 +1086,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                 overrideReason: reason,
                 asyncMode: isAsync || undefined,
                 idempotencyKey: `batch-${selectedEventId || "m"}-${Date.now()}`,
-            };
+            });
 
             const res = await issueCertificateBatch(payload);
             if (res.isAsync) {
@@ -1130,8 +1171,8 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
             sourceTab === "event" &&
             certType === "attendance" &&
             eligibilityReport &&
-            eligibilityReport.eligibleRecipients.some(
-                (r) => selectedUserIds.has(r.userId) && (r.status !== "attended" || !r.checkedInAt)
+            eventRosterItems.some(
+                (r) => selectedUserIds.has(r.id) && (r.status !== "attended" || !r.checkedInAt)
             )
         );
 
@@ -1141,24 +1182,38 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
             hasRecipients,
             hasSigners,
             hasAttendanceDiscrepancy,
-            isAllClear: hasTitle && hasTemplate && hasRecipients,
+            isAllClear: hasTitle && hasTemplate && hasRecipients && (!categoryPolicy.customAchievement || Boolean(customAchievement.trim())),
         };
-    }, [title, activeDesign, selectedUserIds, signerName, signerRole, sourceTab, certType, eligibilityReport]);
+    }, [title, activeDesign, selectedUserIds, signerName, signerRole, sourceTab, certType, eligibilityReport, customAchievement, eventRosterItems]);
 
     // ============================================================================
     // STEP DEFINITIONS FOR EVENT-INTEGRATED ISSUANCE FLOW
     // ============================================================================
     const WIZARD_STEPS: Array<{ id: WizardStep; label: string; number: number }> = [
         { id: "category", label: "Award Category", number: 1 },
-        { id: "eligibility", label: "Eligibility & Audit", number: 2 },
-        { id: "recipients", label: "Select Recipients", number: 3 },
-        { id: "template", label: "Certificate Template", number: 4 },
-        { id: "mapping", label: "Field Mapping", number: 5 },
-        { id: "preview", label: "Live Preview", number: 6 },
-        { id: "approve", label: "Approve & Issue", number: 7 },
+        { id: "eligibility", label: "Eligibility & Recipients", number: 2 },
+        { id: "template", label: "Certificate Template", number: 3 },
+        { id: "mapping", label: "Field Mapping", number: 4 },
+        { id: "preview", label: "Live Preview", number: 5 },
+        { id: "approve", label: "Approve & Issue", number: 6 },
     ];
 
     const currentStepIndex = WIZARD_STEPS.findIndex((s) => s.id === wizardStep);
+
+    const templateListState = isLoadingTemplates ? (
+        <div role="status" aria-live="polite" className="col-span-full flex min-h-48 flex-col items-center justify-center gap-3 py-8">
+            <RefreshCw aria-hidden="true" className="w-7 h-7 animate-spin motion-reduce:animate-none" />
+            <p className="text-xs font-bold text-neutral-600">Loading certificate templates…</p>
+        </div>
+    ) : templateLoadError ? (
+        <div role="alert" className="col-span-full py-8 text-center space-y-3">
+            <p className="text-xs font-bold text-neutral-600">Couldn’t load certificate templates.</p>
+            <button type="button" onClick={() => setTemplateReload((value) => value + 1)}
+                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FFE566] text-xs font-black">Retry</button>
+        </div>
+    ) : availableTemplates.length === 0 ? (
+        <p className="col-span-full py-8 text-center text-xs font-bold text-neutral-600">No certificate templates available.</p>
+    ) : null;
 
     return (
         <div className="space-y-6">
@@ -1360,7 +1415,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-black/10 pb-4">
                                 <div>
                                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                        STEP 1 OF 7
+                                        STEP 1 OF 6
                                     </span>
                                     <h4 className="text-lg font-black text-black mt-1">
                                         Select Award Category
@@ -1381,9 +1436,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                         <div
                                             key={cat.value}
                                             onClick={() => {
-                                                setCertType(cat.value);
-                                                const catLabel = cat.label;
-                                                setTitle(`${catLabel} — ${activeEventTitle}`);
+                                                changeCertificateCategory(cat.value);
                                             }}
                                             className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
                                                 isSelected
@@ -1439,210 +1492,47 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                     onClick={() => setWizardStep("eligibility")}
                                     className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                 >
-                                    <span>Evaluate Eligibility</span>
+                                    <span>Review & Select Recipients</span>
                                     <ArrowRight className="w-4 h-4 stroke-[3]" />
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    {/* STEP 2: EVALUATE ELIGIBILITY & AUTHORITATIVE 7-METRIC AUDIT */}
                     {wizardStep === "eligibility" && (
                         <div className="p-6 bg-white rounded-3xl border-3 border-black shadow-[5px_5px_0px_#000] space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-black/10 pb-4">
-                                <div>
-                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                        STEP 2 OF 7
-                                    </span>
-                                    <h4 className="text-lg font-black text-black mt-1">
-                                        Authoritative Eligibility Audit
-                                    </h4>
-                                    <p className="text-xs text-neutral-600 font-medium">
-                                        Evaluating registrations against rules for &ldquo;{certType}&rdquo;. Registration alone is never treated as verified attendance.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowExclusionsModal(true)}
-                                    className="px-3.5 py-1.5 rounded-xl border-2 border-black bg-rose-50 hover:bg-rose-100 text-xs font-black text-rose-900 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    <UserX className="w-4 h-4 text-rose-700" />
-                                    <span>Inspect Exclusion Reasons</span>
-                                </button>
-                            </div>
-
-                            {/* 7-Metric Authoritative Cards */}
-                            {loadingEligibility ? (
-                                <div className="p-12 text-center space-y-3">
-                                    <RefreshCw className="w-8 h-8 animate-spin mx-auto text-black" />
-                                    <p className="text-xs font-black text-neutral-600">
-                                        Evaluating applicant registrations & attendance records...
-                                    </p>
-                                </div>
-                            ) : eligibilityReport ? (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                                        <div className="p-3 bg-[#FAF6EE] rounded-2xl border-2 border-black text-center">
-                                            <div className="text-[10px] font-black uppercase text-neutral-500">1. Total Signups</div>
-                                            <div className="text-2xl font-black text-black mt-1">
-                                                {eligibilityReport.summary.totalRegistrations}
-                                            </div>
-                                        </div>
-                                        <div className="p-3 bg-emerald-50 rounded-2xl border-2 border-black text-center">
-                                            <div className="text-[10px] font-black uppercase text-emerald-800">2. Eligible</div>
-                                            <div className="text-2xl font-black text-emerald-700 mt-1">
-                                                {eligibilityReport.summary.eligibleCount}
-                                            </div>
-                                        </div>
-                                        <div className="p-3 bg-sky-50 rounded-2xl border-2 border-black text-center">
-                                            <div className="text-[10px] font-black uppercase text-sky-800">3. Attended</div>
-                                            <div className="text-2xl font-black text-sky-700 mt-1">
-                                                {eligibilityReport.summary.verifiedAttendeesCount}
-                                            </div>
-                                        </div>
-                                        <div
-                                            onClick={() => setShowExclusionsModal(true)}
-                                            className="p-3 bg-rose-50 rounded-2xl border-2 border-black text-center cursor-pointer hover:bg-rose-100 transition-colors"
-                                        >
-                                            <div className="text-[10px] font-black uppercase text-rose-800 flex items-center justify-center gap-1">
-                                                <span>4. Excluded</span>
-                                                <span className="text-[9px] underline">Inspect</span>
-                                            </div>
-                                            <div className="text-2xl font-black text-rose-700 mt-1">
-                                                {eligibilityReport.summary.ineligibleCount}
-                                            </div>
-                                        </div>
-                                        <div
-                                            onClick={() => setShowManualReviewModal(true)}
-                                            className="p-3 bg-amber-50 rounded-2xl border-2 border-black text-center cursor-pointer hover:bg-amber-100 transition-colors"
-                                        >
-                                            <div className="text-[10px] font-black uppercase text-amber-800 flex items-center justify-center gap-1">
-                                                <span>5. Review</span>
-                                                <span className="text-[9px] underline">Inspect</span>
-                                            </div>
-                                            <div className="text-2xl font-black text-amber-700 mt-1">
-                                                {eligibilityReport.summary.manualReviewCount}
-                                            </div>
-                                        </div>
-                                        <div className="p-3 bg-neutral-100 rounded-2xl border-2 border-black text-center">
-                                            <div className="text-[10px] font-black uppercase text-neutral-600">6. Missing Info</div>
-                                            <div className="text-2xl font-black text-neutral-800 mt-1">
-                                                {eligibilityReport.summary.missingInfoCount}
-                                            </div>
-                                        </div>
-                                        <div className="p-3 bg-purple-50 rounded-2xl border-2 border-black text-center">
-                                            <div className="text-[10px] font-black uppercase text-purple-800">7. Team Eligible</div>
-                                            <div className="text-2xl font-black text-purple-700 mt-1">
-                                                {eligibilityReport.summary.teamEligibilityCount}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Inline Exclusions Breakdown */}
-                                    <div className="p-4 bg-[#FAF6EE] rounded-2xl border-2 border-black space-y-3">
-                                        <div className="flex items-center justify-between text-xs font-black">
-                                            <span className="flex items-center gap-1.5">
-                                                <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                                                <span>Exclusion Reason Inspection</span>
-                                            </span>
-                                            <span className="text-[11px] text-neutral-500 font-bold">
-                                                {eligibilityReport.ineligibleRecipients.length} Disqualified / Excluded
-                                            </span>
-                                        </div>
-
-                                        {eligibilityReport.ineligibleRecipients.length === 0 ? (
-                                            <p className="text-xs text-neutral-500 py-3 text-center font-bold flex items-center justify-center gap-1.5">
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                                <span>All registered applicants qualify for &ldquo;{certType}&rdquo; credentials.</span>
-                                            </p>
-                                        ) : (
-                                            <div className="max-h-52 overflow-y-auto divide-y divide-neutral-200 text-xs">
-                                                {eligibilityReport.ineligibleRecipients.slice(0, 10).map((inelig) => (
-                                                    <div key={inelig.registrationId} className="py-2 flex items-center justify-between gap-3">
-                                                        <div>
-                                                            <span className="font-black text-black">{inelig.name}</span>
-                                                            <span className="text-[10px] text-neutral-500 ml-2 font-mono">@{inelig.username}</span>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className="text-[10px] font-black text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-300">
-                                                                {inelig.exclusionReason}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
-                                <button
-                                    type="button"
-                                    onClick={() => setWizardStep("category")}
-                                    className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold flex items-center gap-2 cursor-pointer"
-                                >
-                                    <ArrowLeft className="w-4 h-4" />
-                                    <span>Change Category</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setWizardStep("recipients")}
-                                    className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                >
-                                    <span>Select Recipients ({eligibilityReport?.summary.eligibleCount || 0} Eligible)</span>
-                                    <ArrowRight className="w-4 h-4 stroke-[3]" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 3: SELECT RECIPIENTS (PHASE 13 BULK RECIPIENT MANAGEMENT) */}
-                    {wizardStep === "recipients" && (
-                        <div className="p-6 bg-white rounded-3xl border-3 border-black shadow-[5px_5px_0px_#000] space-y-6">
-                            <div className="border-b-2 border-black/10 pb-4">
-                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                    STEP 3 OF 7 · PHASE 13
-                                </span>
-                                <h4 className="text-lg font-black text-black mt-1">
-                                    Multi-Select Recipient Management
-                                </h4>
-                                <p className="text-xs text-neutral-600 font-medium">
-                                    Filter by attendance, select by team, detect duplicates, inspect missing data, and bulk-select candidates for &ldquo;{certType}&rdquo; credentials.
-                                </p>
-                            </div>
-
-                            <RecipientRosterTable
+                            <EligibilityRecipientsStep
+                                report={eligibilityReport}
+                                loading={loadingEligibility}
+                                categoryLabel={CERTIFICATE_CATEGORIES.find((category) => category.value === certType)?.label || certType}
+                                categoryRule={CERTIFICATE_CATEGORIES.find((category) => category.value === certType)?.ruleType || ""}
+                                certType={certType}
+                                title={activeEventTitle ? `Event Roster: ${activeEventTitle}` : "Event Roster"}
                                 recipients={eventRosterItems}
                                 selectedIds={selectedUserIds}
                                 onToggleSelect={toggleUserId}
                                 onSelectMultiple={handleSelectMultipleUserIds}
                                 onDeselectMultiple={handleDeselectMultipleUserIds}
                                 onDeselectAll={deselectAll}
-                                certType={certType}
-                                requireAttendance={certType === "attendance"}
-                                onUpdateCustomPosition={handleUpdateCustomPosition}
-                                title={activeEventTitle ? `Event Roster: ${activeEventTitle}` : "Event Roster"}
+                                onInspectExclusions={() => setShowExclusionsModal(true)}
+                                onInspectReview={() => setShowManualReviewModal(true)}
+                                onRetry={() => setEligibilityReload((value) => value + 1)}
                             />
-
-                            <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
-                                <button
-                                    type="button"
-                                    onClick={() => setWizardStep("eligibility")}
-                                    className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold flex items-center gap-2 cursor-pointer"
-                                >
-                                    <ArrowLeft className="w-4 h-4" />
-                                    <span>Back to Eligibility</span>
+                            <div className="pt-4 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-3">
+                                <button type="button" onClick={() => setWizardStep("category")}
+                                    className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold flex items-center gap-2 cursor-pointer">
+                                    <ArrowLeft className="w-4 h-4" /><span>Change Category</span>
                                 </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setWizardStep("template")}
-                                    className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                >
-                                    <span>Select Certificate Template ({selectedUserIds.size} Selected)</span>
-                                    <ArrowRight className="w-4 h-4 stroke-[3]" />
+                                <button type="button" onClick={() => {
+                                        if (certType !== "attendance" && eventRosterItems.some((recipient) => selectedUserIds.has(recipient.id) && recipient.isEligible === false)) {
+                                            toast.error("Remove excluded recipients before continuing.");
+                                            return;
+                                        }
+                                        setWizardStep("template");
+                                    }}
+                                    disabled={loadingEligibility || !eligibilityReport || selectedUserIds.size === 0}
+                                    className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <span>Select Certificate Template</span><ArrowRight className="w-4 h-4 stroke-[3]" />
                                 </button>
                             </div>
                         </div>
@@ -1654,7 +1544,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-black/10 pb-4">
                                 <div>
                                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                        STEP 4 OF 7
+                                        STEP 3 OF 6
                                     </span>
                                     <h4 className="text-lg font-black text-black mt-1">
                                         Select Certificate Template
@@ -1663,14 +1553,15 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                         Choose an Orbix official design or your club-saved custom template.
                                     </p>
                                 </div>
-                                <span className="text-xs font-black bg-[#FAF6EE] border border-black px-3 py-1.5 rounded-xl">
+                                {!isLoadingTemplates && activeDesign && <span className="text-xs font-black bg-[#FAF6EE] border border-black px-3 py-1.5 rounded-xl">
                                     Current: {activeTemplateName}
-                                </span>
+                                </span>}
                             </div>
 
                             {/* Template Grid (Selected template prioritized at first position) */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {sortedTemplatesForStep4.map((tmpl, idx) => {
+                            <div aria-busy={isLoadingTemplates} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {templateListState}
+                                {!templateListState && sortedTemplatesForStep4.map((tmpl, idx) => {
                                     const isSelected = activeTemplateId === tmpl.id || activeTemplateName === tmpl.name;
                                     return (
                                         <div
@@ -1723,7 +1614,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
                                 <button
                                     type="button"
-                                    onClick={() => setWizardStep("recipients")}
+                                    onClick={() => setWizardStep("eligibility")}
                                     className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold flex items-center gap-2 cursor-pointer"
                                 >
                                     <ArrowLeft className="w-4 h-4" />
@@ -1733,7 +1624,8 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setWizardStep("mapping")}
-                                    className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                    disabled={isLoadingTemplates || !activeDesign}
+                                    className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                 >
                                     <span>Map Event & Recipient Fields</span>
                                     <ArrowRight className="w-4 h-4 stroke-[3]" />
@@ -1748,7 +1640,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-black/10 pb-4">
                                 <div>
                                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                        STEP 5 OF 7
+                                        STEP 4 OF 6
                                     </span>
                                     <h4 className="text-lg font-black text-black mt-1">
                                         Map Dynamic Event & Recipient Fields
@@ -1792,18 +1684,18 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                         />
                                     </div>
 
-                                    <div>
+                                    {categoryPolicy.customAchievement && (<div>
                                         <label className="text-xs font-black text-black block mb-1">
-                                            Award Position / Rank (Optional)
+                                            Achievement Name *
                                         </label>
                                         <input
                                             type="text"
-                                            value={awardPosition}
-                                            onChange={(e) => setAwardPosition(e.target.value)}
-                                            placeholder="e.g. 1st Place / Winner / Finalist"
+                                            value={customAchievement}
+                                            onChange={(e) => setCustomAchievement(e.target.value)}
+                                            placeholder="e.g. Outstanding Community Contribution"
                                             className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:outline-none"
                                         />
-                                    </div>
+                                    </div>) }
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -1876,7 +1768,13 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
 
                                 <button
                                     type="button"
-                                    onClick={() => setWizardStep("preview")}
+                                    onClick={() => {
+                                        if (categoryPolicy.customAchievement && !customAchievement.trim()) {
+                                            toast.error("Enter the achievement name for this custom certificate.");
+                                            return;
+                                        }
+                                        setWizardStep("preview");
+                                    }}
                                     className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                 >
                                     <span>Live Preview & Validation</span>
@@ -1892,7 +1790,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-black/10 pb-4">
                                 <div>
                                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                        STEP 6 OF 7
+                                        STEP 5 OF 6
                                     </span>
                                     <h4 className="text-lg font-black text-black mt-1">
                                         Real-Recipient Preview & Verification
@@ -1990,7 +1888,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                     <span>Unverified Attendance Detected</span>
                                                 </div>
                                                 <div className="text-[10px] text-amber-800">
-                                                    Step 7 will require authorized coordinator justification.
+                                                    Step 6 will require authorized coordinator justification.
                                                 </div>
                                             </div>
                                         )}
@@ -2025,7 +1923,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                         <div className="p-6 bg-white rounded-3xl border-3 border-black shadow-[5px_5px_0px_#000] space-y-6">
                             <div className="border-b-2 border-black/10 pb-4">
                                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                    STEP 7 OF 7
+                                    STEP 6 OF 6
                                 </span>
                                 <h4 className="text-lg font-black text-black mt-1">
                                     Approve & Issue Certificate Batch
@@ -2111,7 +2009,13 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
                                 <button
                                     type="button"
-                                    onClick={() => setWizardStep("preview")}
+                                    onClick={() => {
+                                        if (categoryPolicy.customAchievement && !customAchievement.trim()) {
+                                            toast.error("Enter the achievement name for this custom certificate.");
+                                            return;
+                                        }
+                                        setWizardStep("preview");
+                                    }}
                                     className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold flex items-center gap-2 cursor-pointer"
                                 >
                                     <ArrowLeft className="w-4 h-4" />
@@ -2172,7 +2076,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             </label>
                             <NeoSelect
                                 value={certType}
-                                onChange={(val) => setCertType(val)}
+                                onChange={changeCertificateCategory}
                                 className="w-full"
                                 triggerClassName="bg-[#FAF6EE] text-xs font-bold"
                             >
@@ -2213,18 +2117,18 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             />
                         </div>
 
-                        <div>
+                        {categoryPolicy.customAchievement && (<div>
                             <label className="text-xs font-black text-black block mb-1">
-                                Award Position / Rank (Optional)
+                                Achievement Name *
                             </label>
                             <input
                                 type="text"
-                                value={awardPosition}
-                                onChange={(e) => setAwardPosition(e.target.value)}
-                                placeholder="e.g. 1st Place Winner or Lead Coordinator"
+                                value={customAchievement}
+                                onChange={(e) => setCustomAchievement(e.target.value)}
+                                placeholder="e.g. Outstanding Community Contribution"
                                 className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:outline-none"
                             />
-                        </div>
+                        </div>) }
 
                         <div>
                             <label className="text-xs font-black text-black block mb-1">
@@ -2351,8 +2255,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                     onDeselectAll={deselectAll}
                                     certType={certType}
                                     requireAttendance={certType === "attendance"}
-                                    onUpdateCustomPosition={handleUpdateCustomPosition}
-                                    title={activeEventTitle ? `Event Roster: ${activeEventTitle}` : "Event Roster"}
+                                        title={activeEventTitle ? `Event Roster: ${activeEventTitle}` : "Event Roster"}
                                 />
                             </div>
                         )}
@@ -2608,7 +2511,6 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                             <th className="p-2.5 w-12 text-center">#</th>
                                                             <th className="p-2.5">Recipient Name</th>
                                                             <th className="p-2.5">Email Address</th>
-                                                            <th className="p-2.5">Role / Position</th>
                                                             <th className="p-2.5">Reconciliation Match</th>
                                                         </tr>
                                                     </thead>
@@ -2652,11 +2554,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                                     <td className="p-2.5 font-mono text-[11px] text-neutral-600">
                                                                         {row.email}
                                                                     </td>
-                                                                    <td className="p-2.5">
-                                                                        <span className="text-[11px] font-bold text-neutral-800">
-                                                                            {row.position || row.role || awardPosition || "—"}
-                                                                        </span>
-                                                                    </td>
+
                                                                     <td className="p-2.5">
                                                                         {row.status === "matched_student" ? (
                                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#a2ff86] border border-black font-black text-[10px] text-black">
@@ -2756,7 +2654,6 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                             onClick={() => {
                                                 setExtFormName("");
                                                 setExtFormEmail("");
-                                                setExtFormPosition(awardPosition || "");
                                                 setShowAddExternalModal(true);
                                             }}
                                             className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] text-[11px] font-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000] cursor-pointer"
@@ -3373,8 +3270,9 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             </button>
                         </div>
 
-                        <div className="overflow-y-auto flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pr-1">
-                            {availableTemplates.map((tmpl) => (
+                        <div aria-busy={isLoadingTemplates} className="overflow-y-auto flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pr-1">
+                            {templateListState}
+                            {!templateListState && availableTemplates.map((tmpl) => (
                                 <div
                                     key={tmpl.id}
                                     onClick={() => {
@@ -3485,18 +3383,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                 />
                             </div>
 
-                            <div>
-                                <label className="text-xs font-black text-black block mb-1">
-                                    Custom Award Position / Role (Optional)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={extFormPosition}
-                                    onChange={(e) => setExtFormPosition(e.target.value)}
-                                    placeholder="e.g. Guest Keynote Speaker or Winning Team Lead"
-                                    className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:outline-none"
-                                />
-                            </div>
+
 
                             <div className="p-3 bg-[#FAF6EE] rounded-xl border border-black text-[11px] text-neutral-600 leading-snug">
                                 <span className="font-black text-black">Verified Claim Workflow:</span> External recipients do not need an existing Orbix account. They will receive a unique cryptographic claim token (`https://orbix.dev/verify/certificate/claim/:token`) valid for 60 days to bind to their profile upon signing up.
@@ -3528,7 +3415,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                             id: `ext-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
                                             name: extFormName.trim(),
                                             email: extFormEmail.trim(),
-                                            customPosition: extFormPosition.trim() || undefined,
+                                            customPosition: awardPosition || undefined,
                                         },
                                     ]);
                                     toast.success(`Added external recipient: ${extFormName.trim()}`);
@@ -3687,23 +3574,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                             />
                                         </div>
 
-                                        <div className="w-32">
-                                            <input
-                                                type="text"
-                                                value={member.customPosition || ""}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setTeamSnapshots((prev) => {
-                                                        const cur = prev[reviewingTeamId];
-                                                        const updated = [...cur.members];
-                                                        updated[idx] = { ...updated[idx], customPosition: val };
-                                                        return { ...prev, [reviewingTeamId]: { ...cur, members: updated } };
-                                                    });
-                                                }}
-                                                placeholder="Award Position"
-                                                className="w-full p-1.5 text-xs font-bold border-2 border-black rounded-lg bg-[#FAF6EE] focus:outline-none"
-                                            />
-                                        </div>
+
                                     </div>
                                 </div>
                             ))}

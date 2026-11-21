@@ -1,5 +1,6 @@
+import { persistCodingProfiles } from "./saveCodingProfiles";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Check, ChevronUp } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
@@ -8,7 +9,6 @@ import type { PortalProfileData } from "../PortalProfileCard";
 import { useAppDispatch, useAppSelector, setPortalProfiles } from "../../../store";
 import { useToast } from "../../../context/ToastContext";
 import { Sidebar } from "../../../app/Dashboard/Sidebar";
-import { disconnectPlatform } from "../../../utils/profileApi";
 import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
 import { SectionBottomIllustration } from "../../../app/common/SectionBottomIllustration";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
@@ -129,7 +129,6 @@ const MobilePillAvatar = ({
 
 export default function ProfilesOnboardingPage() {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const dispatch = useAppDispatch();
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
@@ -211,6 +210,7 @@ export default function ProfilesOnboardingPage() {
     const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [isSaving, setIsSaving] = useState(false);
+    const [savedRevision, setSavedRevision] = useState(0);
     const [isMobileBucketOpen, setIsMobileBucketOpen] = useState(false);
 
     const { handleBackdropClick: handleMobileBucketBackdropClick } = useModalDismiss({
@@ -398,11 +398,6 @@ export default function ProfilesOnboardingPage() {
 
         setConnectedProfiles((prev) => {
             const next = { ...prev, [portalId]: data };
-            try {
-                localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
-            } catch {
-                // ignore
-            }
             return next;
         });
 
@@ -445,11 +440,6 @@ export default function ProfilesOnboardingPage() {
         setConnectedProfiles((prev) => {
             const next = { ...prev };
             delete next[portalId];
-            try {
-                localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
-            } catch {
-                // ignore
-            }
             return next;
         });
 
@@ -507,17 +497,10 @@ export default function ProfilesOnboardingPage() {
         }
 
         return false;
-    }, [connectedProfiles, portalValues, judgments]);
+    }, [connectedProfiles, portalValues, judgments, savedRevision]);
 
     const handleSave = async () => {
-        // Production-level check:
-        // If there are NO additions, edits, or deletions, do NOT fire the API!
-        // Immediately navigate to the dashboard without network overhead.
-        if (!isDirty) {
-            const redirectTarget = searchParams.get("redirect") || "/dashboard";
-            navigate(redirectTarget);
-            return;
-        }
+        if (!isDirty || isSaving) return;
 
         setIsSaving(true);
 
@@ -531,14 +514,6 @@ export default function ProfilesOnboardingPage() {
             }
 
             const portalsToDelete = Array.from(deletedPortalsRef.current);
-            // 1. Process pending platform deletions on the backend
-            if (portalsToDelete.length > 0) {
-                await Promise.allSettled(
-                    portalsToDelete.map((p) => disconnectPlatform(p).catch(() => null))
-                );
-                deletedPortalsRef.current.clear();
-            }
-
             // 2. Resolve final profiles to save
             const resolvedProfiles: Record<string, { raw: string; username: string; url: string }> = {};
 
@@ -551,7 +526,7 @@ export default function ProfilesOnboardingPage() {
             }
 
             for (const [key, val] of Object.entries(portalValues)) {
-                if (val.trim() && !resolvedProfiles[key]) {
+                if (val.trim() && !resolvedProfiles[key] && !deletedPortalsRef.current.has(key)) {
                     const judgment = judgments[key];
                     if (judgment && judgment.isValid) {
                         resolvedProfiles[key] = {
@@ -563,11 +538,6 @@ export default function ProfilesOnboardingPage() {
                 }
             }
 
-            // Persist to Redux and LocalStorage
-            dispatch(setPortalProfiles(resolvedProfiles));
-            localStorage.setItem("orbix_connected_portals", JSON.stringify(connectedProfiles));
-
-            // Invalidate all platform caches so Dashboard and Profile charts update immediately
             const activeUser = user || (() => {
                 try {
                     const stored = localStorage.getItem("orbix_user");
@@ -576,8 +546,6 @@ export default function ProfilesOnboardingPage() {
                     return null;
                 }
             })();
-
-            invalidateConnectedPlatformCaches(dispatch, activeUser?.username);
 
             // 3. Persist to Backend API with correct user_id, username, and auth headers
             const savePayload = {
@@ -590,38 +558,26 @@ export default function ProfilesOnboardingPage() {
                 syncMode: "exact",
             };
 
-            // Call standardized endpoint
-            const saveUrl = buildApiUrl("/api/portals/save");
-            try {
-                await fetch(saveUrl, {
-                    method: "POST",
-                    headers,
-                    credentials: "include",
-                    body: JSON.stringify(savePayload),
-                });
-            } catch {
-                // Non-fatal offline fallback
-            }
+            await persistCodingProfiles(buildApiUrl("/api/portals/save"), savePayload, headers);
+
+            // Commit the saved state only after the server confirms persistence.
+            dispatch(setPortalProfiles(resolvedProfiles));
+            localStorage.setItem("orbix_connected_portals", JSON.stringify(connectedProfiles));
+            invalidateConnectedPlatformCaches(dispatch, activeUser?.username);
+            deletedPortalsRef.current.clear();
 
             // Reset dirty snapshot
             initialConnectedProfilesRef.current = { ...connectedProfiles };
             initialPortalValuesRef.current = { ...portalValues };
+            setSavedRevision((revision) => revision + 1);
 
-            toast.success(
-                connectedCount > 0
-                    ? `${connectedCount} coding profiles saved! Redirecting to workspace...`
-                    : "Profile setup completed! Redirecting to workspace...",
-                { title: "Profiles Connected" }
-            );
+            toast.success("Your coding profiles have been saved.", { title: "Profiles Updated" });
         } catch (err: any) {
             console.error("Save error:", err);
-            toast.error("Failed to save some profiles, but local state was preserved.");
+            toast.error(err.message || "Couldn’t save coding profiles. Your changes are ready to retry.");
         } finally {
             setIsSaving(false);
-            setTimeout(() => {
-                const redirectTarget = searchParams.get("redirect") || "/dashboard";
-                navigate(redirectTarget);
-            }, 500);
+
         }
     };
 
@@ -645,7 +601,7 @@ export default function ProfilesOnboardingPage() {
             <div className="flex-1 min-w-0 flex flex-col min-h-screen p-2 sm:p-3 lg:p-3">
                 {/* Main Scrollable Content Card */}
                 <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between">
-                    <div className="p-4 sm:p-6 lg:p-8 flex-1">
+                    <div className={`p-4 sm:p-6 lg:p-8 flex-1 ${isDirty || isSaving ? "pb-28 sm:pb-28 lg:pb-28" : ""}`}>
                         <div className="mx-auto w-full max-w-7xl my-1">
                             {/* Page Header */}
                             <div className="mb-6 lg:mb-8 pb-5 border-b-2 border-black/55 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -820,7 +776,7 @@ export default function ProfilesOnboardingPage() {
                                                 </h4>
                                                 <p className="text-xs font-medium text-neutral-600 max-w-sm mx-auto leading-relaxed">
                                                     {connectedCount === 13
-                                                        ? "Every supported platform is already gathered in your bucket on the right. Tap 'Save & Continue to Dashboard' to persist."
+                                                        ? "Every supported platform is already gathered in your bucket on the right. Use Save Changes below to save your updates."
                                                         : connectedCount > 0
                                                             ? `You have connected ${connectedCount} ${connectedCount === 1 ? "platform" : "platforms"} in your bucket. Adjust your filter or search above to link more.`
                                                             : `No platform matches '${searchQuery}'. Try clearing your search query.`}
@@ -928,46 +884,7 @@ export default function ProfilesOnboardingPage() {
                                             </div>
                                         )}
 
-                                        {/* Actions & Status inside right bucket */}
-                                        <div className="pt-4 mt-4 border-t-2 border-black space-y-3">
-                                            {/* Status indicator row */}
-                                            <div className="flex items-center justify-between text-xs px-1">
-                                                <span className="text-neutral-700 font-extrabold uppercase tracking-wide">Status</span>
-                                                {isDirty ? (
-                                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-black bg-amber-200 border-2 border-black px-2.5 py-0.5 rounded-md shadow-[2px_2px_0px_#000]">
-                                                        <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
-                                                        Unsaved changes
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-black bg-[#a2ff86] border-2 border-black px-2.5 py-0.5 rounded-md shadow-[2px_2px_0px_#000]">
-                                                        <span className="w-2 h-2 rounded-full bg-black" />
-                                                        Up to date
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Save & Continue to Dashboard Button (EXACT MATCH TO USER'S REFERENCE IMAGE) */}
-                                            <button
-                                                type="button"
-                                                onClick={handleSave}
-                                                disabled={isSaving}
-                                                className="w-full h-13 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#92f574] text-black font-black uppercase tracking-wider text-xs sm:text-sm shadow-[4px_4px_0px_#000] hover:shadow-[2px_2px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                                            >
-                                                {isSaving ? (
-                                                    <>
-                                                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                                                        <span>Saving Profiles...</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>Save & Continue to Dashboard</span>
-                                                        <svg className="w-4 h-4 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                                                        </svg>
-                                                    </>
-                                                )}
-                                            </button>
-
+                                        <div className="pt-4 mt-4 border-t-2 border-black">
                                             <p className="text-[11px] text-center font-medium text-neutral-500">
                                                 You can edit or update your public profile handles anytime from your Orbix Dashboard settings.
                                             </p>
@@ -983,9 +900,23 @@ export default function ProfilesOnboardingPage() {
                 </div>
             </div>
 
+            {(isDirty || isSaving) && !isMobileBucketOpen && (
+                <div className="fixed bottom-5 left-4 right-4 lg:left-32 z-40 flex justify-center pointer-events-none animate-slideUp motion-reduce:animate-none">
+                    <div className="pointer-events-auto w-full max-w-xl rounded-xl border-2 border-black bg-white shadow-[4px_4px_0px_#000] p-3 flex items-center justify-between gap-3">
+                        <span className="text-xs font-bold text-neutral-600">Coding profiles</span>
+                        <button type="button" onClick={handleSave} disabled={isSaving}
+                            className="min-h-11 px-5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#92f574] font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+                            aria-busy={isSaving}>
+                            {isSaving && <span aria-hidden="true" className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />}
+                            {isSaving ? "Saving Changes…" : "Save Changes"}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Mobile Floating Bucket Trigger Button for small screens */}
             {connectedCount > 0 && (
-                <div className="fixed bottom-5 right-4 z-40 lg:hidden animate-fadeIn">
+                <div className={`fixed ${isDirty || isSaving ? "bottom-28" : "bottom-5"} right-4 z-40 lg:hidden animate-fadeIn`}>
                     <button
                         type="button"
                         onClick={() => setIsMobileBucketOpen(true)}
@@ -1099,16 +1030,7 @@ export default function ProfilesOnboardingPage() {
 
                         {/* Modal Action Buttons */}
                         <div className="pt-3 border-t-2 border-black flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsMobileBucketOpen(false);
-                                    handleSave();
-                                }}
-                                className="flex-1 h-12 rounded-lg border-2 border-black bg-[#a2ff86] text-black font-black uppercase tracking-wider text-xs shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                            >
-                                Save & Continue to Dashboard
-                            </button>
+
                             <button
                                 type="button"
                                 onClick={() => setIsMobileBucketOpen(false)}

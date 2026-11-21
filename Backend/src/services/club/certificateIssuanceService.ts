@@ -1,3 +1,4 @@
+import { normalizeCertificateCategoryFields } from "../../../../shared/certificateCategoryPolicy.js";
 /**
  * Certificate Studio Batch Issuance & Eligibility Engine
  * Phase 10, 11, 12, 14, 15 Implementation
@@ -721,6 +722,10 @@ export class CertificateIssuanceService {
      * Issues certificates in batch with strict eligibility, snapshot immutability, and transactional persistence
      */
     static async issueBatch(req: BatchIssuanceRequest): Promise<BatchIssuanceResponse> {
+        req = normalizeCertificateCategoryFields(req);
+        if (req.certificateType === "custom" && !req.awardPosition?.trim()) {
+            throw new Error("An achievement name is required for custom certificates.");
+        }
         const {
             clubId,
             staffUserId,
