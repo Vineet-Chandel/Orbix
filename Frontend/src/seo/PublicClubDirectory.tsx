@@ -16,10 +16,24 @@ export function PublicClubDirectory({ initialData }: { initialData?: PageData })
         }).catch(() => { if (!controller.signal.aborted) setUnavailable(true); });
         return () => controller.abort();
     },[page,initialData]);
-    return <section className="mx-auto max-w-6xl px-5 py-12 space-y-5" aria-labelledby="public-campus-clubs">
-        <h2 id="public-campus-clubs" className="text-2xl font-black">Published campus clubs</h2>
-        <p>Explore publicly published organization profiles. Private and unlisted club profiles are excluded from this directory.</p>
-        {unavailable ? <p>Club listings are temporarily unavailable.</p> : <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{data?.clubs?.map(club => <article className="min-w-0 border-2 border-black rounded-2xl bg-white p-5 space-y-3" key={club.path}><h3 className="font-bold break-words"><Link className="underline" to={club.path}>{club.title}</Link></h3><p>{club.description}</p></article>)}</div>}
-        <nav aria-label="Club directory pages" className="flex gap-5">{page>1 && <Link rel="prev" to={page===2?'/clubs':`/clubs?page=${page-1}`}>Previous clubs</Link>}{data?.hasNext && <Link rel="next" to={`/clubs?page=${page+1}`}>More clubs</Link>}</nav>
+    if (unavailable || !data?.clubs || data.clubs.length === 0) {
+        return null;
+    }
+
+    return <section className="mx-auto max-w-6xl px-5 py-8 space-y-6" aria-label="Campus clubs directory">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {data.clubs.map(club => (
+                <article className="min-w-0 border-2 border-black rounded-2xl bg-white p-5 space-y-3 shadow-[3px_3px_0px_#000]" key={club.path}>
+                    <h3 className="font-bold break-words">
+                        <Link className="underline hover:text-neutral-700" to={club.path}>{club.title}</Link>
+                    </h3>
+                    <p className="text-sm text-neutral-600 font-medium">{club.description}</p>
+                </article>
+            ))}
+        </div>
+        <nav aria-label="Club directory pages" className="flex gap-5">
+            {page > 1 && <Link className="text-sm font-bold underline" rel="prev" to={page === 2 ? '/clubs' : `/clubs?page=${page - 1}`}>Previous clubs</Link>}
+            {data?.hasNext && <Link className="text-sm font-bold underline" rel="next" to={`/clubs?page=${page + 1}`}>More clubs</Link>}
+        </nav>
     </section>;
 }

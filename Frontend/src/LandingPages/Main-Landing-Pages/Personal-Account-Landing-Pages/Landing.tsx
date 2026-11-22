@@ -1,4 +1,3 @@
-import { PublicAnswers } from "../../../seo/PublicAnswers";
 import NavBar from '../../NavBar/Landing';
 import Hero from '../Hero/Landing';
 import { lazyWithRetry } from '../../../utils/lazyWithRetry';
@@ -53,8 +52,6 @@ export default function MainLanding() {
           <Clubs />
         </section>
       </ShowcaseSection>
-
-      <PublicAnswers />
 
       {/* Flagship Footer with CTA Banner and Full Width Desk Image */}
       <ShowcaseSection height={340}>

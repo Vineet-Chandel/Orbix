@@ -52,8 +52,8 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 </h3>
                 <p className="text-xs font-medium text-neutral-600 max-w-sm mx-auto leading-relaxed">
                     {scope === "college"
-                        ? "Verify your connected coding accounts to represent this campus on the leaderboard."
-                        : "Verify your connected accounts to make your contributions count toward your ranking."}
+                        ? "Connect a coding platform and keep it public to represent this campus on the leaderboard."
+                        : "Connect a coding platform and keep it public to contribute to the leaderboard."}
                 </p>
             </div>
         );

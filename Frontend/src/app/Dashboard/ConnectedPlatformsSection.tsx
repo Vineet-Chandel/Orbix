@@ -1386,12 +1386,12 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                 <p className="text-xs font-bold text-neutral-700">
                                     Account ownership is cryptographically verified
                                     {activeViewingProfile.verificationMethod ? ` via ${activeViewingProfile.verificationMethod}` : ""}.
-                                    This platform is authenticated for verified profile and leaderboard scoring.
+                                    Public activity from this platform can contribute to your Orbix Score.
                                 </p>
                             ) : isPlatformVerificationSupported(viewingPortalId) ? (
                                 <div className="space-y-2 pt-1">
                                     <p className="text-xs font-bold text-neutral-600 leading-relaxed">
-                                        Cryptographic ownership has not been proven. Verification is required before scores from this account can be officially credited.
+                                        Ownership verification is optional for leaderboard scoring. Public activity from this platform can contribute to your Orbix Score.
                                     </p>
                                     <button
                                         type="button"

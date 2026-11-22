@@ -4,6 +4,7 @@ import NavBar from '../../NavBar/Landing';
 import Hero from '../Hero/Landing';
 import { lazyWithRetry } from '../../../utils/lazyWithRetry';
 import { DeferredSection as ShowcaseSection } from '../DeferredSection';
+const ClubEcosystemShowcase = lazyWithRetry(() => import('./ClubEcosystem').then(m => ({ default: m.ClubEcosystemShowcase })));
 const Footer = lazyWithRetry(() => import('../Footer').then(m => ({ default: m.Footer })));
 
 export default function ClubLanding({ initialData }: { initialData?: PageData }) {
@@ -18,9 +19,14 @@ export default function ClubLanding({ initialData }: { initialData?: PageData })
       {/* Hero Section */}
       <Hero mode="club" />
 
-      <PublicClubDirectory initialData={initialData} />
+      {/* Flagship Club Operating System Showcase */}
+      <ShowcaseSection height={580}>
+        <section className="w-full">
+          <ClubEcosystemShowcase />
+        </section>
+      </ShowcaseSection>
 
-      {/* Future Club Perspective Showcases will be plugged in here */}
+      <PublicClubDirectory initialData={initialData} />
 
       {/* Flagship Footer with CTA Banner and Desk Image */}
       <ShowcaseSection height={340}>

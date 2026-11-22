@@ -1,5 +1,7 @@
 import redis from "../client.js";
 
+const KEY_PREFIX = "orbix:leaderboard:public-links-v3";
+
 /**
  * Cache TTL configuration (in seconds)
  */
@@ -32,7 +34,7 @@ export const cacheLeaderboard = {
     async getGlobalPage(period: string, filter: string, page: number, limit: number, search?: string) {
         try {
             if (!redis || redis.status !== "ready") return null;
-            const key = `orbix:leaderboard:verified-v2:global:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
+            const key = `${KEY_PREFIX}:global:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
             const data = await redis.get(key);
             return data ? JSON.parse(data) : null;
         } catch (err) {
@@ -47,7 +49,7 @@ export const cacheLeaderboard = {
     async setGlobalPage(period: string, filter: string, page: number, limit: number, payload: any, search?: string) {
         try {
             if (!redis || redis.status !== "ready") return;
-            const key = `orbix:leaderboard:verified-v2:global:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
+            const key = `${KEY_PREFIX}:global:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
             const sanitized = { ...payload, currentUser: null, cached: true };
             const ttl = getJitter(GLOBAL_LEADERBOARD_TTL);
             await redis.setex(key, ttl, JSON.stringify(sanitized));
@@ -62,7 +64,7 @@ export const cacheLeaderboard = {
     async getCollegePage(collegeId: string, period: string, filter: string, page: number, limit: number, search?: string) {
         try {
             if (!redis || redis.status !== "ready") return null;
-            const key = `orbix:leaderboard:verified-v2:college:${collegeId}:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
+            const key = `${KEY_PREFIX}:college:${collegeId}:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
             const data = await redis.get(key);
             return data ? JSON.parse(data) : null;
         } catch (err) {
@@ -77,7 +79,7 @@ export const cacheLeaderboard = {
     async setCollegePage(collegeId: string, period: string, filter: string, page: number, limit: number, payload: any, search?: string) {
         try {
             if (!redis || redis.status !== "ready") return;
-            const key = `orbix:leaderboard:verified-v2:college:${collegeId}:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
+            const key = `${KEY_PREFIX}:college:${collegeId}:${period}:${filter}:p${page}:l${limit}:s${normalizeQuery(search)}`;
             const sanitized = { ...payload, currentUser: null, cached: true };
             const ttl = getJitter(COLLEGE_LEADERBOARD_TTL);
             await redis.setex(key, ttl, JSON.stringify(sanitized));
@@ -92,7 +94,7 @@ export const cacheLeaderboard = {
     async getParticipatingColleges() {
         try {
             if (!redis || redis.status !== "ready") return null;
-            const key = "orbix:leaderboard:verified-v2:colleges:participating";
+            const key = `${KEY_PREFIX}:colleges:participating`;
             const data = await redis.get(key);
             return data ? JSON.parse(data) : null;
         } catch (err) {
@@ -107,7 +109,7 @@ export const cacheLeaderboard = {
     async setParticipatingColleges(payload: any) {
         try {
             if (!redis || redis.status !== "ready") return;
-            const key = "orbix:leaderboard:verified-v2:colleges:participating";
+            const key = `${KEY_PREFIX}:colleges:participating`;
             const ttl = getJitter(PARTICIPATING_COLLEGES_TTL);
             await redis.setex(key, ttl, JSON.stringify(payload));
         } catch (err) {
@@ -121,7 +123,7 @@ export const cacheLeaderboard = {
     async getUserRank(username: string, context = "global") {
         try {
             if (!redis || redis.status !== "ready") return null;
-            const key = `orbix:leaderboard:verified-v2:userrank:${encodeURIComponent(username.toLowerCase())}:${context}`;
+            const key = `${KEY_PREFIX}:userrank:${encodeURIComponent(username.toLowerCase())}:${context}`;
             const data = await redis.get(key);
             return data ? JSON.parse(data) : null;
         } catch (err) {
@@ -135,7 +137,7 @@ export const cacheLeaderboard = {
     async setUserRank(username: string, context = "global", payload: any) {
         try {
             if (!redis || redis.status !== "ready") return;
-            const key = `orbix:leaderboard:verified-v2:userrank:${encodeURIComponent(username.toLowerCase())}:${context}`;
+            const key = `${KEY_PREFIX}:userrank:${encodeURIComponent(username.toLowerCase())}:${context}`;
             const ttl = getJitter(GLOBAL_LEADERBOARD_TTL);
             await redis.setex(key, ttl, JSON.stringify(payload));
         } catch (err) {
@@ -153,15 +155,15 @@ export const cacheLeaderboard = {
 
             // Target pattern list
             const patterns = [
-                "orbix:leaderboard:verified-v2:global:*",
-                "orbix:leaderboard:verified-v2:colleges:*",
-                "orbix:leaderboard:verified-v2:userrank:*",
+                `${KEY_PREFIX}:global:*`,
+                `${KEY_PREFIX}:colleges:*`,
+                `${KEY_PREFIX}:userrank:*`,
             ];
 
             if (options?.collegeId) {
-                patterns.push(`orbix:leaderboard:verified-v2:college:${options.collegeId}:*`);
+                patterns.push(`${KEY_PREFIX}:college:${options.collegeId}:*`);
             } else {
-                patterns.push("orbix:leaderboard:verified-v2:college:*");
+                patterns.push(`${KEY_PREFIX}:college:*`);
             }
 
             for (const pattern of patterns) {
