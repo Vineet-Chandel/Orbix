@@ -22,9 +22,6 @@ export interface PublicProfilePayload {
     isEmailVerified?: boolean;
     isVerifiedCoder?: boolean;
     isVerified?: boolean;
-    isCollegeVerified?: boolean;
-    collegeVerificationExpiresAt?: string | null;
-    collegeVerificationStatus?: string;
     isOpenToWork?: boolean;
     isHireable?: boolean;
     resumeUrl?: string | null;
@@ -66,7 +63,6 @@ export const getCachedPublicProfile = async (username: string): Promise<PublicPr
         const data = await redis.get(key);
         if (!data) return null;
         const payload = JSON.parse(data) as PublicProfilePayload;
-        if (payload.isCollegeVerified && (!payload.collegeVerificationExpiresAt || new Date(payload.collegeVerificationExpiresAt).getTime() <= Date.now())) return null;
         return payload;
     } catch {
         return null;
@@ -77,8 +73,7 @@ export const setCachedPublicProfile = async (username: string, profile: PublicPr
     try {
         if (!redis || redis.status !== "ready") return;
         const key = `profile:public:privacy-v2:${username.toLowerCase().trim()}`;
-        const remaining = profile.collegeVerificationExpiresAt ? Math.floor((new Date(profile.collegeVerificationExpiresAt).getTime() - Date.now()) / 1000) : PUBLIC_PROFILE_TTL;
-        await redis.set(key, JSON.stringify(profile), "EX", Math.max(1, Math.min(PUBLIC_PROFILE_TTL, remaining)));
+        await redis.set(key, JSON.stringify(profile), "EX", PUBLIC_PROFILE_TTL);
     } catch {
         // Safe fallback if redis fails
     }

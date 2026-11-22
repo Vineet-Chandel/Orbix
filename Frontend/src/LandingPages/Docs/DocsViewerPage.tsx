@@ -12,7 +12,6 @@ import ProfilePrivacyDocumentary from "./documentaries/ProfilePrivacyDocumentary
 import ClubVerificationDocumentary from "./documentaries/ClubVerificationDocumentary";
 import ClubCredibilityDocumentary from "./documentaries/ClubCredibilityDocumentary";
 import CollegeChaptersDocumentary from "./documentaries/CollegeChaptersDocumentary";
-import CollegeVerificationDocumentary from "./documentaries/CollegeVerificationDocumentary";
 import LikesEventSharingDocumentary from "./documentaries/LikesEventSharingDocumentary";
 import {
     ArrowLeft,
@@ -50,10 +49,8 @@ export const DocsViewerPage: React.FC = () => {
                             ? "club-verification-protocol"
                             : activeSlug === "credibility" || activeSlug === "club-credibility" || activeSlug === "club-credibility-algorithm" || activeSlug === "credibility-engine" || activeSlug === "credibility-algorithm"
                                 ? "club-credibility-algorithm"
-                                : activeSlug === "college-chapters" || activeSlug === "college-chapter-docs" || activeSlug === "chapters" || activeSlug === "campus-chapters" || activeSlug === "college-docs" || activeSlug === "chapter-docs"
+                                : activeSlug === "college-chapters" || activeSlug === "college-chapter-docs" || activeSlug === "chapters" || activeSlug === "campus-chapters" || activeSlug === "college-docs" || activeSlug === "chapter-docs" || activeSlug === "college-verification" || activeSlug === "student-verification" || activeSlug === "collegiate-verification" || activeSlug === "college-identity" || activeSlug === "student-identity" || activeSlug === "student-college-verification"
                                     ? "college-chapters"
-                                    : activeSlug === "college-verification" || activeSlug === "student-verification" || activeSlug === "collegiate-verification" || activeSlug === "college-identity" || activeSlug === "student-identity" || activeSlug === "student-college-verification"
-                                        ? "college-verification"
                                         : activeSlug === "likes-and-event-sharing" || activeSlug === "likes" || activeSlug === "event-sharing" || activeSlug === "sharing" || activeSlug === "blog-likes" || activeSlug === "likes-sharing" || activeSlug === "community-engagement" || activeSlug === "likes-event-sharing"
                                             ? "likes-and-event-sharing"
                                             : activeSlug;
@@ -125,8 +122,6 @@ export const DocsViewerPage: React.FC = () => {
                     <ClubCredibilityDocumentary />
                 ) : resolvedSlug === "college-chapters" ? (
                     <CollegeChaptersDocumentary />
-                ) : resolvedSlug === "college-verification" ? (
-                    <CollegeVerificationDocumentary />
                 ) : resolvedSlug === "likes-and-event-sharing" ? (
                     <LikesEventSharingDocumentary />
                 ) : doc ? (

@@ -18,8 +18,6 @@ import { OrbixErrorBoundary } from "./components/ui/error/OrbixErrorBoundary";
 import { OrbixOfflineBanner } from "./components/ui/network/OrbixOfflineBanner";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
-import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
-import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
 import { ScrollToTop } from "./components/ScrollToTop";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -99,17 +97,6 @@ const LegacyActivityRedirect = () => {
   return <Navigate to={`/activity?${params.toString()}`} replace />;
 };
 
-const AuthenticatedClubRedirect = () => {
-  const { user } = useAppSelector((state) => state.user);
-  if (user) {
-    if (user.accountType === "club") {
-      return <Navigate to="/club/dashboard" replace />;
-    }
-    return <Navigate to="/college-clubs" replace />;
-  }
-  return <ClubLanding />;
-};
-
 const PublicClubRoute = () => {
   const location = useLocation();
   return <PublicClubProfilePage initialClubData={initialSeoData(location.pathname)?.entity?.club} />;
@@ -137,16 +124,12 @@ const App = () => {
           {/* Global Network Connectivity Status Banner */}
           <OrbixOfflineBanner />
 
-          {/* Authoritative Single Institutional Email Token Listener & Single Global Verification Modal Host */}
-          <CollegeEmailVerificationListener />
-          <GlobalCollegeVerificationModal />
-
           <OrbixErrorBoundary level="route">
             <Suspense fallback={<ContentRouteSkeleton />}>
               <Routes>
                 {/* Public Landing & Marketing Pages */}
                 <Route path="/" element={<MainLanding />} />
-                <Route path="/clubs" element={<AuthenticatedClubRedirect />} />
+                <Route path="/clubs" element={<ClubLanding />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
 

@@ -284,43 +284,8 @@ const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
                     verification_status AS "verificationStatus"
              FROM institutions WHERE id = $1 LIMIT 1;`, [userRow.collegeId]
         ) : Promise.resolve({ rows: [] });
-        const verificationPromise = userRow.collegeId ? query(
-            'SELECT id, status, college_id, expires_at FROM college_verifications WHERE user_id = $1 AND (status <> \'APPROVED\' OR expires_at > now()) ORDER BY created_at DESC;',
-            [userRow.id]
-        ).catch((error) => {
-            console.warn('College verification status resolution error:', error);
-            return { rows: [] };
-        }) : Promise.resolve({ rows: [] });
-        const [linksResult, collegeRes, cvRes] = await Promise.all([linksPromise, collegePromise, verificationPromise]);
+        const [linksResult, collegeRes] = await Promise.all([linksPromise, collegePromise]);
         const college = collegeRes.rows[0] || null;
-
-        let isCollegeVerified = false;
-        let collegeVerificationExpiresAt: string | null = null;
-        let collegeVerificationStatus = 'NOT_VERIFIED';
-        if (userRow.collegeId) {
-            try {
-                const appRows = cvRes.rows;
-                const approved = appRows.find(r => r.status === 'APPROVED' && r.college_id === userRow.collegeId);
-                if (approved) {
-                    isCollegeVerified = true;
-                    collegeVerificationExpiresAt = approved.expires_at;
-                    collegeVerificationStatus = 'APPROVED';
-                } else {
-                    const pending = appRows.find(r => r.status === 'PENDING' || r.status === 'PROCESSING');
-                    if (pending) {
-                        collegeVerificationStatus = pending.status;
-                    } else if (appRows[0]?.status === 'INVALIDATED') {
-                        collegeVerificationStatus = 'INVALIDATED';
-                    } else if (appRows[0]?.status === 'REJECTED') {
-                        collegeVerificationStatus = 'REJECTED';
-                    } else {
-                        collegeVerificationStatus = 'NOT_VERIFIED';
-                    }
-                }
-            } catch (cvErr) {
-                console.warn('College verification status resolution error:', cvErr);
-            }
-        }
 
         const cooldownInfo = computeCollegeCooldown(userRow.collegeUpdatedAt);
 
@@ -336,9 +301,6 @@ const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
             collegeUpdatedAt: userRow.collegeUpdatedAt,
             canChangeCollege: cooldownInfo.canChangeCollege,
             collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
-            isCollegeVerified,
-            collegeVerificationExpiresAt,
-            collegeVerificationStatus,
             nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
             skills: Array.isArray(userRow.skills) ? userRow.skills : [],
             links: parseLinks(userRow.links, userRow),
@@ -743,8 +705,6 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                     college_id = $17,
                     college = $18,
                     college_updated_at = (CASE WHEN $21::boolean THEN CURRENT_TIMESTAMP ELSE college_updated_at END),
-                    is_college_verified = (CASE WHEN $21::boolean THEN false ELSE is_college_verified END),
-                    college_verified_at = (CASE WHEN $21::boolean THEN NULL ELSE college_verified_at END),
                     updated_at = CURRENT_TIMESTAMP
                  WHERE id = $19 OR email = $20
                  RETURNING
@@ -771,8 +731,6 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                     is_hireable AS "isHireable",
                     is_public AS "isPublic",
                     is_resume_public AS "isResumePublic",
-                    is_college_verified AS "isCollegeVerified",
-                    college_verified_at AS "collegeVerifiedAt",
                     college,
                     college_id AS "collegeId",
                     college_updated_at AS "collegeUpdatedAt",
@@ -1250,23 +1208,6 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
         }
 
         
-        let isCollegeVerified = false;
-        let collegeVerificationExpiresAt: string | null = null;
-        if (userRow.collegeId) {
-            try {
-                const cvRes = await query(
-                    'SELECT id, expires_at FROM college_verifications WHERE user_id = $1 AND college_id = $2 AND status = \'APPROVED\' AND expires_at > now() LIMIT 1;',
-                    [userRow.id, userRow.collegeId]
-                );
-                if (cvRes.rows.length > 0) {
-                    collegeVerificationExpiresAt = cvRes.rows[0].expires_at;
-                    isCollegeVerified = true;
-                }
-            } catch (pCvErr) {
-                console.warn('Public college verification check warning:', pCvErr);
-            }
-        }
-
         const isProfilePrivate = userRow.isPublic === false;
         const allowedLinks = parseLinks(userRow.links, userRow).slice(0, 4);
 
@@ -1289,8 +1230,6 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             skills: Array.isArray(userRow.skills) ? userRow.skills : [],
             links: allowedLinks,
             college,
-            isCollegeVerified,
-            collegeVerificationExpiresAt,
             isOpenToWork: isProfilePrivate ? false : userRow.isOpenToWork === true,
             isHireable: isProfilePrivate ? false : userRow.isHireable === true,
             isPublic: !isProfilePrivate,

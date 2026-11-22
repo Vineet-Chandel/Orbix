@@ -1,14 +1,12 @@
 import { beginSignOut } from "../../api/authRequests";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, Briefcase, Settings, Compass, GraduationCap, UserPlus } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, Briefcase, Settings, Compass, UserPlus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { OrbixLogo } from "../../components/OrbixLogo";
-import { VerifiedBadge } from "../../components/VerifiedBadge";
-import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
 import { useMyWorkspacesQuery } from "../../store/personalDataApi";
 import { JoinClubModal } from "../Club/JoinClubModal";
 
@@ -923,45 +921,6 @@ export const Sidebar = ({
                             </svg>
                             <span className="truncate">Profile</span>
                         </Link>
-
-                        {/* College Verification Shortcut (Students only) */}
-                        {user?.accountType !== "club" && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsProfileMenuOpen(false);
-                                    openCollegeVerificationModal();
-                                }}
-                                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors cursor-pointer text-left"
-                            >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <GraduationCap className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0 stroke-[2.5]" />
-                                    <span className="truncate">College Verification</span>
-                                </div>
-                                {user?.isCollegeVerified ? (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black min-w-[18px] leading-none shrink-0">
-                                        <VerifiedBadge size="xs" />
-                                        Verified
-                                    </span>
-                                ) : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING" ? (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-950 border border-black min-w-[18px] leading-none shrink-0">
-                                        In Review
-                                    </span>
-                                ) : user?.collegeVerificationStatus === "INVALIDATED" ? (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-orange-950 border border-black min-w-[18px] leading-none shrink-0">
-                                        Re-verify
-                                    </span>
-                                ) : user?.collegeVerificationStatus === "REJECTED" ? (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-950 border border-black min-w-[18px] leading-none shrink-0">
-                                        Rejected
-                                    </span>
-                                ) : (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FFE566] text-black border border-black min-w-[18px] leading-none shrink-0">
-                                        Verify
-                                    </span>
-                                )}
-                            </button>
-                        )}
 
                         <Link
                             to="/notifications"

@@ -1,6 +1,5 @@
 import { createSeoWeb } from "./seo/web.js";
 import { responsePrivacy, safeUnhandledError } from "./middlewares/responsePrivacy.middleware.js";
-import { sheerIdWebhook } from "./Routes/verification/sheerIdWebhook.js";
 if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
     try {
         process.loadEnvFile();
@@ -25,7 +24,6 @@ import {
 } from './Routes/relationships/relationshipRoutes.js';
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
-import { studentCollegeVerificationRouter } from './Routes/verification/collegeVerificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
 import blogRouter from './Routes/blog/blogRoutes.js';
 import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
@@ -57,8 +55,6 @@ app.use(responsePrivacy);
 app.use(createCorsMiddleware());
 
 app.use(cookieParser());
-// Signature verification needs original bytes, before the global JSON parser.
-app.post('/api/verification/college/webhook/sheerid', express.raw({ type: 'application/json', limit: '32kb' }), sheerIdWebhook);
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
@@ -146,10 +142,6 @@ apiRouter.use('/privacy', privacyRouter);
 apiRouter.use('/account/sessions', sessionRouter);
 apiRouter.use('/account', sessionRouter);
 apiRouter.use('/account', manageAccountsRouter);
-
-// College Institutional Verification (Stage 4.4 - 4.6)
-apiRouter.use('/verification/college', studentCollegeVerificationRouter);
-apiRouter.use('/college-verification', studentCollegeVerificationRouter);
 
 // Support & Help Desk
 apiRouter.use('/help', helpRouter);

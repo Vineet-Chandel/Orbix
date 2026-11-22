@@ -63,6 +63,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
     const { currentData: data, isFetching, error: queryError } = useCampusEventsQuery(scope, { skip: !user });
     const events = data?.events || [];
     const collegeName = data?.collegeName || scope.collegeName || "Your College";
+    const hasNoCollege = !user?.collegeId && !user?.college && (!data?.collegeName || data?.collegeName === "Your College");
     const loading = !data && isFetching;
     useEffect(() => {
         if (data) primeEventEngagementCache(data.events || []);
@@ -945,7 +946,36 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                     </div>
                 </div>
 
-                {/* Filter and Search Bar */}
+                {/* State: No College Affiliation Linked */}
+                {hasNoCollege ? (
+                    <div className="p-6 sm:p-8 rounded-2xl bg-[#FFE566]/20 border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                        <div className="flex items-start gap-3.5">
+                            <div className="p-2.5 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex-shrink-0">
+                                <GraduationCap className="w-6 h-6 text-black stroke-[2.5]" />
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-lg font-black text-black">
+                                    Link Your College to Access Campus & National Events
+                                </h3>
+                                <p className="text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
+                                    You haven't set your college affiliation yet. Once you connect your college in your profile, you'll be able to discover campus sessions, registered hackathons, and student meetups organized by clubs at your institution.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 flex items-center gap-3">
+                            <Link
+                                to="/profile"
+                                className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                                <span>Set College in Profile</span>
+                                <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+                            </Link>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {/* Filter and Search Bar */}
                 <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
                     <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                         {/* Search Input */}
@@ -1111,6 +1141,8 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                             </>
                         )}
                     </div>
+                )}
+                    </>
                 )}
             </div>
 
