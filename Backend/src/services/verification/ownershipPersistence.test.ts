@@ -51,7 +51,7 @@ test("saved connections return committed ownership instead of a stale unverified
 
 test("verification invalidates private, public and saved connection caches before returning", async () => {
     await platformVerificationService.refreshOwnershipAfterCommit("user-id");
-    for (const key of ["profile:private:user-id", "profile:public:coder", "user:portals:coder", "user:portals:coder@example.test"]) {
+    for (const key of ["profile:private:user-id", "profile:public:privacy-v2:coder", "user:portals:coder", "user:portals:coder@example.test"]) {
         assert.ok(deleted.includes(key), `${key} must be invalidated`);
     }
 });

@@ -62,7 +62,7 @@ const PRIVATE_PROFILE_TTL = 15 * 60; // 15 minutes
 export const getCachedPublicProfile = async (username: string): Promise<PublicProfilePayload | null> => {
     try {
         if (!redis || redis.status !== "ready") return null;
-        const key = `profile:public:${username.toLowerCase().trim()}`;
+        const key = `profile:public:privacy-v2:${username.toLowerCase().trim()}`;
         const data = await redis.get(key);
         if (!data) return null;
         const payload = JSON.parse(data) as PublicProfilePayload;
@@ -76,7 +76,7 @@ export const getCachedPublicProfile = async (username: string): Promise<PublicPr
 export const setCachedPublicProfile = async (username: string, profile: PublicProfilePayload): Promise<void> => {
     try {
         if (!redis || redis.status !== "ready") return;
-        const key = `profile:public:${username.toLowerCase().trim()}`;
+        const key = `profile:public:privacy-v2:${username.toLowerCase().trim()}`;
         const remaining = profile.collegeVerificationExpiresAt ? Math.floor((new Date(profile.collegeVerificationExpiresAt).getTime() - Date.now()) / 1000) : PUBLIC_PROFILE_TTL;
         await redis.set(key, JSON.stringify(profile), "EX", Math.max(1, Math.min(PUBLIC_PROFILE_TTL, remaining)));
     } catch {
@@ -87,7 +87,7 @@ export const setCachedPublicProfile = async (username: string, profile: PublicPr
 export const invalidatePublicProfileCache = async (username: string): Promise<void> => {
     try {
         if (!redis || redis.status !== "ready") return;
-        const key = `profile:public:${username.toLowerCase().trim()}`;
+        const key = `profile:public:privacy-v2:${username.toLowerCase().trim()}`;
         await redis.del(key);
     } catch {
         // Safe fallback
@@ -138,7 +138,7 @@ export const invalidateAllUserCaches = async (user: { id?: string | undefined; u
             const variants = Array.from(new Set([raw, lower]));
 
             for (const keyVar of variants) {
-                promises.push(redis.del(`profile:public:${keyVar}`));
+                promises.push(redis.del(`profile:public:privacy-v2:${keyVar}`));
                 promises.push(redis.del(`user:portals:${keyVar}`));
                 promises.push(redis.del(`user:submissions:unified:connected-v2:${keyVar}`));
                 promises.push(redis.del(`user:development:unified:connected-v2:${keyVar}`));

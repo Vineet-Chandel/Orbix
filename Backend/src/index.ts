@@ -1,3 +1,5 @@
+import { createSeoWeb } from "./seo/web.js";
+import { responsePrivacy, safeUnhandledError } from "./middlewares/responsePrivacy.middleware.js";
 import { sheerIdWebhook } from "./Routes/verification/sheerIdWebhook.js";
 if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
     try {
@@ -49,6 +51,8 @@ import { apiPerformance } from './middlewares/apiPerformance.middleware.js';
 import { createCorsMiddleware } from './middlewares/cors.middleware.js';
 
 const app: Express = express();
+app.disable("x-powered-by");
+app.use(responsePrivacy);
 
 app.use(createCorsMiddleware());
 
@@ -59,10 +63,10 @@ app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
     if (err instanceof SyntaxError && 'body' in err) {
-        res.status(400).json({ error: "Invalid JSON payload" });
+        res.status(400).json({ success: false, message: "Invalid JSON payload" });
         return;
     }
-    next();
+    next(err);
 });
 
 // ============================================================================
@@ -70,6 +74,7 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 // ============================================================================
 const apiRouter = express.Router();
 apiRouter.use(apiPerformance);
+apiRouter.use((_req, res, next) => { res.setHeader('X-Robots-Tag', 'noindex, nofollow'); next(); });
 
 // System Health & Root Status Endpoints
 apiRouter.get('/health', (req: Request, res: Response) => {
@@ -164,11 +169,15 @@ apiRouter.use('/', authRouter);
 // Mount centralized apiRouter exclusively under /api
 app.use('/api', apiRouter);
 
+// Route public HTML through the same origin as the API only when explicitly configured.
+if (process.env.SERVE_FRONTEND === 'true') app.use(createSeoWeb());
+
 // Fallback alias for OAuth callbacks in case external providers or proxies omit /api prefix
 app.use('/auth', oauthRouter);
 
 // Root health and service check (for ELB, reverse proxies & process managers)
 app.get('/health', (req: Request, res: Response) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.status(200).json({
         success: true,
         service: "orbix-backend",
@@ -186,6 +195,7 @@ app.use('/help', helpRouter);
 app.use('/clubs', clubRouter);
 
 app.get('/', (req: Request, res: Response) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.status(200).json({
         success: true,
         service: "orbix-backend",
@@ -195,6 +205,8 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 
+
+app.use(safeUnhandledError);
 
 const PORT = process.env.PORT || 3000;
 

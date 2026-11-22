@@ -1,3 +1,5 @@
+import { assertProductionDelivery } from "../email/verificationDelivery.js";
+import { requireServerSecret } from "../../config/serverSecrets.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import redis from "../../redis/client.js";
@@ -10,7 +12,7 @@ const OTP_TTL_SECONDS = 600; // 10 minutes
 const COOLDOWN_SECONDS = 60; // 1 minute between OTP requests
 const MAX_HOURLY_REQUESTS = 5; // Max 5 OTP requests per hour per user
 const MAX_VERIFY_ATTEMPTS = 5; // Max 5 incorrect guesses before OTP invalidation
-const JWT_SECRET = process.env.JWT_SECRET || "orbix_secret_fallback_key_2026";
+const JWT_SECRET = requireServerSecret("JWT_SECRET");
 
 interface SendOtpParams {
     userId: string;
@@ -171,6 +173,7 @@ export class EmailVerificationService {
             name: name || userRes.rows[0].username || "Developer",
             otp,
         });
+        assertProductionDelivery(sendResult);
 
         if (!sendResult.success) {
             if (sendResult.sandboxRestricted && process.env.NODE_ENV !== "production") {
@@ -194,7 +197,7 @@ export class EmailVerificationService {
                 : `Verification code sent to ${normalizedEmail}`,
             email: normalizedEmail,
             simulated: Boolean(sendResult.simulated),
-            devOtp: (sendResult.simulated || sendResult.sandboxRestricted || process.env.NODE_ENV !== "production") ? otp : undefined,
+
             sandboxRestricted: Boolean(sendResult.sandboxRestricted),
             provider: sendResult.provider,
             cooldownSeconds: COOLDOWN_SECONDS,
@@ -500,6 +503,7 @@ export class EmailVerificationService {
             name,
             otp,
         });
+        assertProductionDelivery(sendResult);
 
         if (!sendResult.success) {
             if (sendResult.sandboxRestricted && process.env.NODE_ENV !== "production") {

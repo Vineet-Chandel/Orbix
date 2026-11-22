@@ -4,7 +4,7 @@
    transform-box: fill-box;
    transform-origin: center;
    opacity: .78;
-   fill: #0b6e62;
+   fill: #171717;
    animation: wave 1.8s ease-in-out infinite, palette 5.4s linear infinite;
    animation-delay: var(--wave-delay), var(--color-delay);
   }
@@ -13,9 +13,9 @@
    25%, 35% { opacity: 1; transform: scale(1); }
   }
   @keyframes palette {
-   0%, 100% { fill: #0b6e62; }
-   33% { fill: #6d28d9; }
-   66% { fill: #b45309; }
+   0%, 100% { fill: #171717; }
+   33% { fill: #404040; }
+   66% { fill: #666666; }
   }
   @media (prefers-reduced-motion: reduce) {
    rect { animation: none; opacity: 1; transform: none; }

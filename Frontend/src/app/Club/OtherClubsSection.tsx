@@ -7,9 +7,7 @@ import {
     RefreshCw,
     X,
     AlertCircle,
-    Sparkles,
     ExternalLink,
-    Edit3,
     GraduationCap,
     Rocket,
     Share2,
@@ -273,6 +271,7 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                         disabled={loading}
                         className="p-3 rounded-xl bg-white hover:bg-[#FAF6EE] text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                         title="Refresh Clubs List"
+                        aria-label="Refresh clubs"
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                     </button>
@@ -341,7 +340,7 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
 
             {/* Loading Skeleton */}
             {loading && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 min-[900px]:grid-cols-2 min-[1400px]:grid-cols-3 gap-5">
                     {[1, 2, 3].map((n) => (
                         <div
                             key={n}
@@ -362,83 +361,45 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                 </div>
             )}
 
-            {/* Section 1: YOUR CLUB ON CAMPUS (Always Visible & Prominently Displayed) */}
-            {!loading && selfClub && (
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#FFE566] text-black border border-black text-[11px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                <Sparkles className="w-3 h-3 fill-black stroke-none" />
-                                Your Chapter
-                            </span>
-                            <span className="text-xs sm:text-sm font-black text-black">
-                                How your club appears in the campus directory
-                            </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            {onNavigateToEditProfile && (
-                                <button
-                                    type="button"
-                                    onClick={onNavigateToEditProfile}
-                                    className="text-xs font-black text-black hover:underline cursor-pointer flex items-center gap-1"
-                                >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                    <span>Edit Profile</span>
-                                </button>
-                            )}
-                            <Link
-                                to={`/clubs/${selfClub.slug}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs font-black text-neutral-700 hover:text-black hover:underline cursor-pointer flex items-center gap-1"
-                            >
-                                <span>Public View</span>
-                                <ExternalLink className="w-3.5 h-3.5" />
-                            </Link>
-                        </div>
-                    </div>
-
-                    <div className="max-w-md sm:max-w-lg">
-                        <ClubCard
-                            club={selfClub}
-                            isCurrentClub={true}
-                            onSelect={(selected) => setSelectedClubForModal(selected)}
-                        />
-                    </div>
-                </div>
-            )}
-
             {/* Section 2: PEER CAMPUS CLUBS */}
             {!loading && (
                 <div className="space-y-4 pt-2">
                     <div className="flex items-center justify-between px-1">
                         <div className="space-y-0.5">
                             <h3 className="text-lg font-black text-black tracking-tight">
-                                Peer Chapters & Organizations ({peerClubs.length})
+                                Campus Clubs ({clubs.length})
                             </h3>
                             <p className="text-xs font-medium text-neutral-600">
-                                Other active student societies registered at {displayCollegeName}
+                                Your club appears first, followed by other clubs at {displayCollegeName}
                             </p>
                         </div>
                     </div>
+
+                    {onNavigateToEditProfile && (
+                        <button type="button" onClick={onNavigateToEditProfile}
+                            className="text-xs font-bold underline underline-offset-4 min-h-10">
+                            Edit your club profile
+                        </button>
+                    )}
 
                     {/* Filter & Search Bar - only show if peer clubs exist */}
                     {peerClubs.length > 0 && (
                         <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                             {/* Search input */}
-                            <div className="relative flex-1">
+                            <div className="relative flex-1 min-w-0">
                                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search peer clubs by name, domain (#AI, #Web3, #Design), or keywords..."
+                                    aria-label="Search peer clubs"
+                                    placeholder="Search clubs by name, category, or keyword..."
                                     className="w-full pl-10 pr-9 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-black"
                                 />
                                 {searchQuery && (
                                     <button
                                         type="button"
+                                        aria-label="Clear search"
                                         onClick={() => setSearchQuery("")}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black cursor-pointer"
                                     >
@@ -468,6 +429,7 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
 
                                 <button
                                     type="button"
+                                    aria-pressed={onlyRecruiting}
                                     onClick={() => setOnlyRecruiting((prev) => !prev)}
                                     className={`px-3 py-2 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                                         onlyRecruiting
@@ -504,9 +466,12 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                         </div>
                     )}
 
-                    {/* Peer Clubs Grid */}
-                    {filteredPeerClubs.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+                    {/* One shared grid, with the current club pinned first. */}
+                    {(selfClub || filteredPeerClubs.length > 0) && (
+                        <div className="grid grid-cols-1 min-[900px]:grid-cols-2 min-[1400px]:grid-cols-3 gap-5 sm:gap-6">
+                            {selfClub && (
+                                <ClubCard club={selfClub} isCurrentClub={true} onSelect={setSelectedClubForModal} />
+                            )}
                             {filteredPeerClubs.map((clubItem) => (
                                 <ClubCard
                                     key={clubItem.id}

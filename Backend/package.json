@@ -19,7 +19,11 @@
     "db:init-schema": "tsx scripts/apply_production_schema.ts",
     "db:ingest-colleges": "tsx data/ingest_comprehensive_directory.ts",
     "audit:api": "node scripts/audit_api_routes.mjs",
-    "test:performance": "node --import tsx --test src/redis/cache/*.test.ts src/middlewares/cors.middleware.test.ts src/middlewares/apiPerformance.middleware.test.ts ../Frontend/src/store/personalDataApi.test.ts ../Frontend/src/store/authExploreRequests.test.ts"
+    "test:performance": "node --import tsx --test src/redis/cache/*.test.ts src/middlewares/cors.middleware.test.ts src/middlewares/apiPerformance.middleware.test.ts ../Frontend/src/store/personalDataApi.test.ts ../Frontend/src/store/authExploreRequests.test.ts",
+    "test:privacy": "node --import tsx --test src/middlewares/responsePrivacy.middleware.test.ts src/config/serverSecrets.test.ts src/middlewares/publicPrivacyGuards.test.ts src/services/email/verificationDelivery.test.ts",
+    "serve:web": "node --import tsx src/seo/server.ts",
+    "test:seo": "node --import tsx --test ../shared/seo/seo.test.ts src/seo/*.test.ts",
+    "audit:seo": "node --import tsx scripts/seo-route-report.ts"
   },
   "keywords": [],
   "author": "",
@@ -62,4 +66,3 @@
     "typescript": "^7.0.2"
   }
 }
-

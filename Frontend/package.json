@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --ssr src/seo/entry-server.tsx --outDir dist-server",
     "lint": "eslint .",
-"test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts src/app/Club/eventScopePoolSize.test.ts src/app/Club/ApplicationsRoster/teamReadinessFilterSort.test.ts src/data/demoProfileData.test.ts src/api/platformVerificationApi.test.ts src/components/verification/ownershipVerification.test.ts src/app/Leaderboard/verificationConnections.test.ts",
+    "test": "npx tsx --test src/app/Club/eventWizardNavigationGuard.test.ts src/app/Club/eventScopePoolSize.test.ts src/app/Club/ApplicationsRoster/teamReadinessFilterSort.test.ts src/data/demoProfileData.test.ts src/api/platformVerificationApi.test.ts src/components/verification/ownershipVerification.test.ts src/app/Leaderboard/verificationConnections.test.ts",
     "preview": "vite preview",
     "test:forms": "npx tsx --test src/api/clubEventFormApi.test.ts src/app/Club/FormBuilder/draftSaveQueue.test.ts",
     "test:announcements": "npx tsx --tsconfig tsconfig.app.json --test src/api/clubAnnouncementsApi.test.ts src/app/Club/Announcements/announcementRendering.test.tsx"
@@ -63,4 +63,3 @@
     "vite": "^8.3.0"
   }
 }
-

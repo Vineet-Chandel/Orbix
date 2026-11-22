@@ -1,3 +1,4 @@
+import NotFoundPage from "../../pages/NotFoundPage";
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import NavBar from "../NavBar/Landing";
@@ -62,6 +63,7 @@ export const DocsViewerPage: React.FC = () => {
 
     // Related docs from registry
     const relatedDocs = ALL_DOC_FILES.filter((f) => f.slug !== resolvedSlug).slice(0, 3);
+    if (!doc) return <NotFoundPage />;
 
     return (
         <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black font-sans selection:bg-black selection:text-[#a2ff86] relative overflow-x-hidden">

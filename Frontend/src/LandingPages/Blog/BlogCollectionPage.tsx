@@ -1,3 +1,4 @@
+import { ARTICLE_PAGES } from "../../../../shared/seo/routes";
 import { Link } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
 import { Terminal, ArrowRight, Layers, ShieldCheck, Flame } from 'lucide-react';
@@ -69,6 +70,7 @@ export default function BlogCollectionPage() {
                         <img
                             src="https://res.cloudinary.com/dj0ivep44/image/upload/v1792919453/AWS_EC2_Deployment_Banner_samf2y.png"
                             alt="AWS EC2 Deployment Guide Banner"
+                            fetchPriority="high"
                             className="w-full h-auto object-cover max-h-[460px] block transition-transform duration-500 group-hover:scale-[1.01]"
                         />
                         <div className="absolute top-3.5 left-3.5 flex flex-wrap items-center gap-2">
@@ -175,6 +177,10 @@ export default function BlogCollectionPage() {
                         </div>
                     </div>
                 </article>
+                <section aria-labelledby="all-workbook-lessons" className="mt-12 space-y-5">
+                    <h2 id="all-workbook-lessons" className="text-2xl font-black">All AWS Cloud Launchpad lessons</h2>
+                    <ol className="grid gap-4 md:grid-cols-2">{ARTICLE_PAGES.map(page => <li key={page.path} className="rounded-xl border-2 border-black p-4 bg-white"><Link to={page.path} className="font-bold underline">{page.title.replace(' | AWS Cloud Launchpad · Orbix','')}</Link><p className="mt-2 text-sm">{page.description}</p></li>)}</ol>
+                </section>
             </main>
         </div>
     );

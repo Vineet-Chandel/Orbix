@@ -1,3 +1,4 @@
+import { publicAnalyticsPrivacy } from "../../middlewares/publicAnalyticsPrivacy.middleware.js";
 import express, { type Request, type Response } from "express";
 import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
@@ -23,6 +24,10 @@ import { checkVerificationRateLimit } from "../../services/verification/verifica
 import { checkVerificationSchemaStatus } from "../../services/verification/schemaCompatibility.js";
 
 const portalsRouter = express.Router();
+portalsRouter.use([
+    "/submissions/unified", "/development/unified", "/contests", "/badges", "/badges/unified",
+    "/practice/analytics", "/problems/analytics", "/development/analytics", "/github/analytics",
+], optionalAuthenticate, publicAnalyticsPrivacy);
 
 export interface DifficultyBreakdown {
     easy: number;
@@ -4081,10 +4086,10 @@ portalsRouter.get("/profile/save", authenticate, handleGetSavedPortals);
 portalsRouter.get("/links", authenticate, handleGetSavedPortals);
 
 // Resync endpoints
-portalsRouter.post("/resync", optionalAuthenticate, handleResyncPortals);
-portalsRouter.get("/resync", optionalAuthenticate, handleResyncPortals);
-portalsRouter.post("/profile/resync", optionalAuthenticate, handleResyncPortals);
-portalsRouter.get("/profile/resync", optionalAuthenticate, handleResyncPortals);
+portalsRouter.post("/resync", authenticate, handleResyncPortals);
+portalsRouter.get("/resync", authenticate, handleResyncPortals);
+portalsRouter.post("/profile/resync", authenticate, handleResyncPortals);
+portalsRouter.get("/profile/resync", authenticate, handleResyncPortals);
 
 // ============================================================================
 // PLATFORM ACCOUNT OWNERSHIP VERIFICATION ENDPOINTS

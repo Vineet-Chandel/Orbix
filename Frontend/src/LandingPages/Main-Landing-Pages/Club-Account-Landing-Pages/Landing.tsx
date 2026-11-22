@@ -1,10 +1,12 @@
+import { PublicClubDirectory } from "../../../seo/PublicClubDirectory";
+import type { PageData } from "../../../../../shared/seo/metadata";
 import NavBar from '../../NavBar/Landing';
 import Hero from '../Hero/Landing';
 import { lazyWithRetry } from '../../../utils/lazyWithRetry';
 import { DeferredSection as ShowcaseSection } from '../DeferredSection';
 const Footer = lazyWithRetry(() => import('../Footer').then(m => ({ default: m.Footer })));
 
-export default function ClubLanding() {
+export default function ClubLanding({ initialData }: { initialData?: PageData }) {
   return (
     <div className="bg-[#FAF6EE] text-slate-900 selection:bg-slate-900 selection:text-white relative overflow-x-clip font-sans min-h-screen">
       {/* Eye-friendly subtle canvas dot grid across the entire page flow */}
@@ -15,6 +17,8 @@ export default function ClubLanding() {
 
       {/* Hero Section */}
       <Hero mode="club" />
+
+      <PublicClubDirectory initialData={initialData} />
 
       {/* Future Club Perspective Showcases will be plugged in here */}
 

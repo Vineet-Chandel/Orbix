@@ -303,8 +303,7 @@ export async function recordTimelineEvent(_params: any) {
  */
 export const getReviewerAllowlist = (): string[] => {
     const raw =
-        process.env.ORBIX_REVIEWER_EMAILS ||
-        "admin@orbix.dev,staff@orbix.dev,reviewer@orbix.dev";
+        process.env.ORBIX_REVIEWER_EMAILS || "";
     return raw
         .split(",")
         .map((e) => e.trim().toLowerCase())
@@ -834,8 +833,11 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             });
         }
 
+        if (!validated.password) {
+            return res.status(400).json({ success: false, message: "A password is required for the club account." });
+        }
         const verificationTimestamp = new Date();
-        const hashedPassword = await bcrypt.hash(validated.password || "TempPassword123!", 10);
+        const hashedPassword = await bcrypt.hash(validated.password, 10);
 
         // 7. ALWAYS create a dedicated Club Account in users and auth.users
         // CRITICAL ARCHITECTURE RULE:

@@ -8,8 +8,7 @@ import { query } from "../database/client.js";
 export const getStaffAllowlist = (): string[] => {
     const raw =
         process.env.ORBIX_STAFF_EMAILS ||
-        process.env.ORBIX_REVIEWER_EMAILS ||
-        "admin@orbix.dev,staff@orbix.dev,reviewer@orbix.dev,support@orbix.dev";
+        process.env.ORBIX_REVIEWER_EMAILS || "";
     return raw
         .split(",")
         .map((e) => e.trim().toLowerCase())

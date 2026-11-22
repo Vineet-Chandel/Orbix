@@ -1,3 +1,4 @@
+import { maskPublicContacts } from "../../../../shared/privacy/publicContact.js";
 import crypto from "node:crypto";
 import { query, pool } from "../../database/client.js";
 import { ClubTeamService, type ClubUserPermissions } from "./clubTeamService.js";
@@ -1545,14 +1546,15 @@ export class ClubProfileService {
         );
 
         // Clean sensitive fields from club object before sending to public
-        const { authUserId, ...publicClub } = club;
+        const { authUserId, ...clubFields } = club;
+        const publicClub = maskPublicContacts(clubFields);
 
         const responsePayload = {
             isBlockedByClub: false,
             club: publicClub,
             upcomingEvents,
             pastEvents,
-            coordinators: coordRes.rows,
+            coordinators: coordRes.rows.map(maskPublicContacts),
             achievements: achRes.rows,
             teams: teamsRes.rows,
             totalEvents: eventsRes.rows.length,
@@ -1583,15 +1585,12 @@ export class ClubProfileService {
         let collegeName = options?.collegeName;
         let callerClubId = options?.clubId;
 
-        // 1. If not explicitly provided and user is authenticated, determine their college and club context
-        if (userId && !callerClubId) {
-            try {
-                const perms = await ClubTeamService.resolveUserClubPermissions(userId, options?.clubId);
-                if (perms?.clubId) {
-                    callerClubId = perms.clubId;
-                }
-            } catch {
-                // Not a club manager - proceed as normal student/user
+        // A supplied club ID is a filter, never proof of membership or preview access.
+        callerClubId = undefined;
+        if (userId) {
+            const perms = await ClubTeamService.resolveUserClubPermissions(userId, options?.clubId);
+            if (perms?.clubId && (perms.isOwner || perms.isAdmin || perms.isTeamLead || perms.userRole === "member")) {
+                callerClubId = perms.clubId;
             }
         }
 
@@ -1806,7 +1805,7 @@ export class ClubProfileService {
                 u.avatar_url AS "linkedAvatarUrl"
              FROM club_coordinators c
              LEFT JOIN users u ON u.id = c.linked_user_id
-             WHERE c.club_id = ANY($1::uuid[])
+             WHERE c.club_id = ANY($1::uuid[]) AND c.is_public = true
              ORDER BY c.display_order ASC, c.created_at ASC;`,
             [clubIds]
         );
@@ -1848,13 +1847,13 @@ export class ClubProfileService {
         const enrichedClubs = rows.map((c: any) => {
             const isCurrent = Boolean(callerClubId && c.id === callerClubId);
             return {
-                ...c,
+                ...maskPublicContacts(c),
                 memberCount: parseInt(c.memberCount, 10) || 0,
                 eventsCount: parseInt(c.eventsCount, 10) || 0,
                 achievementsCount: parseInt(c.achievementsCount, 10) || 0,
                 coordinatorsCount: parseInt(c.coordinatorsCount, 10) || 0,
                 isCurrentClub: isCurrent,
-                coordinators: coordinatorsMap.get(c.id) || [],
+                coordinators: (coordinatorsMap.get(c.id) || []).map(maskPublicContacts),
                 achievements: achievementsMap.get(c.id) || [],
             };
         });

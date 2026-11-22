@@ -1,3 +1,4 @@
+import { requireServerSecret } from "../../config/serverSecrets.js";
 /**
  * GitHub App & Secure Repository Authorization Service (Phase 3)
  *
@@ -11,7 +12,7 @@
 import crypto from "crypto";
 import { query } from "../../database/client.js";
 
-const STATE_SECRET = process.env.JWT_SECRET || "orbix_secure_github_state_secret_2026";
+const STATE_SECRET = requireServerSecret("JWT_SECRET");
 const STATE_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // AES-256-GCM key derived from JWT_SECRET

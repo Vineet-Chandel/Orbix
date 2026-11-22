@@ -1097,7 +1097,7 @@ const handleSignout = async (req: Request, res: Response) => {
             const normalizedGmail = gmail.toLowerCase().trim();
             void deleteUserDetailsCache(normalizedGmail).catch(() => undefined);
             if (redis.status === "ready") {
-                void redis.del(`user:portals:${normalizedGmail}`, `profile:public:${normalizedGmail}`).catch(() => undefined);
+                void redis.del(`user:portals:${normalizedGmail}`, `profile:public:privacy-v2:${normalizedGmail}`).catch(() => undefined);
             }
         }
 

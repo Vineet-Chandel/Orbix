@@ -57,8 +57,6 @@ const OFFICIAL_RELEASE_HISTORY: ReleaseHistoryItem[] = [
  * Returns dynamic, authentic platform and open-source project metadata
  */
 platformRouter.get("/about", (_req: Request, res: Response) => {
-    const gitCommitSha = process.env.RENDER_GIT_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || "main-2026.10";
-    const environment = process.env.NODE_ENV || "production";
 
     return res.status(200).json({
         success: true,
@@ -69,9 +67,6 @@ platformRouter.get("/about", (_req: Request, res: Response) => {
             releaseChannel: "production",
             releaseName: "Titan Edition",
             buildDate: "2026-10-31T00:00:00.000Z",
-            gitCommitSha,
-            environment: environment === "production" ? "Production (Cloud)" : "Development",
-            repositoryUrl: "https://github.com/Vineet-Chandel/Orbix",
             license: "Apache-2.0",
             platformStatus: "Operational",
             supportedPortalsCount: 16,
@@ -111,7 +106,6 @@ platformRouter.get("/about", (_req: Request, res: Response) => {
                 eventsCalendar: "/events",
                 leaderboard: "/leaderboard",
                 engineeringBlog: "/blogs",
-                github: "https://github.com/Vineet-Chandel/Orbix",
             },
         },
     });

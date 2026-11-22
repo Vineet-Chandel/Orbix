@@ -1,3 +1,4 @@
+import { maskPublicPhone, maskPublicEmail } from "../../../../../shared/privacy/publicContact";
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
@@ -217,13 +218,13 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                     {club.publicEmail && (
                                         <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black text-[11px] font-black text-black flex items-center gap-1.5">
                                             <Mail className="w-3 h-3" />
-                                            <span>{club.publicEmail}</span>
+                                            <span>{maskPublicEmail(club.publicEmail)}</span>
                                         </span>
                                     )}
                                     {club.contactPhone && (
                                         <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black text-[11px] font-black text-black flex items-center gap-1.5">
                                             <Phone className="w-3 h-3" />
-                                            <span>{club.contactPhone}</span>
+                                            <span>{maskPublicPhone(club.contactPhone)}</span>
                                         </span>
                                     )}
                                 </div>

@@ -96,7 +96,6 @@ workspaceRouter.get("/health", async (_req: Request, res: Response) => {
         success: true,
         subsystem: "team-workspace",
         redisHealthy,
-        redisNamespace: process.env.WORKSPACE_REDIS_NAMESPACE || "orbix:team-workspace:",
         timestamp: new Date().toISOString(),
     });
 });

@@ -167,7 +167,8 @@ export class WorkspaceNotificationController {
      */
     static async handleResendWebhook(req: Request, res: Response) {
         try {
-            const secret = process.env.RESEND_WEBHOOK_SECRET || "whsec_test_secret_for_orbix_2026";
+            const secret = process.env.RESEND_WEBHOOK_SECRET;
+            if (!secret) return res.status(503).json({ success: false, message: "Webhook unavailable." });
             const svixId = (req.headers["svix-id"] as string) || (req.headers["webhook-id"] as string);
             const svixTimestamp = (req.headers["svix-timestamp"] as string) || (req.headers["webhook-timestamp"] as string);
             const svixSignature = (req.headers["svix-signature"] as string) || (req.headers["webhook-signature"] as string);

@@ -217,7 +217,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = React.memo(
                                 </div>
                             </div>
                             <div className="mt-4">
-                                <h1 className="text-5xl font-black text-white tracking-tight flex items-center justify-center gap-3.5">
+                                <h2 className="text-5xl font-black text-white tracking-tight flex items-center justify-center gap-3.5">
                                     <span>{displayName}</span>
                                     {/* Verified Badge Icon - only for personal users verified via email OTP */}
                                     {Boolean(user?.isEmailVerified || user?.is_email_verified || user?.isVerifiedCoder || user?.isVerified) && (
@@ -227,7 +227,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = React.memo(
                                             </svg>
                                         </div>
                                     )}
-                                </h1>
+                                </h2>
                                 <div className="flex items-center justify-center gap-3 text-2xl font-medium text-neutral-300 mt-2">
                                     <span className="text-neutral-200 font-medium truncate max-w-[650px]">
                                         {tagline}

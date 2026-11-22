@@ -48,7 +48,7 @@ export class ClubTeamService {
 
         // 2. Fetch membership record
         const memRes = await query(
-            `SELECT id, club_role, access_role, title, status FROM public.club_memberships WHERE club_id = $1 AND user_id = $2 LIMIT 1;`,
+            `SELECT id, club_role, access_role, title, status FROM public.club_memberships WHERE club_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1;`,
             [clubId, userId]
         );
         const membership = memRes.rows[0];

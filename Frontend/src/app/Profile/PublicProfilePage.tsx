@@ -713,15 +713,12 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 setRawError(null);
                 setLoading(false);
                 toast.success("Profile reconnected successfully!", { title: "Connected" });
-                if (!isEmbedded) {
-                    document.title = `${data.displayName} (@${data.username}) — Orbix Profile`;
-                }
             })
             .catch((err: any) => {
                 setRawError(err);
                 setLoading(false);
-                const diag = diagnoseProfileError(err, username);
-                toast.error(diag.title, { title: "Connection Failed" });
+
+                toast.error(diagnoseProfileError(err, username).title, { title: "Connection Failed" });
             })
             .finally(() => {
                 setTimeout(() => setIsRetrying(false), 500);
@@ -765,9 +762,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             setUserProjects(demoProjects);
             setLoading(false);
             setRawError(null);
-            if (!isEmbedded) {
-                document.title = `${demoPublicProfile.displayName} (@${demoPublicProfile.username}) — Orbix Demo Profile`;
-            }
             return;
         }
 
@@ -792,19 +786,12 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                     setLoading(false);
                     setRawError(null);
                     // Update document title for SEO
-                    if (!isEmbedded) {
-                        document.title = `${data.displayName} (@${data.username}) — Orbix Profile`;
-                    }
                 }
             })
             .catch((err: any) => {
                 if (isMounted) {
                     setRawError(err);
                     setLoading(false);
-                    if (!isEmbedded) {
-                        const diag = diagnoseProfileError(err, username);
-                        document.title = `${diag.title} — Orbix`;
-                    }
                 }
             });
 

@@ -1,3 +1,5 @@
+import { assertProductionDelivery } from "../email/verificationDelivery.js";
+import { requireServerSecret } from "../../config/serverSecrets.js";
 import crypto from "crypto";
 import validator from "../../utils/validation.js";
 import bcrypt from "bcrypt";
@@ -9,7 +11,7 @@ import { sendSecurityNotificationEmail } from "../email/resendService.js";
 import { EmailVerificationService } from "../email/emailVerificationService.js";
 import { checkHandleAvailabilityAcrossPlatform } from "../../validators/usernamePolicy.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "orbix_jwt_secret_fallback_2026";
+const JWT_SECRET = requireServerSecret("JWT_SECRET");
 const OTP_TTL_SECONDS = 600; // 10 minutes
 const COOLDOWN_SECONDS = 60; // 60 seconds
 const MAX_VERIFY_ATTEMPTS = 5;
@@ -513,8 +515,8 @@ export class ManageAccountsService {
             isWarning: false,
             footerNotice: "If you did not request this change, someone may be attempting to access your account. Please change your password immediately."
         });
+        assertProductionDelivery(sendResult);
 
-        const isDev = process.env.NODE_ENV !== "production";
 
         return {
             success: true,
@@ -524,7 +526,7 @@ export class ManageAccountsService {
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresAt: expiresAt.toISOString(),
             simulated: Boolean(sendResult.simulated),
-            devOtp: (isDev || sendResult.sandboxRestricted) ? otp : undefined,
+
             sandboxRestricted: Boolean(sendResult.sandboxRestricted),
             provider: sendResult.provider,
         };
@@ -704,8 +706,8 @@ export class ManageAccountsService {
             isWarning: false,
             footerNotice: "This verification code expires in 10 minutes. If you did not request to set this email, please ignore this message."
         });
+        assertProductionDelivery(sendResult);
 
-        const isDev = process.env.NODE_ENV !== "production";
 
         return {
             success: true,
@@ -716,7 +718,7 @@ export class ManageAccountsService {
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresAt: newExpiresAt.toISOString(),
             simulated: Boolean(sendResult.simulated),
-            devOtp: (isDev || sendResult.sandboxRestricted || !sendResult.success) ? newOtp : undefined,
+
             sandboxRestricted: Boolean(sendResult.sandboxRestricted),
             provider: sendResult.provider,
         };
@@ -1233,8 +1235,8 @@ export class ManageAccountsService {
             otpLabel: isOld ? "Authorization Code" : "Verification Code",
             isWarning: false,
         });
+        assertProductionDelivery(sendResult);
 
-        const isDev = process.env.NODE_ENV !== "production";
 
         return {
             success: true,
@@ -1242,7 +1244,7 @@ export class ManageAccountsService {
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresAt: expiresAt.toISOString(),
             simulated: Boolean(sendResult.simulated),
-            devOtp: (isDev || sendResult.sandboxRestricted) ? otp : undefined,
+
             sandboxRestricted: Boolean(sendResult.sandboxRestricted),
             provider: sendResult.provider,
         };
@@ -1387,8 +1389,8 @@ export class ManageAccountsService {
                 isWarning: false,
                 footerNotice: "If you did not request to change your username, please secure your account immediately."
             });
+            assertProductionDelivery(sendResult);
 
-            const isDev = process.env.NODE_ENV !== "production";
 
             return {
                 success: true,
@@ -1399,7 +1401,7 @@ export class ManageAccountsService {
                 cooldownSeconds: COOLDOWN_SECONDS,
                 expiresAt: expiresAt.toISOString(),
                 simulated: Boolean(sendResult.simulated),
-                devOtp: (isDev || sendResult.sandboxRestricted || !sendResult.success) ? otp : undefined,
+
                 sandboxRestricted: Boolean(sendResult.sandboxRestricted),
                 provider: sendResult.provider,
             };

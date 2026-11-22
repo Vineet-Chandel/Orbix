@@ -1136,20 +1136,6 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             });
         }
 
-        // Check Redis cache first (only for public visitors, not owners who see private details)
-        if (!isOwner) {
-            const cached = await getCachedPublicProfile(username);
-            if (cached) {
-                return res.status(200).json({
-                    success: true,
-                    profile: {
-                        ...cached,
-                        isOwner: false,
-                    },
-                });
-            }
-        }
-
         // Query database for user
         const userResult = await query(
             `SELECT
@@ -1208,6 +1194,18 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             }
         }
 
+        // Check current visibility and block state before serving any cached response.
+        if (!isOwner && userRow.isPublic !== true) {
+            return res.status(404).json({ success: false, message: "This profile is unavailable." });
+        }
+        if (!isOwner) {
+            const cached = await getCachedPublicProfile(username);
+            if (cached) {
+                const relationship = viewer?.id ? await resolveRelationshipState(viewer.id, userRow.id) : null;
+                return res.status(200).json({ success: true, profile: { ...cached, isOwner: false, relationship } });
+            }
+        }
+
         // Query all verified/connected platforms for showcase
         const { hasOwnershipStatusColumn: hasColPub } = await checkVerificationSchemaStatus();
         const pubOwnershipSelect = hasColPub
@@ -1227,9 +1225,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 last_sync_at AS "lastSyncAt"
                 ${pubOwnershipSelect}
             FROM user_links
-            WHERE (LOWER(username) = $1)
+            WHERE (LOWER(username) = $1) AND ($2::boolean OR is_public IS TRUE)
             ORDER BY portal ASC;`,
-            [username]
+            [username, !!isOwner]
         );
 
         const fullName = `${userRow.firstName} ${userRow.lastName || ""}`.trim();
@@ -1299,7 +1297,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             isEmailVerified: Boolean(userRow.isEmailVerified),
             isVerifiedCoder: Boolean(userRow.isEmailVerified),
             isVerified: Boolean(userRow.isEmailVerified),
-            resumeUrl: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeUrl || null) : null),
+            resumeUrl: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeUrl ? `/api/profile/resume/view/${encodeURIComponent(userRow.username)}` : null) : null),
             resumeFilename: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeFilename || null) : null),
             resumeFilesize: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeFilesize || null) : null),
             resumeUpdatedAt: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeUpdatedAt || null) : null),
@@ -1309,7 +1307,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
         };
 
         // Cache public profile in Redis only if public
-        if (!isProfilePrivate) {
+        if (!isProfilePrivate && !isOwner) {
             await setCachedPublicProfile(username, publicProfilePayload);
         }
 
@@ -1600,6 +1598,9 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
  */
 export const handlePrivacyAudit = async (req: Request, res: Response) => {
     try {
+        if (!req.user?.username || req.user.username.toLowerCase() !== String(req.params.username || "").trim().toLowerCase()) {
+            return res.status(403).json({ success: false, message: "Access denied." });
+        }
         const usernameParam = req.params.username;
         const username = String(usernameParam || "").trim().toLowerCase();
         if (!username) {
@@ -1719,8 +1720,8 @@ export const handlePrivacyAudit = async (req: Request, res: Response) => {
 };
 
 profileRouter.get("/explore", optionalAuthenticate, handleExploreProfiles);
-profileRouter.get("/privacy-audit/:username", optionalAuthenticate, handlePrivacyAudit);
-profileRouter.get("/:username/privacy-audit", optionalAuthenticate, handlePrivacyAudit);
+profileRouter.get("/privacy-audit/:username", authenticate, handlePrivacyAudit);
+profileRouter.get("/:username/privacy-audit", authenticate, handlePrivacyAudit);
 
 /**
  * POST /api/profile/:username/hire-message (and /api/profile/hire-message)

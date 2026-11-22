@@ -1,6 +1,6 @@
 import redis from "../client.js";
 
-const CLUB_PUBLIC_CACHE_PREFIX = "cache:club:public:";
+const CLUB_PUBLIC_CACHE_PREFIX = "cache:club:public:privacy-v2:";
 const CLUB_WORKSPACE_CACHE_PREFIX = "cache:club:workspace:";
 
 /**

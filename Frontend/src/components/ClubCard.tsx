@@ -56,7 +56,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                     if (onSelect) onSelect(club);
                 }
             }}
-            className={`group bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all duration-200 overflow-hidden flex flex-col justify-between cursor-pointer relative text-left select-none ${
+            className={`group min-w-0 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all duration-200 overflow-hidden flex flex-col justify-between cursor-pointer relative text-left select-none ${
                 isSelf ? "ring-2 ring-black bg-[#FAF6EE]/50" : ""
             } ${className}`}
         >
@@ -142,7 +142,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({
 
                     {/* Club Name & Handle */}
                     <div className="space-y-0.5">
-                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight leading-snug line-clamp-1 group-hover:text-neutral-800">
+                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight leading-snug line-clamp-2 break-words group-hover:text-neutral-800">
                             {club.name}
                         </h3>
 
@@ -159,7 +159,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                     </div>
 
                     {/* Short Description */}
-                    <p className="text-xs font-medium text-neutral-700 leading-relaxed mt-2.5 line-clamp-2 min-h-[36px]">
+                    <p className="text-xs font-medium text-neutral-700 leading-relaxed mt-2.5 line-clamp-2 break-words min-h-[36px]">
                         {narrativeSnippet}
                     </p>
 

@@ -1,0 +1,33 @@
+name: Public SEO validation
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      SEO_INDEXING_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            Backend/package-lock.json
+            Frontend/package-lock.json
+      - run: npm ci --prefix Backend
+      - run: npm ci --prefix Frontend
+      - name: Build browser and server renderer
+        run: npm run build --prefix Frontend
+      - name: Validate route policy, public data, XML and initial HTML
+        run: npm run test:seo --prefix Backend
+        env:
+          NODE_ENV: production
+      - name: Lint new SEO frontend modules
+        working-directory: Frontend
+        run: npx eslint src/seo vite.config.ts

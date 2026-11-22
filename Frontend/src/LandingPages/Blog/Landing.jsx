@@ -1,5 +1,7 @@
+import { routePolicy } from "../../../../shared/seo/routes";
+import NotFoundPage from "../../pages/NotFoundPage";
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 import { AppHeader } from './components/layout/AppHeader';
 import { Sidebar } from './components/layout/Sidebar';
@@ -74,6 +76,7 @@ const VALID_PAGES = [
 
 const BlogLanding = () => {
   const { hoster, blogName, pageId } = useParams();
+  const currentLocation = useLocation();
   const navigate = useNavigate();
 
   // Normalize hoster and blogName slugs
@@ -240,6 +243,8 @@ const BlogLanding = () => {
         };
     }
   }, [activePage]);
+
+  if (routePolicy(currentLocation.pathname).kind === 'missing') return <NotFoundPage />;
 
   return (
     <div className="blog-container min-h-screen neo-grid-bg text-black dark:text-zinc-100 flex flex-col font-sans transition-colors duration-150">

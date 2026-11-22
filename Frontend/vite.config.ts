@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig, createLogger } from 'vite'
+import { defineConfig, createLogger, loadEnv } from 'vite'
+import { siteConfig } from '../shared/seo/site.js'
 
 const logger = createLogger()
 const loggerError = logger.error
@@ -13,7 +14,12 @@ logger.error = (msg, options) => {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), ['SITE_', 'SEO_']);
+  const site = siteConfig({ ...env, SITE_URL: process.env.SITE_URL || env.SITE_URL, SEO_INDEXING_ENABLED: process.env.SEO_INDEXING_ENABLED || env.SEO_INDEXING_ENABLED, NODE_ENV: mode });
+  return {
+  define: { __PUBLIC_SITE_CONFIG__: JSON.stringify(site) },
+  build: { sourcemap: false },
   customLogger: logger,
   plugins: [react()],
   assetsInclude: ['**/*.md'],
@@ -39,4 +45,5 @@ export default defineConfig({
       },
     },
   },
+  };
 })

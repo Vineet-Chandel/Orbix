@@ -1,3 +1,4 @@
+import { WORKBOOK_BASE } from "../../../../../../shared/seo/routes";
 import React from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -15,9 +16,9 @@ export function ChapterPagination({
     <div className="mt-12 pt-8 border-t-2 border-black dark:border-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
       {/* Previous Page Link */}
       {prev ? (
-        <motion.button
-          type="button"
-          onClick={() => onNavigate(prev.id)}
+        <motion.a
+          href={prev.id === "overview" ? WORKBOOK_BASE : `${WORKBOOK_BASE}/${prev.id}`}
+          onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNavigate(prev.id); } }}
           whileHover={{ x: -1, y: -1, boxShadow: '5px 5px 0px #000000' }}
           whileTap={{ x: 2, y: 2, boxShadow: '0px 0px 0px #000000' }}
           className="flex-1 flex items-start gap-3 p-4 border-2 border-black dark:border-white bg-white dark:bg-zinc-900 text-left transition-colors group focus:outline-none shadow-[3.5px_3.5px_0px_#000000] dark:shadow-[3.5px_3.5px_0px_#ffffff]"
@@ -33,16 +34,16 @@ export function ChapterPagination({
               {prev.title}
             </span>
           </div>
-        </motion.button>
+        </motion.a>
       ) : (
         <div className="flex-1 hidden sm:block" />
       )}
 
       {/* Next Page Link - Vibrant Lime Green CTA */}
       {next && (
-        <motion.button
-          type="button"
-          onClick={() => onNavigate(next.id)}
+        <motion.a
+          href={next.id === "overview" ? WORKBOOK_BASE : `${WORKBOOK_BASE}/${next.id}`}
+          onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNavigate(next.id); } }}
           whileHover={{ x: -1, y: -1, boxShadow: '5px 5px 0px #000000' }}
           whileTap={{ x: 2, y: 2, boxShadow: '0px 0px 0px #000000' }}
           className="flex-1 flex items-start justify-between gap-3 p-4 border-2 border-black dark:border-white bg-[#a6ff70] text-black text-right transition-colors group focus:outline-none shadow-[3.5px_3.5px_0px_#000000] dark:shadow-[3.5px_3.5px_0px_#ffffff]"
@@ -58,7 +59,7 @@ export function ChapterPagination({
           <div className="p-2 border-2 border-black bg-black text-white mt-0.5 shrink-0 shadow-[1px_1px_0px_#ffffff]">
             <ArrowRight className="w-4 h-4 stroke-[3]" />
           </div>
-        </motion.button>
+        </motion.a>
       )}
     </div>
   );
