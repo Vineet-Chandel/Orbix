@@ -1,0 +1,82 @@
+.orbix-intro {
+  --intro-gutter: clamp(16px, 2.5vw, 56px);
+  position: fixed;
+  inset: 0;
+  z-index: 99990;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--intro-gutter);
+  padding-top: max(var(--intro-gutter), env(safe-area-inset-top));
+  padding-bottom: max(var(--intro-gutter), env(safe-area-inset-bottom));
+  overflow: hidden;
+  background: #faf6ee;
+  color: #111;
+  font-family: 'Poppins', Arial, sans-serif;
+  isolation: isolate;
+}
+.orbix-intro__counter {
+  align-self: flex-end;
+  display: block;
+  font-size: clamp(48px, 7vw, 148px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .055em;
+  line-height: 1;
+  text-align: right;
+}
+.orbix-intro__middle {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px 0;
+}
+.orbix-intro__pixels {
+  display: block;
+  width: min(128px, 20vw, 20svh);
+  height: auto;
+}
+.orbix-intro__word {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 75vw;
+  flex-shrink: 0;
+  margin-top: auto;
+  overflow: hidden;
+  font-size: 23vw;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: .84;
+  padding-top: .12em;
+  padding-bottom: .06em;
+}
+.orbix-intro__word > span {
+  display: block;
+  flex-shrink: 0;
+  animation: orbix-letter-in .6s cubic-bezier(.16, 1, .3, 1) both;
+}
+.orbix-intro__word > span:nth-child(2) { animation-delay: .06s; }
+.orbix-intro__word > span:nth-child(3) { animation-delay: .12s; }
+.orbix-intro__word > span:nth-child(4) { animation-delay: .18s; }
+.orbix-intro__word > span:nth-child(5) { animation-delay: .24s; }
+.orbix-intro.is-leaving {
+  pointer-events: none;
+  animation: orbix-intro-out .55s cubic-bezier(.76, 0, .24, 1) forwards;
+}
+.orbix-intro--contained { position: relative; min-height: 100svh; }
+.orbix-intro__recovery { position: absolute; top: 50%; left: var(--intro-gutter); display: flex; gap: 24px; font-size: 13px; }
+.orbix-intro__recovery button { color: inherit; font: inherit; background: none; border: 0; text-decoration: underline; padding: 8px 0; cursor: pointer; }
+@keyframes orbix-letter-in {
+  from { transform: translateY(125%) rotate(8deg); }
+  to { transform: translateY(0) rotate(0); }
+}
+@keyframes orbix-intro-out {
+  to { transform: translateY(-100%); visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbix-intro__word > span, .orbix-intro.is-leaving { animation: none; }
+  .orbix-intro.is-leaving { visibility: hidden; }
+}
