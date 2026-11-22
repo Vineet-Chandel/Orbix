@@ -6,9 +6,7 @@ import { query } from "../database/client.js";
  * Server-side staff/admin allowlist.
  */
 export const getStaffAllowlist = (): string[] => {
-    const raw =
-        process.env.ORBIX_STAFF_EMAILS ||
-        process.env.ORBIX_REVIEWER_EMAILS || "";
+    const raw = process.env.ORBIX_STAFF_EMAILS || "";
     return raw
         .split(",")
         .map((e) => e.trim().toLowerCase())

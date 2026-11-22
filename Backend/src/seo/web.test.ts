@@ -86,3 +86,41 @@ test('authenticated dynamic documents never render anonymous data that bypasses 
     const response=await request('/clubs/public',{repository:{...repository(),page:async()=>{reads++;throw Error('must not bypass viewer checks');}},render:()=>{throw Error('must use authorized CSR flow');}},{cookie:'token=existing-session'});
     assert.equal(response.status,200);assert.equal(reads,0);assert.ok(String(response.headers['x-robots-tag']).includes('noindex'));assert.ok(!response.body.includes('application/ld+json'));
 });
+
+test('alternate hosts stay noindex even with the production environment enabled', async () => {
+    const headers = { host: 'preview.example.com' };
+    const response = await request('/docs', {}, headers);
+    assert.match(String(response.headers['x-robots-tag']), /^noindex/);
+    assert.ok(!response.body.includes('rel="canonical"'));
+    assert.match((await request('/robots.txt', {}, headers)).body, /Disallow: \/\n/);
+    assert.ok(!(await request('/sitemap.xml', {}, headers)).body.includes('<loc>'));
+});
+
+test('HTML assembly preserves literal dollar sequences in page content and metadata', async () => {
+    const title = "Budget $& and $` and $'";
+    const entity = { kind: 'club' as const, path: '/clubs/public', title, description: title };
+    const result = await request(entity.path, {
+        repository: { ...repository(), page: async () => ({ entity }) },
+        render: () => '<main><h1>Budget $&</h1></main>',
+    });
+    assert.ok(result.body.includes('<h1>Budget $&</h1>'));
+    assert.equal(JSON.parse(result.body.match(/id="orbix-public-data">([^<]+)/)![1]!).data.entity.title, title);
+    assert.equal((result.body.match(/<\/head>/g) || []).length, 1);
+});
+
+test('direct index.html requests redirect to the canonical homepage path', async () => {
+    const response = await request('/index.html');
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.location, '/');
+});
+
+test('unlisted club links remain usable without including their details or metadata in server HTML', async () => {
+    const response = await request('/clubs/unlisted', {
+        repository: { ...repository(), isUnlistedClub: async () => true },
+        render: () => { throw Error('unlisted club should use the client flow'); },
+    });
+    assert.equal(response.status, 200);
+    assert.match(String(response.headers['x-robots-tag']), /^noindex/);
+    assert.ok(!response.body.includes('rel="canonical"'));
+    assert.ok(!response.body.includes('application/ld+json'));
+});

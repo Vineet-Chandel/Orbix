@@ -28,7 +28,7 @@ async function applyMigration() {
         WHERE table_name = 'user_github_installations';
     `);
 
-    console.log("Verified table user_github_installations exists:", tblCheck.rowCount > 0);
+    console.log("Verified table user_github_installations exists:", tblCheck.rows.length > 0);
     process.exit(0);
 }
 

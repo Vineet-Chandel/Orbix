@@ -40,6 +40,13 @@ export function createPublicRepository(query: Query = liveQuery, origin: string 
             }
             return null;
         },
+        async isUnlistedClub(path: string): Promise<boolean> {
+            const result = await query(`SELECT 1 FROM verified_clubs vc LEFT JOIN users u ON u.id = vc.auth_user_id
+                WHERE vc.is_active IS TRUE AND vc.visibility = 'unlisted'
+                  AND vc.publication_status = 'published' AND vc.profile_visibility = 'unlisted'
+                  AND (LOWER(vc.slug) = LOWER($1) OR LOWER(u.username) = LOWER($1)) LIMIT 1`, [path.slice(7)]);
+            return result.rows.length > 0;
+        },
         async counts(): Promise<{ clubs: number; events: number }> {
             const result = await query(`SELECT (SELECT COUNT(*) FROM verified_clubs vc WHERE ${PUBLIC_CLUB_SQL}) AS clubs,
                 (SELECT COUNT(*) FROM club_events e JOIN verified_clubs vc ON vc.id = e.club_id WHERE ${PUBLIC_EVENT_SQL}) AS events`);

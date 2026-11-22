@@ -1075,7 +1075,6 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             lastName: "Club",
             gmail: clubDedicatedEmail,
             username: validated.username.toLowerCase(),
-            password_hash: hashedPassword,
             termsAccepted: true,
             accountType: "club",
         }).catch(() => {});
@@ -1111,9 +1110,9 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
             contactPersonName: validated.contactPersonName,
             contactPersonRole: validated.contactPersonRole,
             contactEmail: validated.contactEmail,
-            contactPhone: validated.contactPhone || undefined,
-            collegeOfficialEmail: validated.collegeOfficialEmail || undefined,
-            clubWebsiteUrl: validated.clubWebsiteUrl || undefined,
+            ...(validated.contactPhone && { contactPhone: validated.contactPhone }),
+            ...(validated.collegeOfficialEmail && { collegeOfficialEmail: validated.collegeOfficialEmail }),
+            ...(validated.clubWebsiteUrl && { clubWebsiteUrl: validated.clubWebsiteUrl }),
             submittedAt: createdRequest.submitted_at,
             requestId: createdRequest.id,
         });
@@ -1783,7 +1782,7 @@ const handlePromoteClub = async (req: Request, res: Response) => {
             slug: verifiedClub.slug,
             contactPersonName: app.contact_person_name,
             contactEmail: app.contact_email,
-            reviewedBy: reviewerId,
+            ...(reviewerId && { reviewedBy: reviewerId }),
             verifiedAt: verifiedClub.verified_at,
         });
 
@@ -3472,6 +3471,9 @@ clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res:
     try {
         const { eventId } = req.params;
         const userId = req.user!.id;
+        if (typeof eventId !== "string") {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const result = await toggleEventLike(eventId, userId);
 
         return res.json({
@@ -3494,8 +3496,7 @@ clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res:
 clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
-        if (!isUuid) {
+        if (typeof eventId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
         const userId = req.user!.id;
@@ -3728,12 +3729,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 );
                 sendSoleRegistrationEmail({
                     to: finalEmail,
-                    userName: finalName,
+                    recipientName: finalName,
                     eventTitle: event.title,
-                    clubName: event.clubName,
-                    venueOrLocation: event.venue_or_location || undefined,
+                    ...(event.venue_or_location ? { venue: event.venue_or_location } : {}),
                     startsAt: event.starts_at,
-                    eventId: event.id,
                     status: "pending",
                 }).catch((emailErr) => console.error("[Registration] Failed to send sole registration email on reactivation:", emailErr));
 
@@ -3906,12 +3905,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 
         sendSoleRegistrationEmail({
             to: finalEmail,
-            userName: finalName,
+            recipientName: finalName,
             eventTitle: event.title,
-            clubName: event.clubName,
-            venueOrLocation: event.venue_or_location || undefined,
+            ...(event.venue_or_location ? { venue: event.venue_or_location } : {}),
             startsAt: event.starts_at,
-            eventId: event.id,
             status: "pending",
         }).catch((emailErr) => console.error("[Registration] Failed to send sole registration email:", emailErr));
 

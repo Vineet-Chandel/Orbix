@@ -16,7 +16,7 @@ import { WorkspaceCapabilityService } from "../../services/workspace/workspaceCa
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import { ClubTeamService } from "../../services/club/clubTeamService.js";
-import { query } from "../../database/client.js";
+import { pool, query } from "../../database/client.js";
 import multer from "multer";
 
 const fileUpload = multer({
@@ -1153,6 +1153,9 @@ workspaceRouter.patch("/members/:targetUserId/custom-permissions", authenticate,
 
         const authUser = (req as any).user;
         const targetUserId = req.params.targetUserId;
+        if (typeof targetUserId !== "string") {
+            return res.status(400).json({ success: false, message: "A member ID is required." });
+        }
         const customPermissions = req.body.customPermissions;
 
         if (!customPermissions || typeof customPermissions !== "object") {
@@ -1400,10 +1403,7 @@ workspaceRouter.post("/invitations/accept", authenticate, async (req: Request, r
         if (invitationId && (!token || typeof token !== "string" || !token.trim())) {
             if (type === "club_team") {
                 const result = await ClubTeamService.acceptInvitation(invitationId, authUser.id);
-                let workspace = await WorkspaceRepository.findByClubId(result.clubId);
-                if (!workspace) {
-                    workspace = await WorkspaceService.initializeForClub(result.clubId, authUser.id);
-                }
+                const workspace = await WorkspaceRepository.findByClubId(result.clubId);
                 const member = workspace ? await WorkspaceRepository.findMember(workspace.id, authUser.id) : null;
                 return res.json({
                     success: true,
@@ -1729,13 +1729,16 @@ workspaceRouter.get("/permissions/preview", authenticate, async (req: Request, r
         if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
 
         const authUser = (req as any).user;
-        const roleId = req.query.roleId as string | undefined;
-        const targetUserId = req.query.targetUserId as string | undefined;
+        const { roleId, targetUserId } = req.query;
+        if ((roleId !== undefined && typeof roleId !== "string") ||
+            (targetUserId !== undefined && typeof targetUserId !== "string")) {
+            return res.status(400).json({ success: false, message: "Use a single role or member ID." });
+        }
 
         const simulation = await WorkspaceCapabilityService.previewCapabilities(
             workspace.id,
             authUser.id,
-            { roleId, targetUserId }
+            { ...(roleId !== undefined && { roleId }), ...(targetUserId !== undefined && { targetUserId }) }
         );
 
         return res.json({ success: true, preview: simulation });

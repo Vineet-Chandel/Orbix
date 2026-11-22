@@ -61,7 +61,7 @@ export interface SignedStatePayload {
 export function generateInstallationState(userId: string, repoHint?: string): string {
     const payload: SignedStatePayload = {
         userId,
-        repoHint,
+        ...(repoHint !== undefined && { repoHint }),
         timestamp: Date.now(),
         nonce: crypto.randomBytes(16).toString("hex"),
     };
@@ -83,12 +83,10 @@ export function verifyInstallationState(rawState: string): { userId: string; rep
         throw new Error("Missing or invalid authorization state parameter.");
     }
 
-    const parts = rawState.split(".");
-    if (parts.length !== 2) {
+    const [dataString, incomingSignature, ...extraParts] = rawState.split(".");
+    if (!dataString || !incomingSignature || extraParts.length > 0) {
         throw new Error("Malformed authorization state format.");
     }
-
-    const [dataString, incomingSignature] = parts;
 
     // Verify HMAC signature
     const expectedSignature = crypto
@@ -96,12 +94,9 @@ export function verifyInstallationState(rawState: string): { userId: string; rep
         .update(dataString)
         .digest("base64url");
 
-    if (
-        !crypto.timingSafeEqual(
-            Buffer.from(incomingSignature, "utf8"),
-            Buffer.from(expectedSignature, "utf8")
-        )
-    ) {
+    const incomingBytes = Buffer.from(incomingSignature, "utf8");
+    const expectedBytes = Buffer.from(expectedSignature, "utf8");
+    if (incomingBytes.length !== expectedBytes.length || !crypto.timingSafeEqual(incomingBytes, expectedBytes)) {
         throw new Error("Invalid authorization state signature (potential CSRF attack).");
     }
 
@@ -114,7 +109,7 @@ export function verifyInstallationState(rawState: string): { userId: string; rep
 
     return {
         userId: payload.userId,
-        repoHint: payload.repoHint,
+        ...(payload.repoHint !== undefined && { repoHint: payload.repoHint }),
     };
 }
 

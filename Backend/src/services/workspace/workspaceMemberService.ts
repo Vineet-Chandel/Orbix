@@ -624,10 +624,7 @@ export class WorkspaceMemberService {
             const clubInv = clubInvRes.rows[0];
             if (clubInv) {
                 await ClubTeamService.acceptInvitation(clubInv.id, acceptingUserId);
-                let ws = await WorkspaceRepository.findByClubId(clubInv.club_id);
-                if (!ws) {
-                    ws = await WorkspaceService.initializeForClub(clubInv.club_id, acceptingUserId);
-                }
+                const ws = await WorkspaceRepository.findByClubId(clubInv.club_id);
                 const mem = ws ? await WorkspaceRepository.findMember(ws.id, acceptingUserId) : null;
                 return {
                     workspace: ws || ({ id: "", name: "Club Workspace" } as any),

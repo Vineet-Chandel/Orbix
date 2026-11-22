@@ -8,7 +8,6 @@ export interface IUserDetails {
     lastName: string;
     gmail: string;
     username: string;
-    password_hash?: string;
     termsAccepted: boolean | string;
     firstname?: string;
     middlename?: string;
@@ -39,14 +38,9 @@ const userDetailsCache = async (user: IUserDetails) => {
             account_type: user.accountType || user.account_type || "personal",
         };
 
-        // Only store password_hash if a valid non-empty hash is provided (e.g., bcrypt hash)
-        // Never overwrite an existing hash with an empty string
-        if (user.password_hash && typeof user.password_hash === "string" && user.password_hash.trim().length >= 20) {
-            dataToSet.password_hash = user.password_hash.trim();
-        }
-
-        const promises: Promise<any>[] = [
+        const promises: Promise<unknown>[] = [
             redis.hset(key, dataToSet),
+            redis.hdel(key, "password_hash"),
             redis.expire(key, CACHE_TTL),
         ];
 
@@ -92,7 +86,6 @@ const getUserDetailsCache = async (identifier: string): Promise<IUserDetails | n
         const accountType = user.accountType || user.account_type || "personal";
 
         return {
-            ...(user as any),
             id: user.id || "",
             firstName,
             middleName,
@@ -102,12 +95,11 @@ const getUserDetailsCache = async (identifier: string): Promise<IUserDetails | n
             lastname: lastName,
             gmail: user.gmail || targetGmail,
             username: user.username || "",
-            password_hash: user.password_hash || "",
             termsAccepted,
             termsaccepted: termsAccepted,
             accountType,
             account_type: accountType,
-        } as IUserDetails;
+        };
     } catch (err: any) {
         console.warn("[Redis Cache] Failed to get user details from cache:", err?.message || err);
         return null;

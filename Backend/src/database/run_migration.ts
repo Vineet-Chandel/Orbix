@@ -172,9 +172,6 @@ export const MIGRATION_SIGNATURES: Record<string, { tables?: string[]; columns?:
     "068_club_announcements.sql": {
         tables: ["club_announcements", "club_announcement_assets", "club_announcement_likes", "club_announcement_limits", "club_announcement_jobs", "club_announcement_audit"],
     },
-"068_club_announcements.sql": {
-        tables: ["club_announcements", "club_announcement_assets", "club_announcement_likes", "club_announcement_limits", "club_announcement_jobs", "club_announcement_audit"],
-    },
     "069_platform_account_ownership_verification.sql": {
         tables: ["platform_verification_challenges", "user_links_orphaned_archive"],
         columns: [

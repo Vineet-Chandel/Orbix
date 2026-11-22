@@ -1,3 +1,4 @@
+import { WorkspaceRecognitionController } from "../controllers/workspace/workspaceRecognitionController.js";
 import { getStaffAllowlist } from "./staff.middleware.js";
 import test, { beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -118,7 +119,7 @@ test('staff email grants require explicit server configuration', () => {
     const reviewers = process.env.ORBIX_REVIEWER_EMAILS;
     try {
         process.env.ORBIX_STAFF_EMAILS = '';
-        process.env.ORBIX_REVIEWER_EMAILS = '';
+        process.env.ORBIX_REVIEWER_EMAILS = 'reviewer@example.test';
         assert.deepEqual(getStaffAllowlist(), []);
         process.env.ORBIX_STAFF_EMAILS = 'operator@example.test';
         assert.deepEqual(getStaffAllowlist(), ['operator@example.test']);
@@ -126,4 +127,16 @@ test('staff email grants require explicit server configuration', () => {
         if (staff === undefined) delete process.env.ORBIX_STAFF_EMAILS; else process.env.ORBIX_STAFF_EMAILS = staff;
         if (reviewers === undefined) delete process.env.ORBIX_REVIEWER_EMAILS; else process.env.ORBIX_REVIEWER_EMAILS = reviewers;
     }
+});
+
+
+test('recognition summaries reject a request for a different member before querying', async () => {
+    const res = response();
+    await WorkspaceRecognitionController.getSummary({
+        user: { id: 'viewer' },
+        params: { workspaceId: 'workspace-id' },
+        query: { userId: 'target' },
+    } as any, res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(queries.length, 0);
 });

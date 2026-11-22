@@ -73,10 +73,10 @@ export function generateRandomBase62(length: number): string {
 
     while (chars.length < length) {
         const randomBytes = crypto.randomBytes(batchSize);
-        for (let i = 0; i < randomBytes.length && chars.length < length; i++) {
-            const byte = randomBytes[i];
+        for (const byte of randomBytes) {
+            if (chars.length >= length) break;
             if (byte < BASE62_REJECTION_THRESHOLD) {
-                chars.push(BASE62_CHARSET[byte % 62]);
+                chars.push(BASE62_CHARSET.charAt(byte % BASE62_CHARSET.length));
             }
         }
     }

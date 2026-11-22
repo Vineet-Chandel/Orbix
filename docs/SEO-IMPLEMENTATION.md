@@ -96,11 +96,34 @@ Earlier uncommitted privacy fixes and the user's loader SVG work were preserved.
 2. Verify HTTPS and alternate host redirects at the real proxy/CDN, and retain API authorization. Purge any old static-SPA/CDN fallbacks. A code change cannot make an unmodified static hosting configuration render server HTML.
 3. Complete domain ownership verification and submit sitemap in Google Search Console and Bing Webmaster Tools. Credentials/verification tokens were not invented.
 4. Have content owners approve pricing/customer claims, platform-list consistency, official contacts/socials, article dates/bylines and detailed event venues.
-5. Validate deployed social URLs, Rich Results/Schema.org, browser navigation/auth, mobile layouts, and real CWV/Lighthouse. The live root/robots/sitemap could not be retrieved through the research tool; a started local preview process did not remain reachable from a subsequent request. No live deployment/browser score is reported.
+5. Validate deployed social URLs, Rich Results/Schema.org, browser navigation/auth, mobile layouts, and real CWV/Lighthouse. A read-only browser check reached the live homepage. It still served the previous title and had no managed SEO tags or canonical in the inspected DOM. The live robots URL displayed the application’s fallback page and the sitemap URL did not display sitemap XML. The local preview rendered the new implementation. No production Lighthouse or field score was collected.
 6. Resolve existing broad backend type-check failures and full-project lint resource/debt separately. Focused SEO checks and introduced diagnostic comparisons are recorded below.
 
 No commit, push, deployment, analytics script or external indexing submission was performed.
 
 ## Verification results
 
-Final executed results are recorded below after the last verification run.
+| Check | Observed result |
+|---|---|
+| Frontend TypeScript and production builds | Browser and server bundles built successfully. |
+| SEO suite | 35 passed, including all 39 registry renders, publication withdrawal, noindex, canonical URLs, JSON-LD, XML, compression, redirects, and template content integrity. |
+| Existing suites | 56 frontend and 159 backend tests passed. 10 backend database integration tests were skipped. |
+| Lint | Focused SEO lint passed. The repository-wide lint process exhausted its Node heap. |
+| Backend types | The repository-wide check still fails on existing diagnostics. Comparison with the earlier baseline found no new application diagnostic types. |
+| Local HTTP | Documentation returned 200, an unknown document returned 404, and the social PNG returned 200 as image/png. The canonical Host returned the robots sitemap directive and an XML sitemap containing exactly 39 canonical URLs. A local preview Host returned disallow-all robots. |
+| Local browser | Docs rendered with its expected title and heading. Following the scoring guide link updated the route and page title and cleared the previous page’s bootstrap data. Preview pages retained noindex. |
+| Live browser | Existing production frontend remains on its prior serving path. Rollout and ownership verification are still pending. |
+| Lighthouse and Core Web Vitals | Lighthouse CLI was unavailable. Mobile rendering, signed-in browser flows and field CWV remain unverified. |
+
+A single unthrottled loopback run transferred about 7.9 KB, 15.4 KB and 8.8 KB of gzip HTML for the homepage, docs and workbook hub respectively. Local time to first byte was 1.95 s for the first request, including renderer import, then 24 ms and 12 ms for the next two distinct routes. These are local HTTP measurements. CDN behavior, client performance and Web Vitals require browser or field measurements.
+
+The follow-up keeps legacy OAuth callbacks ahead of the HTML handler. It also preserves link access to published unlisted clubs as a noindex client page. Alternate hosts cannot return an indexable document or populated sitemap even when the production indexing flag is set. Hosting must forward the canonical Host header.
+
+
+## Production readiness follow-up
+
+Both live sign-in forms accepted submission and returned to sign-in during the browser check. No authenticated dashboard or account session was confirmed. The homepage, docs and club sign-in had no horizontal overflow at a 375 × 812 viewport. The local sign-in forms now show persistent inline errors. Verify both accounts again against the deployed release, including session refresh, sign-out and authenticated mobile layouts.
+
+Reviewer-only environment entries no longer grant administrator access. Recognition summaries now use the authenticated account as their subject and reject requests for another member. Auth cache writes omit password hashes and remove an existing hash field on refresh. Cache reads return explicit profile fields, so legacy entries cannot return a hash. Untouched cache entries expire under the existing one-day TTL. Production signing secrets and user roles still require setup in the hosting environment described in the maintenance guide.
+
+The production frontend build, 106 frontend tests, 141 backend suite tests, 20 privacy tests and 35 SEO tests passed. Ten migration tests were skipped because the local sandbox blocked PostgreSQL shared memory. Full frontend lint exhausted the Node heap, and focused sign-in lint still reports existing errors. The strict backend type check dropped from 280 to 147 diagnostics and still fails. The remaining diagnostics are concentrated in résumé processing, workspace repositories and leaderboards, and project routes and extraction. No production rollout or Lighthouse run was completed.

@@ -3,23 +3,26 @@ import type { Request, Response } from "express";
 import { WorkspaceRecognitionService } from "../../services/workspace/workspaceRecognitionService.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 
+function requiredParam(req: Request, name: string): string {
+    const value = req.params[name];
+    if (typeof value !== "string" || !value) throw new Error(`Missing ${name} parameter.`);
+    return value;
+}
+
 export class WorkspaceRecognitionController {
     /**
      * Helper to resolve workspaceId from params or club query
      */
     private static async resolveWorkspaceId(req: Request): Promise<string> {
-        let wsId = req.params.workspaceId;
-        if (!wsId || wsId.length < 10) {
-            const clubId = (req.query.clubId as string) || (req.body?.clubId as string);
-            if (clubId) {
-                const ws = await WorkspaceRepository.findByClubId(clubId);
-                if (ws) wsId = ws.id;
-            }
+        const workspaceId = req.params.workspaceId;
+        if (typeof workspaceId === "string" && workspaceId.length >= 10) return workspaceId;
+
+        const clubId = req.query.clubId || req.body?.clubId;
+        if (typeof clubId === "string" && clubId) {
+            const workspace = await WorkspaceRepository.findByClubId(clubId);
+            if (workspace) return workspace.id;
         }
-        if (!wsId) {
-            throw new Error("Target workspace could not be determined.");
-        }
-        return wsId;
+        throw new Error("Target workspace could not be determined.");
     }
 
     /**
@@ -40,7 +43,7 @@ export class WorkspaceRecognitionController {
                 workspaceId,
                 authUser.id,
                 req.body,
-                { ipAddress, userAgent }
+                { ...(ipAddress && { ipAddress }), ...(userAgent && { userAgent }) }
             );
 
             return res.status(201).json({
@@ -65,10 +68,7 @@ export class WorkspaceRecognitionController {
                 return res.status(401).json({ success: false, message: "Authentication required." });
             }
 
-            const awardId = req.params.awardId;
-            if (!awardId) {
-                return res.status(400).json({ success: false, message: "Award ID parameter is required." });
-            }
+            const awardId = requiredParam(req, "awardId");
 
             const ipAddress = req.ip || req.socket.remoteAddress || undefined;
             const userAgent = req.headers["user-agent"] || undefined;
@@ -78,7 +78,7 @@ export class WorkspaceRecognitionController {
                 authUser.id,
                 awardId,
                 req.body,
-                { ipAddress, userAgent }
+                { ...(ipAddress && { ipAddress }), ...(userAgent && { userAgent }) }
             );
 
             return res.json({
@@ -150,8 +150,8 @@ export class WorkspaceRecognitionController {
                 issuerId: issuerId as string,
                 departmentId: departmentId as string,
                 categoryId: categoryId as string,
-                limit: limit ? parseInt(limit as string, 10) : undefined,
-                offset: offset ? parseInt(offset as string, 10) : undefined,
+                ...(typeof limit === "string" && { limit: parseInt(limit, 10) }),
+                ...(typeof offset === "string" && { offset: parseInt(offset, 10) }),
             });
 
             return res.json({ success: true, ...result });
@@ -165,14 +165,20 @@ export class WorkspaceRecognitionController {
      */
     static async getSummary(req: Request, res: Response) {
         try {
-            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
-            const authUser = (req as any).user;
-            const targetUserId = (req.query.userId as string) || authUser.id;
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: "Authentication required." });
+            }
+            if (req.query.userId !== undefined && req.query.userId !== userId) {
+                return res.status(403).json({ success: false, message: "This summary is available to its owner." });
+            }
 
-            const summary = await WorkspaceRecognitionService.getMyRecognitionSummary(workspaceId, targetUserId);
+            const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
+            const summary = await WorkspaceRecognitionService.getMyRecognitionSummary(workspaceId, userId);
             return res.json({ success: true, summary });
         } catch (err: any) {
-            return res.status(400).json({ success: false, message: err.message });
+            const status = err.message.includes("Unauthorized") ? 403 : 400;
+            return res.status(status).json({ success: false, message: err.message });
         }
     }
 
@@ -238,7 +244,7 @@ export class WorkspaceRecognitionController {
         try {
             const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
             const authUser = (req as any).user;
-            const categoryId = req.params.categoryId;
+            const categoryId = requiredParam(req, "categoryId");
 
             const category = await WorkspaceRecognitionService.updateCategory(
                 workspaceId,
@@ -260,7 +266,7 @@ export class WorkspaceRecognitionController {
         try {
             const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
             const authUser = (req as any).user;
-            const awardId = req.params.awardId;
+            const awardId = requiredParam(req, "awardId");
 
             const award = await WorkspaceRecognitionService.getAwardById(workspaceId, authUser.id, awardId);
             return res.json({ success: true, award });
@@ -277,7 +283,7 @@ export class WorkspaceRecognitionController {
         try {
             const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
             const authUser = (req as any).user;
-            const departmentId = req.params.departmentId;
+            const departmentId = requiredParam(req, "departmentId");
 
             const summary = await WorkspaceRecognitionService.getDepartmentRecognition(
                 workspaceId,
@@ -298,7 +304,7 @@ export class WorkspaceRecognitionController {
         try {
             const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
             const authUser = (req as any).user;
-            const targetUserId = req.params.userId;
+            const targetUserId = requiredParam(req, "userId");
 
             const profile = await WorkspaceRecognitionService.getMemberRecognitionProfile(
                 workspaceId,
@@ -319,7 +325,7 @@ export class WorkspaceRecognitionController {
         try {
             const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
             const authUser = (req as any).user;
-            const awardId = req.params.awardId;
+            const awardId = requiredParam(req, "awardId");
             const { note } = req.body;
 
             const noteRecord = await WorkspaceRecognitionService.addAppreciationNote(
@@ -346,7 +352,7 @@ export class WorkspaceRecognitionController {
         try {
             const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
             const authUser = (req as any).user;
-            const awardId = req.params.awardId;
+            const awardId = requiredParam(req, "awardId");
 
             const notes = await WorkspaceRecognitionService.getAwardNotes(workspaceId, authUser.id, awardId);
             return res.json({ success: true, notes });
@@ -372,7 +378,7 @@ export class WorkspaceRecognitionController {
             const leaderboards = await WorkspaceRecognitionService.getThreeLeaderboards(
                 workspaceId,
                 authUser.id,
-                { period, departmentId }
+                { period, ...(departmentId && { departmentId }) }
             );
 
             return res.json({ success: true, leaderboards });
@@ -398,7 +404,7 @@ export class WorkspaceRecognitionController {
             const analytics = await WorkspaceRecognitionService.getComprehensiveAnalytics(
                 workspaceId,
                 authUser.id,
-                { period, departmentId }
+                { period, ...(departmentId && { departmentId }) }
             );
 
             return res.json({ success: true, analytics });
@@ -417,7 +423,7 @@ export class WorkspaceRecognitionController {
         try {
             const workspaceId = await WorkspaceRecognitionController.resolveWorkspaceId(req);
             const authUser = (req as any).user;
-            const targetUserId = req.params.userId;
+            const targetUserId = requiredParam(req, "userId");
             const period = (req.query.period as any) || "this_month";
 
             const analytics = await WorkspaceRecognitionService.getIndividualMemberAnalytics(
@@ -456,7 +462,7 @@ export class WorkspaceRecognitionController {
             const result = await WorkspaceRecognitionService.getRedisTopRankings(
                 workspaceId,
                 authUser.id,
-                { boardType, period, limit, offset, departmentId }
+                { boardType, period, limit, offset, ...(departmentId && { departmentId }) }
             );
 
             return res.json({ success: true, ...result });
@@ -488,7 +494,7 @@ export class WorkspaceRecognitionController {
             const result = await WorkspaceRecognitionService.getRedisNearbyRankings(
                 workspaceId,
                 authUser.id,
-                { boardType, period, targetUserId, radius, departmentId }
+                { boardType, period, targetUserId, radius, ...(departmentId && { departmentId }) }
             );
 
             return res.json({ success: true, ...result });
@@ -516,7 +522,6 @@ export class WorkspaceRecognitionController {
             );
 
             return res.json({
-                success: true,
                 message: "Successfully rebuilt Redis leaderboards from PostgreSQL source of truth.",
                 ...result,
             });
@@ -544,7 +549,6 @@ export class WorkspaceRecognitionController {
             );
 
             return res.json({
-                success: true,
                 message: result.matched
                     ? "Leaderboards are perfectly synchronized between Redis and PostgreSQL."
                     : `Reconciled ${result.correctedCount} discrepancies.`,

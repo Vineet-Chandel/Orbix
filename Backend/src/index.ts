@@ -169,11 +169,11 @@ apiRouter.use('/', authRouter);
 // Mount centralized apiRouter exclusively under /api
 app.use('/api', apiRouter);
 
-// Route public HTML through the same origin as the API only when explicitly configured.
-if (process.env.SERVE_FRONTEND === 'true') app.use(createSeoWeb());
-
 // Fallback alias for OAuth callbacks in case external providers or proxies omit /api prefix
 app.use('/auth', oauthRouter);
+
+// Route public HTML through the same origin as the API only when explicitly configured.
+if (process.env.SERVE_FRONTEND === 'true') app.use(createSeoWeb());
 
 // Root health and service check (for ELB, reverse proxies & process managers)
 app.get('/health', (req: Request, res: Response) => {
@@ -187,7 +187,6 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Legacy root fallback aliases for backwards compatibility
-app.use('/auth', oauthRouter);
 app.use('/profile', profileRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);

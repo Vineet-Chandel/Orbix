@@ -17,7 +17,15 @@ Build both artifacts with `npm run build --prefix Frontend`. Keep `Frontend/dist
 
 TLS termination must permanently redirect HTTP to HTTPS and forward the canonical Host. Enable gzip/Brotli for static CSS/JS/images at the edge; the public HTML handler also negotiates asynchronous gzip itself. Fingerprinted assets have immutable one-year caching. HTML and dynamic sitemaps use no-store so publication/privacy changes are not retained in shared caches. Static anonymous React body rendering is bounded and memoized in-process; it never contains request cookies/user state.
 
-Set preview indexing false on both build/runtime environments. Server and browser configuration must agree; verify the rendered HTML and hydrated/taken-over DOM after deployment. Default index.html intentionally has noindex so an accidentally deployed raw SPA shell does not become an indexed copy.
+Set preview indexing false on both build/runtime environments. The server also requires the incoming Host header to match SITE_URL before emitting indexable metadata or sitemap URLs. Preserve that header through the reverse proxy. Server and browser configuration must agree; verify the rendered HTML and hydrated/taken-over DOM after deployment. Default index.html intentionally has noindex so an accidentally deployed raw SPA shell does not become an indexed copy.
+
+## Production authentication setup
+
+Keep `JWT_SECRET` in the hosting provider's backend secret store. Use the same value across replicas and preserve the existing secure value across releases. The backend refuses missing or weak values in production. Plan any rotation with the deployment owner. Rotation invalidates existing signed sessions and verification flows, and GitHub App credentials encrypted using the old key need a migration or reauthorization.
+
+Configure `ORBIX_STAFF_EMAILS` only for identities explicitly approved for administrator access. Use `ORBIX_REVIEWER_EMAILS` for the club application review queue. Each setting is a comma-separated server-only list. An empty staff list grants no environment-based administrator access. Database-assigned staff roles are evaluated separately.
+
+After deploying to the canonical host, verify personal sign-in, club sign-in, refresh and sign-out with dedicated test accounts. Check the reviewer queue with an approved reviewer and check that a reviewer-only account and an ordinary account are denied on governance routes. On mobile, verify that opening the authenticated dashboards and switching between club directory views works. Record public SEO and Lighthouse checks against the deployed release.
 
 ## Local and CI checks
 
