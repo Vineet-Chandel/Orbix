@@ -4047,7 +4047,7 @@ export const handleResyncPortals = async (req: Request, res: Response) => {
 
         // Trigger automatic leaderboard score recalculation
         if (userIdentifier) {
-            syncLeaderboardForUser(userIdentifier).catch((sErr: any) => {
+            syncLeaderboardForUser(userIdentifier, { refreshProviderStats: true }).catch((sErr: any) => {
                 console.warn(`Resync leaderboard update warning for ${userIdentifier}:`, sErr?.message);
             });
         }
@@ -4446,7 +4446,7 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
 
         // Recalculate leaderboard score upon updating/connecting a portal
         if (authUser.username) {
-            syncLeaderboardForUser(authUser.username).catch((sErr: any) => {
+            syncLeaderboardForUser(authUser.username, { refreshProviderStats: true }).catch((sErr: any) => {
                 console.warn(`Portal update leaderboard sync warning for ${authUser.username}:`, sErr?.message);
             });
         }

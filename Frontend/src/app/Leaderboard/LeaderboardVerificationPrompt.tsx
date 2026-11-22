@@ -80,7 +80,7 @@ export function LeaderboardVerificationPrompt({ onVerified }: { onVerified: () =
         {(pending.length > 0 || error) && <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-[#FFF8D6] border-2 border-black shadow-[3px_3px_0px_#000]">
             <div className="flex items-center gap-3 min-w-0">
                 <ShieldCheck className="w-6 h-6 shrink-0" />
-                <p className="text-sm font-bold">{error ? "Could not check your platform verification." : `Both verified and unverified public platform connections count toward your ranking.`}</p>
+                <p className="text-sm font-bold">{error ? "Could not check your platform verification." : `Public platform activity can count toward your ranking with or without ownership verification.`}</p>
             </div>
             <button type="button" className="shrink-0 rounded-lg border-2 border-black px-4 py-2 bg-[#FFE566] text-sm font-black" onClick={() => {
                 if (error) void loadConnections().then(() => setOpen(true)).catch(() => setError(true));

@@ -1,5 +1,6 @@
 // Backend/src/services/account/privacyCenterService.ts
 import { query } from "../../database/client.js";
+import cacheLeaderboard from "../../redis/cache/cache-leaderboard.js";
 
 export interface UserPrivacyPreferences {
     anonymousTelemetryEnabled: boolean;
@@ -134,9 +135,14 @@ export async function updateUserPrivacyPreferences(
     // Keep existing `users.is_public` in sync with profile visibility
     try {
         await query(
-            `UPDATE users SET is_public = $1 WHERE id = $2;`,
+            `WITH updated_user AS (
+                UPDATE users SET is_public = $1 WHERE id = $2 RETURNING id
+            )
+            UPDATE leaderboard_entries SET is_public = $1
+            WHERE user_id IN (SELECT id FROM updated_user);`,
             [profileVis === "public", userId]
         );
+        if (profileVis !== current.publicProfileVisibility) await cacheLeaderboard.invalidate();
     } catch {
         // Safe fallback if is_public column name differs
     }

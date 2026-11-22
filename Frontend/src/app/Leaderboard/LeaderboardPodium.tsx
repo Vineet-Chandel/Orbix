@@ -156,7 +156,10 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
                             >
                                 {entry.displayName}
                             </Link>
-                            {entry.isVerified && (
+                            {entry.scoreBreakdown?.demoFixture === true && (
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-black">Demo</span>
+                            )}
+                            {entry.isVerified && entry.scoreBreakdown?.demoFixture !== true && (
                                 <span title="Verified Coder" className="inline-flex items-center">
                                     <CheckCircle2
                                         className="w-4 h-4 text-sky-500 fill-sky-500/20 shrink-0"

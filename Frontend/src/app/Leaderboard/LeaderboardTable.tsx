@@ -148,7 +148,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                                         {initials}
                                                     </div>
                                                 )}
-                                                {entry.isVerified && (
+                                                {entry.isVerified && entry.scoreBreakdown?.demoFixture !== true && (
                                                     <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black border border-white flex items-center justify-center text-[#a2ff86]">
                                                         <CheckCircle2 className="w-3 h-3" />
                                                     </div>
@@ -164,6 +164,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                                     >
                                                         {entry.displayName}
                                                     </Link>
+                                                    {entry.scoreBreakdown?.demoFixture === true && (
+                                                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-black">Demo</span>
+                                                    )}
                                                     {isCurrentUser && (
                                                         <span className="px-1.5 py-0.2 rounded bg-black text-[#a2ff86] text-[9px] font-black uppercase">
                                                             You

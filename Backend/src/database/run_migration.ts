@@ -183,7 +183,10 @@ export const MIGRATION_SIGNATURES: Record<string, { tables?: string[]; columns?:
             "user_links.verification_method",
             "user_links.verification_metadata",
         ],
-    }
+    },
+    "071_leaderboard_provider_snapshot.sql": {
+        columns: ["user_links.leaderboard_snapshot"],
+    },
 };
 
 /**

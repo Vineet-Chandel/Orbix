@@ -17,6 +17,10 @@ const unverifiedLink = {
     stats: [],
 };
 let links: Array<Record<string, unknown>> = [];
+
+function providerSnapshot(portal: string, handle: string, data: Record<string, unknown>) {
+    return { portal, handle, profile: { success: true, stats: [], ...data } };
+}
 const today = new Date().toISOString().slice(0, 10);
 
 beforeEach(() => {
@@ -25,6 +29,7 @@ beforeEach(() => {
     queries.length = 0;
     links = [{
         ...unverifiedLink,
+        leaderboard_snapshot: providerSnapshot("leetcode", "connected-user", { totalSolved: 5 }),
         snapshot: { success: true, portal: "leetcode", username: "connected-user", name: "Connected User", stats: [], totalSolved: 5, totalSubmissions: 2, submissionCalendar: { [today]: 2 } },
     }];
     globalThis.fetch = async () => new Response("{}", { status: 503 });
@@ -72,8 +77,8 @@ test("unverified public platform activity contributes to the Orbix Score", async
 test("mixed ownership states contribute while private connections stay out", async () => {
     const publicOnly = await syncLeaderboardForUser("coder");
     links.push(
-        { portal: "codeforces", portal_username: "cf-user", verified: true, is_public: true, stats: [], snapshot: { totalSolved: 17, rating: 1400 } },
-        { portal: "codechef", portal_username: "private-user", verified: true, is_public: false, stats: [], snapshot: { totalSolved: 5000, rating: 2800 } },
+        { portal: "codeforces", portal_username: "cf-user", verified: true, is_public: true, stats: [], leaderboard_snapshot: providerSnapshot("codeforces", "cf-user", { totalSolved: 17, rating: 1400 }) },
+        { portal: "codechef", portal_username: "private-user", verified: true, is_public: false, stats: [], leaderboard_snapshot: providerSnapshot("codechef", "private-user", { totalSolved: 5000, rating: 2800 }) },
     );
     const result = await syncLeaderboardForUser("user-id");
     assert.ok(result && publicOnly);
@@ -82,6 +87,41 @@ test("mixed ownership states contribute while private connections stay out", asy
     assert.ok(result.score > publicOnly.score);
     assert.equal(result.platformRatings.codeforces?.rating, 1400);
     assert.equal(result.platformRatings.codechef, undefined);
+});
+
+test("a newly linked unverified handle can score using the server's provider data", async (t) => {
+    delete links[0]?.leaderboard_snapshot;
+    const status = redis.status;
+    redis.status = "ready";
+    t.after(() => { redis.status = status; });
+    t.mock.method(redis, "get", async (key: string) => {
+        assert.equal(key, "portal:profile:leetcode:connected-user");
+        return JSON.stringify({ success: true, stats: [], totalSolved: 8 });
+    });
+
+    const result = await syncLeaderboardForUser("coder", { invalidateCache: false });
+    assert.equal(result?.totalSolved, 8);
+    const stored = queries.find(({ sql }) => sql.includes("SET leaderboard_snapshot"));
+    assert.ok(stored);
+    assert.equal(JSON.parse(stored.values[0]).handle, "connected-user");
+    assert.match(stored.sql, /AND portal_username = \$5/);
+});
+
+test("client snapshots and cached stats for a replaced handle cannot set the score", async () => {
+    links[0] = {
+        ...links[0],
+        portal_username: "different-user",
+        snapshot: { totalSolved: 5000, rating: 4000 },
+        stats: [{ label: "Streak", value: "365" }],
+    };
+    const result = await syncLeaderboardForUser("coder");
+    assert.equal(result?.score, 0);
+    assert.equal(result?.totalSolved, 0);
+    assert.equal(result?.streak, 0);
+    const selection = queries.find(({ sql }) => sql.includes("FROM user_links"));
+    assert.ok(selection);
+    assert.match(selection.sql, /portal_username, leaderboard_snapshot/);
+    assert.doesNotMatch(selection.sql, /, (?:stats|snapshot)\b/);
 });
 
 test("leaderboard ignores legacy scores and streaks when there are no public platform connections", async () => {
@@ -134,8 +174,12 @@ test("all public ranking views use public connection eligibility", async () => {
         assert.equal(success, true, path);
         assert.ok(publicQueries.length > start, path);
         for (const sql of publicQueries.slice(start)) {
+            assert.match(sql, /owner\.is_public IS NOT FALSE/, path);
             assert.match(sql, /IN \(SELECT user_id FROM user_links WHERE is_public IS NOT FALSE\)/, path);
             assert.doesNotMatch(sql, /ownership_status|verified\s*=\s*true/, path);
+            const demoEnabled = process.env.ORBIX_LEADERBOARD_DEMO === "true" && process.env.NODE_ENV !== "production";
+            assert.match(sql, demoEnabled ? /OR EXISTS \(/ : /AND NOT EXISTS \(/, path);
+            assert.match(sql, /"demoFixture": true/, path);
         }
     }
 });

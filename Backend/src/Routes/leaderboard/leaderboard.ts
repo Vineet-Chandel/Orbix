@@ -11,14 +11,24 @@ import {
     getCodeChefTier,
     getAtCoderTier,
 } from "../../utils/ratingSystems.js";
-import cacheLeaderboard from "../../redis/cache/cache-leaderboard.js";
+import cacheLeaderboard, { leaderboardDemoEnabled } from "../../redis/cache/cache-leaderboard.js";
 import { requireGovernanceAdmin } from "../../middlewares/staff.middleware.js";
 
 const leaderboardRouter = express.Router();
 
 // Shared by score sync and every public ranking surface.
 const PUBLIC_PLATFORM_LINK = "is_public IS NOT FALSE";
-const LEADERBOARD_PARTICIPANTS = `SELECT user_id FROM user_links WHERE ${PUBLIC_PLATFORM_LINK}`;
+const LINKED_PARTICIPANT = `owner.id IN (SELECT user_id FROM user_links WHERE ${PUBLIC_PLATFORM_LINK})`;
+const DEMO_PARTICIPANT = `EXISTS (
+    SELECT 1 FROM leaderboard_entries demo
+    WHERE demo.user_id = owner.id AND demo.score_breakdown @> '{"demoFixture": true}'::jsonb
+)`;
+const leaderboardParticipants = (includeDemo: boolean) => `
+    SELECT owner.id
+    FROM users owner
+    WHERE owner.is_public IS NOT FALSE
+      AND (${LINKED_PARTICIPANT} ${includeDemo ? "OR" : "AND NOT"} ${DEMO_PARTICIPANT})`;
+const LEADERBOARD_PARTICIPANTS = leaderboardParticipants(leaderboardDemoEnabled);
 
 export interface LeaderboardEntryDTO {
     rank: number;
@@ -166,7 +176,7 @@ export function parseRatingsSafe(
  */
 export async function syncLeaderboardForUser(
     username: string,
-    options: { refreshMissingSnapshots?: boolean; invalidateCache?: boolean } = {},
+    options: { refreshProviderStats?: boolean; invalidateCache?: boolean } = {},
 ): Promise<LeaderboardEntryDTO | null> {
     const cleanUser = (username || "").trim();
     if (!cleanUser) return null;
@@ -222,7 +232,7 @@ export async function syncLeaderboardForUser(
 
     // Ownership verification is independent of scoring eligibility.
     const linksRes = await query(
-        `SELECT id, portal, portal_username, stats, snapshot
+        `SELECT id, portal, portal_username, leaderboard_snapshot
          FROM user_links
          WHERE user_id = $1 AND ${PUBLIC_PLATFORM_LINK};`,
         [userId]
@@ -234,44 +244,46 @@ export async function syncLeaderboardForUser(
     let totalSolvedAcc = 0;
     let totalContestsAcc = 0;
 
-    for (const link of linksRes.rows) {
+    const scoredLinks = await Promise.all(linksRes.rows.map(async (link) => {
         const portal = (link.portal || "").toLowerCase().trim();
-        let snap = link.snapshot;
-        if (typeof snap === "string") {
-            try { snap = JSON.parse(snap); } catch { snap = {}; }
-        }
-        if (!snap || typeof snap !== "object") snap = {};
+        const handle = link.portal_username;
+        const saved = link.leaderboard_snapshot;
+        let snapshot = saved?.handle === handle && saved?.portal === portal && saved?.profile?.success
+            ? saved.profile
+            : null;
 
-        let stats = link.stats;
-        if (typeof stats === "string") {
-            try { stats = JSON.parse(stats); } catch { stats = []; }
-        }
-        if (!Array.isArray(stats)) stats = [];
-
-        // If snapshot and stats are empty but portal_username is present, attempt live fetch
-        if (options.refreshMissingSnapshots !== false && Object.keys(snap).length === 0 && stats.length === 0 && link.portal_username) {
+        if ((!snapshot || options.refreshProviderStats) && portal && handle) {
             try {
                 const { verifyAndFetchPortal } = await import("../portals/portals.js");
-                const liveData = await verifyAndFetchPortal(portal, link.portal_username);
-                if (liveData && liveData.success) {
-                    snap = liveData;
-                    stats = liveData.stats || [];
-                    query(
+                const profile = await verifyAndFetchPortal(portal, handle);
+                if (profile?.success) {
+                    const stored = await query(
                         `UPDATE user_links
-                         SET snapshot = $1::jsonb, stats = $2::jsonb, updated_at = CURRENT_TIMESTAMP
-                         WHERE id = $3 AND user_id = $4 AND portal_username = $5;`,
-                        [JSON.stringify(liveData), JSON.stringify(stats), link.id, userId, link.portal_username]
-                    ).catch(() => null);
+                         SET leaderboard_snapshot = $1::jsonb
+                         WHERE id = $2 AND user_id = $3 AND portal = $4 AND portal_username = $5
+                           AND ${PUBLIC_PLATFORM_LINK};`,
+                        [JSON.stringify({ portal, handle, profile }), link.id, userId, link.portal, handle]
+                    );
+                    if (!stored.rowCount) return null;
+                    snapshot = profile;
                 }
             } catch {
-                // Ignore live fetch error
+                // A provider outage can fall back to that handle's last provider-fetched data.
             }
         }
+
+        return snapshot ? { portal, handle, snapshot } : null;
+    }));
+
+    for (const link of scoredLinks) {
+        if (!link) continue;
+        const { portal, handle, snapshot: snap } = link;
+        const stats: Array<{ label?: string; value?: string }> = Array.isArray(snap.stats) ? snap.stats : [];
 
         portalsMap[portal] = {
             ...snap,
             portal,
-            portal_username: link.portal_username,
+            portal_username: handle,
             stats,
         };
 
@@ -354,12 +366,9 @@ export async function syncLeaderboardForUser(
     let maxActiveDays = 0;
     let maxStreak = 0;
 
-    for (const link of linksRes.rows) {
-        let stats = link.stats;
-        if (typeof stats === "string") {
-            try { stats = JSON.parse(stats); } catch { stats = []; }
-        }
-        if (!Array.isArray(stats)) stats = [];
+    for (const link of scoredLinks) {
+        const stats = link?.snapshot.stats;
+        if (!Array.isArray(stats)) continue;
         for (const s of stats) {
             if (!s) continue;
             const lbl = String(s.label || "").toLowerCase();
@@ -1466,7 +1475,7 @@ leaderboardRouter.post("/sync", authenticate, async (req: Request, res: Response
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        const updatedEntry = await syncLeaderboardForUser(effectiveUser);
+        const updatedEntry = await syncLeaderboardForUser(effectiveUser, { refreshProviderStats: true });
 
         if (!updatedEntry) {
             return res.status(404).json({ success: false, message: "User account not found for synchronization" });
@@ -1489,7 +1498,8 @@ leaderboardRouter.post("/sync", authenticate, async (req: Request, res: Response
 
 /**
  * POST /api/leaderboard/recalculate-all
- * Internal batch recalculation of all public profiles
+ * Staff-only backfill for public profiles with public platform links.
+ * Start without a cursor and pass nextAfterUserId as afterUserId until it is null.
  */
 leaderboardRouter.post("/recalculate-all", authenticate, requireGovernanceAdmin, async (req: Request, res: Response) => {
     const afterUserId: unknown = req.body?.afterUserId ?? null;
@@ -1497,14 +1507,14 @@ leaderboardRouter.post("/recalculate-all", authenticate, requireGovernanceAdmin,
         return res.status(400).json({ success: false, message: "afterUserId must be a UUID." });
     }
 
-    const batchSize = 50;
+    const batchSize = 10;
     try {
         const usersRes = await query(
             `SELECT id
              FROM users
              WHERE ($1::uuid IS NULL OR id > $1::uuid)
                AND is_public = true
-               AND id IN (${LEADERBOARD_PARTICIPANTS})
+               AND id IN (${leaderboardParticipants(false)})
              ORDER BY id
              LIMIT $2;`,
             [afterUserId, batchSize + 1]
@@ -1513,7 +1523,6 @@ leaderboardRouter.post("/recalculate-all", authenticate, requireGovernanceAdmin,
         let updatedCount = 0;
         for (const user of batch) {
             const result = await syncLeaderboardForUser(user.id, {
-                refreshMissingSnapshots: false,
                 invalidateCache: false,
             });
             if (result) updatedCount++;

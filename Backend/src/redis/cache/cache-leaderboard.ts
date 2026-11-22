@@ -1,6 +1,7 @@
 import redis from "../client.js";
 
-const KEY_PREFIX = "orbix:leaderboard:public-links-v3";
+export const leaderboardDemoEnabled = process.env.ORBIX_LEADERBOARD_DEMO === "true" && process.env.NODE_ENV !== "production";
+const KEY_PREFIX = `orbix:leaderboard:public-links-v4:${leaderboardDemoEnabled ? "demo" : "live"}`;
 
 /**
  * Cache TTL configuration (in seconds)

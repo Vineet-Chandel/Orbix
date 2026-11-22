@@ -110,6 +110,7 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE user_links ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
             ALTER TABLE user_links ADD COLUMN IF NOT EXISTS last_error TEXT NULL;
             ALTER TABLE user_links ADD COLUMN IF NOT EXISTS snapshot JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE user_links ADD COLUMN IF NOT EXISTS leaderboard_snapshot JSONB;
             ALTER TABLE user_links ADD COLUMN IF NOT EXISTS retry_count INT DEFAULT 0;
             CREATE INDEX IF NOT EXISTS idx_user_links_username ON user_links(username);
             CREATE INDEX IF NOT EXISTS idx_user_links_portal ON user_links(portal);
