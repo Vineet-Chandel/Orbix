@@ -4,6 +4,7 @@ import {
     isPlatformVerificationSupported,
     getPlatformVerificationMethod,
     getPlatformVerificationField,
+    getPlatformVerificationGuide,
     SUPPORTED_VERIFICATION_PLATFORMS,
 } from "../../utils/platformVerificationSupport.ts";
 import type { OwnershipStatus, ActiveVerificationChallenge } from "../../types/platformVerification.ts";
@@ -51,6 +52,44 @@ test("Ownership Verification Support & Registry", async (t) => {
             "hackerrank",
             "github",
         ]);
+    });
+
+    await t.test("getPlatformVerificationGuide produces exact platform instructions and settings URLs", () => {
+        const testToken = "orbix-v-testToken123456789";
+
+        // LeetCode: must target ReadMe and settings/profile/
+        const leetcodeGuide = getPlatformVerificationGuide("leetcode", testToken);
+        assert.equal(leetcodeGuide.portalId, "leetcode");
+        assert.equal(leetcodeGuide.portalName, "LeetCode");
+        assert.equal(leetcodeGuide.targetFieldName, "ReadMe");
+        assert.equal(leetcodeGuide.settingsUrl, "https://leetcode.com/settings/profile/");
+        assert.equal(leetcodeGuide.settingsUrlLabel, "Open LeetCode Profile Settings");
+        assert.ok(leetcodeGuide.instruction.includes("ReadMe"));
+        assert.ok(!leetcodeGuide.instruction.includes(testToken));
+        assert.ok(leetcodeGuide.instruction.includes("verification code"));
+        assert.ok(leetcodeGuide.detailText.includes("ReadMe"));
+        assert.equal(leetcodeGuide.hasScreenshot, true);
+        assert.ok(leetcodeGuide.screenshotAlt?.includes("ReadMe"));
+
+        // Codeforces: must target Organization and settings/social
+        const cfGuide = getPlatformVerificationGuide("codeforces", testToken);
+        assert.equal(cfGuide.portalId, "codeforces");
+        assert.equal(cfGuide.portalName, "Codeforces");
+        assert.equal(cfGuide.targetFieldName, "Organization");
+        assert.equal(cfGuide.settingsUrl, "https://codeforces.com/settings/social");
+        assert.ok(cfGuide.instruction.includes("Organization"));
+        assert.ok(!cfGuide.instruction.includes(testToken));
+        assert.equal(cfGuide.hasScreenshot, false);
+
+        // HackerRank: must target Short Bio and settings/profile
+        const hrGuide = getPlatformVerificationGuide("hackerrank", testToken);
+        assert.equal(hrGuide.portalId, "hackerrank");
+        assert.equal(hrGuide.portalName, "HackerRank");
+        assert.equal(hrGuide.targetFieldName, "Short Bio");
+        assert.equal(hrGuide.settingsUrl, "https://www.hackerrank.com/settings/profile");
+        assert.ok(hrGuide.instruction.includes("Short Bio"));
+        assert.ok(!hrGuide.instruction.includes(testToken));
+        assert.equal(hrGuide.hasScreenshot, false);
     });
 });
 
