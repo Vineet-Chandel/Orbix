@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { OrbixInitialLoader } from "../../components/ui/loader";
 import { useToast } from "../../context/ToastContext";
-import { useAppDispatch, fetchUserProfile } from "../../store";
+import { useAppDispatch, setUser, fetchUserProfile } from "../../store";
 import { buildApiUrl } from "../../api/apiClient";
 
 export const OAuthCallbackPage: React.FC = () => {
@@ -43,15 +43,46 @@ export const OAuthCallbackPage: React.FC = () => {
         if (status === "success" && token) {
             try {
                 localStorage.setItem("orbix_token", token);
+                localStorage.removeItem("orbix_signed_out");
             } catch {
                 // Ignore storage quota errors
             }
 
-            // Immediately load user profile into Redux store
-            dispatch(fetchUserProfile({ force: true }))
-                .unwrap()
-                .then(() => {
-                    const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+            const establishSessionAndRedirect = async () => {
+                const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+                try {
+                    // Call /api/auth/oauth/session to set HTTPOnly cookies on frontend origin and retrieve user
+                    const sessionUrl = buildApiUrl("/api/auth/oauth/session");
+                    const res = await fetch(sessionUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                        },
+                        credentials: "include",
+                        body: JSON.stringify({ token }),
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data?.token) {
+                            try {
+                                localStorage.setItem("orbix_token", data.token);
+                            } catch {}
+                        }
+                        if (data?.user) {
+                            dispatch(setUser({
+                                ...data.user,
+                                accountType: "personal",
+                            }));
+                        } else {
+                            await dispatch(fetchUserProfile({ force: true })).unwrap();
+                        }
+                    } else {
+                        // Fallback to fetchUserProfile if session endpoint returns non-OK
+                        await dispatch(fetchUserProfile({ force: true })).unwrap();
+                    }
+
                     if (isNew) {
                         toast.success(`Welcome to Orbix! Successfully registered with ${providerName}.`, {
                             title: "Account Created",
@@ -62,12 +93,22 @@ export const OAuthCallbackPage: React.FC = () => {
                         });
                     }
                     navigate(returnTo, { replace: true });
-                })
-                .catch((err) => {
-                    console.warn("Profile sync warning on OAuth callback:", err);
-                    // Still navigate since cookie & token are already established
-                    navigate(returnTo, { replace: true });
-                });
+                } catch (err: any) {
+                    console.error("OAuth session sync warning:", err);
+                    // Defensive fallback: attempt fetchUserProfile directly
+                    try {
+                        await dispatch(fetchUserProfile({ force: true })).unwrap();
+                        navigate(returnTo, { replace: true });
+                    } catch (finalErr: any) {
+                        toast.error(finalErr?.message || "Failed to finalize authentication session.", {
+                            title: "Authentication Error",
+                        });
+                        navigate("/auth/signin", { replace: true });
+                    }
+                }
+            };
+
+            establishSessionAndRedirect();
             return;
         }
 

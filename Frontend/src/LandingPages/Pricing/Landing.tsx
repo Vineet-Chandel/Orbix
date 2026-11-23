@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAppSelector } from '../../store';
 import NavBar from '../NavBar/Landing';
 
 export default function PricingPage() {
     const navigate = useNavigate();
+    const { user, isAuthenticated } = useAppSelector((state) => state.user);
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
 
     const handleSelectPlan = (_plan?: string) => {
-        const user = localStorage.getItem("orbix_user");
-        if (user) {
+        const isOnline = typeof navigator === "undefined" || navigator.onLine;
+        if (isAuthenticated && user && isOnline) {
             navigate("/dashboard");
         } else {
             navigate("/auth/signup");

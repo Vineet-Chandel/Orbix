@@ -9,6 +9,7 @@ import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import {
   OrbixLoadingProvider,
+  OrbixInitialLoader,
   DashboardRouteSkeleton,
   DocsRouteSkeleton,
   ContentRouteSkeleton,
@@ -61,8 +62,22 @@ const PublicCertificateVerifyPage = lazyWithRetry(() => import("./app/Certificat
 const JoinClubPage = lazyWithRetry(() => import("./app/Club/JoinClubPage"));
 
 const WorkspaceRedirect = () => {
-  const { user } = useAppSelector((state) => state.user);
-  if (!user) return <Navigate to="/auth/signin" replace />;
+  const { user, isAuthenticated, loading } = useAppSelector((state) => state.user);
+  const isOnline = typeof navigator === "undefined" || navigator.onLine;
+
+  if (loading) {
+    return (
+      <OrbixInitialLoader
+        message="Verifying session…"
+        subMessage="Connecting to your workspace"
+      />
+    );
+  }
+
+  if (!isAuthenticated || !user || !isOnline) {
+    return <Navigate to="/auth/signin" replace />;
+  }
+
   if (user.accountType === "club") {
     if (user.clubStatus === "approved" || user.verifiedClub) {
       return <Navigate to="/club/dashboard" replace />;
@@ -110,7 +125,23 @@ const App = () => {
     try {
       if (localStorage.getItem("orbix_signed_out")) return;
     } catch { /* Verify the session normally when storage is unavailable. */ }
-    dispatch(fetchUserProfile());
+
+    if (typeof navigator === "undefined" || navigator.onLine) {
+      dispatch(fetchUserProfile());
+    }
+
+    const handleOnline = () => {
+      try {
+        if (!localStorage.getItem("orbix_signed_out") && localStorage.getItem("orbix_token")) {
+          dispatch(fetchUserProfile({ force: true }));
+        }
+      } catch {
+        dispatch(fetchUserProfile({ force: true }));
+      }
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, [dispatch]);
 
   return (

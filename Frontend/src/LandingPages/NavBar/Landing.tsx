@@ -139,21 +139,25 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
 
     const { user, loading, isAuthenticated } = useAppSelector((state) => state.user);
 
-    // Synchronous fallback from localStorage for immediate paint
-    const storedUser = React.useMemo(() => {
-        try {
-            const raw = localStorage.getItem("orbix_user");
-            return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
+    // Track online connectivity to prevent treating past cached data as active sessions when offline
+    const [isOnline, setIsOnline] = useState<boolean>(
+        typeof navigator === "undefined" ? true : navigator.onLine
+    );
+
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener("online", handleOnline);
+        window.addEventListener("offline", handleOffline);
+        return () => {
+            window.removeEventListener("online", handleOnline);
+            window.removeEventListener("offline", handleOffline);
+        };
     }, []);
 
-    const currentUser = user || storedUser;
-    const isLoggedIn = Boolean(
-        (isAuthenticated && user) ||
-        (currentUser && (currentUser.username || currentUser.gmail || currentUser.id))
-    );
+    // Strict account verification: Logged in and workspace redirection ONLY occurs when account is verified by server
+    const isLoggedIn = Boolean(isAuthenticated && user && isOnline);
+    const currentUser = isLoggedIn ? user : null;
 
     // Unread count synchronization for mobile menu badge
     const updateUnreadCount = useCallback(async () => {
@@ -280,7 +284,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
     const handleWorkspaceClick = (e: React.MouseEvent) => {
         e.preventDefault();
         if (loading) return;
-        if (isLoggedIn) {
+        if (isLoggedIn && currentUser) {
             if (isClubAccount) {
                 if (currentUser?.clubStatus === "approved" || currentUser?.verifiedClub) {
                     navigate("/club/dashboard");

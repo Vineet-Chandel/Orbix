@@ -89,7 +89,7 @@ export class OAuthService {
         return `${this.getBackendUrl()}/api/auth/google/callback`;
     }
 
-    private static getAuthCookieOptions() {
+    public static getAuthCookieOptions() {
         const isProduction = process.env.NODE_ENV === "production";
         return {
             httpOnly: true,

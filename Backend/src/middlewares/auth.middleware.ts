@@ -13,13 +13,21 @@ type ResolvedAuthOutcome =
     | { ok: true; user: any; sessionId?: string }
     | { ok: false; status: number; code?: string; message: string; sessionRevoked?: boolean };
 
-function extractToken(req: Request): string | undefined {
-    return (
-        req.cookies?.token ||
-        (req.headers.authorization?.startsWith("Bearer ")
-            ? req.headers.authorization.slice(7)
-            : undefined)
-    );
+function extractCandidateTokens(req: Request): string[] {
+    const candidates: string[] = [];
+    if (req.headers.authorization?.startsWith("Bearer ")) {
+        const hToken = req.headers.authorization.slice(7).trim();
+        if (hToken && hToken !== "null" && hToken !== "undefined") {
+            candidates.push(hToken);
+        }
+    }
+    if (req.cookies?.token && typeof req.cookies.token === "string") {
+        const cToken = req.cookies.token.trim();
+        if (cToken && cToken !== "null" && cToken !== "undefined" && !candidates.includes(cToken)) {
+            candidates.push(cToken);
+        }
+    }
+    return candidates;
 }
 
 /**
@@ -32,18 +40,27 @@ export async function resolveAuthenticatedUser(req: Request): Promise<ResolvedAu
         return { ok: false, status: 500, message: "Internal server error" };
     }
 
-    const token = extractToken(req);
-    if (!token) {
+    const tokens = extractCandidateTokens(req);
+    if (tokens.length === 0) {
         return { ok: false, status: 401, message: "Authentication required" };
     }
 
     let decoded: any;
-    try {
-        decoded = jwt.verify(token, JWT_SECRET, {
-            issuer: "orbix",
-            audience: "orbix-users",
-        });
-    } catch {
+    let verifiedToken: string | null = null;
+    for (const token of tokens) {
+        try {
+            decoded = jwt.verify(token, JWT_SECRET, {
+                issuer: "orbix",
+                audience: "orbix-users",
+            });
+            verifiedToken = token;
+            break;
+        } catch {
+            // Try next candidate token (prevents stale cookie from shadowing valid Bearer token)
+        }
+    }
+
+    if (!decoded || !verifiedToken) {
         return { ok: false, status: 401, message: "Invalid or expired token" };
     }
 

@@ -99,9 +99,27 @@ export function ToastActionNotice({ open, title, actions }: { open: boolean; tit
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={toastExit}
                     transition={toastSpring}
-                    className="w-full pointer-events-auto"
+                    className="w-full max-w-xl sm:max-w-2xl lg:max-w-3xl pointer-events-auto"
                 >
-                    <ToastCard type="warning" title={title} actions={actions} />
+                    <div
+                        role="status"
+                        className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 rounded-2xl border-2 border-black p-3.5 sm:px-5 sm:py-3.5 shadow-[4px_4px_0px_#000] overflow-hidden bg-amber-50"
+                    >
+                        {/* Alert Icon & Text Content: Aligned and centered together */}
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#FFE566] text-black shadow-[2px_2px_0px_#000]">
+                                <AlertTriangle aria-hidden="true" className="w-5 h-5 stroke-[2.5]" />
+                            </div>
+                            <h4 className="text-sm sm:text-base font-black text-black tracking-tight leading-snug truncate whitespace-nowrap">
+                                {title}
+                            </h4>
+                        </div>
+
+                        {/* Action Buttons: Just below on mobile, inline on tablet & laptop */}
+                        <div className="flex items-center justify-end gap-2 shrink-0 w-full sm:w-auto [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:justify-center">
+                            {actions}
+                        </div>
+                    </div>
                 </motion.div>
             )}
         </AnimatePresence>,
@@ -203,9 +221,9 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
     const toastPortal = (
         <div
-            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[999999] pointer-events-none flex flex-col items-center w-full max-w-[460px] px-4"
+            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[999999] pointer-events-none flex flex-col items-center w-full px-4"
         >
-            <div aria-live="polite" aria-atomic="true" className="relative w-full flex flex-col items-center justify-end">
+            <div aria-live="polite" aria-atomic="true" className="relative w-full max-w-[460px] flex flex-col items-center justify-end">
                 <AnimatePresence mode="popLayout">
                     {toasts.slice(0, 3).map((item, index) => {
                         // Stack calculation:
@@ -249,7 +267,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                     })}
                 </AnimatePresence>
             </div>
-            <div ref={setActionSlot} className="w-full mt-2 empty:hidden" />
+            <div ref={setActionSlot} className="w-full flex justify-center mt-2 empty:hidden" />
         </div>
     );
 
