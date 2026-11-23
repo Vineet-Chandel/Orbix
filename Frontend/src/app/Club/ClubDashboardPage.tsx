@@ -439,7 +439,7 @@ export default function ClubDashboardPage() {
     }).format(new Date());
 
     if (loading) {
-        return <DashboardRouteSkeleton />;
+        return <DashboardRouteSkeleton showSidebar />;
     }
 
     if (!club) {

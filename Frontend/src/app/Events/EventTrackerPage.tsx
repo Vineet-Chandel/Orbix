@@ -486,18 +486,6 @@ export const EventTrackerPage: React.FC = () => {
                         {/* 1. Header Bar */}
                         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-black/55 pb-5">
                             <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsMobileSidebarOpen(true)}
-                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer flex-shrink-0"
-                                    aria-label="Open sidebar"
-                                >
-                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <line x1="3" y1="12" x2="21" y2="12" />
-                                        <line x1="3" y1="6" x2="21" y2="6" />
-                                        <line x1="3" y1="18" x2="21" y2="18" />
-                                    </svg>
-                                </button>
                                 <div className="flex items-center gap-2.5">
                                     <div className="orbix-page-heading-icon orbix-page-heading-icon--size-9 w-9 h-9 rounded-xl bg-black text-[#FFE566] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
                                         <CalendarIcon className="w-5 h-5 stroke-[2.5]" />

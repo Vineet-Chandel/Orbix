@@ -197,6 +197,23 @@ export default function SettingsPage() {
                 activeTab="settings"
                 isOpen={isMobileSidebarOpen}
                 onClose={() => setIsMobileSidebarOpen(false)}
+                onTabChange={(tab) => {
+                    if (tab === "dashboard") navigate("/dashboard");
+                    if (tab === "profile") navigate("/profile");
+                    if (tab === "connect-platform") navigate("/onboarding");
+                    if (tab === "resume") navigate("/resume");
+                    if (tab === "projects") navigate("/projects");
+                    if (tab === "leaderboard") navigate("/leaderboard");
+                    if (tab === "clubs") navigate("/college-clubs");
+                    if (tab === "college-events") navigate("/college-events");
+                    if (tab === "events") navigate("/events");
+                    if (tab === "activity" || tab === "applications") navigate("/activity");
+                    if (tab === "explore") navigate("/explore");
+                    if (tab === "trends") navigate("/trends");
+                    if (tab === "notifications") navigate("/notifications");
+                    if (tab === "settings") navigate("/settings");
+                    if (tab === ("workspace" as any)) navigate("/workspace");
+                }}
             />
 
             {/* Main Content Area */}
@@ -206,23 +223,11 @@ export default function SettingsPage() {
                     aria-label="Account Settings & Preferences"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
-                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6 w-full">
+                    <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6 w-full">
                         {/* Page Header (rendered on hub view) */}
                         {currentView === "hub" && (
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-2 border-black/15">
                                 <div className="flex items-start gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsMobileSidebarOpen(true)}
-                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
-                                        aria-label="Open sidebar"
-                                    >
-                                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <line x1="3" y1="12" x2="21" y2="12" />
-                                            <line x1="3" y1="6" x2="21" y2="6" />
-                                            <line x1="3" y1="18" x2="21" y2="18" />
-                                        </svg>
-                                    </button>
                                     <div className="space-y-1">
                                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-black font-black text-xs shadow-[2px_2px_0px_#000] uppercase tracking-wider">
                                             <Settings className="w-3.5 h-3.5 stroke-[2.5]" />

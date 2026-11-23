@@ -235,7 +235,7 @@ const App = () => {
                 <Route path="/club/team-workspace/join" element={<JoinClubPage />} />
                 <Route path="/join-club" element={<JoinClubPage />} />
                 <Route path="/club/join" element={<JoinClubPage />} />
-                <Route element={<Suspense fallback={<DashboardRouteSkeleton />}><ClubProtectedRoute /></Suspense>}>
+                <Route element={<Suspense fallback={<DashboardRouteSkeleton showSidebar />}><ClubProtectedRoute /></Suspense>}>
                   <Route path="/club/status" element={<ClubStatusPage />} />
                   <Route path="/clubs/status" element={<Navigate to="/club/status" replace />} />
                   <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />
@@ -271,7 +271,7 @@ const App = () => {
                 <Route path="/profile/setup" element={<ProfilesOnboardingPage />} />
 
                 {/* Protected Routes */}
-                <Route element={<Suspense fallback={<DashboardRouteSkeleton />}><ProtectedRoute /></Suspense>}>
+                <Route element={<Suspense fallback={<DashboardRouteSkeleton showSidebar />}><ProtectedRoute /></Suspense>}>
                   <Route path="/club-announcements" element={<MemberAnnouncementsPage />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/college-clubs" element={<Dashboard />} />

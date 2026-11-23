@@ -273,7 +273,6 @@ export const LeaderboardPage: React.FC = () => {
                             onPeriodChange={() => {}}
                             onSyncNow={handleSyncNow}
                             isSyncing={isSyncing}
-                            onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             onCounterClick={() => handleTabChange("college")}
                             onOpenAlgorithm={() => setIsAlgorithmModalOpen(true)}
                         />
