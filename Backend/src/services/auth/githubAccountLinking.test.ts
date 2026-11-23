@@ -63,7 +63,7 @@ describe('GitHub OAuth Account-Linking Final Security Closure', () => {
     test('Proven handle is saved atomically and downstream refresh starts only after commit', async () => {
         const originalRefresh = platformVerificationService.refreshOwnershipAfterCommit;
         let refreshes = 0;
-        platformVerificationService.refreshOwnershipAfterCommit = () => {
+        platformVerificationService.refreshOwnershipAfterCommit = async (_userId: string) => {
             assert.ok(executedQueries.some(({ sql }) => sql.trim().startsWith('COMMIT')));
             refreshes++;
         };
