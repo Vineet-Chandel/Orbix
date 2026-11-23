@@ -962,6 +962,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
 
         return (
             <div ref={headlineRef} className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.05rem,4vw,1.65rem)] sm:text-[clamp(1.45rem,3.4vw,2.85rem)] lg:text-[clamp(2rem,3.2vw,3.85rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
+                <h1 className="text-xs sm:text-sm font-bold uppercase tracking-widest">Orbix for campus clubs</h1>
 
                 {/* Line 1: Naturally wrapping on small viewports */}
                 <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
@@ -1005,6 +1006,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines({ mode }: HeroHeadlinesP
 
     return (
         <div ref={headlineRef} className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3 md:gap-4 lg:gap-5 text-[clamp(1.15rem,4.5vw,1.85rem)] sm:text-[clamp(1.65rem,4vw,3.25rem)] lg:text-[clamp(2.4rem,3.8vw,4.25rem)] text-black font-MyCustomFont3 pt-[85px] sm:pt-[120px] md:pt-[140px] lg:pt-[160px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.28] sm:leading-[1.2] md:leading-[1.16] select-none">
+            <h1 className="text-xs sm:text-sm font-bold uppercase tracking-widest">Orbix for developers</h1>
 
             {/* Line 1: Responsive wrapping with animated platform pill */}
             <div className='flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>

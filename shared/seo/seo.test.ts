@@ -84,6 +84,32 @@ test('default social card is a real 1200x630 PNG asset',()=>{
     assert.equal(png.subarray(1,4).toString(),'PNG');assert.equal(png.readUInt32BE(16),1200);assert.equal(png.readUInt32BE(20),630);
 });
 
+test('production favicon and application icon set is complete and dimensionally accurate',()=>{
+    const read = (file: string) => readFileSync(fileURLToPath(new URL(`../../Frontend/public/${file}`, import.meta.url)));
+    const checkPng = (file: string, width: number, height: number) => {
+        const buf = read(file);
+        assert.equal(buf.subarray(1,4).toString(),'PNG');
+        assert.equal(buf.readUInt32BE(16), width, `${file} width mismatch`);
+        assert.equal(buf.readUInt32BE(20), height, `${file} height mismatch`);
+    };
+    checkPng('favicon-48.png', 48, 48);
+    checkPng('favicon-96.png', 96, 96);
+    checkPng('apple-touch-icon.png', 180, 180);
+    checkPng('icon-192.png', 192, 192);
+    checkPng('icon-512.png', 512, 512);
+
+    const ico = read('favicon.ico');
+    assert.equal(ico.readUInt16LE(0), 0);
+    assert.equal(ico.readUInt16LE(2), 1);
+    assert.ok(ico.readUInt16LE(4) >= 3, 'ICO must contain at least 3 sizes (16, 32, 48)');
+
+    const manifest = JSON.parse(read('site.webmanifest').toString());
+    assert.equal(manifest.name, 'Orbix — The Engineering Credibility Network');
+    assert.ok(manifest.icons.some((i: any) => i.sizes === '48x48' && i.src === '/favicon-48.png'));
+    assert.ok(manifest.icons.some((i: any) => i.sizes === '192x192' && i.src === '/icon-192.png'));
+    assert.ok(manifest.icons.some((i: any) => i.sizes === '512x512' && i.src === '/icon-512.png'));
+});
+
 test('the XML builder rejects accidentally supplied private, alias and duplicate URLs',()=>{
     const xml=sitemapXml([{path:'/docs'},{path:'/docs'},{path:'/settings'},{path:'/profile/u/alice'},{path:'/privacy-policy'}],site);
     assert.equal((xml.match(/<url>/g)||[]).length,1);assert.ok(xml.includes('/docs'));assert.ok(!xml.includes('settings'));

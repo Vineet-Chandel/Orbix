@@ -83,6 +83,7 @@ export const APP_ROUTE_PATTERNS = [
   "/announcements/:announcementId",
   "/clubs/:slug",
   "/staff/club-reviews",
+  "/onboarding/college",
   "/onboarding",
   "/auth/profiles",
   "/profile/setup",

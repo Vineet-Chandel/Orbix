@@ -29,7 +29,7 @@ export function metadataFor(path: string, site: SiteConfig, data?: PageData, sta
     const image = indexable ? safeImage(entity?.image || page?.image || '/social-card.png', site.origin) : undefined;
     const schema: Record<string, unknown>[] = [];
     if (indexable && canonical && site.origin) {
-        const org = { '@type': 'Organization', '@id': `${site.origin}/#organization`, name: 'Orbix', url: site.origin, logo: { '@type': 'ImageObject', url: `${site.origin}/favicon.svg` } };
+        const org = { '@type': 'Organization', '@id': `${site.origin}/#organization`, name: 'Orbix', url: site.origin, logo: { '@type': 'ImageObject', url: `${site.origin}/icon-512.png` } };
         const web = { '@type': 'WebSite', '@id': `${site.origin}/#website`, name: 'Orbix', url: site.origin, publisher: { '@id': `${site.origin}/#organization` } };
         const pageSchema: Record<string, unknown> = { '@type': page?.kind === 'collection' ? 'CollectionPage' : page?.kind === 'doc' ? 'TechArticle' : page?.kind === 'article' ? 'Article' : 'WebPage', '@id': `${canonical}#page`, url: canonical, name: title, description, isPartOf: { '@id': `${site.origin}/#website` }, ...(image ? { image } : {}) };
         // Static registries supply month labels, not precise publication timestamps. Do not invent dates/authors.
