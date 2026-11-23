@@ -915,6 +915,7 @@ export default function ProfilesOnboardingPage() {
                                                                             isSupported={isPlatformVerificationSupported(pId)}
                                                                             size="xs"
                                                                             showLabel={false}
+                                                                            showBox={false}
                                                                         />
                                                                     </div>
                                                                     <p className="text-[11px] text-neutral-600 font-mono font-bold truncate">
@@ -1090,6 +1091,7 @@ export default function ProfilesOnboardingPage() {
                                                         isSupported={isPlatformVerificationSupported(pId)}
                                                         size="xs"
                                                         showLabel={false}
+                                                        showBox={false}
                                                     />
                                                 </div>
                                                 <p className="text-xs text-neutral-900 font-bold truncate">

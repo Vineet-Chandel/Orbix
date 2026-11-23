@@ -87,18 +87,22 @@ export const OAuthCallbackPage: React.FC = () => {
                         toast.success(`Welcome to Orbix! Successfully registered with ${providerName}.`, {
                             title: "Account Created",
                         });
+                        navigate(`/onboarding/college?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
                     } else {
                         toast.success(`Welcome back! Successfully authenticated via ${providerName}.`, {
                             title: "Signed In",
                         });
+                        navigate(returnTo, { replace: true });
                     }
-                    navigate(returnTo, { replace: true });
                 } catch (err: any) {
                     console.error("OAuth session sync warning:", err);
                     // Defensive fallback: attempt fetchUserProfile directly
                     try {
                         await dispatch(fetchUserProfile({ force: true })).unwrap();
-                        navigate(returnTo, { replace: true });
+                        const fallbackDestination = isNew
+                            ? `/onboarding/college?returnTo=${encodeURIComponent(returnTo)}`
+                            : returnTo;
+                        navigate(fallbackDestination, { replace: true });
                     } catch (finalErr: any) {
                         toast.error(finalErr?.message || "Failed to finalize authentication session.", {
                             title: "Authentication Error",

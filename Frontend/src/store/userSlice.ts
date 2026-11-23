@@ -70,7 +70,7 @@ export interface User {
         district?: string | null;
         institutionType?: string | null;
         aisheCode?: string | null;
-        verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string;
+        verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string | null;
     } | null;
     collegeUpdatedAt?: string | null;
     canChangeCollege?: boolean;

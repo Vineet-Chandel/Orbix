@@ -963,6 +963,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                                 isSupported={isPlatformVerificationSupported(portalId)}
                                                 size="xs"
                                                 showLabel={false}
+                                                showBox={false}
                                             />
                                         </div>
                                     ) : (

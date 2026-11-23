@@ -42,6 +42,7 @@ const Dashboard = lazyWithRetry(() => import("./app/Dashboard/Landing"));
 const ProfileManager = lazyWithRetry(() => import("./app/Profile/ProfileManager"));
 const SettingsPage = lazyWithRetry(() => import("./app/Settings/SettingsPage"));
 const PublicProfilePage = lazyWithRetry(() => import("./app/Profile/PublicProfilePage"));
+const CollegeOnboardingPage = lazyWithRetry(() => import("./LandingPages/Auth-Pages/CollegeOnboarding/CollegeOnboardingPage"));
 const ProfilesOnboardingPage = lazyWithRetry(() => import("./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage"));
 const LeaderboardPage = lazyWithRetry(() => import("./app/Leaderboard/LeaderboardPage"));
 const EventsIndex = lazyWithRetry(() => import("./seo/EventsIndex"));
@@ -264,6 +265,7 @@ const App = () => {
                 <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 
                 {/* New User Onboarding & Profiles Links Setup */}
+                <Route path="/onboarding/college" element={<CollegeOnboardingPage />} />
                 <Route path="/onboarding" element={<ProfilesOnboardingPage />} />
                 <Route path="/auth/profiles" element={<ProfilesOnboardingPage />} />
                 <Route path="/profile/setup" element={<ProfilesOnboardingPage />} />

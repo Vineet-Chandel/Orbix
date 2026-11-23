@@ -252,9 +252,8 @@ export function CollegeAutocomplete({
                                         setIsWarningModalOpen(true);
                                     }
                                 }}
-                                className={`px-3 py-1.5 rounded-lg text-black border-2 border-black text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] ${
-                                    canChangeCollege === false ? "bg-amber-100 hover:bg-amber-200" : "hover:bg-neutral-100"
-                                }`}
+                                className={`px-3 py-1.5 rounded-lg text-black border-2 border-black text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] ${canChangeCollege === false ? "bg-amber-100 hover:bg-amber-200" : "hover:bg-neutral-100"
+                                    }`}
                                 title={canChangeCollege === false ? "College affiliation is locked for 3 days" : "Change or remove selected institution"}
                             >
                                 {canChangeCollege === false ? (
@@ -413,11 +412,10 @@ export function CollegeAutocomplete({
                                             aria-selected={isHighlighted}
                                             onMouseEnter={() => setHighlightedIndex(idx)}
                                             onClick={() => handleSelect(item)}
-                                            className={`group px-4 py-3 flex items-center justify-between gap-3 cursor-pointer transition-all ${
-                                                isHighlighted
-                                                    ? "bg-[#FFE566]/25 border-l-4 border-l-black pl-3"
-                                                    : "hover:bg-neutral-50 border-l-4 border-l-transparent pl-3"
-                                            }`}
+                                            className={`group px-4 py-3 flex items-center justify-between gap-3 cursor-pointer transition-all ${isHighlighted
+                                                ? "bg-[#FFE566]/25 border-l-4 border-l-black pl-3"
+                                                : "hover:bg-neutral-50 border-l-4 border-l-transparent pl-3"
+                                                }`}
                                         >
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -524,9 +522,9 @@ export function CollegeAutocomplete({
                 </button>
             </div>
 
-            <div className="flex items-center gap-1.5 px-1 mt-1 text-[11px] text-neutral-600 font-semibold">
+            <div className="flex items-center gap-1.5 px-1 mt-3 mb-1 text-[11px] text-neutral-600 font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5 text-black flex-shrink-0 stroke-[2.5]" />
-                <span>Selected college identity will be locked for 3 days once saved to your profile.</span>
+                <span>Selected college identity will be locked for <b>3 days</b> once saved to your profile.</span>
             </div>
 
             {/* Request College Modal */}
