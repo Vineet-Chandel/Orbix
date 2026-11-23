@@ -14,9 +14,17 @@ function repository() {
 async function request(url: string, options: Parameters<typeof createSeoWeb>[0] = {}, headers: Record<string,string> = {}, existingApp?: express.Express) {
     const app = existingApp || express(); if (!existingApp) app.use(createSeoWeb({ env, template, repository:repository(), render: () => '<main><h1>Public content</h1></main>', ...options }));
     return new Promise<{ status: number; headers: ReturnType<ServerResponse['getHeaders']>; body: string; bytes: Buffer }>((resolve,reject) => {
-        const req = new IncomingMessage(new Socket()); req.method='GET';req.url=url;req.headers={host:'theorbix.world',accept:'text/html',...headers};
+        const socket = new Socket();
+        const req = new IncomingMessage(socket); req.method='GET';req.url=url;req.headers={host:'theorbix.world',accept:'text/html',...headers};
         const res = new ServerResponse(req);
-        res.end = ((chunk?: unknown) => { resolve({status:res.statusCode,headers:res.getHeaders(),body:chunk == null ? '' : String(chunk), bytes: Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk == null ? '' : String(chunk))}); return res; }) as typeof res.end;
+        res.end = ((chunk?: unknown) => {
+            const body = chunk == null ? '' : String(chunk);
+            const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(body);
+            resolve({status:res.statusCode,headers:res.getHeaders(),body, bytes});
+            res.emit('finish');
+            socket.destroy();
+            return res;
+        }) as typeof res.end;
         const handle = app as unknown as (request: IncomingMessage, response: ServerResponse, next: (error?: unknown) => void) => void;
         handle(req,res,(error?: unknown) => { if (error) reject(error); else reject(new Error(`Unhandled route: ${url}`)); });
     });
@@ -123,4 +131,31 @@ test('unlisted club links remain usable without including their details or metad
     assert.match(String(response.headers['x-robots-tag']), /^noindex/);
     assert.ok(!response.body.includes('rel="canonical"'));
     assert.ok(!response.body.includes('application/ld+json'));
+});
+
+test('static favicon and manifest assets return HTTP 200 with correct media types', async () => {
+    const app = express();
+    app.use(createSeoWeb({ env, template, repository: repository(), render: () => '<main><h1>Public</h1></main>' }));
+    const server = app.listen(0);
+    try {
+        const port = (server.address() as { port: number }).port;
+        const checkAsset = async (path: string, mimeRegex: RegExp) => {
+            const res = await fetch(`http://127.0.0.1:${port}${path}`, { headers: { host: 'theorbix.world' } });
+            assert.equal(res.status, 200, `Expected 200 for ${path}`);
+            assert.match(res.headers.get('content-type') || '', mimeRegex, `Expected ${mimeRegex} for ${path}`);
+            assert.match(res.headers.get('cache-control') || '', /public|max-age/i, `Expected cache-control for ${path}`);
+            await res.arrayBuffer(); // Drain response
+        };
+        await checkAsset('/favicon.ico', /image\/(vnd\.microsoft\.icon|x-icon)/);
+        await checkAsset('/favicon-48.png', /^image\/png/);
+        await checkAsset('/favicon-96.png', /^image\/png/);
+        await checkAsset('/apple-touch-icon.png', /^image\/png/);
+        await checkAsset('/icon-192.png', /^image\/png/);
+        await checkAsset('/icon-512.png', /^image\/png/);
+        await checkAsset('/favicon.svg', /^image\/svg\+xml/);
+        await checkAsset('/site.webmanifest', /application\/(manifest\+json|json)/);
+        await checkAsset('/robots.txt', /^text\/plain/);
+    } finally {
+        await new Promise((resolve) => server.close(resolve));
+    }
 });
