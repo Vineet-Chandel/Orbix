@@ -33,7 +33,6 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
     const [errors, setErrors] = useState<{ gmail?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
-    const [submitError, setSubmitError] = useState("");
     const [redirecting, setRedirecting] = useState(false);
     const [redirectMeta, setRedirectMeta] = useState({
         message: "Opening your workspace…",
@@ -188,7 +187,6 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
         e.preventDefault();
 
         if (requestLock.current) return;
-        setSubmitError("");
         if (!validate()) return;
         requestLock.current = true;
         setLoading(true);
@@ -253,13 +251,13 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             }
 
             if (!response.ok) {
-                setSubmitError(resultData?.code === "ACCOUNT_TYPE_MISMATCH"
+                toast.error(resultData?.code === "ACCOUNT_TYPE_MISMATCH"
                     ? "Use the Club Account tab to sign in."
                     : response.status === 429
                         ? "Too many attempts. Wait a moment and try again."
                         : response.status >= 500 || response.status === 404
                             ? "Sign-in is temporarily unavailable. Try again shortly."
-                            : "Check your username or email and password.");
+                            : "Check your username or email and password.", { title: "Sign-in Failed" });
                 return;
             }
 
@@ -279,7 +277,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             handleLoginSuccess(resultData);
         } catch {
             if (lifetime.current.signal.aborted) return;
-            setSubmitError("Could not connect to sign-in. Check your connection and try again.");
+            toast.error("Could not connect to sign-in. Check your connection and try again.", { title: "Connection Error" });
         } finally {
             requestLock.current = false;
             setLoading(false);
@@ -635,8 +633,6 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             Forgot Password?
         </button>
     </div>
-
-    {submitError && <p role="alert" className="text-sm font-semibold text-red-700">{submitError}</p>}
 
     {/* Neo-brutalist Capsule Button matching landing page theme */}
     <div className="pt-2">

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import {
     Calendar,
     Clock,
@@ -181,58 +182,109 @@ export const EventPublicTimelineView: React.FC<EventPublicTimelineViewProps> = (
 
     return (
         <div className="space-y-4">
-            <div className="p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                    <div className="flex items-center gap-2">
-                        <Layers className="w-5 h-5 text-black" />
-                        <h3 className="font-black text-base sm:text-lg text-black tracking-tight">
+            <div className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border-2 sm:border-3 border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black/10 gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Layers className="w-5 h-5 text-black shrink-0" />
+                        <h3 className="font-black text-base sm:text-lg text-black tracking-tight truncate">
                             Event Timeline & Round Pipeline
                         </h3>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#FAF6EE] text-black border border-black text-[11px] font-black">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#FAF6EE] text-black border border-black text-[11px] font-black shrink-0">
                         {stages.length} {stages.length === 1 ? "Stage" : "Stages"}
                     </span>
                 </div>
 
                 {/* Timeline Pipeline */}
-                <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-black/30">
+                <div className="space-y-3.5 sm:space-y-4 pt-1">
                     {stages.map((stage, idx) => {
                         const now = new Date();
                         const sDate = new Date(stage.startsAt);
                         const eDate = new Date(stage.endsAt);
                         const isActive = now >= sDate && now <= eDate;
                         const isPast = now > eDate;
+                        const isFirst = idx === 0;
+                        const isLast = idx === stages.length - 1;
 
                         return (
-                            <div key={stage.id} className="relative group">
-                                {/* Dot Indicator */}
-                                <div
-                                    className={`absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-black flex items-center justify-center font-black text-[11px] shadow-[1px_1px_0px_#000] ${
-                                        isActive
-                                            ? "bg-[#A2FF86] text-black ring-4 ring-[#A2FF86]/30 animate-pulse"
-                                            : isPast
-                                            ? "bg-black text-white"
-                                            : "bg-[#FAF6EE] text-black"
-                                    }`}
-                                >
-                                    {isPast ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : idx + 1}
+                            <div key={stage.id} className="relative flex items-center gap-2.5 sm:gap-3.5 md:gap-4.5 group">
+                                {/* Left Column: Responsive Vertical Pipeline Track */}
+                                <div className="relative flex flex-col items-center justify-center shrink-0 w-7 sm:w-8 md:w-9 self-stretch">
+                                    {/* Top Connector Line to Circle Node */}
+                                    {!isFirst && (
+                                        <div
+                                            className={`absolute top-0 bottom-1/2 w-[3px] -translate-x-1/2 left-1/2 rounded-full transition-colors duration-300 ${
+                                                isPast || isActive ? "bg-black" : "bg-black/20"
+                                            }`}
+                                        />
+                                    )}
+
+                                    {/* Bottom Connector Line from Circle Node to Next Stage */}
+                                    {!isLast && (
+                                        <div
+                                            className={`absolute top-1/2 -bottom-3.5 sm:-bottom-4 w-[3px] -translate-x-1/2 left-1/2 rounded-full transition-colors duration-300 ${
+                                                isPast ? "bg-black" : "bg-black/20"
+                                            }`}
+                                        />
+                                    )}
+
+                                    {/* Step Circle Indicator (Always 100% vertically centered to the respected stage box) */}
+                                    <div className="relative z-10 my-auto flex items-center justify-center">
+                                        {isActive ? (
+                                            <motion.div
+                                                animate={{ scale: [1, 1.05, 1] }}
+                                                transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                                                className="relative flex items-center justify-center"
+                                            >
+                                                {/* Expanding Radar Ripple 1 */}
+                                                <motion.span
+                                                    animate={{ scale: [1, 1.65, 2.1], opacity: [0.65, 0.25, 0] }}
+                                                    transition={{ repeat: Infinity, duration: 2.2, ease: "easeOut" }}
+                                                    className="absolute inset-0 rounded-full bg-[#A2FF86] pointer-events-none"
+                                                />
+                                                {/* Expanding Radar Ripple 2 (Outlined ring) */}
+                                                <motion.span
+                                                    animate={{ scale: [1, 1.35, 1.65], opacity: [0.8, 0.35, 0] }}
+                                                    transition={{ repeat: Infinity, duration: 2.2, delay: 0.35, ease: "easeOut" }}
+                                                    className="absolute inset-0 rounded-full border-2 border-emerald-500 pointer-events-none"
+                                                />
+                                                {/* Main Solid Active Step Circle */}
+                                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#A2FF86] text-black border-2 border-black flex items-center justify-center font-black text-xs sm:text-sm shadow-[2px_2px_0px_#000] relative z-10 select-none">
+                                                    <span>{idx + 1}</span>
+                                                    {/* Live pulse beacon badge in corner */}
+                                                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600 border border-black" />
+                                                    </span>
+                                                </div>
+                                            </motion.div>
+                                        ) : isPast ? (
+                                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black text-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] sm:shadow-[2px_2px_0px_#000] transition-transform group-hover:scale-105 select-none">
+                                                <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FAF6EE] text-black/75 border-2 border-black/40 flex items-center justify-center font-black text-xs sm:text-sm shadow-[1px_1px_0px_#000] transition-colors group-hover:border-black group-hover:text-black select-none">
+                                                <span>{idx + 1}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {/* Stage Box */}
+                                {/* Right Column: Full-Size Stage Box */}
                                 <div
-                                    className={`p-4 rounded-2xl border-2 transition-all ${
+                                    className={`flex-1 min-w-0 p-3 sm:p-4 md:p-4.5 rounded-xl sm:rounded-2xl border-2 transition-all ${
                                         isActive
-                                            ? "bg-white border-black shadow-[3px_3px_0px_#000] ring-2 ring-[#38BDF8]"
+                                            ? "bg-white border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] ring-2 ring-[#A2FF86]"
                                             : isPast
-                                            ? "bg-[#FAF6EE]/60 border-black/40 shadow-[1px_1px_0px_#000]"
-                                            : "bg-white border-black/60 shadow-[2px_2px_0px_#000]"
+                                            ? "bg-[#FAF6EE]/60 border-black/40 shadow-[1px_1px_0px_#000] hover:bg-[#FAF6EE] hover:border-black/60"
+                                            : "bg-white border-black/60 shadow-[2px_2px_0px_#000] hover:border-black"
                                     }`}
                                 >
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-black text-sm text-black">{stage.name}</span>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
+                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                                            <span className="font-black text-xs sm:text-sm text-black break-words">{stage.name}</span>
                                             <span
-                                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border shrink-0 ${
                                                     isActive
                                                         ? "bg-[#A2FF86] text-black border-black shadow-[1px_1px_0px_#000]"
                                                         : isPast
@@ -243,14 +295,14 @@ export const EventPublicTimelineView: React.FC<EventPublicTimelineViewProps> = (
                                                 {isActive ? "Live Now" : isPast ? "Concluded" : "Upcoming"}
                                             </span>
                                             {stage.requirements?.isElimination && (
-                                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 text-[10px] font-black uppercase">
+                                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 text-[10px] font-black uppercase shrink-0">
                                                     Elimination
                                                 </span>
                                             )}
                                         </div>
 
-                                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-600">
-                                            <Calendar className="w-3.5 h-3.5" />
+                                        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-neutral-600 shrink-0">
+                                            <Calendar className="w-3.5 h-3.5 shrink-0" />
                                             <span>
                                                 {sDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} –{" "}
                                                 {eDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
@@ -259,16 +311,16 @@ export const EventPublicTimelineView: React.FC<EventPublicTimelineViewProps> = (
                                     </div>
 
                                     {stage.description && (
-                                        <p className="text-xs text-neutral-700 font-medium mt-1.5 leading-relaxed">
+                                        <p className="text-xs sm:text-[13px] text-neutral-700 font-medium mt-1.5 leading-relaxed break-words">
                                             {stage.description}
                                         </p>
                                     )}
 
                                     {/* Action button if active and requires submission */}
                                     {isActive && (stage.requirements?.requiresSubmission || stage.actionType !== "none") && (
-                                        <div className="mt-3 pt-3 border-t border-black/10 flex items-center justify-between flex-wrap gap-2">
+                                        <div className="mt-3 pt-3 border-t border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                                             <span className="text-[11px] font-bold text-neutral-600 flex items-center gap-1.5">
-                                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                                 <span>Deadline: {eDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
                                             </span>
 
@@ -276,7 +328,7 @@ export const EventPublicTimelineView: React.FC<EventPublicTimelineViewProps> = (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleOpenSubmission(stage)}
-                                                    className="px-3.5 py-1.5 rounded-xl bg-[#38BDF8] hover:bg-[#0ea5e9] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                    className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-[#38BDF8] hover:bg-[#0ea5e9] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                                 >
                                                     <UploadCloud className="w-3.5 h-3.5 stroke-[2.5]" />
                                                     <span>Submit Deliverables</span>

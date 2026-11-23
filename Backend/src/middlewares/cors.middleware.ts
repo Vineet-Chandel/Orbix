@@ -2,13 +2,21 @@ import type { RequestHandler } from "express";
 
 export function createCorsMiddleware(env: NodeJS.ProcessEnv = process.env): RequestHandler {
     const allowed = new Set<string>();
-    for (const candidate of [env.FRONTEND_URL, ...(env.CORS_ALLOWED_ORIGINS || "").split(",")]) {
+    for (const candidate of [
+        env.FRONTEND_URL,
+        env.SITE_URL,
+        env.APP_BASE_URL,
+        ...(env.CORS_ALLOWED_ORIGINS || "").split(","),
+    ]) {
         if (!candidate?.trim()) continue;
         const url = new URL(candidate.trim());
         if (!["http:", "https:"].includes(url.protocol)) throw new Error("Invalid CORS origin protocol");
         allowed.add(url.origin);
     }
-    if (env.NODE_ENV !== "production") {
+    if (env.NODE_ENV === "production") {
+        allowed.add("https://theorbix.world");
+        allowed.add("https://www.theorbix.world");
+    } else {
         allowed.add("http://localhost:5173");
         allowed.add("http://127.0.0.1:5173");
     }

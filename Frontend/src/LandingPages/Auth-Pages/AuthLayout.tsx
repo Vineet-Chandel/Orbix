@@ -38,7 +38,7 @@ export const AuthLayout = ({
         let deviceId = "";
         try {
             deviceId = getOrCreateDeviceId();
-        } catch {}
+        } catch { }
         const query = new URLSearchParams({ returnTo });
         if (deviceId) query.set("deviceId", deviceId);
         window.location.href = `${buildApiUrl("/auth/google")}?${query.toString()}`;
@@ -51,7 +51,7 @@ export const AuthLayout = ({
         let deviceId = "";
         try {
             deviceId = getOrCreateDeviceId();
-        } catch {}
+        } catch { }
         const query = new URLSearchParams({ returnTo });
         if (deviceId) query.set("deviceId", deviceId);
         window.location.href = `${buildApiUrl("/auth/github")}?${query.toString()}`;
@@ -82,19 +82,19 @@ export const AuthLayout = ({
                 </div>
 
                 {/* Center Form Container */}
-                <div className={`w-full ${wide ? "max-w-2xl xl:max-w-3xl" : "max-w-[490px]"} mx-auto my-auto py-2 transition-all duration-200`}>
+                <div className="w-[95%] sm:w-[80%] mx-auto my-auto py-2 transition-all duration-200">
                     {/* Header Heading matching landing page neo-brutalist theme */}
                     <div className="mb-7 text-center">
                         <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-black tracking-tight text-black leading-tight">
                             {title}
                         </h1>
-                        <p className={`mt-2.5 text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed ${wide ? "max-w-xl" : "max-w-sm"} mx-auto`}>
+                        <p className="mt-2.5 text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed max-w-2xl mx-auto">
                             {subtitle}
                         </p>
                     </div>
 
                     {/* Main Form Fields */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 w-full">
                         {children}
                     </div>
 

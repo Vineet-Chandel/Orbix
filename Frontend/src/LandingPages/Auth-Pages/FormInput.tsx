@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 interface FormInputProps extends InputHTMLAttributes<HTMLInputElement> {
     label?: string;
@@ -84,14 +84,6 @@ export const FormInput = ({
                     </button>
                 )}
             </div>
-
-            {/* Error Message */}
-            {error && (
-                <p className="flex items-center gap-1.5 text-xs font-bold text-rose-600 px-3 pt-1">
-                    <AlertCircle className="h-3.5 w-3.5 stroke-[2.5] flex-shrink-0" />
-                    <span>{error}</span>
-                </p>
-            )}
-        </div>
+    </div>
     );
 };

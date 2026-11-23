@@ -41,3 +41,25 @@ test("signout clears discovery data and ignores its pending request", () => {
     assert.equal(state.explore.total, 0);
     assert.deepEqual(state.explore.items, []);
 });
+
+test("offline network failure prevents unverified session access", () => {
+    let state = userReducer(undefined, { type: "@@INIT" });
+    assert.equal(state.user, null);
+    assert.equal(state.isAuthenticated, false);
+
+    state = userReducer(state, fetchUserProfile.pending("req1", undefined));
+    state = userReducer(state, fetchUserProfile.rejected(null, "req1", undefined, "Offline: Internet connection is unavailable."));
+    assert.equal(state.user, null);
+    assert.equal(state.isAuthenticated, false);
+    assert.equal(state.loading, false);
+});
+
+test("server confirmation is required to enter workspace authenticated state", () => {
+    let state = userReducer(undefined, fetchUserProfile.pending("req2", undefined));
+    assert.equal(state.isAuthenticated, false);
+
+    state = userReducer(state, fetchUserProfile.fulfilled(user, "req2", undefined));
+    assert.equal(state.isAuthenticated, true);
+    assert.equal(state.user?.id, "new-user");
+    assert.equal(state.loading, false);
+});

@@ -70,7 +70,7 @@ export interface User {
         district?: string | null;
         institutionType?: string | null;
         aisheCode?: string | null;
-        verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string;
+        verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string | null;
     } | null;
     collegeUpdatedAt?: string | null;
     canChangeCollege?: boolean;
@@ -87,22 +87,14 @@ export interface UserState {
     currentRequestId?: string;
 }
 
-const getStoredUser = (): User | null => {
-    try {
-        if (localStorage.getItem("orbix_signed_out")) return null;
-        const stored = localStorage.getItem("orbix_user");
-        return stored ? JSON.parse(stored) : null;
-    } catch {
-        return null;
-    }
-};
-
-const initialStoredUser = getStoredUser();
-
 const initialState: UserState = {
-    user: initialStoredUser,
-    loading: !initialStoredUser && (() => { try { return !localStorage.getItem("orbix_signed_out"); } catch { return true; } })(),
-    isAuthenticated: !!initialStoredUser,
+    user: null,
+    loading: typeof window !== "undefined" && Boolean(
+        localStorage.getItem("orbix_token") &&
+        !localStorage.getItem("orbix_signed_out") &&
+        (typeof navigator === "undefined" || navigator.onLine)
+    ),
+    isAuthenticated: false,
     error: null,
     lastFetchedAt: null,
 };
@@ -115,6 +107,11 @@ let profileController: AbortController | null = null;
 export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | void, { rejectValue: string }>(
     "user/fetchUserProfile",
     async (_options, { rejectWithValue }) => {
+        // Fail-fast if offline so the UI does not hang or assume past cached credentials
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            return rejectWithValue("Offline: Internet connection is unavailable.");
+        }
+
         // Return existing in-flight request if one is active unless forced
         if (inFlightFetchPromise && !_options?.force) {
             try {
@@ -383,16 +380,17 @@ export const userSlice = createSlice({
                 if (state.currentRequestId !== action.meta.requestId) return;
                 state.currentRequestId = undefined;
                 state.loading = false;
-                // If unauthorized or expired token, clear user session
-                if (action.payload === "Unauthorized") {
-                    state.user = null;
-                    state.isAuthenticated = false;
-                    try {
-                        localStorage.removeItem("orbix_user");
+                state.user = null;
+                state.isAuthenticated = false;
+
+                // When server rejects or internet is unavailable, do NOT assume logged-in state
+                try {
+                    localStorage.removeItem("orbix_user");
+                    if (action.payload === "Unauthorized") {
                         localStorage.removeItem("orbix_token");
-                    } catch {
-                        // ignore
                     }
+                } catch {
+                    // ignore
                 }
                 state.error = action.payload || "Session verification failed";
             });

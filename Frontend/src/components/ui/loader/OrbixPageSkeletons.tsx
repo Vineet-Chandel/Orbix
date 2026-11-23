@@ -1,71 +1,88 @@
 import React from "react";
 import { OrbixSkeleton } from "./OrbixSkeleton";
 
+export interface DashboardRouteSkeletonProps {
+    showSidebar?: boolean;
+}
+
 /**
  * DashboardRouteSkeleton
  *
  * Page-appropriate skeleton simulating the dashboard layout:
- * Left floating rail + Header bar + Metrics Cards + Data Table.
+ * - Content area skeleton by default (for tab switching / nested suspense within mounted dashboard layouts)
+ * - Optional full-page layout with left rail placeholder when showSidebar is true (for top-level route loading)
  */
-export const DashboardRouteSkeleton: React.FC = () => {
-    return (
-        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans select-none">
-            {/* Left Rail Placeholder (mimics Desktop Sidebar) */}
-            <div className="hidden lg:block h-screen sticky top-0 flex-shrink-0 w-[84px] sm:w-[88px] p-3">
-                <div className="h-[calc(100vh-1.5rem)] rounded-2xl bg-[#FAF6EE] border-3 border-black p-3 flex flex-col justify-between items-center shadow-[4px_4px_0px_#000]">
-                    <OrbixSkeleton variant="avatar" width={40} height={40} />
-                    <div className="space-y-4 w-full flex flex-col items-center">
-                        <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
-                        <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
-                        <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
-                        <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
-                    </div>
-                    <OrbixSkeleton variant="avatar" width={40} height={40} />
+export const DashboardRouteSkeleton: React.FC<DashboardRouteSkeletonProps> = ({ showSidebar = false }) => {
+    const content = (
+        <div className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 overflow-y-auto space-y-6">
+            {/* Header Bar */}
+            <div className="pb-5 border-b-2 border-black/15 flex items-center justify-between gap-4">
+                <div className="space-y-2">
+                    <OrbixSkeleton variant="text" width={220} height={28} />
+                    <OrbixSkeleton variant="text" width={140} height={18} />
+                </div>
+                <OrbixSkeleton variant="button" width={120} height={38} rounded="rounded-xl" />
+            </div>
+
+            {/* Metric Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                    <OrbixSkeleton variant="text" width={90} height={16} />
+                    <OrbixSkeleton variant="text" width={60} height={32} />
+                </div>
+                <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                    <OrbixSkeleton variant="text" width={110} height={16} />
+                    <OrbixSkeleton variant="text" width={75} height={32} />
+                </div>
+                <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                    <OrbixSkeleton variant="text" width={100} height={16} />
+                    <OrbixSkeleton variant="text" width={80} height={32} />
+                </div>
+                <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                    <OrbixSkeleton variant="text" width={80} height={16} />
+                    <OrbixSkeleton variant="text" width={50} height={32} />
                 </div>
             </div>
 
-            {/* Main Content Area */}
-            <main className="flex-1 min-w-0 h-screen flex flex-col p-2 sm:p-3 overflow-hidden">
-                <div className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 overflow-y-auto space-y-6">
-                    {/* Header Bar */}
-                    <div className="pb-5 border-b-2 border-black/15 flex items-center justify-between gap-4">
-                        <div className="space-y-2">
-                            <OrbixSkeleton variant="text" width={220} height={28} />
-                            <OrbixSkeleton variant="text" width={140} height={18} />
-                        </div>
-                        <OrbixSkeleton variant="button" width={120} height={38} rounded="rounded-xl" />
-                    </div>
+            {/* Table Area */}
+            <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                    <OrbixSkeleton variant="text" width={160} height={20} />
+                    <OrbixSkeleton variant="button" width={90} height={32} />
+                </div>
+                <OrbixSkeleton variant="table-row" count={4} />
+            </div>
+        </div>
+    );
 
-                    {/* Metric Cards Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                            <OrbixSkeleton variant="text" width={90} height={16} />
-                            <OrbixSkeleton variant="text" width={60} height={32} />
+    if (showSidebar) {
+        return (
+            <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans select-none">
+                {/* Left Rail Placeholder (mimics Desktop Sidebar) */}
+                <div className="hidden lg:block h-screen sticky top-0 flex-shrink-0 w-[84px] sm:w-[88px] p-3">
+                    <div className="h-[calc(100vh-1.5rem)] rounded-2xl bg-[#FAF6EE] border-3 border-black p-3 flex flex-col justify-between items-center shadow-[4px_4px_0px_#000]">
+                        <OrbixSkeleton variant="avatar" width={40} height={40} />
+                        <div className="space-y-4 w-full flex flex-col items-center">
+                            <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
+                            <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
+                            <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
+                            <OrbixSkeleton variant="button" width={40} height={40} rounded="rounded-xl" />
                         </div>
-                        <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                            <OrbixSkeleton variant="text" width={110} height={16} />
-                            <OrbixSkeleton variant="text" width={75} height={32} />
-                        </div>
-                        <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                            <OrbixSkeleton variant="text" width={100} height={16} />
-                            <OrbixSkeleton variant="text" width={80} height={32} />
-                        </div>
-                        <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                            <OrbixSkeleton variant="text" width={80} height={16} />
-                            <OrbixSkeleton variant="text" width={50} height={32} />
-                        </div>
-                    </div>
-
-                    {/* Table Area */}
-                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                            <OrbixSkeleton variant="text" width={160} height={20} />
-                            <OrbixSkeleton variant="button" width={90} height={32} />
-                        </div>
-                        <OrbixSkeleton variant="table-row" count={4} />
+                        <OrbixSkeleton variant="avatar" width={40} height={40} />
                     </div>
                 </div>
-            </main>
+
+                {/* Main Content Area */}
+                <main className="flex-1 min-w-0 h-screen flex flex-col p-2 sm:p-3 overflow-hidden">
+                    {content}
+                </main>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden select-none">
+            {content}
         </div>
     );
 };

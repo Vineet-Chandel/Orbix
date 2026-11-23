@@ -891,7 +891,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
         >
             <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                 {/* Header Banner */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="space-y-1.5 min-w-0">
                         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                             {onOpenMobileSidebar && (
@@ -977,43 +977,19 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                     <>
                         {/* Filter and Search Bar */}
                 <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-                        {/* Search Input */}
-                        <div className="relative flex-1">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search by title, topics, hackathons, clubs, or location..."
-                                className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden focus:bg-white"
-                            />
-                        </div>
-
-                        {/* Club Dropdown Filter */}
-                        {availableClubs.length > 0 && (
-                            <div className="shrink-0 flex items-center gap-2 min-w-[200px]">
-                                <SlidersHorizontal className="w-4 h-4 text-neutral-500 shrink-0" />
-                                <div className="flex-1">
-                                    <NeoSelect
-                                        value={selectedClubId}
-                                        onChange={(val) => setSelectedClubId(val)}
-                                        size="sm"
-                                        triggerClassName="!bg-[#FAF6EE] !rounded-xl !py-2 text-xs !shadow-none"
-                                    >
-                                        <option value="all">All Campus Clubs</option>
-                                        {availableClubs.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.name}
-                                            </option>
-                                        ))}
-                                    </NeoSelect>
-                                </div>
-                            </div>
-                        )}
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search by title, topics, hackathons, clubs, or location..."
+                            className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden focus:bg-white"
+                        />
                     </div>
 
-                    {/* Timeline Filter Pills */}
+                    {/* Timeline Filter Pills + Club Dropdown in one row */}
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-black/10">
                         <div className="flex flex-wrap items-center gap-2">
                             <button
@@ -1073,9 +1049,33 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                             </button>
                         </div>
 
-                        <span className="text-xs font-bold text-neutral-500">
-                            Showing {filteredEvents.length} total event{filteredEvents.length === 1 ? "" : "s"}
-                        </span>
+                        <div className="flex items-center gap-3">
+                            {/* Club Dropdown Filter */}
+                            {availableClubs.length > 0 && (
+                                <div className="shrink-0 flex items-center gap-2 min-w-[200px]">
+                                    <SlidersHorizontal className="w-4 h-4 text-neutral-500 shrink-0" />
+                                    <div className="flex-1">
+                                        <NeoSelect
+                                            value={selectedClubId}
+                                            onChange={(val) => setSelectedClubId(val)}
+                                            size="sm"
+                                            triggerClassName="!bg-[#FAF6EE] !rounded-xl !py-2 text-xs !shadow-none"
+                                        >
+                                            <option value="all">All Campus Clubs</option>
+                                            {availableClubs.map((c) => (
+                                                <option key={c.id} value={c.id}>
+                                                    {c.name}
+                                                </option>
+                                            ))}
+                                        </NeoSelect>
+                                    </div>
+                                </div>
+                            )}
+
+                            <span className="text-xs font-bold text-neutral-500 shrink-0">
+                                Showing {filteredEvents.length} total event{filteredEvents.length === 1 ? "" : "s"}
+                            </span>
+                        </div>
                     </div>
                 </div>
 

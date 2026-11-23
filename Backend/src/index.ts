@@ -49,6 +49,7 @@ import { apiPerformance } from './middlewares/apiPerformance.middleware.js';
 import { createCorsMiddleware } from './middlewares/cors.middleware.js';
 
 const app: Express = express();
+app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use(responsePrivacy);
 

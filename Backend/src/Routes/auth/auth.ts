@@ -246,6 +246,19 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
         // Hash Password AFTER validation
         const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
+        // Resolve authoritative college name from verified institutions directory
+        const instCheck = await query(
+            `SELECT id, official_name FROM institutions WHERE id = $1 AND verification_status = 'verified' AND is_active = true LIMIT 1;`,
+            [validatedData.collegeId]
+        );
+        if (instCheck.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Selected institution is not verified or not active"
+            });
+        }
+        const resolvedCollegeName = instCheck.rows[0].official_name;
+
         // 1. Insert into Database FIRST with default avatar, verified email and verified coder flag
         const defaultAvatarUrl = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
         const result = await query(
@@ -269,9 +282,12 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                     account_type,
                     is_email_verified,
                     email_verified_at,
-                    is_verified_coder
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,'v1.0',CURRENT_TIMESTAMP,true,'v1.0',CURRENT_TIMESTAMP,true,CURRENT_TIMESTAMP,$8,'personal',true,CURRENT_TIMESTAMP,true)
-                RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl", is_email_verified AS "isEmailVerified", is_verified_coder AS "isVerifiedCoder"`,
+                    is_verified_coder,
+                    college_id,
+                    college,
+                    college_updated_at
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,'v1.0',CURRENT_TIMESTAMP,true,'v1.0',CURRENT_TIMESTAMP,true,CURRENT_TIMESTAMP,$8,'personal',true,CURRENT_TIMESTAMP,true,$9,$10,$11)
+                RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl", is_email_verified AS "isEmailVerified", is_verified_coder AS "isVerifiedCoder", college_id AS "collegeId", college`,
             [
                 validatedData.username,
                 validatedData.firstName,
@@ -280,7 +296,10 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 validatedData.gmail,
                 hashedPassword,
                 validatedData.termsAccepted,
-                defaultAvatarUrl
+                defaultAvatarUrl,
+                validatedData.collegeId || null,
+                resolvedCollegeName,
+                validatedData.collegeId ? new Date() : null
             ]
         );
 
@@ -307,9 +326,16 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             console.error("Failed to log user legal consents:", consentErr);
         }
 
-        // Ensure leaderboard entry verification status is synchronized
+        // Ensure leaderboard entry verification status and college affiliation are synchronized
         try {
-            await query(`UPDATE leaderboard_entries SET is_verified = true WHERE user_id = $1;`, [userId]);
+            await query(
+                `UPDATE leaderboard_entries 
+                 SET is_verified = true, 
+                     college_id = COALESCE($2, college_id), 
+                     college = COALESCE($3, college) 
+                 WHERE user_id = $1;`,
+                [userId, validatedData.collegeId || null, resolvedCollegeName]
+            );
         } catch {
             // Non-blocking if user doesn't have leaderboard row yet
         }
@@ -406,6 +432,8 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 isEmailVerified: true,
                 isVerifiedCoder: true,
                 isVerified: true,
+                collegeId: validatedData.collegeId || null,
+                college: resolvedCollegeName,
             }
         });
 

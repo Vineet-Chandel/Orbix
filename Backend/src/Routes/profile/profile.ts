@@ -309,6 +309,21 @@ const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
 
         await enrichUserWithClubData(fullUser, authUser.id);
 
+        // Ensure browser receives/maintains HTTPOnly cookie for the active session on current origin
+        if (req.headers.authorization && !req.cookies?.token) {
+            const bearerToken = req.headers.authorization.slice(7).trim();
+            if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
+                const isProduction = process.env.NODE_ENV === "production";
+                res.cookie("token", bearerToken, {
+                    httpOnly: true,
+                    sameSite: "lax",
+                    path: "/",
+                    secure: isProduction,
+                    maxAge: 8 * 60 * 60 * 1000,
+                });
+            }
+        }
+
         return res.status(200).json({
             success: true,
             user: fullUser,

@@ -64,12 +64,20 @@ export class OAuthService {
     }
 
     public static getFrontendUrl(): string {
-        const raw = process.env.FRONTEND_URL || "http://localhost:5173";
+        const raw =
+            process.env.FRONTEND_URL ||
+            process.env.APP_BASE_URL ||
+            process.env.SITE_URL ||
+            (process.env.NODE_ENV === "production" ? "https://theorbix.world" : "http://localhost:5173");
         return raw.trim().replace(/\/+$/, "");
     }
 
     public static getBackendUrl(): string {
-        const raw = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`;
+        const raw =
+            process.env.BACKEND_URL ||
+            (process.env.NODE_ENV === "production"
+                ? (process.env.SITE_URL || process.env.FRONTEND_URL || "https://theorbix.world")
+                : `http://localhost:${process.env.PORT || 3000}`);
         return raw.trim().replace(/\/+$/, "");
     }
 
@@ -89,7 +97,7 @@ export class OAuthService {
         return `${this.getBackendUrl()}/api/auth/google/callback`;
     }
 
-    private static getAuthCookieOptions() {
+    public static getAuthCookieOptions() {
         const isProduction = process.env.NODE_ENV === "production";
         return {
             httpOnly: true,

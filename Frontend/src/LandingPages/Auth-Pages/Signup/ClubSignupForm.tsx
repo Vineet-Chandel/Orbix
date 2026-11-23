@@ -770,9 +770,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 showChangeWarningModal={false}
                                 placeholder="Search verified Indian colleges, IITs, NITs, universities..."
                             />
-                            {errors.collegeName && (
-                                <p className="text-[11px] font-bold text-rose-600 mt-1">{errors.collegeName}</p>
-                            )}
                         </div>
 
                         {/* Auto-filled Verified Location Badges (Locked & Authoritative) */}
@@ -1104,9 +1101,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                         </span>
                                     }
                                 />
-                                {errors.termsAccepted && (
-                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
-                                )}
                             </div>
 
                             <div className="w-full">
@@ -1128,9 +1122,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                         </span>
                                     }
                                 />
-                                {errors.privacyPolicyAccepted && (
-                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
-                                )}
                             </div>
                         </div>
                     </div>

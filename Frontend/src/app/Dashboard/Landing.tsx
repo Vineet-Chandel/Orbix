@@ -174,31 +174,31 @@ export default function Dashboard() {
                 <Suspense fallback={<DashboardRouteSkeleton />}>
                 {activeTab === "college-events" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <CollegeEventsView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <CollegeEventsView />
                     </div>
                 ) : activeTab === "activity" || activeTab === "applications" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <StudentActivityView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <StudentActivityView />
                     </div>
                 ) : activeTab === "clubs" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <StudentCampusClubsView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <StudentCampusClubsView />
                     </div>
                 ) : activeTab === "explore" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <ExploreView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <ExploreView />
                     </div>
                 ) : activeTab === "resume" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <ResumeManager onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <ResumeManager />
                     </div>
                 ) : activeTab === "notifications" ? (
                     <section
                         aria-label="Orbix Inbox"
                         className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
-                        <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
-                            <NotificationsView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6">
+                            <NotificationsView />
                         </div>
                         <SectionBottomIllustration alt="Notifications illustration" />
                     </section>
@@ -207,22 +207,21 @@ export default function Dashboard() {
                         aria-label="Orbix Trends"
                         className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
-                        <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+                        <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6">
                             <TrendsView
                                 connectedPortals={connectedPortals}
                                 username={user?.username || ""}
-                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
                         </div>
                         <SectionBottomIllustration alt="Trends illustration" />
                     </section>
                 ) : activeTab === "projects" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <ProjectsManagementView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <ProjectsManagementView />
                     </div>
                 ) : activeTab === ("workspace" as any) || location.pathname.startsWith("/workspace") ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <MemberWorkspaceView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <MemberWorkspaceView />
                     </div>
                 ) : (
                     /* Default Dashboard View (Practice vs Development) */
@@ -230,24 +229,12 @@ export default function Dashboard() {
                         aria-label="Orbix Developer Dashboard"
                         className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
-                        <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+                        <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6">
                             {/* Dashboard Header Bar */}
                             <div className="pb-5 border-b-2 border-black/55 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                {/* Left: Mobile Toggle & Welcome Greeting */}
+                                {/* Left: Welcome Greeting */}
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsMobileSidebarOpen(true)}
-                                            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
-                                            aria-label="Open sidebar"
-                                        >
-                                            <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <line x1="3" y1="12" x2="21" y2="12" />
-                                                <line x1="3" y1="6" x2="21" y2="6" />
-                                                <line x1="3" y1="18" x2="21" y2="18" />
-                                            </svg>
-                                        </button>
                                         <div className="orbix-page-heading-icon p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
                                             <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
                                         </div>

@@ -4,11 +4,11 @@ import { useAppSelector } from "./store";
 import { OrbixInitialLoader } from "./components/ui/loader";
 
 const ProtectedRoute = () => {
-    const { user, loading } = useAppSelector((state) => state.user);
+    const { user, loading, isAuthenticated } = useAppSelector((state) => state.user);
     const context = useOutletContext();
     const location = useLocation();
 
-    if (loading && !user) {
+    if (loading && (!user || !isAuthenticated)) {
         return (
             <OrbixInitialLoader
                 message="Verifying Session..."
@@ -17,7 +17,7 @@ const ProtectedRoute = () => {
         );
     }
 
-    if (!user) {
+    if (!user || !isAuthenticated) {
         const redirectParam = encodeURIComponent(location.pathname + location.search);
         return <Navigate to={`/auth/signin?redirect=${redirectParam}`} replace />;
     }
@@ -34,11 +34,11 @@ const ProtectedRoute = () => {
 };
 
 export const ClubProtectedRoute = () => {
-    const { user, loading } = useAppSelector((state) => state.user);
+    const { user, loading, isAuthenticated } = useAppSelector((state) => state.user);
     const context = useOutletContext();
     const location = useLocation();
 
-    if (loading && !user) {
+    if (loading && (!user || !isAuthenticated)) {
         return (
             <OrbixInitialLoader
                 message="Verifying Club Session..."
@@ -47,7 +47,7 @@ export const ClubProtectedRoute = () => {
         );
     }
 
-    if (!user) {
+    if (!user || !isAuthenticated) {
         const redirectParam = encodeURIComponent(location.pathname + location.search);
         return <Navigate to={`/auth/signin?tab=club&redirect=${redirectParam}`} replace />;
     }

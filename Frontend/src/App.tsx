@@ -9,6 +9,7 @@ import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import {
   OrbixLoadingProvider,
+  OrbixInitialLoader,
   DashboardRouteSkeleton,
   DocsRouteSkeleton,
   ContentRouteSkeleton,
@@ -41,6 +42,7 @@ const Dashboard = lazyWithRetry(() => import("./app/Dashboard/Landing"));
 const ProfileManager = lazyWithRetry(() => import("./app/Profile/ProfileManager"));
 const SettingsPage = lazyWithRetry(() => import("./app/Settings/SettingsPage"));
 const PublicProfilePage = lazyWithRetry(() => import("./app/Profile/PublicProfilePage"));
+const CollegeOnboardingPage = lazyWithRetry(() => import("./LandingPages/Auth-Pages/CollegeOnboarding/CollegeOnboardingPage"));
 const ProfilesOnboardingPage = lazyWithRetry(() => import("./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage"));
 const LeaderboardPage = lazyWithRetry(() => import("./app/Leaderboard/LeaderboardPage"));
 const EventsIndex = lazyWithRetry(() => import("./seo/EventsIndex"));
@@ -61,8 +63,22 @@ const PublicCertificateVerifyPage = lazyWithRetry(() => import("./app/Certificat
 const JoinClubPage = lazyWithRetry(() => import("./app/Club/JoinClubPage"));
 
 const WorkspaceRedirect = () => {
-  const { user } = useAppSelector((state) => state.user);
-  if (!user) return <Navigate to="/auth/signin" replace />;
+  const { user, isAuthenticated, loading } = useAppSelector((state) => state.user);
+  const isOnline = typeof navigator === "undefined" || navigator.onLine;
+
+  if (loading) {
+    return (
+      <OrbixInitialLoader
+        message="Verifying session…"
+        subMessage="Connecting to your workspace"
+      />
+    );
+  }
+
+  if (!isAuthenticated || !user || !isOnline) {
+    return <Navigate to="/auth/signin" replace />;
+  }
+
   if (user.accountType === "club") {
     if (user.clubStatus === "approved" || user.verifiedClub) {
       return <Navigate to="/club/dashboard" replace />;
@@ -110,7 +126,23 @@ const App = () => {
     try {
       if (localStorage.getItem("orbix_signed_out")) return;
     } catch { /* Verify the session normally when storage is unavailable. */ }
-    dispatch(fetchUserProfile());
+
+    if (typeof navigator === "undefined" || navigator.onLine) {
+      dispatch(fetchUserProfile());
+    }
+
+    const handleOnline = () => {
+      try {
+        if (!localStorage.getItem("orbix_signed_out") && localStorage.getItem("orbix_token")) {
+          dispatch(fetchUserProfile({ force: true }));
+        }
+      } catch {
+        dispatch(fetchUserProfile({ force: true }));
+      }
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, [dispatch]);
 
   return (
@@ -203,7 +235,7 @@ const App = () => {
                 <Route path="/club/team-workspace/join" element={<JoinClubPage />} />
                 <Route path="/join-club" element={<JoinClubPage />} />
                 <Route path="/club/join" element={<JoinClubPage />} />
-                <Route element={<Suspense fallback={<DashboardRouteSkeleton />}><ClubProtectedRoute /></Suspense>}>
+                <Route element={<Suspense fallback={<DashboardRouteSkeleton showSidebar />}><ClubProtectedRoute /></Suspense>}>
                   <Route path="/club/status" element={<ClubStatusPage />} />
                   <Route path="/clubs/status" element={<Navigate to="/club/status" replace />} />
                   <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />
@@ -233,12 +265,13 @@ const App = () => {
                 <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 
                 {/* New User Onboarding & Profiles Links Setup */}
+                <Route path="/onboarding/college" element={<CollegeOnboardingPage />} />
                 <Route path="/onboarding" element={<ProfilesOnboardingPage />} />
                 <Route path="/auth/profiles" element={<ProfilesOnboardingPage />} />
                 <Route path="/profile/setup" element={<ProfilesOnboardingPage />} />
 
                 {/* Protected Routes */}
-                <Route element={<Suspense fallback={<DashboardRouteSkeleton />}><ProtectedRoute /></Suspense>}>
+                <Route element={<Suspense fallback={<DashboardRouteSkeleton showSidebar />}><ProtectedRoute /></Suspense>}>
                   <Route path="/club-announcements" element={<MemberAnnouncementsPage />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/college-clubs" element={<Dashboard />} />

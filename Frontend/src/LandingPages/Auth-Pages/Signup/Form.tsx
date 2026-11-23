@@ -6,6 +6,7 @@ import {
     X,
     ArrowLeft,
     CheckCircle2,
+    GraduationCap,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
@@ -16,6 +17,8 @@ import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { CollegeAutocomplete } from "../../../components/CollegeAutocomplete";
+import type { InstitutionItem } from "../../../utils/profileApi";
 import { buildApiUrl } from "../../../api/apiClient";
 import { isDemoProfileUsername } from "../../../data/demoProfileData";
 import { isDemoClubSlug } from "../../../data/demoClubProfileData";
@@ -31,7 +34,6 @@ export default function SignupForm() {
     const [formData, setFormData] = useState({
         username: "",
         firstName: "",
-        middleName: "",
         lastName: "",
         gmail: "",
         password: "",
@@ -39,6 +41,7 @@ export default function SignupForm() {
         privacyPolicyAccepted: false,
         isAgeConfirmed: false,
     });
+    const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(null);
 
     const [errors, setErrors] = useState<{
         username?: string;
@@ -46,6 +49,7 @@ export default function SignupForm() {
         lastName?: string;
         gmail?: string;
         password?: string;
+        college?: string;
         termsAccepted?: string;
         privacyPolicyAccepted?: string;
         isAgeConfirmed?: string;
@@ -118,6 +122,10 @@ export default function SignupForm() {
             newErrors.password = "Password is required";
         } else if (!passwordStrength.isValid) {
             newErrors.password = "Please satisfy all password conditions below";
+        }
+
+        if (!selectedCollege?.id) {
+            newErrors.college = "College / University affiliation is required to create an account";
         }
 
         if (!formData.termsAccepted) {
@@ -327,13 +335,13 @@ export default function SignupForm() {
             const registrationPayload = {
                 username: formData.username.trim().toLowerCase(),
                 firstName: formData.firstName.trim(),
-                middleName: formData.middleName.trim() || undefined,
                 lastName: formData.lastName.trim(),
                 gmail: email,
                 password: formData.password,
                 termsAccepted: formData.termsAccepted,
                 privacyPolicyAccepted: formData.privacyPolicyAccepted,
                 isAgeConfirmed: formData.isAgeConfirmed,
+                collegeId: selectedCollege?.id || undefined,
                 verificationToken,
             };
 
@@ -373,12 +381,13 @@ export default function SignupForm() {
             const fullUser = signupData?.user || {
                 username: registrationPayload.username,
                 firstName: registrationPayload.firstName,
-                middleName: registrationPayload.middleName,
                 lastName: registrationPayload.lastName,
                 gmail: registrationPayload.gmail,
                 isEmailVerified: true,
                 isVerifiedCoder: true,
                 isVerified: true,
+                collegeId: selectedCollege?.id || null,
+                college: selectedCollege || null,
             };
 
             dispatch(setUser(fullUser));
@@ -412,8 +421,8 @@ export default function SignupForm() {
         <>
             <form onSubmit={handleInitiateSignup} className="space-y-3.5" noValidate>
 
-                {/* Names Row: First Name, Middle Name, Last Name */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {/* Names Row: First Name, Last Name */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <FormInput
                         name="firstName"
                         type="text"
@@ -426,18 +435,6 @@ export default function SignupForm() {
                         }}
                         error={errors.firstName}
                         autoComplete="given-name"
-                    />
-
-                    <FormInput
-                        name="middleName"
-                        type="text"
-                        placeholder="Middle (optional)"
-                        hideLabel
-                        value={formData.middleName}
-                        onChange={(e) => {
-                            setFormData({ ...formData, middleName: e.target.value });
-                        }}
-                        autoComplete="additional-name"
                     />
 
                     <FormInput
@@ -518,6 +515,50 @@ export default function SignupForm() {
                     />
                 </div>
 
+                {/* College / University (Verified Directory) */}
+                <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            College / University (Verified Directory)
+                        </label>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-black bg-[#FFE566] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
+                            Required
+                        </span>
+                    </div>
+                    <CollegeAutocomplete
+                        value={selectedCollege?.id || null}
+                        selectedCollege={selectedCollege}
+                        onChange={(college) => {
+                            setSelectedCollege(college);
+                            if (errors.college) setErrors({ ...errors, college: undefined });
+                        }}
+                        disabled={loading || verifyingAndRegistering}
+                        showChangeWarningModal={false}
+                    />
+
+                    {/* Selected Institution Card (shown only after user selects an institution) */}
+                    {selectedCollege?.id && (
+                        <div className="mt-2.5 p-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                    <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
+                                        Selected Institution
+                                    </span>
+                                    <h4 className="text-xs font-black text-black truncate">
+                                        {selectedCollege.officialName}
+                                    </h4>
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
+                                Your profile will be linked with {selectedCollege.officialName}. You will have access to official campus chapters, college events, and leaderboards.
+                            </p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Separate Versioned Legal Consents & Age Confirmation (One by One) */}
                 <div className="flex flex-col gap-3.5 pt-2">
                     {/* 1. Terms & Conditions */}
@@ -540,9 +581,6 @@ export default function SignupForm() {
                                 </span>
                             }
                         />
-                        {errors.termsAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
-                        )}
                     </div>
 
                     {/* 2. Privacy Policy */}
@@ -565,9 +603,6 @@ export default function SignupForm() {
                                 </span>
                             }
                         />
-                        {errors.privacyPolicyAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
-                        )}
                     </div>
 
                     {/* 3. Age 18+ Confirmation */}
@@ -586,9 +621,6 @@ export default function SignupForm() {
                                 </span>
                             }
                         />
-                        {errors.isAgeConfirmed && (
-                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.isAgeConfirmed}</p>
-                        )}
                     </div>
                 </div>
 

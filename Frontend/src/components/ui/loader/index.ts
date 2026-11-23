@@ -13,6 +13,7 @@ export {
     ContentRouteSkeleton,
     AuthRouteSkeleton,
 } from "./OrbixPageSkeletons";
+export type { DashboardRouteSkeletonProps } from "./OrbixPageSkeletons";
 export { OrbixButton } from "../button/OrbixButton";
 export type {
     OrbixButtonProps,

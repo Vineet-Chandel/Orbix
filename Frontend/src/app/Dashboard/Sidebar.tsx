@@ -9,6 +9,7 @@ import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { useMyWorkspacesQuery } from "../../store/personalDataApi";
 import { JoinClubModal } from "../Club/JoinClubModal";
+import { MobileBottomNav } from "./MobileBottomNav";
 
 export type SidebarTab =
     | "home"
@@ -1021,6 +1022,23 @@ export const Sidebar = ({
                 >
                     <div onClick={(e) => e.stopPropagation()}>{sidebarContent}</div>
                 </div>
+            )}
+
+            {/* Mobile Sticky Floating Bottom Navigation Bar (5 Options + Radial Circumference Menu) */}
+            {!isOpen && (
+                <MobileBottomNav
+                    activeTab={activeTab}
+                    onTabChange={onTabChange}
+                    user={user}
+                    displayName={displayName}
+                    avatarSrc={avatarSrc}
+                    clubWorkspaces={clubWorkspaces}
+                    unreadNotificationsCount={unreadNotificationsCount}
+                    connectedPortalsCount={connectedPortalsCount}
+                    brokenPortalsCount={brokenPortalsCount}
+                    onSignOut={handleSignOut}
+                    onOpenJoinClub={() => setIsJoinClubModalOpen(true)}
+                />
             )}
 
             {/* Join Club Workspace Modal */}

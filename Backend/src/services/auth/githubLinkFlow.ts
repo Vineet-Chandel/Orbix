@@ -3,7 +3,12 @@ export function resolveGitHubLinkReturnTo(returnTo: unknown, frontendUrl: string
     const fallback = new URL("/onboarding", frontend);
     try {
         const destination = new URL(typeof returnTo === "string" ? returnTo : "/onboarding", frontend);
-        if (destination.origin !== frontend.origin) return fallback.href;
+        const isSameOrigin = destination.origin === frontend.origin;
+        const isCanonicalDomain =
+            (destination.hostname === "theorbix.world" || destination.hostname === "www.theorbix.world") &&
+            (frontend.hostname === "theorbix.world" || frontend.hostname === "www.theorbix.world") &&
+            destination.protocol === "https:";
+        if (!isSameOrigin && !isCanonicalDomain) return fallback.href;
         return destination.href;
     } catch {
         return fallback.href;

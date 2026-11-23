@@ -1,12 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useAppSelector } from '../../store';
 import NavBar from '../NavBar/Landing';
 
 export default function PlatformPage() {
     const navigate = useNavigate();
+    const { user, isAuthenticated } = useAppSelector((state) => state.user);
 
     const handleGetStarted = () => {
-        const user = localStorage.getItem("orbix_user");
-        if (user) {
+        const isOnline = typeof navigator === "undefined" || navigator.onLine;
+        if (isAuthenticated && user && isOnline) {
             navigate("/dashboard");
         } else {
             navigate("/auth/signup");

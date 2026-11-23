@@ -1,5 +1,6 @@
 // Backend/src/Routes/auth/oauthRoutes.ts
 import express, { type Request, type Response } from "express";
+import jwt from "jsonwebtoken";
 import { OAuthService } from "../../services/auth/oauthService.js";
 import { authenticate, resolveAuthenticatedUser } from "../../middlewares/auth.middleware.js";
 import { assertVerificationSchemaReady } from "../../services/verification/schemaCompatibility.js";
@@ -326,5 +327,105 @@ oauthRouter.get(["/github/callback", "/github/link/callback"], async (req: Reque
                 err.message || "Failed to authenticate with GitHub"
             )}`
         );
+    }
+});
+
+/**
+ * 6. OAUTH SESSION SYNC & COOKIE ISSUANCE
+ * Route: POST /api/auth/oauth/session and POST /api/auth/session/sync
+ * Called by OAuthCallbackPage on the frontend origin with the token from the redirect URL.
+ * Sets standard HTTPOnly cookies ('token' and 'refreshToken') directly on the frontend domain/origin.
+ */
+oauthRouter.post(["/oauth/session", "/session/sync"], async (req: Request, res: Response) => {
+    try {
+        const tokenCandidate =
+            req.body?.token ||
+            (req.headers.authorization?.startsWith("Bearer ")
+                ? req.headers.authorization.slice(7)
+                : undefined) ||
+            req.cookies?.token;
+
+        if (!tokenCandidate || typeof tokenCandidate !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "A valid authentication token is required.",
+            });
+        }
+
+        req.headers.authorization = `Bearer ${tokenCandidate.trim()}`;
+
+        const outcome = await resolveAuthenticatedUser(req);
+        if (!outcome.ok) {
+            return res.status(outcome.status).json({
+                success: false,
+                message: outcome.message,
+            });
+        }
+
+        const user = outcome.user;
+        const sessionId = outcome.sessionId;
+        const JWT_SECRET = process.env.JWT_SECRET;
+        if (!JWT_SECRET) {
+            return res.status(500).json({ success: false, message: "JWT secret not configured." });
+        }
+
+        const accessToken = jwt.sign(
+            {
+                sub: user.id,
+                gmail: user.gmail,
+                username: user.username,
+                sid: sessionId,
+                accountType: user.accountType || "personal",
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "8h",
+                issuer: "orbix",
+                audience: "orbix-users",
+            }
+        );
+
+        const refreshToken = jwt.sign(
+            {
+                sub: user.id,
+                gmail: user.gmail,
+                username: user.username,
+                sid: sessionId,
+                accountType: user.accountType || "personal",
+                type: "refresh",
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "7d",
+                issuer: "orbix",
+                audience: "orbix-users",
+            }
+        );
+
+        const ACCESS_TOKEN_EXPIRY_MS = 8 * 60 * 60 * 1000;
+        const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+
+        res.cookie("token", accessToken, {
+            ...OAuthService.getAuthCookieOptions(),
+            maxAge: ACCESS_TOKEN_EXPIRY_MS,
+        });
+
+        res.cookie("refreshToken", refreshToken, {
+            ...OAuthService.getAuthCookieOptions(),
+            maxAge: REFRESH_TOKEN_EXPIRY_MS,
+        });
+
+        return res.json({
+            success: true,
+            user,
+            token: accessToken,
+            refreshToken,
+        });
+    } catch (err: any) {
+        console.error("OAuth session sync error:", err);
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to establish authenticated session.",
+        });
     }
 });

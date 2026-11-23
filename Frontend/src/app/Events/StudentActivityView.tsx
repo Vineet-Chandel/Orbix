@@ -23,8 +23,9 @@ import {
     Lock,
     Sparkles,
     Eye,
-    RefreshCw,
+    Filter,
 } from "lucide-react";
+import { NeoSelect } from "../../components/NeoSelect";
 import { useToast } from "../../context/ToastContext";
 import {
     cancelEventRegistration,
@@ -105,24 +106,7 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
     }, [appsError]);
 
     const [walletCertificatesCount, setWalletCertificatesCount] = useState<number | null>(null);
-    const [walletRefreshTrigger, setWalletRefreshTrigger] = useState<number>(0);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-
-    const handleRefreshAll = async () => {
-        setIsRefreshing(true);
-        try {
-            await Promise.allSettled([
-                loadApplications(),
-                loadInvitations(),
-            ]);
-            setWalletRefreshTrigger((prev) => prev + 1);
-            toast.success("Activity & credentials refreshed", { title: "Refreshed" });
-        } catch {
-            // ignore
-        } finally {
-            setIsRefreshing(false);
-        }
-    };
+    const [walletRefreshTrigger] = useState<number>(0);
 
     const [configuringTeamApp, setConfiguringTeamApp] = useState<StudentApplicationItem | null>(null);
     const [createTeamName, setCreateTeamName] = useState("");
@@ -307,48 +291,33 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
             className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
         >
             <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
-                {/* Header Banner */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                            {onOpenMobileSidebar && (
-                                <button
-                                    type="button"
-                                    onClick={onOpenMobileSidebar}
-                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
-                                    aria-label="Open sidebar"
-                                >
-                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <line x1="3" y1="12" x2="21" y2="12" />
-                                        <line x1="3" y1="6" x2="21" y2="6" />
-                                        <line x1="3" y1="18" x2="21" y2="18" />
-                                    </svg>
-                                </button>
-                            )}
-                            <div className="orbix-page-heading-icon orbix-page-heading-icon--card-p5-b2 p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
-                                <Activity className="w-5 h-5 text-black stroke-[2.5]" />
-                            </div>
-                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
-                                Activity & Credentials
-                            </h1>
+                {/* Header Section (clean without outer box border or refresh button) */}
+                <div className="pt-1">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        {onOpenMobileSidebar && (
+                            <button
+                                type="button"
+                                onClick={onOpenMobileSidebar}
+                                className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                                aria-label="Open sidebar"
+                            >
+                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <line x1="3" y1="12" x2="21" y2="12" />
+                                    <line x1="3" y1="6" x2="21" y2="6" />
+                                    <line x1="3" y1="18" x2="21" y2="18" />
+                                </svg>
+                            </button>
+                        )}
+                        <div className="orbix-page-heading-icon orbix-page-heading-icon--card-p5-b2 p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                            <Activity className="w-5 h-5 text-black stroke-[2.5]" />
                         </div>
-                        <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
-                            Track your event registration applications, access active session passes, and view verified digital certificates issued by campus clubs.
-                        </p>
+                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight truncate">
+                            Activity & Credentials
+                        </h1>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                        <button
-                            type="button"
-                            onClick={handleRefreshAll}
-                            disabled={isRefreshing}
-                            className="px-3.5 py-2 rounded-xl bg-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:bg-neutral-100 flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer disabled:opacity-50"
-                            title="Refresh Activity & Credentials"
-                        >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-                            <span className="hidden sm:inline">Refresh</span>
-                        </button>
-                    </div>
+                    <p className="mt-1.5 text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
+                        Track your event registration applications, access active session passes, and view verified digital certificates issued by campus clubs.
+                    </p>
                 </div>
 
                 {/* Segment Switcher Navigation */}
@@ -426,79 +395,70 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 {activeSegment === "applications" && (
                     <div className="space-y-6">
                         {/* Search & Status Filters */}
-                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-                            <div className="relative flex-1">
+                        <div className="p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                            {/* Search input with constrained, practical width */}
+                            <div className="relative w-full sm:w-80 md:w-96">
                                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Search applications by event, club, ticket code..."
-                                    className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-black font-bold text-xs bg-[#FAF6EE] focus:outline-none focus:ring-2 focus:ring-[#a2ff86]"
+                                    className="w-full pl-9 pr-8 h-10 rounded-xl border-2 border-black font-bold text-xs bg-[#FAF6EE] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#a2ff86] transition-all"
                                 />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery("")}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black p-0.5 cursor-pointer"
+                                        title="Clear search"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                <button
-                                    onClick={() => setStatusFilter("all")}
-                                    className={`px-3 py-1.5 rounded-lg border font-black transition-all ${
-                                        statusFilter === "all"
-                                            ? "bg-black text-white border-black"
-                                            : "bg-white text-neutral-700 border-neutral-300 hover:border-black"
-                                    }`}
-                                >
-                                    All ({applications.length})
-                                </button>
-                                <button
-                                    onClick={() => setStatusFilter("pending")}
-                                    className={`px-3 py-1.5 rounded-lg border font-black transition-all ${
-                                        statusFilter === "pending"
-                                            ? "bg-[#FFDE59] text-black border-black"
-                                            : "bg-white text-neutral-700 border-neutral-300 hover:border-black"
-                                    }`}
-                                >
-                                    Pending ({applications.filter((a) => a.status === "pending").length})
-                                </button>
-                                <button
-                                    onClick={() => setStatusFilter("registered")}
-                                    className={`px-3 py-1.5 rounded-lg border font-black transition-all ${
-                                        statusFilter === "registered"
-                                            ? "bg-[#a2ff86] text-black border-black"
-                                            : "bg-white text-neutral-700 border-neutral-300 hover:border-black"
-                                    }`}
-                                >
-                                    Accepted ({applications.filter((a) => a.status === "registered").length})
-                                </button>
-                                <button
-                                    onClick={() => setStatusFilter("attended")}
-                                    className={`px-3 py-1.5 rounded-lg border font-black transition-all ${
-                                        statusFilter === "attended"
-                                            ? "bg-[#A6E3E9] text-black border-black"
-                                            : "bg-white text-neutral-700 border-neutral-300 hover:border-black"
-                                    }`}
-                                >
-                                    Attended ({applications.filter((a) => a.status === "attended").length})
-                                </button>
-                                <button
-                                    onClick={() => setStatusFilter("rejected")}
-                                    className={`px-3 py-1.5 rounded-lg border font-black transition-all ${
-                                        statusFilter === "rejected"
-                                            ? "bg-[#FFAEBC] text-black border-black"
-                                            : "bg-white text-neutral-700 border-neutral-300 hover:border-black"
-                                    }`}
-                                >
-                                    Rejected ({applications.filter((a) => a.status === "rejected").length})
-                                </button>
-                                <button
-                                    onClick={() => setStatusFilter("cancelled")}
-                                    className={`px-3 py-1.5 rounded-lg border font-black transition-all ${
-                                        statusFilter === "cancelled"
-                                            ? "bg-neutral-300 text-black border-black"
-                                            : "bg-white text-neutral-700 border-neutral-300 hover:border-black"
-                                    }`}
-                                >
-                                    Withdrawn ({applications.filter((a) => a.status === "cancelled").length})
-                                </button>
+                            {/* Redesigned NeoSelect Dropdown on the right side of the search input */}
+                            <div className="w-full sm:w-56 shrink-0">
+                                <NeoSelect
+                                    value={statusFilter}
+                                    onChange={(val) => setStatusFilter(val as any)}
+                                    size="sm"
+                                    triggerClassName="h-10 rounded-xl bg-[#FAF6EE] hover:bg-white border-2 border-black shadow-[2px_2px_0px_#000] font-black text-xs"
+                                    dropdownClassName="rounded-xl border-2 border-black shadow-[3px_3px_0px_#000]"
+                                    options={[
+                                        {
+                                            value: "all",
+                                            label: `All (${applications.length})`,
+                                            icon: <Filter className="w-3.5 h-3.5 text-black stroke-[2.5]" />,
+                                        },
+                                        {
+                                            value: "pending",
+                                            label: `Pending (${applications.filter((a) => a.status === "pending").length})`,
+                                            icon: <span className="w-2.5 h-2.5 rounded-full bg-[#FFDE59] border border-black inline-block shrink-0" />,
+                                        },
+                                        {
+                                            value: "registered",
+                                            label: `Accepted (${applications.filter((a) => a.status === "registered").length})`,
+                                            icon: <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black inline-block shrink-0" />,
+                                        },
+                                        {
+                                            value: "attended",
+                                            label: `Attended (${applications.filter((a) => a.status === "attended").length})`,
+                                            icon: <span className="w-2.5 h-2.5 rounded-full bg-[#A6E3E9] border border-black inline-block shrink-0" />,
+                                        },
+                                        {
+                                            value: "rejected",
+                                            label: `Rejected (${applications.filter((a) => a.status === "rejected").length})`,
+                                            icon: <span className="w-2.5 h-2.5 rounded-full bg-[#FFAEBC] border border-black inline-block shrink-0" />,
+                                        },
+                                        {
+                                            value: "cancelled",
+                                            label: `Withdrawn (${applications.filter((a) => a.status === "cancelled").length})`,
+                                            icon: <span className="w-2.5 h-2.5 rounded-full bg-neutral-300 border border-black inline-block shrink-0" />,
+                                        },
+                                    ]}
+                                />
                             </div>
                         </div>
 

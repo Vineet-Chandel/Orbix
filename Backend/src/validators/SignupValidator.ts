@@ -544,6 +544,17 @@ const SignupValidator = (data: any) => {
         throw new ValidationError("Middle name must be a string if provided.");
     }
 
+    if (!data.collegeId || (typeof data.collegeId === "string" && (!data.collegeId.trim() || data.collegeId.trim() === "null"))) {
+        throw new ValidationError("College affiliation is required. Please select your college or university.");
+    }
+    if (typeof data.collegeId !== "string") {
+        throw new ValidationError("College ID must be a string.");
+    }
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(data.collegeId.trim())) {
+        throw new ValidationError("Invalid college ID format.");
+    }
+
     // Legal Consent & Age Validation (Non-negotiable)
     if (data.termsAccepted !== true) {
         throw new ValidationError("You must accept the Terms and Conditions.");
@@ -598,6 +609,8 @@ const SignupValidator = (data: any) => {
         throw new ValidationError("Password contains a common weak pattern.");
     }
 
+    const normalizedCollegeId = data.collegeId.trim();
+
     return {
         firstName: normalizedFirstName,
         middleName: normalizedMiddleName,
@@ -605,6 +618,7 @@ const SignupValidator = (data: any) => {
         gmail: normalizedGmail,
         password: password, // preserved exactly
         username: normalizedUsername,
+        collegeId: normalizedCollegeId,
         termsAccepted: true,
         termsVersion: "v1.0",
         privacyPolicyAccepted: true,
