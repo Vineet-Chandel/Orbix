@@ -535,9 +535,6 @@ export default function SignupForm() {
                         disabled={loading || verifyingAndRegistering}
                         showChangeWarningModal={false}
                     />
-                    {errors.college && (
-                        <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.college}</p>
-                    )}
 
                     {/* Selected Institution Card (shown only after user selects an institution) */}
                     {selectedCollege?.id && (
@@ -584,9 +581,6 @@ export default function SignupForm() {
                                 </span>
                             }
                         />
-                        {errors.termsAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
-                        )}
                     </div>
 
                     {/* 2. Privacy Policy */}
@@ -609,9 +603,6 @@ export default function SignupForm() {
                                 </span>
                             }
                         />
-                        {errors.privacyPolicyAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
-                        )}
                     </div>
 
                     {/* 3. Age 18+ Confirmation */}
@@ -630,9 +621,6 @@ export default function SignupForm() {
                                 </span>
                             }
                         />
-                        {errors.isAgeConfirmed && (
-                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.isAgeConfirmed}</p>
-                        )}
                     </div>
                 </div>
 

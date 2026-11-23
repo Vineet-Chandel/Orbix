@@ -38,7 +38,6 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
 
     const [errors, setErrors] = useState<{ identity?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
-    const [submitError, setSubmitError] = useState("");
     const [redirecting, setRedirecting] = useState(false);
     const [redirectMeta, setRedirectMeta] = useState({
         message: "Opening Club Portal…",
@@ -168,7 +167,6 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
         e.preventDefault();
 
         if (requestLock.current) return;
-        setSubmitError("");
         if (!validate()) return;
         requestLock.current = true;
         setLoading(true);
@@ -233,13 +231,13 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
             }
 
             if (!response.ok) {
-                setSubmitError(resultData?.code === "ACCOUNT_TYPE_MISMATCH"
+                toast.error(resultData?.code === "ACCOUNT_TYPE_MISMATCH"
                     ? "Use the Personal Account tab to sign in."
                     : response.status === 429
                         ? "Too many attempts. Wait a moment and try again."
                         : response.status >= 500 || response.status === 404
                             ? "Sign-in is temporarily unavailable. Try again shortly."
-                            : "Check your club username or email and password.");
+                            : "Check your club username or email and password.", { title: "Sign-in Failed" });
                 return;
             }
 
@@ -259,7 +257,7 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
             handleLoginSuccess(resultData);
         } catch {
             if (lifetime.current.signal.aborted) return;
-            setSubmitError("Could not connect to sign-in. Check your connection and try again.");
+            toast.error("Could not connect to sign-in. Check your connection and try again.", { title: "Connection Error" });
         } finally {
             requestLock.current = false;
             setLoading(false);
@@ -624,8 +622,6 @@ export default function ClubSigninForm({ initialIdentifier = "", onForgotPasswor
                     Forgot password?
                 </button>
             </div>
-
-            {submitError && <p role="alert" className="text-sm font-semibold text-red-700">{submitError}</p>}
 
             {/* Neo-brutalist Submit Button */}
             <button
