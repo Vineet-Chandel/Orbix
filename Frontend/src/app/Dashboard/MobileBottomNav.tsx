@@ -331,7 +331,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     // Geometry calculation for circular circumference fan-out:
     // Orbit container dimensions
     const CONTAINER_W = 340;
-    const CONTAINER_H = 155;
     const CX = CONTAINER_W / 2; // 170
     const CY = 155; // Bottom anchor point
     const RADIUS = 126; // Arc radius in px
@@ -447,7 +446,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         }
 
         if (item.hasSubItems && item.arcKey) {
-            setActiveArc((prev) => (prev === item.arcKey ? null : item.arcKey));
+            setActiveArc((prev) => (prev === item.arcKey ? null : item.arcKey!));
         }
     };
 
