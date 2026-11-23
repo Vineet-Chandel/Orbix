@@ -126,7 +126,7 @@ export class EventStageService {
 
         return {
             isOpen: true,
-            deadline: ev.ends_at ? new Date(ev.ends_at) : undefined,
+            ...(ev.ends_at && { deadline: new Date(ev.ends_at) }),
             startsAt: new Date(ev.starts_at),
         };
     }

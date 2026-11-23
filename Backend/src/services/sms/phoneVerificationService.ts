@@ -1,3 +1,5 @@
+import { assertProductionDelivery } from "../email/verificationDelivery.js";
+import { requireServerSecret } from "../../config/serverSecrets.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import redis from "../../redis/client.js";
@@ -10,7 +12,7 @@ const COOLDOWN_SECONDS = 60; // 1 minute between OTP requests
 const MAX_HOURLY_REQUESTS = 5; // Max 5 OTP requests per hour per phone
 const MAX_VERIFY_ATTEMPTS = 5; // Max 5 incorrect guesses before OTP invalidation
 
-const JWT_SECRET = process.env.JWT_SECRET || "orbix_secret_fallback_key_2026";
+const JWT_SECRET = requireServerSecret("JWT_SECRET");
 
 export interface SendPhoneOtpParams {
     phone: string;
@@ -216,6 +218,7 @@ export class PhoneVerificationService {
             otp,
             clubName,
         });
+        assertProductionDelivery(sendResult);
 
         if (!sendResult.success) {
             throw new Error(sendResult.error || "Failed to dispatch SMS verification code");
@@ -231,7 +234,6 @@ export class PhoneVerificationService {
             await redis.set(`otp:phone_verification:${canonical}`, redisPayload, "EX", OTP_TTL_SECONDS);
         }
 
-        const isDev = process.env.NODE_ENV !== "production";
 
         return {
             success: true,
@@ -244,7 +246,7 @@ export class PhoneVerificationService {
             providerError: sendResult.providerError,
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresInSeconds: OTP_TTL_SECONDS,
-            devOtp: (isDev || sendResult.simulated) ? otp : undefined,
+
         };
     }
 

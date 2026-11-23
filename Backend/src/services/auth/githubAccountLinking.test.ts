@@ -23,6 +23,7 @@ import { OAuthService, type NormalizedOAuthProfile } from './oauthService.js';
 import { platformVerificationService } from '../verification/platformVerificationService.js';
 import { resolveAuthenticatedUser } from '../../middlewares/auth.middleware.js';
 import { GitHubAdapter } from '../verification/adapters/githubAdapter.js';
+import { assertVerificationSchemaReady, checkVerificationSchemaStatus, resetSchemaStateCache } from '../verification/schemaCompatibility.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-at-least-32-chars-long";
 process.env.JWT_SECRET = JWT_SECRET;
@@ -41,7 +42,46 @@ describe('GitHub OAuth Account-Linking Final Security Closure', () => {
     const originalRedisEval = (redis as any).eval?.bind(redis);
     const originalRedisMget = (redis as any).mget?.bind(redis);
 
+    test('Missing ownership migration rejects linking before any account mutation', async () => {
+        customQueryHandler = (sql) => sql.includes('information_schema.') ? { rows: [], rowCount: 0 } : undefined;
+        await assert.rejects(
+            OAuthService.linkGitHubAccount('a0000000-0000-4000-8000-000000000001', {
+                provider: 'github', providerId: '583231', email: 'alice@example.com', name: 'Alice', usernameCandidate: 'alice-octo',
+            }, 'alice-octo'),
+            { code: 'MIGRATION_REQUIRED', statusCode: 503 }
+        );
+        assert.equal(executedQueries.some(({ sql }) => /BEGIN|UPDATE public.users|ownership_status = 'VERIFIED'/.test(sql)), false);
+    });
+
+    test('Concurrent schema preflights share one metadata inspection per replica', async () => {
+        await Promise.all(Array.from({ length: 20 }, () => assertVerificationSchemaReady()));
+        await checkVerificationSchemaStatus();
+        assert.equal(executedQueries.filter(({ sql }) => sql.includes('information_schema.columns')).length, 1);
+        assert.equal(executedQueries.filter(({ sql }) => sql.includes('information_schema.tables')).length, 1);
+    });
+
+    test('Proven handle is saved atomically and downstream refresh starts only after commit', async () => {
+        const originalRefresh = platformVerificationService.refreshOwnershipAfterCommit;
+        let refreshes = 0;
+        platformVerificationService.refreshOwnershipAfterCommit = () => {
+            assert.ok(executedQueries.some(({ sql }) => sql.trim().startsWith('COMMIT')));
+            refreshes++;
+        };
+        try {
+            await OAuthService.linkGitHubAccount('a0000000-0000-4000-8000-000000000001', {
+                provider: 'github', providerId: '583231', email: 'alice@example.com', name: 'Alice', usernameCandidate: 'alice-octo',
+            }, 'alice-octo');
+            assert.equal(refreshes, 1);
+            const handleUpdate = executedQueries.findIndex(({ sql }) => sql.includes('SET portal_username = $1'));
+            const ownershipWrite = executedQueries.findIndex(({ sql }) => sql.includes("SET ownership_status = 'VERIFIED'") || sql.includes('INSERT INTO public.user_links'));
+            assert.ok(handleUpdate >= 0 && ownershipWrite > handleUpdate);
+        } finally {
+            platformVerificationService.refreshOwnershipAfterCommit = originalRefresh;
+        }
+    });
+
     beforeEach(() => {
+        resetSchemaStateCache();
         executedQueries = [];
         customQueryHandler = null;
         redisStore.clear();
@@ -57,6 +97,10 @@ describe('GitHub OAuth Account-Linking Final Security Closure', () => {
             if (customQueryHandler) {
                 const handled = await customQueryHandler(normSql, values);
                 if (handled !== undefined) return handled;
+            }
+
+            if (normSql.includes('information_schema.columns') || normSql.includes('information_schema.tables')) {
+                return { rows: [{ exists: 1 }], rowCount: 1 };
             }
 
             // Default safe query responses
@@ -427,7 +471,7 @@ describe('GitHub OAuth Account-Linking Final Security Closure', () => {
 
         assert.ok(cancelledPayload);
         assert.equal(cancelledPayload?.action, 'link');
-        assert.equal(cancelledPayload?.returnTo, returnToUrl);
+        assert.equal(cancelledPayload?.returnTo, new URL(returnToUrl, OAuthService.getFrontendUrl()).href);
 
         // State must be completely removed from Redis
         assert.equal(redisStore.has(`oauth:state:${state}`), false);

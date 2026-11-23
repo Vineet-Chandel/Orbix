@@ -241,7 +241,7 @@ export const PortalProfileInput = ({
                         {fetchState.loading ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-white text-black border-2 border-black shadow-[2px_2px_0px_#000] animate-pulse">
                                 <span className="w-2.5 h-2.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                                Verifying...
+                                Loading...
                             </span>
                         ) : fetchState.error ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-rose-100 text-rose-900 border-2 border-black shadow-[2px_2px_0px_#000]">
@@ -369,6 +369,7 @@ export const PortalProfileInput = ({
             {/* Interactive Profile Reaction Card when handle is valid */}
             {judgment.isValid && judgment.username && (
                 <PortalProfileCard
+                    key={`${portalId}:${judgment.username.trim().toLowerCase()}`}
                     portalId={portalId}
                     username={judgment.username}
                     isConnected={isConnected}

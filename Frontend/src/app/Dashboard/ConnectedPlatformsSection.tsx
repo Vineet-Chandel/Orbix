@@ -434,7 +434,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     const brokenCount = useMemo(() => {
         return DASHBOARD_PLATFORMS_ORDER.filter((id) => {
             const prof = portalsState[id];
-            return prof && (prof.verified === false || prof.syncStatus === "broken");
+            return prof && prof.syncStatus === "broken";
         }).length;
     }, [portalsState]);
 
@@ -1386,12 +1386,12 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                 <p className="text-xs font-bold text-neutral-700">
                                     Account ownership is cryptographically verified
                                     {activeViewingProfile.verificationMethod ? ` via ${activeViewingProfile.verificationMethod}` : ""}.
-                                    This platform is authenticated for verified profile and leaderboard scoring.
+                                    Public activity from this platform can contribute to your Orbix Score.
                                 </p>
                             ) : isPlatformVerificationSupported(viewingPortalId) ? (
                                 <div className="space-y-2 pt-1">
                                     <p className="text-xs font-bold text-neutral-600 leading-relaxed">
-                                        Cryptographic ownership has not been proven. Verification is required before scores from this account can be officially credited.
+                                        Ownership verification is optional for leaderboard scoring. Public activity from this platform can contribute to your Orbix Score.
                                     </p>
                                     <button
                                         type="button"
@@ -1561,7 +1561,11 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                     verifiedAt: res.verifiedAt,
                                 },
                             };
-                            persistPortals(next);
+                            // Proof is already persisted; do not re-save every connection from a stale snapshot.
+                            setPortalsState(next);
+                            try { localStorage.setItem("orbix_connected_portals", JSON.stringify(next)); } catch { /* Storage may be unavailable. */ }
+                            window.dispatchEvent(new Event("orbix_portals_updated"));
+                            invalidateConnectedPlatformCaches(dispatch, user?.username);
                         }
                         dispatch(fetchUserProfile({ force: true }));
                     }}

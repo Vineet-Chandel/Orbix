@@ -1,3 +1,6 @@
+import { initialSeoData } from "./seo/client";
+import { StandaloneShowcase } from "./seo/StandaloneShowcase";
+import { RouteSeo } from "./seo/RouteSeo";
 import { useEffect, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import MainLanding from "./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Landing";
@@ -15,8 +18,6 @@ import { OrbixErrorBoundary } from "./components/ui/error/OrbixErrorBoundary";
 import { OrbixOfflineBanner } from "./components/ui/network/OrbixOfflineBanner";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
-import { CollegeEmailVerificationListener } from "./components/CollegeVerification/CollegeEmailVerificationListener";
-import { GlobalCollegeVerificationModal } from "./components/CollegeVerification/GlobalCollegeVerificationModal";
 import { ScrollToTop } from "./components/ScrollToTop";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -42,7 +43,9 @@ const SettingsPage = lazyWithRetry(() => import("./app/Settings/SettingsPage"));
 const PublicProfilePage = lazyWithRetry(() => import("./app/Profile/PublicProfilePage"));
 const ProfilesOnboardingPage = lazyWithRetry(() => import("./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage"));
 const LeaderboardPage = lazyWithRetry(() => import("./app/Leaderboard/LeaderboardPage"));
-const EventTrackerPage = lazyWithRetry(() => import("./app/Events/EventTrackerPage"));
+const EventsIndex = lazyWithRetry(() => import("./seo/EventsIndex"));
+const PublicEventPage = lazyWithRetry(() => import("./seo/PublicEventPage"));
+const AboutPage = lazyWithRetry(() => import("./seo/PublicAnswers"));
 const Card = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Card").then(m => ({ default: m.Card })));
 const Platform = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Platform").then(m => ({ default: m.Platform })));
 const Events = lazyWithRetry(() => import("./LandingPages/Main-Landing-Pages/Personal-Account-Landing-Pages/Events").then(m => ({ default: m.Events })));
@@ -94,15 +97,9 @@ const LegacyActivityRedirect = () => {
   return <Navigate to={`/activity?${params.toString()}`} replace />;
 };
 
-const AuthenticatedClubRedirect = () => {
-  const { user } = useAppSelector((state) => state.user);
-  if (user) {
-    if (user.accountType === "club") {
-      return <Navigate to="/club/dashboard" replace />;
-    }
-    return <Navigate to="/college-clubs" replace />;
-  }
-  return <ClubLanding />;
+const PublicClubRoute = () => {
+  const location = useLocation();
+  return <PublicClubProfilePage initialClubData={initialSeoData(location.pathname)?.entity?.club} />;
 };
 
 const App = () => {
@@ -122,20 +119,17 @@ const App = () => {
         <BrowserRouter>
           {/* Universal automatic scroll restoration on route navigation */}
           <ScrollToTop />
+          <RouteSeo />
 
           {/* Global Network Connectivity Status Banner */}
           <OrbixOfflineBanner />
-
-          {/* Authoritative Single Institutional Email Token Listener & Single Global Verification Modal Host */}
-          <CollegeEmailVerificationListener />
-          <GlobalCollegeVerificationModal />
 
           <OrbixErrorBoundary level="route">
             <Suspense fallback={<ContentRouteSkeleton />}>
               <Routes>
                 {/* Public Landing & Marketing Pages */}
                 <Route path="/" element={<MainLanding />} />
-                <Route path="/clubs" element={<AuthenticatedClubRedirect />} />
+                <Route path="/clubs" element={<ClubLanding />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
 
@@ -153,12 +147,14 @@ const App = () => {
                 <Route path="/demo/club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
                 <Route path="/demo-club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
-                <Route path="/events" element={<EventTrackerPage />} />
+                <Route path="/events" element={<EventsIndex />} />
+                <Route path="/events/:eventId" element={<PublicEventPage />} />
+                <Route path="/about" element={<AboutPage />} />
                 <Route path="/events/:eventId/register" element={<PublicEventRegistrationPage />} />
-                <Route path="/card" element={<Card />} />
-                <Route path="/platforms" element={<Platform />} />
+                <Route path="/card" element={<StandaloneShowcase path="/card"><Card /></StandaloneShowcase>} />
+                <Route path="/platforms" element={<StandaloneShowcase path="/platforms"><Platform /></StandaloneShowcase>} />
                 <Route path="/orbit" element={<Platform />} />
-                <Route path="/events-showcase" element={<Events />} />
+                <Route path="/events-showcase" element={<StandaloneShowcase path="/events-showcase"><Events /></StandaloneShowcase>} />
                 <Route path="/event-calendar" element={<Events />} />
 
                 {/* Blog / Documentation Pages — /blog/hoster_name/blog_name/:pageId */}
@@ -233,7 +229,7 @@ const App = () => {
                   <Route path="/club/inbox" element={<ClubDashboardPage />} />
                 </Route>
                 <Route path="/announcements/:announcementId" element={<AnnouncementPermalinkPage />} />
-                <Route path="/clubs/:slug" element={<PublicClubProfilePage />} />
+                <Route path="/clubs/:slug" element={<PublicClubRoute />} />
                 <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 
                 {/* New User Onboarding & Profiles Links Setup */}

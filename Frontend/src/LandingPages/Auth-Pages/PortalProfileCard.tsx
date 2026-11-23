@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { PORTALS } from "../../utils/portalParser";
 import { buildApiUrl } from "../../api/apiClient";
 import type { OwnershipStatus } from "../../types/platformVerification";
+import { matchesPortalProfileIdentity } from "./portalProfileIdentity";
 
 export interface PortalProfileData {
     success: boolean;
@@ -43,10 +44,13 @@ export const PortalProfileCard = ({
     onFetchStateChange,
 }: PortalProfileCardProps) => {
     const config = PORTALS[portalId];
-    const [profile, setProfile] = useState<PortalProfileData | null>(initialProfile || null);
-    const [loading, setLoading] = useState(false);
+    const matchingInitialProfile = matchesPortalProfileIdentity(initialProfile, portalId, username) ? initialProfile || null : null;
+    const [profile, setProfile] = useState<PortalProfileData | null>(matchingInitialProfile);
+    const [loading, setLoading] = useState(!matchingInitialProfile && username.trim().length >= 2);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [avatarFailed, setAvatarFailed] = useState(false);
+    const onFetchStateChangeRef = useRef(onFetchStateChange);
+    onFetchStateChangeRef.current = onFetchStateChange;
 
     useEffect(() => {
         setAvatarFailed(false);
@@ -57,30 +61,34 @@ export const PortalProfileCard = ({
             setProfile(null);
             setLoading(false);
             setFetchError(null);
-            onFetchStateChange?.({ loading: false, error: null, profile: null });
+            onFetchStateChangeRef.current?.({ loading: false, error: null, profile: null });
             return;
         }
 
         // If we already have a valid profile matching the handle, reuse it immediately
         if (
-            initialProfile &&
-            (initialProfile.username?.toLowerCase() === username.toLowerCase() ||
-             initialProfile.portal?.toLowerCase() === portalId.toLowerCase())
+            initialProfile && matchesPortalProfileIdentity(initialProfile, portalId, username)
         ) {
             setProfile(initialProfile);
             setLoading(false);
             setFetchError(null);
-            onFetchStateChange?.({ loading: false, error: null, profile: initialProfile });
+            onFetchStateChangeRef.current?.({ loading: false, error: null, profile: initialProfile });
             return;
         }
 
         let isMounted = true;
         const controller = new AbortController();
 
+        // Clear the previous identity before the typing debounce begins.
+        setProfile(null);
+        setLoading(true);
+        setFetchError(null);
+        onFetchStateChangeRef.current?.({ loading: true, error: null, profile: null });
+
         const fetchDetails = async () => {
             setLoading(true);
             setFetchError(null);
-            onFetchStateChange?.({ loading: true, error: null, profile: null });
+            onFetchStateChangeRef.current?.({ loading: true, error: null, profile: null });
 
             const endpoints = [buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`)];
 
@@ -94,7 +102,7 @@ export const PortalProfileCard = ({
                     });
                     if (res.ok) {
                         const json = await res.json();
-                        if (json && json.success) {
+                        if (json && matchesPortalProfileIdentity(json, portalId, username)) {
                             data = json;
                             break;
                         }
@@ -113,12 +121,12 @@ export const PortalProfileCard = ({
             if (data && data.success) {
                 setProfile(data);
                 setFetchError(null);
-                onFetchStateChange?.({ loading: false, error: null, profile: data });
+                onFetchStateChangeRef.current?.({ loading: false, error: null, profile: data });
             } else {
                 const finalErr = errorMessage || `Account not found on ${config?.name || portalId}`;
                 setProfile(null);
                 setFetchError(finalErr);
-                onFetchStateChange?.({ loading: false, error: finalErr, profile: null });
+                onFetchStateChangeRef.current?.({ loading: false, error: finalErr, profile: null });
             }
             setLoading(false);
         };
@@ -131,7 +139,7 @@ export const PortalProfileCard = ({
             clearTimeout(timer);
             controller.abort();
         };
-    }, [portalId, username, config?.name]);
+    }, [portalId, username, config?.name, initialProfile]);
 
     if (!username || username.trim().length < 2) {
         return null;
@@ -151,7 +159,7 @@ export const PortalProfileCard = ({
                     </div>
                     <div className="flex items-center gap-2 text-xs font-black uppercase text-black border-2 border-black bg-[#FAF6EE] px-3 py-1.5 rounded-md shadow-[2px_2px_0px_#000]">
                         <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        <span>Verifying account...</span>
+                        <span>Loading account...</span>
                     </div>
                 </div>
             </div>
@@ -159,7 +167,7 @@ export const PortalProfileCard = ({
     }
 
     // If fetch failed or user does not exist on platform, DO NOT SHOW THE CARD AT ALL
-    if (fetchError || !profile || !profile.success) {
+    if (fetchError || !profile || !matchesPortalProfileIdentity(profile, portalId, username)) {
         return null;
     }
 

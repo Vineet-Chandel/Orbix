@@ -1,3 +1,4 @@
+import { publicAnalyticsPrivacy } from "../../middlewares/publicAnalyticsPrivacy.middleware.js";
 import express, { type Request, type Response } from "express";
 import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
@@ -20,9 +21,13 @@ import {
 } from "../../utils/ratingSystems.js";
 import { platformVerificationService } from "../../services/verification/platformVerificationService.js";
 import { checkVerificationRateLimit } from "../../services/verification/verificationRateLimiter.js";
-import { getVerifiedLinksCondition, checkVerificationSchemaStatus } from "../../services/verification/schemaCompatibility.js";
+import { checkVerificationSchemaStatus } from "../../services/verification/schemaCompatibility.js";
 
 const portalsRouter = express.Router();
+portalsRouter.use([
+    "/submissions/unified", "/development/unified", "/contests", "/badges", "/badges/unified",
+    "/practice/analytics", "/problems/analytics", "/development/analytics", "/github/analytics",
+], optionalAuthenticate, publicAnalyticsPrivacy);
 
 export interface DifficultyBreakdown {
     easy: number;
@@ -1799,8 +1804,8 @@ export async function calculateUnifiedSubmissions(
     clientPortals?: Record<string, string>
 ) {
     // Query Postgres for user's connected platforms excluding github using case-insensitive matching
-    // Strictly filter to ownership-verified accounts and include snapshot so historical submission calendars are never lost if external APIs time out
-    const verifiedCondition = await getVerifiedLinksCondition();
+    // Load saved connected accounts and include snapshot so historical submission calendars are never lost if external APIs time out
+
     const result = await query(
         `SELECT portal, portal_username, verified, display_name, stats, snapshot
          FROM user_links
@@ -1809,7 +1814,6 @@ export async function calculateUnifiedSubmissions(
             OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
             OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) LIMIT 1)
          )
-           AND ${verifiedCondition}
            AND LOWER(portal) != 'github'
          ORDER BY portal ASC;`,
         [username]
@@ -1819,7 +1823,7 @@ export async function calculateUnifiedSubmissions(
     let effectiveRows: any[] = [];
 
     if (clientPortals && Object.keys(clientPortals).length > 0) {
-        // Neutralize clientPortals injection: ONLY match platforms that are verified in database
+        // Neutralize clientPortals injection: ONLY match platforms saved in the database
         const clientKeys = new Set(
             Object.keys(clientPortals)
                 .map((p) => p.toLowerCase().trim())
@@ -2391,8 +2395,8 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
         }
 
         const cleanUser = username.toLowerCase().trim();
-        const cacheKey = `user:submissions:unified:${cleanUser}`;
-        const cooldownKey = `user:submissions:cooldown:${cleanUser}`;
+        const cacheKey = `user:submissions:unified:connected-v2:${cleanUser}`;
+        const cooldownKey = `user:submissions:cooldown:connected-v2:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         // Parse clientPortals if provided
@@ -2510,14 +2514,15 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
             Object.keys(clientPortals).length > 0 ? clientPortals : undefined
         );
 
-        // Cache in Redis for 1 hour (3600s), and if forceRefresh, enforce 1-hour cooldown
+        // Empty/unavailable calendars get a short retry window, not a one-hour lockout.
+        const refreshTtl = Object.keys(responseData.dailyMerged || {}).length > 0 ? 3600 : 60;
         let activeCooldownRemaining = 0;
         if (redis && redis.status === "ready") {
             try {
-                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 3600);
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", refreshTtl);
                 if (forceRefresh) {
-                    await redis.set(cooldownKey, "1", "EX", 3600);
-                    activeCooldownRemaining = 3600;
+                    await redis.set(cooldownKey, "1", "EX", refreshTtl);
+                    activeCooldownRemaining = refreshTtl;
                 } else if (cooldownTtl > 0) {
                     activeCooldownRemaining = cooldownTtl;
                 }
@@ -2692,7 +2697,7 @@ export function computeDevelopmentCharts(
 /**
  * Unified Development Contributions endpoint (GitHub & code versioning platforms):
  * - Live parses full 365-day contributions calendar directly from GitHub
- * - Caches in Redis under user:development:unified:<username>
+ * - Caches in Redis under user:development:unified:connected-v2:<username>
  * - Background revalidates without blocking the UI
  */
 const activeDevelopmentRefreshes = new Set<string>();
@@ -2838,7 +2843,7 @@ portalsRouter.get("/development/unified", async (req: Request, res: Response) =>
         }
 
         const cleanUser = username.toLowerCase().trim();
-        const cacheKey = `user:development:unified:${cleanUser}`;
+        const cacheKey = `user:development:unified:connected-v2:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         // Check Redis cache first for sub-millisecond response
@@ -2944,7 +2949,7 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
         }
 
         const cleanUser = username.toLowerCase().trim();
-        const cacheKey = `user:contests:unified:${cleanUser}`;
+        const cacheKey = `user:contests:unified:connected-v2:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         // Check Redis cache first for sub-millisecond response
@@ -3058,7 +3063,7 @@ portalsRouter.get(["/badges", "/badges/unified"], async (req: Request, res: Resp
         }
 
         const cleanUser = username.toLowerCase().trim();
-        const cacheKey = `user:badges:unified:${cleanUser}`;
+        const cacheKey = `user:badges:unified:connected-v2:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         let clientPortals: Record<string, string> | undefined = undefined;
@@ -3129,7 +3134,7 @@ const handlePracticeAnalytics = async (req: Request, res: Response) => {
             });
         }
 
-        const cacheKey = `user:practice:analytics:${username}`;
+        const cacheKey = `user:practice:analytics:connected-v2:${username}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true" || req.body?.refresh === true || req.body?.force === true;
 
         let clientPortals: Record<string, string> | undefined = undefined;
@@ -3203,7 +3208,7 @@ const handleDevelopmentAnalytics = async (req: Request, res: Response) => {
         }
 
         const directHandle = String(req.query.githubHandle || req.query.handle || req.body?.githubHandle || req.body?.handle || "").trim();
-        const cacheKey = `user:development:analytics:${username}${directHandle ? `:${directHandle}` : ""}`;
+        const cacheKey = `user:development:analytics:connected-v2:${username}${directHandle ? `:${directHandle}` : ""}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true" || req.body?.refresh === true || req.body?.force === true;
 
         let clientPortals: Record<string, string> | undefined = undefined;
@@ -3779,24 +3784,12 @@ export const handleGetSavedPortals = async (req: Request, res: Response) => {
             });
         }
 
-        // Check Redis cache first
-        try {
-            if (redis && redis.status === "ready") {
-                const cached = await redis.get(`user:portals:${username}`);
-                if (cached) {
-                    const links = JSON.parse(cached);
-                    return res.status(200).json({
-                        success: true,
-                        username,
-                        links,
-                        count: links.length,
-                        source: "cache",
-                    });
-                }
-            }
-        } catch {
-            // Fall through to DB
-        }
+        // Ownership is authoritative database state; legacy portal caches omit proof metadata.
+        res.setHeader("Cache-Control", "no-store");
+        const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
+        const ownershipSelect = hasOwnershipStatusColumn
+            ? `, ownership_status, verification_method, verified_at`
+            : `, 'CONNECTED_UNVERIFIED' AS ownership_status, NULL AS verification_method, NULL AS verified_at`;
 
         // Query Postgres
         const result = await query(
@@ -3815,10 +3808,11 @@ export const handleGetSavedPortals = async (req: Request, res: Response) => {
                 last_sync_at,
                 created_at,
                 updated_at
+                ${ownershipSelect}
             FROM user_links
-            WHERE username = $1
+            WHERE username = $1 OR user_id = $2
             ORDER BY portal ASC;`,
-            [username]
+            [username, authUser?.id || null]
         );
 
         return res.status(200).json({
@@ -3841,7 +3835,6 @@ export interface ResyncPortalResult {
     portal: string;
     username: string;
     status: "valid" | "broken" | "error";
-    verified: boolean;
     message?: string;
     profileData?: PortalProfileData;
     lastSyncAt: string;
@@ -3851,6 +3844,7 @@ export interface ResyncPortalResult {
 export const handleResyncPortals = async (req: Request, res: Response) => {
     try {
         const authUser = (req as any).user;
+        const userId = authUser?.id || null;
         const body = req.body || {};
         const userIdentifier =
             authUser?.username ||
@@ -4014,7 +4008,6 @@ export const handleResyncPortals = async (req: Request, res: Response) => {
                     portal: item.portal,
                     username: item.username,
                     status: "error",
-                    verified: false,
                     message: `Service error checking ${item.portal}: ${err?.message || "Request timed out"}`,
                     lastSyncAt: nowIso,
                 };
@@ -4054,7 +4047,7 @@ export const handleResyncPortals = async (req: Request, res: Response) => {
 
         // Trigger automatic leaderboard score recalculation
         if (userIdentifier) {
-            syncLeaderboardForUser(userIdentifier).catch((sErr: any) => {
+            syncLeaderboardForUser(userIdentifier, { refreshProviderStats: true }).catch((sErr: any) => {
                 console.warn(`Resync leaderboard update warning for ${userIdentifier}:`, sErr?.message);
             });
         }
@@ -4093,10 +4086,10 @@ portalsRouter.get("/profile/save", authenticate, handleGetSavedPortals);
 portalsRouter.get("/links", authenticate, handleGetSavedPortals);
 
 // Resync endpoints
-portalsRouter.post("/resync", optionalAuthenticate, handleResyncPortals);
-portalsRouter.get("/resync", optionalAuthenticate, handleResyncPortals);
-portalsRouter.post("/profile/resync", optionalAuthenticate, handleResyncPortals);
-portalsRouter.get("/profile/resync", optionalAuthenticate, handleResyncPortals);
+portalsRouter.post("/resync", authenticate, handleResyncPortals);
+portalsRouter.get("/resync", authenticate, handleResyncPortals);
+portalsRouter.post("/profile/resync", authenticate, handleResyncPortals);
+portalsRouter.get("/profile/resync", authenticate, handleResyncPortals);
 
 // ============================================================================
 // PLATFORM ACCOUNT OWNERSHIP VERIFICATION ENDPOINTS
@@ -4168,6 +4161,8 @@ portalsRouter.post("/verification/initiate", authenticate, async (req: Request, 
             profileSettingsUrl: result.profileSettingsUrl,
             expiresAt: result.expiresAt,
             alreadyVerified: result.alreadyVerified,
+            verificationMethod: result.verificationMethod,
+            verifiedAt: result.verifiedAt,
         });
     } catch (err: any) {
         console.error("[VerificationInitiate] Error:", err);
@@ -4451,7 +4446,7 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
 
         // Recalculate leaderboard score upon updating/connecting a portal
         if (authUser.username) {
-            syncLeaderboardForUser(authUser.username).catch((sErr: any) => {
+            syncLeaderboardForUser(authUser.username, { refreshProviderStats: true }).catch((sErr: any) => {
                 console.warn(`Portal update leaderboard sync warning for ${authUser.username}:`, sErr?.message);
             });
         }

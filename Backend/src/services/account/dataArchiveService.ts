@@ -1,3 +1,4 @@
+import { assertProductionDelivery } from "../email/verificationDelivery.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import { query } from "../../database/client.js";
@@ -155,7 +156,7 @@ export class DataArchiveService {
     /**
      * Sends an email OTP to authorize GDPR Data Export (for passwordless / step-up accounts).
      */
-    static async requestStepUpCode(userId: string): Promise<{ success: boolean; message: string; cooldownSeconds: number; devOtp?: string }> {
+    static async requestStepUpCode(userId: string): Promise<{ success: boolean; message: string; cooldownSeconds: number }> {
         const userRes = await query(
             `SELECT id, email, username, firstname FROM users WHERE id = $1 LIMIT 1;`,
             [userId]
@@ -199,18 +200,16 @@ export class DataArchiveService {
             isWarning: false,
             footerNotice: "This authorization code expires in 10 minutes. If you did not request this archive, someone may be attempting to exfiltrate your account data.",
         });
+        assertProductionDelivery(sendResult);
 
-        const isDev = process.env.NODE_ENV !== "production";
 
-        const response: { success: boolean; message: string; cooldownSeconds: number; devOtp?: string } = {
+        const response: { success: boolean; message: string; cooldownSeconds: number } = {
             success: true,
             message: `Verification code sent to your primary email address (${user.email}).`,
             cooldownSeconds: 60,
         };
 
-        if (isDev || sendResult.simulated) {
-            response.devOtp = otp;
-        }
+
 
         return response;
     }

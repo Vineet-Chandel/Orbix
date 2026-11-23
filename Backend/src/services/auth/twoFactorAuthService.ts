@@ -1,3 +1,4 @@
+import { requireServerSecret } from "../../config/serverSecrets.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
@@ -11,7 +12,7 @@ const OTP_TTL_SECONDS = 600; // 10 minutes
 const COOLDOWN_SECONDS = 60; // 60 seconds cooldown between OTP requests
 const MAX_HOURLY_REQUESTS = 6; // Max 6 requests per hour per user
 const MAX_VERIFY_ATTEMPTS = 5; // Max 5 incorrect attempts before code invalidation
-const JWT_SECRET = process.env.JWT_SECRET || "orbix_jwt_secret_fallback_2026";
+const JWT_SECRET = requireServerSecret("JWT_SECRET");
 
 export function maskEmail(email: string): string {
     if (!email || !email.includes("@")) return email || "";

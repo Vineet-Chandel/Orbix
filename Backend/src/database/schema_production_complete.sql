@@ -1656,6 +1656,7 @@ CREATE TABLE IF NOT EXISTS public.user_links (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     last_error text,
     snapshot jsonb DEFAULT '{}'::jsonb,
+    leaderboard_snapshot jsonb,
     retry_count integer DEFAULT 0,
     CONSTRAINT user_links_pkey PRIMARY KEY (id),
     CONSTRAINT unique_user_portal UNIQUE (username, portal)

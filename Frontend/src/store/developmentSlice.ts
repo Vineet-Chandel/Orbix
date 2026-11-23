@@ -48,7 +48,7 @@ export interface DevelopmentState {
 // Local storage caching for zero-flicker instant hydration
 const getStoredDevelopment = (): Record<string, UnifiedDevelopmentData> => {
     try {
-        const stored = localStorage.getItem("orbix_unified_development");
+        const stored = localStorage.getItem("orbix_unified_development_connected_v2");
         return stored ? JSON.parse(stored) : {};
     } catch {
         return {};
@@ -57,7 +57,7 @@ const getStoredDevelopment = (): Record<string, UnifiedDevelopmentData> => {
 
 const saveStoredDevelopment = (data: Record<string, UnifiedDevelopmentData>) => {
     try {
-        localStorage.setItem("orbix_unified_development", JSON.stringify(data));
+        localStorage.setItem("orbix_unified_development_connected_v2", JSON.stringify(data));
     } catch {
         // Safe fallback
     }

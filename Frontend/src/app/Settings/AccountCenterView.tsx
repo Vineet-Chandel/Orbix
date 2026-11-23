@@ -33,27 +33,11 @@ export const AccountCenterView: React.FC<AccountCenterViewProps> = ({
         {
             id: "verify-account" as SettingsViewKey,
             title: "Verify Account",
-            description: "Verify your email via Resend OTP, confirm collegiate enrollment & unlock the verified student coder badge.",
+            description: "Verify your email via Resend OTP, manage your collegiate affiliation & secure your developer profile.",
             icon: <BadgeCheck className="w-5 h-5 text-black stroke-[2.5]" />,
             iconBg: "bg-[#FFE566]",
-            badge: user?.isCollegeVerified && user?.isEmailVerified
-                ? "Fully Verified"
-                : user?.isCollegeVerified
-                ? "College Verified"
-                : user?.collegeVerificationStatus === "INVALIDATED"
-                ? "Re-verify Required"
-                : user?.isEmailVerified
-                ? (user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING" ? "In Review" : "Email Verified")
-                : (user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING" ? "In Review" : "Pending Verification"),
-            badgeStyle: user?.isCollegeVerified && user?.isEmailVerified
-                ? "bg-[#a2ff86] text-black"
-                : user?.isCollegeVerified || user?.isEmailVerified
-                ? "bg-[#FFE566] text-black"
-                : user?.collegeVerificationStatus === "INVALIDATED"
-                ? "bg-orange-100 text-orange-950 border border-orange-300"
-                : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING"
-                ? "bg-amber-100 text-amber-900 border border-amber-300"
-                : "bg-amber-100 text-amber-900 border border-amber-300",
+            badge: user?.isEmailVerified ? "Email Verified" : "Pending Verification",
+            badgeStyle: user?.isEmailVerified ? "bg-[#a2ff86] text-black" : "bg-amber-100 text-amber-900 border border-amber-300",
         },
         {
             id: "account-privacy" as SettingsViewKey,

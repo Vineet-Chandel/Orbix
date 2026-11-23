@@ -14,7 +14,7 @@ import {
 } from "../../redis/cache/cache-profile.js";
 import { verifyAndFetchPortal, extractPortalUsername } from "../portals/portals.js";
 import { syncLeaderboardForUser } from "../leaderboard/leaderboard.js";
-import { checkVerificationSchemaStatus, getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
+import { checkVerificationSchemaStatus } from "../../services/verification/schemaCompatibility.js";
 import photoRouter from "./photo.js";
 import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
 import { getBlockState } from "../../services/relationship/blockService.js";
@@ -273,9 +273,9 @@ const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
                 last_sync_at AS "lastSyncAt"
                 ${ownershipSelect}
             FROM user_links
-            WHERE username = $1 OR username = $2
+            WHERE username = $1 OR username = $2 OR user_id = $3
             ORDER BY created_at ASC;`,
-            [userRow.username, userRow.gmail]
+            [userRow.username, userRow.gmail, userRow.id]
         );
 
         const collegePromise = userRow.collegeId ? query(
@@ -284,41 +284,8 @@ const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
                     verification_status AS "verificationStatus"
              FROM institutions WHERE id = $1 LIMIT 1;`, [userRow.collegeId]
         ) : Promise.resolve({ rows: [] });
-        const verificationPromise = userRow.collegeId ? query(
-            'SELECT id, status, college_id FROM college_verifications WHERE user_id = $1 ORDER BY created_at DESC;',
-            [userRow.id]
-        ).catch((error) => {
-            console.warn('College verification status resolution error:', error);
-            return { rows: [] };
-        }) : Promise.resolve({ rows: [] });
-        const [linksResult, collegeRes, cvRes] = await Promise.all([linksPromise, collegePromise, verificationPromise]);
+        const [linksResult, collegeRes] = await Promise.all([linksPromise, collegePromise]);
         const college = collegeRes.rows[0] || null;
-
-        let isCollegeVerified = false;
-        let collegeVerificationStatus = 'NOT_VERIFIED';
-        if (userRow.collegeId) {
-            try {
-                const appRows = cvRes.rows;
-                const approved = appRows.find(r => r.status === 'APPROVED' && r.college_id === userRow.collegeId);
-                if (approved) {
-                    isCollegeVerified = true;
-                    collegeVerificationStatus = 'APPROVED';
-                } else {
-                    const pending = appRows.find(r => r.status === 'PENDING' || r.status === 'PROCESSING');
-                    if (pending) {
-                        collegeVerificationStatus = pending.status;
-                    } else if (appRows[0]?.status === 'INVALIDATED') {
-                        collegeVerificationStatus = 'INVALIDATED';
-                    } else if (appRows[0]?.status === 'REJECTED') {
-                        collegeVerificationStatus = 'REJECTED';
-                    } else {
-                        collegeVerificationStatus = 'NOT_VERIFIED';
-                    }
-                }
-            } catch (cvErr) {
-                console.warn('College verification status resolution error:', cvErr);
-            }
-        }
 
         const cooldownInfo = computeCollegeCooldown(userRow.collegeUpdatedAt);
 
@@ -334,8 +301,6 @@ const { hasOwnershipStatusColumn } = await checkVerificationSchemaStatus();
             collegeUpdatedAt: userRow.collegeUpdatedAt,
             canChangeCollege: cooldownInfo.canChangeCollege,
             collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
-            isCollegeVerified,
-            collegeVerificationStatus,
             nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
             skills: Array.isArray(userRow.skills) ? userRow.skills : [],
             links: parseLinks(userRow.links, userRow),
@@ -740,8 +705,6 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                     college_id = $17,
                     college = $18,
                     college_updated_at = (CASE WHEN $21::boolean THEN CURRENT_TIMESTAMP ELSE college_updated_at END),
-                    is_college_verified = (CASE WHEN $21::boolean THEN false ELSE is_college_verified END),
-                    college_verified_at = (CASE WHEN $21::boolean THEN NULL ELSE college_verified_at END),
                     updated_at = CURRENT_TIMESTAMP
                  WHERE id = $19 OR email = $20
                  RETURNING
@@ -768,8 +731,6 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                     is_hireable AS "isHireable",
                     is_public AS "isPublic",
                     is_resume_public AS "isResumePublic",
-                    is_college_verified AS "isCollegeVerified",
-                    college_verified_at AS "collegeVerifiedAt",
                     college,
                     college_id AS "collegeId",
                     college_updated_at AS "collegeUpdatedAt",
@@ -1133,20 +1094,6 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             });
         }
 
-        // Check Redis cache first (only for public visitors, not owners who see private details)
-        if (!isOwner) {
-            const cached = await getCachedPublicProfile(username);
-            if (cached) {
-                return res.status(200).json({
-                    success: true,
-                    profile: {
-                        ...cached,
-                        isOwner: false,
-                    },
-                });
-            }
-        }
-
         // Query database for user
         const userResult = await query(
             `SELECT
@@ -1205,6 +1152,18 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             }
         }
 
+        // Check current visibility and block state before serving any cached response.
+        if (!isOwner && userRow.isPublic !== true) {
+            return res.status(404).json({ success: false, message: "This profile is unavailable." });
+        }
+        if (!isOwner) {
+            const cached = await getCachedPublicProfile(username);
+            if (cached) {
+                const relationship = viewer?.id ? await resolveRelationshipState(viewer.id, userRow.id) : null;
+                return res.status(200).json({ success: true, profile: { ...cached, isOwner: false, relationship } });
+            }
+        }
+
         // Query all verified/connected platforms for showcase
         const { hasOwnershipStatusColumn: hasColPub } = await checkVerificationSchemaStatus();
         const pubOwnershipSelect = hasColPub
@@ -1224,9 +1183,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 last_sync_at AS "lastSyncAt"
                 ${pubOwnershipSelect}
             FROM user_links
-            WHERE (LOWER(username) = $1)
+            WHERE (LOWER(username) = $1) AND ($2::boolean OR is_public IS TRUE)
             ORDER BY portal ASC;`,
-            [username]
+            [username, !!isOwner]
         );
 
         const fullName = `${userRow.firstName} ${userRow.lastName || ""}`.trim();
@@ -1249,21 +1208,6 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
         }
 
         
-        let isCollegeVerified = false;
-        if (userRow.collegeId) {
-            try {
-                const cvRes = await query(
-                    'SELECT id FROM college_verifications WHERE user_id = $1 AND college_id = $2 AND status = \'APPROVED\' LIMIT 1;',
-                    [userRow.id, userRow.collegeId]
-                );
-                if (cvRes.rows.length > 0) {
-                    isCollegeVerified = true;
-                }
-            } catch (pCvErr) {
-                console.warn('Public college verification check warning:', pCvErr);
-            }
-        }
-
         const isProfilePrivate = userRow.isPublic === false;
         const allowedLinks = parseLinks(userRow.links, userRow).slice(0, 4);
 
@@ -1292,7 +1236,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             isEmailVerified: Boolean(userRow.isEmailVerified),
             isVerifiedCoder: Boolean(userRow.isEmailVerified),
             isVerified: Boolean(userRow.isEmailVerified),
-            resumeUrl: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeUrl || null) : null),
+            resumeUrl: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeUrl ? `/api/profile/resume/view/${encodeURIComponent(userRow.username)}` : null) : null),
             resumeFilename: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeFilename || null) : null),
             resumeFilesize: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeFilesize || null) : null),
             resumeUpdatedAt: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeUpdatedAt || null) : null),
@@ -1302,7 +1246,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
         };
 
         // Cache public profile in Redis only if public
-        if (!isProfilePrivate) {
+        if (!isProfilePrivate && !isOwner) {
             await setCachedPublicProfile(username, publicProfilePayload);
         }
 
@@ -1593,6 +1537,9 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
  */
 export const handlePrivacyAudit = async (req: Request, res: Response) => {
     try {
+        if (!req.user?.username || req.user.username.toLowerCase() !== String(req.params.username || "").trim().toLowerCase()) {
+            return res.status(403).json({ success: false, message: "Access denied." });
+        }
         const usernameParam = req.params.username;
         const username = String(usernameParam || "").trim().toLowerCase();
         if (!username) {
@@ -1616,9 +1563,8 @@ export const handlePrivacyAudit = async (req: Request, res: Response) => {
         const u = userRes.rows[0];
         const isPublic = u.is_public !== false;
 
-        const verifiedCondition = await getVerifiedLinksCondition();
         const linksRes = await query(
-            `SELECT portal, portal_username, verified, stats FROM user_links WHERE LOWER(username) = $1 AND ${verifiedCondition};`,
+            `SELECT portal, portal_username, verified, stats FROM user_links WHERE LOWER(username) = $1;`,
             [username]
         );
 
@@ -1713,8 +1659,8 @@ export const handlePrivacyAudit = async (req: Request, res: Response) => {
 };
 
 profileRouter.get("/explore", optionalAuthenticate, handleExploreProfiles);
-profileRouter.get("/privacy-audit/:username", optionalAuthenticate, handlePrivacyAudit);
-profileRouter.get("/:username/privacy-audit", optionalAuthenticate, handlePrivacyAudit);
+profileRouter.get("/privacy-audit/:username", authenticate, handlePrivacyAudit);
+profileRouter.get("/:username/privacy-audit", authenticate, handlePrivacyAudit);
 
 /**
  * POST /api/profile/:username/hire-message (and /api/profile/hire-message)

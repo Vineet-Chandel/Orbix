@@ -31,10 +31,88 @@ interface ToastContextValue {
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
+const ToastActionSlotContext = createContext<HTMLDivElement | null>(null);
+
+const toastEnter = { opacity: 0, y: 50, scale: 0.92 };
+const toastExit = { opacity: 0, y: 25, scale: 0.88 };
+const toastSpring = { type: "spring", stiffness: 420, damping: 30, mass: 0.8 } as const;
+
+const toastStyles = {
+    error: { Icon: AlertCircle, card: "bg-rose-50", icon: "bg-[#FF4D4D] text-white" },
+    success: { Icon: CheckCircle2, card: "bg-emerald-50", icon: "bg-[#a2ff86] text-black" },
+    warning: { Icon: AlertTriangle, card: "bg-amber-50", icon: "bg-[#FFE566] text-black" },
+    info: { Icon: Info, card: "bg-[#FAF6EE]", icon: "bg-sky-300 text-black" },
+} as const;
+
+function ToastCard({ type, title, message, more = 0, onDismiss, actions }: {
+    type: ToastType;
+    title: string;
+    message?: string;
+    more?: number;
+    onDismiss?: () => void;
+    actions?: ReactNode;
+}) {
+    const { Icon, card, icon } = toastStyles[type];
+
+    return (
+        <div className={`relative flex items-start gap-3.5 rounded-2xl border-2 border-black p-4 shadow-[4px_4px_0px_#000] overflow-hidden ${card}`}>
+            <div className={`flex h-9 w-9 shrink-0 mt-0.5 items-center justify-center rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] ${icon}`}>
+                <Icon aria-hidden="true" className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div className="flex-1 min-w-0 pr-1">
+                <div role={actions ? "status" : undefined}>
+                    <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-black text-black tracking-tight leading-snug truncate">{title}</h4>
+                        {more > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FFE566] text-black border-2 border-black shadow-[1px_1px_0px_#000]">
+                                +{more} more
+                            </span>
+                        )}
+                    </div>
+                    {message && <p className="mt-0.5 text-xs text-neutral-800 leading-relaxed break-words font-bold">{message}</p>}
+                </div>
+                {actions && <div className="mt-2.5 flex flex-wrap justify-end gap-2">{actions}</div>}
+            </div>
+            {onDismiss && (
+                <button
+                    type="button"
+                    onClick={onDismiss}
+                    className="flex-shrink-0 text-black hover:bg-black hover:text-white transition-all p-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none focus:outline-none cursor-pointer"
+                    aria-label="Dismiss notification"
+                >
+                    <X className="w-4 h-4 stroke-[2.5]" />
+                </button>
+            )}
+        </div>
+    );
+}
+
+export function ToastActionNotice({ open, title, actions }: { open: boolean; title: string; actions: ReactNode }) {
+    const slot = useContext(ToastActionSlotContext);
+    if (!slot) return null;
+
+    return createPortal(
+        <AnimatePresence>
+            {open && (
+                <motion.div
+                    initial={toastEnter}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={toastExit}
+                    transition={toastSpring}
+                    className="w-full pointer-events-auto"
+                >
+                    <ToastCard type="warning" title={title} actions={actions} />
+                </motion.div>
+            )}
+        </AnimatePresence>,
+        slot
+    );
+}
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
     // Newest toast is at index 0 (front of the stack)
     const [toasts, setToasts] = useState<ToastItem[]>([]);
+    const [actionSlot, setActionSlot] = useState<HTMLDivElement | null>(null);
     const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
     const dismiss = useCallback((id: string) => {
@@ -125,11 +203,9 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
     const toastPortal = (
         <div
-            aria-live="polite"
-            aria-atomic="true"
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999999] pointer-events-none flex flex-col items-center w-full max-w-[460px] px-4"
+            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[999999] pointer-events-none flex flex-col items-center w-full max-w-[460px] px-4"
         >
-            <div className="relative w-full flex flex-col items-center justify-end min-h-[90px]">
+            <div aria-live="polite" aria-atomic="true" className="relative w-full flex flex-col items-center justify-end">
                 <AnimatePresence mode="popLayout">
                     {toasts.slice(0, 3).map((item, index) => {
                         // Stack calculation:
@@ -146,19 +222,14 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                             <motion.div
                                 key={item.id}
                                 layout
-                                initial={{ opacity: 0, y: 50, scale: 0.92 }}
+                                initial={toastEnter}
                                 animate={{
                                     opacity,
                                     y: yOffset,
                                     scale,
                                 }}
-                                exit={{ opacity: 0, y: 25, scale: 0.88 }}
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 420,
-                                    damping: 30,
-                                    mass: 0.8,
-                                }}
+                                exit={toastExit}
+                                transition={toastSpring}
                                 style={{
                                     zIndex,
                                     position: isFront ? "relative" : "absolute",
@@ -166,74 +237,27 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                                 }}
                                 className="w-full pointer-events-auto"
                             >
-                                <div className={`relative flex items-start gap-3.5 rounded-2xl border-2 border-black p-4 shadow-[4px_4px_0px_#000] overflow-hidden ${
-                                    item.type === "error" ? "bg-rose-50" :
-                                    item.type === "success" ? "bg-emerald-50" :
-                                    item.type === "warning" ? "bg-amber-50" :
-                                    "bg-[#FAF6EE]"
-                                }`}>
-                                    {/* Icon based on notification type */}
-                                    <div className="flex-shrink-0 mt-0.5">
-                                        {item.type === "error" && (
-                                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FF4D4D] border-2 border-black text-white shadow-[2px_2px_0px_#000]">
-                                                <AlertCircle className="w-5 h-5 stroke-[2.5]" />
-                                            </span>
-                                        )}
-                                        {item.type === "success" && (
-                                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#a2ff86] border-2 border-black text-black shadow-[2px_2px_0px_#000]">
-                                                <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
-                                            </span>
-                                        )}
-                                        {item.type === "warning" && (
-                                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFE566] border-2 border-black text-black shadow-[2px_2px_0px_#000]">
-                                                <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
-                                            </span>
-                                        )}
-                                        {item.type === "info" && (
-                                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-300 border-2 border-black text-black shadow-[2px_2px_0px_#000]">
-                                                <Info className="w-5 h-5 stroke-[2.5]" />
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Content: Title & Message */}
-                                    <div className="flex-1 min-w-0 pr-1">
-                                        <div className="flex items-center gap-2">
-                                            <h4 className="text-sm font-black text-black tracking-tight leading-snug truncate">
-                                                {item.title}
-                                            </h4>
-                                            {toasts.length > 1 && isFront && (
-                                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FFE566] text-black border-2 border-black shadow-[1px_1px_0px_#000]">
-                                                    +{toasts.length - 1} more
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="mt-0.5 text-xs text-neutral-800 leading-relaxed break-words font-bold">
-                                            {item.message}
-                                        </p>
-                                    </div>
-
-                                    {/* Dismiss Button */}
-                                    <button
-                                        type="button"
-                                        onClick={() => dismiss(item.id)}
-                                        className="flex-shrink-0 text-black hover:bg-black hover:text-white transition-all p-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none focus:outline-none cursor-pointer"
-                                        aria-label="Dismiss notification"
-                                    >
-                                        <X className="w-4 h-4 stroke-[2.5]" />
-                                    </button>
-                                </div>
+                                <ToastCard
+                                    type={item.type}
+                                    title={item.title}
+                                    message={item.message}
+                                    more={isFront ? toasts.length - 1 : 0}
+                                    onDismiss={() => dismiss(item.id)}
+                                />
                             </motion.div>
                         );
                     })}
                 </AnimatePresence>
             </div>
+            <div ref={setActionSlot} className="w-full mt-2 empty:hidden" />
         </div>
     );
 
     return (
         <ToastContext.Provider value={contextValue}>
-            {children}
+            <ToastActionSlotContext.Provider value={actionSlot}>
+                {children}
+            </ToastActionSlotContext.Provider>
             {typeof document !== "undefined" ? createPortal(toastPortal, document.body) : toastPortal}
         </ToastContext.Provider>
     );

@@ -1,16 +1,17 @@
 import "dotenv/config";
-import { query, pool, testDatabaseConnection } from "./src/database/client.js";
+import { activeDbConfig, query, pool, testDatabaseConnection } from "./src/database/client.js";
 import { calculateOrbixScore } from "./src/scoring/orbixScore.js";
 import { getCodeforcesTier, getLeetCodeTier, getCodeChefTier, getAtCoderTier } from "./src/utils/ratingSystems.js";
 import { clearLeaderboardCache } from "./src/Routes/leaderboard/leaderboard.js";
 import bcrypt from "bcrypt";
+import { randomBytes } from "node:crypto";
+import { leaderboardDemoEnabled } from "./src/redis/cache/cache-leaderboard.js";
 
 interface SeedCoder {
     username: string;
     displayName: string;
     email: string;
     college: string;
-    isVerified: boolean;
     streak: number;
     cfRating?: number;
     lcRating?: number;
@@ -33,7 +34,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Gennady Korotkevich",
         email: "gennady@orbix.dev",
         college: "ITMO University",
-        isVerified: true,
         streak: 184,
         cfRating: 3780, // Legendary Grandmaster
         lcRating: 3450,
@@ -53,7 +53,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Benjamin Qi",
         email: "benq@orbix.dev",
         college: "MIT",
-        isVerified: true,
         streak: 92,
         cfRating: 3510, // International Grandmaster
         lcRating: 3200,
@@ -73,7 +72,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Andrew He",
         email: "andrew@orbix.dev",
         college: "MIT",
-        isVerified: true,
         streak: 64,
         cfRating: 3320, // Grandmaster
         lcRating: 3050,
@@ -92,7 +90,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Aryan Sharma",
         email: "aryan@iitb.ac.in",
         college: "IIT Bombay",
-        isVerified: true,
         streak: 45,
         cfRating: 2420, // Grandmaster
         lcRating: 2750,
@@ -111,7 +108,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Priya Nair",
         email: "priya@stanford.edu",
         college: "Stanford University",
-        isVerified: true,
         streak: 38,
         cfRating: 2180, // Master
         lcRating: 2610,
@@ -131,7 +127,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Alex Chen",
         email: "alex@cmu.edu",
         college: "Carnegie Mellon University",
-        isVerified: true,
         streak: 29,
         cfRating: 1980, // Candidate Master
         lcRating: 2420,
@@ -150,7 +145,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Rohit Verma",
         email: "rohit@iitd.ac.in",
         college: "IIT Delhi",
-        isVerified: false,
         streak: 22,
         cfRating: 1850, // Candidate Master
         lcRating: 2250,
@@ -169,7 +163,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Sophia Wang",
         email: "sophia@berkeley.edu",
         college: "UC Berkeley",
-        isVerified: true,
         streak: 19,
         cfRating: 1740, // Expert
         lcRating: 2150,
@@ -187,7 +180,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Benchmark Master",
         email: "benchmark@orbix.dev",
         college: "National University of Singapore",
-        isVerified: true,
         streak: 14,
         cfRating: 1400, // Benchmark test case: CF 1400, 200 E, 150 M, 30 H, 20 C, 120 D -> 1630 pts
         easy: 200,
@@ -203,7 +195,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Siddharth Rao",
         email: "sid@iiit.ac.in",
         college: "IIIT Hyderabad",
-        isVerified: false,
         streak: 12,
         cfRating: 1580, // Specialist
         lcRating: 1980,
@@ -222,7 +213,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Marcus Krueger",
         email: "marcus@tum.de",
         college: "Technical University of Munich",
-        isVerified: true,
         streak: 10,
         cfRating: 1620, // Expert
         lcRating: 1910,
@@ -239,7 +229,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Ananya Gupta",
         email: "ananya@bits.ac.in",
         college: "BITS Pilani",
-        isVerified: false,
         streak: 8,
         lcRating: 1840,
         ccRating: 1650,
@@ -256,7 +245,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Lucas Silva",
         email: "lucas@usp.br",
         college: "University of São Paulo",
-        isVerified: true,
         streak: 7,
         cfRating: 1480, // Specialist
         easy: 140,
@@ -272,7 +260,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Yuki Tanaka",
         email: "yuki@u-tokyo.ac.jp",
         college: "University of Tokyo",
-        isVerified: true,
         streak: 5,
         acRating: 1650,
         easy: 130,
@@ -288,7 +275,6 @@ const SAMPLE_CODERS: SeedCoder[] = [
         displayName: "Neha Kulkarni",
         email: "neha@coep.ac.in",
         college: "COEP Tech",
-        isVerified: false,
         streak: 3,
         lcRating: 1680,
         easy: 110,
@@ -302,6 +288,9 @@ const SAMPLE_CODERS: SeedCoder[] = [
 ];
 
 async function seed() {
+    if (!leaderboardDemoEnabled || activeDbConfig.isProduction) {
+        throw new Error("Use ORBIX_LEADERBOARD_DEMO=true with a development or staging database to seed demonstration profiles.");
+    }
     console.log("🌱 Initializing Database and Leaderboard Seed...");
     await testDatabaseConnection();
 
@@ -309,7 +298,7 @@ async function seed() {
     const existingCount = parseInt(existingCountRes.rows[0]?.count || "0", 10);
     console.log(`Current leaderboard_entries count: ${existingCount}`);
 
-    const hashedPassword = await bcrypt.hash("Password@123", 10);
+    const hashedPassword = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
 
     for (const coder of SAMPLE_CODERS) {
         // Calculate platform ratings chips
@@ -375,7 +364,7 @@ async function seed() {
                 $1, $2, $3, $4, $5, true,
                 $6, $7, $8, $9,
                 CURRENT_TIMESTAMP, $10, $11, $12,
-                $13, $14, $14, true
+                $13, false, false, true
              )
              ON CONFLICT (username) DO UPDATE SET
                 firstName = EXCLUDED.firstName,
@@ -391,6 +380,7 @@ async function seed() {
                 platform_ratings = EXCLUDED.platform_ratings,
                 is_verified_coder = EXCLUDED.is_verified_coder,
                 is_email_verified = EXCLUDED.is_email_verified
+             WHERE LOWER(users.email) = LOWER(EXCLUDED.email)
              RETURNING id, username;`,
             [
                 coder.username,
@@ -400,17 +390,20 @@ async function seed() {
                 hashedPassword,
                 coder.college,
                 scoreResult.totalScore,
-                JSON.stringify(scoreResult.breakdown),
+                JSON.stringify({ ...scoreResult.breakdown, demoFixture: true }),
                 scoreResult.version,
                 coder.streak,
                 totalSolved,
                 totalContests,
                 JSON.stringify(platformRatings),
-                coder.isVerified,
             ]
         );
 
-        const userId = userUpsertRes.rows[0].id;
+        const userId = userUpsertRes.rows[0]?.id;
+        if (!userId) {
+            console.warn(`Skipped @${coder.username}: the username belongs to another account.`);
+            continue;
+        }
 
         // 2. Upsert into leaderboard_entries projection
         await query(
@@ -440,9 +433,9 @@ async function seed() {
                 coder.username,
                 coder.displayName,
                 coder.college,
-                coder.isVerified,
+                false,
                 scoreResult.totalScore,
-                JSON.stringify(scoreResult.breakdown),
+                JSON.stringify({ ...scoreResult.breakdown, demoFixture: true }),
                 totalSolved,
                 totalContests,
                 JSON.stringify(platformRatings),

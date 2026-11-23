@@ -7,7 +7,7 @@ import { checkHandleAvailabilityAcrossPlatform } from '../../validators/username
 import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
 import { failsOccursSignin, failsOccursSignup, resetSigninFailures, getFailures } from '../../redis/rate-limiters/rate-limiters-auth.js';
-import { deleteUserDetailsCache, getUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
+import { deleteUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
 import redis from '../../redis/client.js';
 import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
@@ -376,7 +376,6 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             lastName: validatedData.lastName,
             gmail: validatedData.gmail,
             username: validatedData.username,
-            password_hash: hashedPassword,
             termsAccepted: validatedData.termsAccepted,
             accountType: "personal"
         });
@@ -742,7 +741,7 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         });
 
         // Strip password_hash before returning user
-        const { password_hash, ...safeUser }: any = user;
+        const { password_hash: _passwordHash, ...safeUser }: any = user;
         safeUser.accountType = effectiveAccountType;
         safeUser.links = parseLinks(safeUser.links, safeUser);
         safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
@@ -789,7 +788,6 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             lastName: user.lastName,
             gmail: user.gmail,
             username: user.username,
-            password_hash,
             termsAccepted: user.termsAccepted,
             accountType: effectiveAccountType,
         });
@@ -1097,7 +1095,7 @@ const handleSignout = async (req: Request, res: Response) => {
             const normalizedGmail = gmail.toLowerCase().trim();
             void deleteUserDetailsCache(normalizedGmail).catch(() => undefined);
             if (redis.status === "ready") {
-                void redis.del(`user:portals:${normalizedGmail}`, `profile:public:${normalizedGmail}`).catch(() => undefined);
+                void redis.del(`user:portals:${normalizedGmail}`, `profile:public:privacy-v2:${normalizedGmail}`).catch(() => undefined);
             }
         }
 

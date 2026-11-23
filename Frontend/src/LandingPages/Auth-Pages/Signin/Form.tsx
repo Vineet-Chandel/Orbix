@@ -33,6 +33,7 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
 
     const [errors, setErrors] = useState<{ gmail?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
+    const [submitError, setSubmitError] = useState("");
     const [redirecting, setRedirecting] = useState(false);
     const [redirectMeta, setRedirectMeta] = useState({
         message: "Opening your workspace…",
@@ -186,7 +187,9 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (requestLock.current || !validate()) return;
+        if (requestLock.current) return;
+        setSubmitError("");
+        if (!validate()) return;
         requestLock.current = true;
         setLoading(true);
 
@@ -250,16 +253,13 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             }
 
             if (!response.ok) {
-                const message =
-                    resultData?.message ||
-                    (response.status === 404
-                        ? "Authentication service route not found (HTTP 404). Please ensure the backend is running."
-                        : response.status >= 500
-                            ? "Authentication server encountered an unexpected error (HTTP 500). Please try again shortly."
-                            : "Invalid credentials.");
-                toast.error(message, {
-                    title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Club Account Detected" : "Sign In Failed",
-                });
+                setSubmitError(resultData?.code === "ACCOUNT_TYPE_MISMATCH"
+                    ? "Use the Club Account tab to sign in."
+                    : response.status === 429
+                        ? "Too many attempts. Wait a moment and try again."
+                        : response.status >= 500 || response.status === 404
+                            ? "Sign-in is temporarily unavailable. Try again shortly."
+                            : "Check your username or email and password.");
                 return;
             }
 
@@ -277,10 +277,9 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             }
 
             handleLoginSuccess(resultData);
-        } catch (err: any) {
+        } catch {
             if (lifetime.current.signal.aborted) return;
-            console.error("Sign in error:", err);
-            await toast.handleError(err, "An unexpected error occurred. Please try again.");
+            setSubmitError("Could not connect to sign-in. Check your connection and try again.");
         } finally {
             requestLock.current = false;
             setLoading(false);
@@ -636,6 +635,8 @@ export default function SigninForm({ initialIdentifier = "", onForgotPassword }:
             Forgot Password?
         </button>
     </div>
+
+    {submitError && <p role="alert" className="text-sm font-semibold text-red-700">{submitError}</p>}
 
     {/* Neo-brutalist Capsule Button matching landing page theme */}
     <div className="pt-2">

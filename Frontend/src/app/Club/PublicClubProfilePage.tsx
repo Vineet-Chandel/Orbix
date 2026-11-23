@@ -1,3 +1,4 @@
+import { maskPublicPhone, maskPublicEmail } from "../../../../shared/privacy/publicContact";
 import { useEffect, useState, useMemo, Suspense, type ReactNode } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { lazyWithRetry } from "../../utils/lazyWithRetry";
@@ -230,9 +231,6 @@ export default function PublicClubProfilePage({
             setLoading(false);
             setNotFound(false);
             setIsBlockedByClub(false);
-            if (!isEmbedded && !onClose) {
-                document.title = `${bundle.club.name} | Verified Collegiate Club on Orbix`;
-            }
             return;
         }
 
@@ -263,9 +261,6 @@ export default function PublicClubProfilePage({
                     setIsManagerOrMember(Boolean(data.isManagerOrMember));
 
                     // Dynamic Document Title & SEO meta
-                    if (!isEmbedded && !onClose) {
-                        document.title = `${data.club.name} | Verified Collegiate Club on Orbix`;
-                    }
                 } else if (!club) {
                     setNotFound(true);
                 }
@@ -816,22 +811,20 @@ export default function PublicClubProfilePage({
                                 </>
                             )}
                             {club.publicEmail && (
-                                <a
-                                    href={`mailto:${club.publicEmail}`}
+                                <span
                                     className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
                                 >
                                     <Mail className="w-3.5 h-3.5" />
-                                    <span>{club.publicEmail}</span>
-                                </a>
+                                    <span className="break-all">{maskPublicEmail(club.publicEmail)}</span>
+                                </span>
                             )}
                             {club.contactPhone && (
-                                <a
-                                    href={`tel:${club.contactPhone}`}
+                                <span
                                     className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
                                 >
                                     <Phone className="w-3.5 h-3.5" />
-                                    <span>{club.contactPhone}</span>
-                                </a>
+                                    <span>{maskPublicPhone(club.contactPhone)}</span>
+                                </span>
                             )}
                         </div>
                     </div>
@@ -1020,13 +1013,12 @@ export default function PublicClubProfilePage({
 
                                             <div className="flex items-center gap-2">
                                                 {coord.contactEmail && (
-                                                    <a
-                                                        href={`mailto:${coord.contactEmail}`}
+                                                    <span
                                                         className="p-1 rounded-md bg-white border border-black text-black hover:bg-neutral-100"
-                                                        title={coord.contactEmail}
+                                                        title={maskPublicEmail(coord.contactEmail) || undefined}
                                                     >
                                                         <Mail className="w-3.5 h-3.5" />
-                                                    </a>
+                                                    </span>
                                                 )}
                                                 {coord.linkedinUrl && (
                                                     <a

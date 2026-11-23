@@ -132,8 +132,8 @@ export class OrbixErrorBoundary extends Component<
                             </h2>
                             <p className="text-xs sm:text-sm font-medium text-neutral-600 leading-relaxed">
                                 {isChunkError
-                                    ? "Your connection may have blinked or a new version of Orbix was recently released. Reloading the view will retrieve the latest assets."
-                                    : "An unexpected error occurred while loading this view. Your other tabs and sessions remain safe."}
+                                    ? "This page could not load. Check your connection and try again, or reload the page."
+                                    : "An unexpected error occurred while loading this view. Please try again."}
                             </p>
                         </div>
 
@@ -155,15 +155,6 @@ export class OrbixErrorBoundary extends Component<
                                 <span>Reload</span>
                             </button>
                         </div>
-
-                        {import.meta.env.DEV && error && (
-                            <details className="mt-4 text-left p-3 rounded-xl bg-neutral-100 border border-neutral-300 text-[11px] font-mono text-neutral-800 overflow-x-auto">
-                                <summary className="cursor-pointer font-bold select-none text-rose-700">
-                                    Developer Diagnostic Details
-                                </summary>
-                                <pre className="mt-2 whitespace-pre-wrap">{error.stack || error.message}</pre>
-                            </details>
-                        )}
                     </div>
                 </div>
             );
@@ -198,7 +189,7 @@ export class OrbixErrorBoundary extends Component<
                             Application Recovery
                         </h1>
                         <p className="text-xs sm:text-sm font-medium text-neutral-600 leading-relaxed max-w-md mx-auto">
-                            Orbix intercepted an unexpected runtime issue. Your local data and session have been safely retained. Please reload to resume normal operation.
+                            Something went wrong. Reload Orbix to continue.
                         </p>
                     </div>
 
@@ -220,15 +211,6 @@ export class OrbixErrorBoundary extends Component<
                             <span>Homepage</span>
                         </button>
                     </div>
-
-                    {import.meta.env.DEV && error && (
-                        <details className="mt-4 text-left p-3.5 rounded-xl bg-neutral-100 border border-neutral-300 text-[11px] font-mono text-neutral-800 overflow-x-auto">
-                            <summary className="cursor-pointer font-bold select-none text-rose-700">
-                                Developer Diagnostics
-                            </summary>
-                            <pre className="mt-2 whitespace-pre-wrap">{error.stack || error.message}</pre>
-                        </details>
-                    )}
                 </div>
             </div>
         );

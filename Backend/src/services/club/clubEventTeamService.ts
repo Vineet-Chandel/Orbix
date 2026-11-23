@@ -642,7 +642,7 @@ export class ClubEventTeamService {
                     ) AS "isAlreadyRegistered",
                     EXISTS (
                         SELECT 1 FROM club_event_team_invitations ti 
-                        WHERE ti.team_id = $2 AND ti.invitee_user_id = u.id AND ti.status = 'pending'
+                        WHERE ti.team_id = $2::uuid AND ti.invitee_user_id = u.id AND ti.status = 'pending'
                     ) AS "hasPendingInvite"
              FROM users u
              LEFT JOIN institutions inst ON inst.id = u.college_id

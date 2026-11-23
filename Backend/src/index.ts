@@ -1,3 +1,5 @@
+import { createSeoWeb } from "./seo/web.js";
+import { responsePrivacy, safeUnhandledError } from "./middlewares/responsePrivacy.middleware.js";
 if (typeof process.loadEnvFile === 'function' && process.env.NODE_ENV !== 'test') {
     try {
         process.loadEnvFile();
@@ -22,7 +24,6 @@ import {
 } from './Routes/relationships/relationshipRoutes.js';
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
-import { studentCollegeVerificationRouter } from './Routes/verification/collegeVerificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
 import blogRouter from './Routes/blog/blogRoutes.js';
 import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
@@ -48,6 +49,8 @@ import { apiPerformance } from './middlewares/apiPerformance.middleware.js';
 import { createCorsMiddleware } from './middlewares/cors.middleware.js';
 
 const app: Express = express();
+app.disable("x-powered-by");
+app.use(responsePrivacy);
 
 app.use(createCorsMiddleware());
 
@@ -56,10 +59,10 @@ app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
     if (err instanceof SyntaxError && 'body' in err) {
-        res.status(400).json({ error: "Invalid JSON payload" });
+        res.status(400).json({ success: false, message: "Invalid JSON payload" });
         return;
     }
-    next();
+    next(err);
 });
 
 // ============================================================================
@@ -67,6 +70,7 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 // ============================================================================
 const apiRouter = express.Router();
 apiRouter.use(apiPerformance);
+apiRouter.use((_req, res, next) => { res.setHeader('X-Robots-Tag', 'noindex, nofollow'); next(); });
 
 // System Health & Root Status Endpoints
 apiRouter.get('/health', (req: Request, res: Response) => {
@@ -139,10 +143,6 @@ apiRouter.use('/account/sessions', sessionRouter);
 apiRouter.use('/account', sessionRouter);
 apiRouter.use('/account', manageAccountsRouter);
 
-// College Institutional Verification (Stage 4.4 - 4.6)
-apiRouter.use('/verification/college', studentCollegeVerificationRouter);
-apiRouter.use('/college-verification', studentCollegeVerificationRouter);
-
 // Support & Help Desk
 apiRouter.use('/help', helpRouter);
 
@@ -161,8 +161,15 @@ apiRouter.use('/', authRouter);
 // Mount centralized apiRouter exclusively under /api
 app.use('/api', apiRouter);
 
+// Fallback alias for OAuth callbacks in case external providers or proxies omit /api prefix
+app.use('/auth', oauthRouter);
+
+// Route public HTML through the same origin as the API only when explicitly configured.
+if (process.env.SERVE_FRONTEND === 'true') app.use(createSeoWeb());
+
 // Root health and service check (for ELB, reverse proxies & process managers)
 app.get('/health', (req: Request, res: Response) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.status(200).json({
         success: true,
         service: "orbix-backend",
@@ -172,7 +179,6 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Legacy root fallback aliases for backwards compatibility
-app.use('/auth', oauthRouter);
 app.use('/profile', profileRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);
@@ -180,6 +186,7 @@ app.use('/help', helpRouter);
 app.use('/clubs', clubRouter);
 
 app.get('/', (req: Request, res: Response) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.status(200).json({
         success: true,
         service: "orbix-backend",
@@ -189,6 +196,8 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 
+
+app.use(safeUnhandledError);
 
 const PORT = process.env.PORT || 3000;
 

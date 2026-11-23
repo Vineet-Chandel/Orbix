@@ -7,6 +7,26 @@
  */
 
 import { buildApiUrl, getAuthHeaders } from "./apiClient";
+
+/** Starts authenticated account linking, rather than GitHub login/signup. */
+export async function startGitHubOwnershipVerification(portalUsername: string, returnTo: string): Promise<string> {
+    const response = await fetch(buildApiUrl("/api/auth/github/link"), {
+        method: "POST",
+        credentials: "include",
+        redirect: "error",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ portalUsername, returnTo }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || !data?.url) {
+        throw new Error(data?.message || "Could not start GitHub verification. Please retry.");
+    }
+    const destination = new URL(data.url);
+    if (destination.protocol !== "https:" || destination.hostname !== "github.com" || destination.pathname !== "/login/oauth/authorize") {
+        throw new Error("Could not open GitHub authorization. Please retry.");
+    }
+    return destination.href;
+}
 import type {
     InitiateVerificationPayload,
     InitiateVerificationSuccessResponse,

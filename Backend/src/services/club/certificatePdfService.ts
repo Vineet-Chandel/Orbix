@@ -3,7 +3,12 @@
  * Built with pdf-lib & qrcode for deterministic, pure-JS vector rendering
  * Phase 9 & Phase 16 Implementation
  */
-import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
+import * as _pdfLib from "pdf-lib";
+const { PDFDocument, rgb, StandardFonts, degrees } = (
+    (_pdfLib as unknown as { default?: typeof _pdfLib }).default?.PDFDocument
+        ? (_pdfLib as unknown as { default: typeof _pdfLib }).default
+        : _pdfLib
+);
 import QRCode from "qrcode";
 import crypto from "crypto";
 import type { CertificateDesign, CertificateElement, DynamicDataSnapshot } from "../../types/certificateStudio.js";

@@ -61,7 +61,6 @@ import { HireMeModal } from "./HireMeModal";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { GetTheCardModal } from "./GetTheCardModal";
-import { openCollegeVerificationModal, ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT } from "../../utils/collegeVerificationModalEvents";
 import { CARD_THEMES } from "./CardStudio/types";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
@@ -661,21 +660,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         };
     }, []);
 
-    // Refresh public profile data when college verification completes
-    useEffect(() => {
-        const handleUpdate = () => {
-            if (username && !isDemoProfileUsername(username)) {
-                invalidatePublicProfileClientCache(username);
-                fetchPublicProfile(username, true).then((data) => {
-                    setProfile(data);
-                }).catch(() => {});
-            }
-        };
-
-        window.addEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleUpdate);
-        return () => window.removeEventListener(ORBIX_COLLEGE_VERIFICATION_UPDATED_EVENT, handleUpdate);
-    }, [username]);
-
     const handleCopyDiagnostics = () => {
         const diag = diagnoseProfileError(rawError, username);
         const payload = JSON.stringify(
@@ -713,15 +697,12 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 setRawError(null);
                 setLoading(false);
                 toast.success("Profile reconnected successfully!", { title: "Connected" });
-                if (!isEmbedded) {
-                    document.title = `${data.displayName} (@${data.username}) — Orbix Profile`;
-                }
             })
             .catch((err: any) => {
                 setRawError(err);
                 setLoading(false);
-                const diag = diagnoseProfileError(err, username);
-                toast.error(diag.title, { title: "Connection Failed" });
+
+                toast.error(diagnoseProfileError(err, username).title, { title: "Connection Failed" });
             })
             .finally(() => {
                 setTimeout(() => setIsRetrying(false), 500);
@@ -765,9 +746,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             setUserProjects(demoProjects);
             setLoading(false);
             setRawError(null);
-            if (!isEmbedded) {
-                document.title = `${demoPublicProfile.displayName} (@${demoPublicProfile.username}) — Orbix Demo Profile`;
-            }
             return;
         }
 
@@ -792,19 +770,12 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                     setLoading(false);
                     setRawError(null);
                     // Update document title for SEO
-                    if (!isEmbedded) {
-                        document.title = `${data.displayName} (@${data.username}) — Orbix Profile`;
-                    }
                 }
             })
             .catch((err: any) => {
                 if (isMounted) {
                     setRawError(err);
                     setLoading(false);
-                    if (!isEmbedded) {
-                        const diag = diagnoseProfileError(err, username);
-                        document.title = `${diag.title} — Orbix`;
-                    }
                 }
             });
 
@@ -1590,7 +1561,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         </div>
                                     )}
 
-                                    {/* Verified College / Institution */}
+                                    {/* College / Institution */}
                                     {profile.college && (
                                         <div className="flex items-start gap-2.5 pt-1 text-xs font-bold text-black">
                                             <GraduationCap className="w-4 h-4 text-black stroke-[2.5] flex-shrink-0 mt-0.5" />
@@ -1599,39 +1570,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                     <span className="truncate font-black tracking-tight text-black">
                                                         {profile.college.officialName}
                                                     </span>
-                                                    {Boolean(profile.isCollegeVerified) ? (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-950 uppercase shadow-[1px_1px_0px_#000]">
-                                                            <VerifiedBadge size="xs" />
-                                                            College Verified
-                                                        </span>
-                                                    ) : profile.college.verificationStatus === "verified" ? (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-black text-[10px] font-black text-neutral-800 uppercase shadow-[1px_1px_0px_#000]">
-                                                            <VerifiedBadge size="xs" />
-                                                            Verified Directory
-                                                        </span>
-                                                    ) : null}
-
-                                                    {profile.isOwner && !profile.isCollegeVerified && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openCollegeVerificationModal({
-                                                                collegeId: profile.college?.id,
-                                                                collegeName: profile.college?.officialName,
-                                                            })}
-                                                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] hover:bg-[#ffe043] border border-black text-[10px] font-black text-black uppercase shadow-[1px_1px_0px_#000] cursor-pointer transition-all shrink-0"
-                                                        >
-                                                            <GraduationCap className="w-3 h-3 stroke-[2.5]" />
-                                                            <span>
-                                                                {profile.collegeVerificationStatus === "PENDING" || profile.collegeVerificationStatus === "PROCESSING"
-                                                                    ? "Review Pending"
-                                                                    : profile.collegeVerificationStatus === "INVALIDATED"
-                                                                    ? "Re-verify"
-                                                                    : profile.collegeVerificationStatus === "REJECTED"
-                                                                    ? "Resubmit"
-                                                                    : "Get Verified"}
-                                                            </span>
-                                                        </button>
-                                                    )}
                                                 </div>
                                                 {(profile.college.city || profile.college.state) && (
                                                     <span className="text-[10px] text-neutral-600 font-semibold block truncate mt-0.5">

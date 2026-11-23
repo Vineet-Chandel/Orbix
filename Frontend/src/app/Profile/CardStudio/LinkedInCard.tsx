@@ -314,9 +314,9 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = React.memo(({
                                 <div className="flex flex-col gap-1.5 justify-center">
                                     {/* Line 1: Name + Verified Badge + Open To Work Badge (Image 2) */}
                                     <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h1 className="text-5xl font-black text-white tracking-tight leading-none">
+                                        <h2 className="text-5xl font-black text-white tracking-tight leading-none">
                                             {displayName}
-                                        </h1>
+                                        </h2>
                                         {/* Verified Badge Icon - only for personal users verified via email OTP */}
                                         {Boolean(user?.isEmailVerified || user?.is_email_verified || user?.isVerifiedCoder || user?.isVerified) && (
                                             <div className="w-8 h-8 flex items-center justify-center text-[#1D9BF0] flex-shrink-0" title="Verified Developer (Email OTP Verified)">

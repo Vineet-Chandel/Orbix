@@ -1,0 +1,30 @@
+# Student enrollment verification
+
+The application uses a server-created SheerID hosted session. OCR is only available as a rate-limited readability/prefill utility; document text, client scores, email ownership, SMS and browser redirects cannot grant enrollment. Existing account email verification uses the configured Resend flow in Settings and accepts Gmail. Hosted document fallback is owned by SheerID; Orbix does not upload or retain new enrollment documents.
+
+## Required activation
+
+1. Apply `070_sheerid_student_verification.sql` through the existing migration runner/release process before deploying this code. It adds provider/audit/expiry fields, gives legacy approvals a one-year lifetime from their original review, and invalidates pending legacy applications so students can restart. It does not delete legacy evidence or approvals.
+2. Obtain a contracted, published, **student-only** SheerID program. Confirm pricing and target-institution coverage. Enable **API Access Control / requireToken** with your account team. Disable SMS/mobile collection and SMS loops in the hosted program; use email loops/institutional checks and provider document review. Program settings are external configuration, not controllable from an Orbix redirect. Test that no selected verification route requires a phone number.
+3. Configure server secrets: `SHEERID_PROGRAM_ID`, `SHEERID_API_TOKEN`, `SHEERID_WEBHOOK_SECRET`. The token must read Verification Details with **Customer PII** permission. Missing person/organization evidence fails closed. No secrets belong in Vite variables.
+4. Map each supported local `institutions.id` to the corresponding authoritative SheerID organization ID using the provider organization catalog and a reviewed database update to `institutions.sheerid_organization_id`. Never infer this mapping from email domains, fuzzy names, user input or OCR. Institutions without a mapping show an unavailable state and cannot start a session. A student selecting a different school in the hosted form cannot earn the selected Orbix school badge.
+5. Configure `POST https://<api-domain>/api/verification/college/webhook/sheerid` in MySheerID. Subscribe to success, rejection, upload-limit, expiration and error events, plus email events if available. Configure the hosted completion return to your frontend with `?open_verification=true` (the existing listener opens the modal; no URL parameter authorizes verification).
+6. Confirm Redis is available. Shared fail-closed rate limits cover starts (6/minute), refreshes (4/minute) and OCR (3/minute). PostgreSQL additionally caps new attempts at 3/user/day and serializes session creation across replicas. Active sessions resume without creating another provider request. Abandoned sessions can be restarted after seven days.
+
+## Result processing and operations
+
+The raw-body HMAC-SHA256 signature is verified with constant-time comparison before processing a webhook. Signed payloads are signals only: the backend fetches `/verification/{id}/details` using its token. Session, program, student audience, account email, confirmed name and organization must match. Unknown steps remain unverified; phone loops fail with an email-support message. The browser can refresh only its own recorded session. Provider requests have a six-second timeout and never follow redirects. Processing errors return 503 so SheerID retries.
+
+User and verification row locks use a consistent order. Status, expiry, cached user flags and minimal event history are updated transactionally. Duplicate webhook hashes and provider snapshots are idempotent. Late results cannot revive invalidated sessions. Cache invalidation follows commit, and profile reads enforce expiry. The UI checks status while visible, on return/focus, and while the modal is closed. It refreshes the shared profile and emits the existing verification update event. No profile Save step is required after approval.
+
+Approval expires after 365 days or an earlier known current enrollment end timestamp. Legacy approvals also have an explicit expiry. Expired results are excluded from profile badges immediately on fresh reads; public profile cache TTL cannot extend beyond the cached verification expiry. The status endpoint invalidates expired rows when read. Never use `users.is_college_verified` alone as an authorization source; check the current college, approved record and expiry for protected actions.
+
+Keep document retention in the provider agreement as short as operationally necessary. Existing legacy local/Cloudinary uploads are untouched by this migration: apply your established retention policy to those separately. Minimal audit history contains session reference, transition, deduplication key and time; it does not contain document images, birth dates, provider rewards or complete provider responses. Configure a retention job for old audit rows according to your policy.
+
+The UI provides SheerID support/appeal access. Name/email/institution mismatches fail closed and need review; users should use the exact confirmed name and their verified Orbix email in the hosted form. Check production token permissions and error metrics before rollout. Provider API errors are not exposed to users.
+
+## Validation before rollout
+
+Run policy tests, frontend type/build checks, and backend type checks. In a SheerID test program, exercise instant success, email/institution login, document pending/rejection/resume, duplicate callbacks, a callback while the modal is closed, wrong school/email/name, missing PII access, expired enrollment, account switching and provider/Redis outages. Simulated policy tests do not substitute for this live integration validation. Confirm the application always returns to the correct logged-in account and that a redirect alone never grants a badge.
+
+References: https://developer.sheerid.com/tutorials/secure-verification-creation and https://developer.sheerid.com/tutorials/verifications/webhooks and https://services.sheerid.com/rest/v2/swagger.yaml

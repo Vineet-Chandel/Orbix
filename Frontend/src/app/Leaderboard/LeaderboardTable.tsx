@@ -52,8 +52,8 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 </h3>
                 <p className="text-xs font-medium text-neutral-600 max-w-sm mx-auto leading-relaxed">
                     {scope === "college"
-                        ? "Be the first student to link your coding handles and represent this campus on the leaderboard!"
-                        : "Be the first coder to link your coding profiles and take the #1 spot on Orbix!"}
+                        ? "Connect a coding platform and keep it public to represent this campus on the leaderboard."
+                        : "Connect a coding platform and keep it public to contribute to the leaderboard."}
                 </p>
             </div>
         );
@@ -148,7 +148,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                                         {initials}
                                                     </div>
                                                 )}
-                                                {entry.isVerified && (
+                                                {entry.isVerified && entry.scoreBreakdown?.demoFixture !== true && (
                                                     <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black border border-white flex items-center justify-center text-[#a2ff86]">
                                                         <CheckCircle2 className="w-3 h-3" />
                                                     </div>
@@ -164,6 +164,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                                     >
                                                         {entry.displayName}
                                                     </Link>
+                                                    {entry.scoreBreakdown?.demoFixture === true && (
+                                                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-black">Demo</span>
+                                                    )}
                                                     {isCurrentUser && (
                                                         <span className="px-1.5 py-0.2 rounded bg-black text-[#a2ff86] text-[9px] font-black uppercase">
                                                             You

@@ -85,7 +85,7 @@ export interface ContestsState {
 // Local storage caching for zero-flicker rehydration across page refreshes
 const getStoredContests = (): Record<string, UnifiedContestData> => {
     try {
-        const stored = localStorage.getItem("orbix_unified_contests");
+        const stored = localStorage.getItem("orbix_unified_contests_connected_v2");
         return stored ? JSON.parse(stored) : {};
     } catch {
         return {};
@@ -94,7 +94,7 @@ const getStoredContests = (): Record<string, UnifiedContestData> => {
 
 const saveStoredContests = (data: Record<string, UnifiedContestData>) => {
     try {
-        localStorage.setItem("orbix_unified_contests", JSON.stringify(data));
+        localStorage.setItem("orbix_unified_contests_connected_v2", JSON.stringify(data));
     } catch {
         // Safe fallback if quota exceeded
     }

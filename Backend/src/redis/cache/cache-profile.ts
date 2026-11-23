@@ -22,8 +22,6 @@ export interface PublicProfilePayload {
     isEmailVerified?: boolean;
     isVerifiedCoder?: boolean;
     isVerified?: boolean;
-    isCollegeVerified?: boolean;
-    collegeVerificationStatus?: string;
     isOpenToWork?: boolean;
     isHireable?: boolean;
     resumeUrl?: string | null;
@@ -61,10 +59,11 @@ const PRIVATE_PROFILE_TTL = 15 * 60; // 15 minutes
 export const getCachedPublicProfile = async (username: string): Promise<PublicProfilePayload | null> => {
     try {
         if (!redis || redis.status !== "ready") return null;
-        const key = `profile:public:${username.toLowerCase().trim()}`;
+        const key = `profile:public:privacy-v2:${username.toLowerCase().trim()}`;
         const data = await redis.get(key);
         if (!data) return null;
-        return JSON.parse(data) as PublicProfilePayload;
+        const payload = JSON.parse(data) as PublicProfilePayload;
+        return payload;
     } catch {
         return null;
     }
@@ -73,7 +72,7 @@ export const getCachedPublicProfile = async (username: string): Promise<PublicPr
 export const setCachedPublicProfile = async (username: string, profile: PublicProfilePayload): Promise<void> => {
     try {
         if (!redis || redis.status !== "ready") return;
-        const key = `profile:public:${username.toLowerCase().trim()}`;
+        const key = `profile:public:privacy-v2:${username.toLowerCase().trim()}`;
         await redis.set(key, JSON.stringify(profile), "EX", PUBLIC_PROFILE_TTL);
     } catch {
         // Safe fallback if redis fails
@@ -83,7 +82,7 @@ export const setCachedPublicProfile = async (username: string, profile: PublicPr
 export const invalidatePublicProfileCache = async (username: string): Promise<void> => {
     try {
         if (!redis || redis.status !== "ready") return;
-        const key = `profile:public:${username.toLowerCase().trim()}`;
+        const key = `profile:public:privacy-v2:${username.toLowerCase().trim()}`;
         await redis.del(key);
     } catch {
         // Safe fallback
@@ -134,14 +133,14 @@ export const invalidateAllUserCaches = async (user: { id?: string | undefined; u
             const variants = Array.from(new Set([raw, lower]));
 
             for (const keyVar of variants) {
-                promises.push(redis.del(`profile:public:${keyVar}`));
+                promises.push(redis.del(`profile:public:privacy-v2:${keyVar}`));
                 promises.push(redis.del(`user:portals:${keyVar}`));
-                promises.push(redis.del(`user:submissions:unified:${keyVar}`));
-                promises.push(redis.del(`user:development:unified:${keyVar}`));
-                promises.push(redis.del(`user:contests:unified:${keyVar}`));
-                promises.push(redis.del(`user:badges:unified:${keyVar}`));
-                promises.push(redis.del(`user:practice:analytics:${keyVar}`));
-                promises.push(redis.del(`user:development:analytics:${keyVar}`));
+                promises.push(redis.del(`user:submissions:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:development:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:contests:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:badges:unified:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:practice:analytics:connected-v2:${keyVar}`));
+                promises.push(redis.del(`user:development:analytics:connected-v2:${keyVar}`));
                 promises.push(redis.del(`resume:private:${keyVar}`));
                 promises.push(redis.del(`resume:public:${keyVar}`));
             }
@@ -150,12 +149,12 @@ export const invalidateAllUserCaches = async (user: { id?: string | undefined; u
         if (user.id) {
             promises.push(redis.del(`profile:private:${user.id}`));
             promises.push(redis.del(`user:portals:${user.id}`));
-            promises.push(redis.del(`user:submissions:unified:${user.id}`));
-            promises.push(redis.del(`user:development:unified:${user.id}`));
-            promises.push(redis.del(`user:contests:unified:${user.id}`));
-            promises.push(redis.del(`user:badges:unified:${user.id}`));
-            promises.push(redis.del(`user:practice:analytics:${user.id}`));
-            promises.push(redis.del(`user:development:analytics:${user.id}`));
+            promises.push(redis.del(`user:submissions:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:development:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:contests:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:badges:unified:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:practice:analytics:connected-v2:${user.id}`));
+            promises.push(redis.del(`user:development:analytics:connected-v2:${user.id}`));
             promises.push(redis.del(`resume:private:${user.id}`));
         }
 

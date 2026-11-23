@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { OrbixInitialLoader } from "../../components/ui/loader";
 import { getOrCreateDeviceId } from "../../api/sessionActivityApi";
+import { buildApiUrl } from "../../api/apiClient";
 import Right from "./Right";
 
 interface AuthLayoutProps {
@@ -40,7 +41,7 @@ export const AuthLayout = ({
         } catch {}
         const query = new URLSearchParams({ returnTo });
         if (deviceId) query.set("deviceId", deviceId);
-        window.location.href = `/api/auth/google?${query.toString()}`;
+        window.location.href = `${buildApiUrl("/auth/google")}?${query.toString()}`;
     };
 
     const handleGitHubAuth = () => {
@@ -53,7 +54,7 @@ export const AuthLayout = ({
         } catch {}
         const query = new URLSearchParams({ returnTo });
         if (deviceId) query.set("deviceId", deviceId);
-        window.location.href = `/api/auth/github?${query.toString()}`;
+        window.location.href = `${buildApiUrl("/auth/github")}?${query.toString()}`;
     };
     return (
         <div className="min-h-screen w-full bg-[#FAF6EE] flex flex-col lg:flex-row overflow-hidden text-neutral-900 font-sans selection:bg-black selection:text-white relative">

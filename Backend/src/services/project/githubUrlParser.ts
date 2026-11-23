@@ -45,7 +45,7 @@ export function parseAndNormalizeGithubUrl(input: string): ParsedGithubUrl {
         throw new GithubUrlValidationError("Please provide a GitHub repository URL or 'owner/repository' identifier.");
     }
 
-    let raw = input.trim();
+    const raw = input.trim();
 
     // Check for explicit URI scheme / protocol to enforce strict SSRF protection
     if (raw.includes("://")) {
@@ -79,7 +79,7 @@ export function parseAndNormalizeGithubUrl(input: string): ParsedGithubUrl {
     // Check for unsupported git providers
     for (const domain of KNOWN_UNSUPPORTED_DOMAINS) {
         if (raw.toLowerCase().includes(domain)) {
-            const providerName = domain.split(".")[0];
+            const providerName = domain.slice(0, domain.indexOf("."));
             const capitalized = providerName.charAt(0).toUpperCase() + providerName.slice(1);
             throw new GithubUrlValidationError(
                 `Only GitHub repositories are currently supported for automated intelligent extraction. ${capitalized} links cannot be automatically extracted. You can still add your project using manual entry.`,
@@ -108,14 +108,14 @@ export function parseAndNormalizeGithubUrl(input: string): ParsedGithubUrl {
     // Split path segments
     const segments = path.split("/").map((s) => s.trim()).filter(Boolean);
 
-    if (segments.length < 2) {
+    const [owner, repository, section, branch] = segments;
+    if (!owner || !repository) {
         throw new GithubUrlValidationError(
             "Invalid repository format. Please enter a full GitHub URL (e.g. 'https://github.com/owner/repository') or 'owner/repository'."
         );
     }
 
-    const owner = segments[0];
-    let repo = segments[1];
+    let repo = repository;
 
     // Strip .git suffix if present
     if (repo.toLowerCase().endsWith(".git")) {
@@ -123,10 +123,7 @@ export function parseAndNormalizeGithubUrl(input: string): ParsedGithubUrl {
     }
 
     // Optional branch or path hint: e.g. /tree/main or /blob/main
-    let branchHint: string | undefined;
-    if (segments.length >= 4 && (segments[2] === "tree" || segments[2] === "blob")) {
-        branchHint = segments[3];
-    }
+    const branchHint = section === "tree" || section === "blob" ? branch : undefined;
 
     // Validate owner format
     if (!GITHUB_OWNER_REGEX.test(owner)) {
@@ -147,6 +144,6 @@ export function parseAndNormalizeGithubUrl(input: string): ParsedGithubUrl {
         repo,
         canonicalUrl: `https://github.com/${owner}/${repo}`,
         normalizedFullName: `${owner}/${repo}`,
-        branchHint,
+        ...(branchHint !== undefined && { branchHint }),
     };
 }

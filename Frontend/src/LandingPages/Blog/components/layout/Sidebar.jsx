@@ -1,3 +1,4 @@
+import { WORKBOOK_BASE } from "../../../../../../shared/seo/routes";
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -224,10 +225,10 @@ export function Sidebar({
                         const Icon = ICON_MAP[item.icon] || FileText;
 
                         return (
-                          <motion.button
+                          <motion.a
                             key={item.id}
-                            type="button"
-                            onClick={() => handleItemClick(item.id)}
+                            href={item.id === "overview" ? WORKBOOK_BASE : `${WORKBOOK_BASE}/${item.id}`}
+                            onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); handleItemClick(item.id); } }}
                             whileHover={{ x: -1, y: -1 }}
                             whileTap={{ x: 1.5, y: 1.5 }}
                             className={`w-full flex items-center justify-between px-2.5 py-2 text-left transition-colors group relative border-2 ${
@@ -246,7 +247,7 @@ export function Sidebar({
                               />
                               <span className="truncate leading-snug">{item.title}</span>
                             </div>
-                          </motion.button>
+                          </motion.a>
                         );
                       })}
                     </motion.div>

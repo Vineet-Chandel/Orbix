@@ -1,5 +1,4 @@
 import { pool } from "../../database/client.js";
-import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 
 export interface UnifiedBadgeRecord {
     id: string;
@@ -194,11 +193,10 @@ export async function calculateUserBadges(
     const connectedPortals: Record<string, string> = {};
 
     try {
-        const verifiedCondition = await getVerifiedLinksCondition();
+
         const dbResult = await pool.query(
             `SELECT portal, portal_username FROM user_links 
-             WHERE (LOWER(username) = LOWER($1) OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1))
-               AND ${verifiedCondition}`,
+             WHERE (LOWER(username) = LOWER($1) OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1))`,
             [cleanUser]
         );
         for (const row of dbResult.rows) {

@@ -115,11 +115,11 @@ export function computeProjectDiff(
     }
 
     const beforeStars = Number(currentProject.repo_stars || currentProject.repoStars || 0);
-    const afterStars = freshExtraction.stars || freshExtraction.repoStars || 0;
+    const afterStars = freshExtraction.stars;
     const beforeForks = Number(currentProject.repo_forks || currentProject.repoForks || 0);
-    const afterForks = freshExtraction.forks || freshExtraction.repoForks || 0;
+    const afterForks = freshExtraction.forks;
     const beforeLang = currentProject.repo_language || currentProject.repoLanguage || null;
-    const afterLang = freshExtraction.primaryLanguage || freshExtraction.repoLanguage || null;
+    const afterLang = freshExtraction.primaryLanguage;
 
     return {
         projectId: currentProject.id,
@@ -156,9 +156,9 @@ export function buildMergedProjectPayload(
     const newRawExtractedData: Record<string, any> = {};
 
     // 1. Facts & Statistics are updated directly from GitHub
-    mergedPayload["repoStars"] = freshExtraction.stars || freshExtraction.repoStars || 0;
-    mergedPayload["repoForks"] = freshExtraction.forks || freshExtraction.repoForks || 0;
-    mergedPayload["repoLanguage"] = freshExtraction.primaryLanguage || freshExtraction.repoLanguage || currentProject.repoLanguage;
+    mergedPayload["repoStars"] = freshExtraction.stars;
+    mergedPayload["repoForks"] = freshExtraction.forks;
+    mergedPayload["repoLanguage"] = freshExtraction.primaryLanguage ?? currentProject.repoLanguage;
     mergedPayload["repoPushedAt"] = freshExtraction.pushedAt || currentProject.repoPushedAt;
     mergedPayload["repoLicense"] = freshExtraction.license || currentProject.repoLicense;
 

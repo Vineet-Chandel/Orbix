@@ -48,6 +48,7 @@ interface RecipientRosterTableProps {
     requireAttendance?: boolean | undefined;
     onUpdateCustomPosition?: ((id: string, position: string) => void) | undefined;
     title?: string | undefined;
+    showSummary?: boolean;
 }
 
 export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
@@ -57,10 +58,10 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
     onSelectMultiple,
     onDeselectMultiple,
     onDeselectAll,
-    certType: _certType = "participation",
+    certType = "participation",
     requireAttendance = false,
-    onUpdateCustomPosition,
     title = "Recipient Roster",
+    showSummary = true,
 }) => {
     // Search & Filter States
     const [searchQuery, setSearchQuery] = useState("");
@@ -151,7 +152,8 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                 const emailMatch = r.email?.toLowerCase().includes(q);
                 const teamMatch = r.teamName?.toLowerCase().includes(q);
                 const roleMatch = r.role?.toLowerCase().includes(q);
-                if (!nameMatch && !userMatch && !emailMatch && !teamMatch && !roleMatch) {
+                const departmentMatch = r.department?.toLowerCase().includes(q);
+                if (!nameMatch && !userMatch && !emailMatch && !teamMatch && !roleMatch && !departmentMatch) {
                     return false;
                 }
             }
@@ -192,7 +194,7 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
     const paginatedRecipients = filteredRecipients.slice(startIndex, startIndex + pageSize);
 
     // 7. Header selection status on current view
-    const currentPageIds = paginatedRecipients.map((r) => r.id);
+    const currentPageIds = paginatedRecipients.filter((recipient) => isItemEligible(recipient) && !recipient.alreadyHasCert).map((r) => r.id);
     const allCurrentPageSelected = currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id));
     const someCurrentPageSelected = currentPageIds.some((id) => selectedIds.has(id));
 
@@ -205,24 +207,22 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
         }
     };
 
+    const eligibleRecipients = recipients.filter((recipient) => isItemEligible(recipient) && !recipient.alreadyHasCert);
+    const hasUnselectedEligible = eligibleRecipients.some((recipient) => !selectedIds.has(recipient.id));
+
     const handleSelectAllEligible = () => {
-        const eligibleIds = recipients.filter(isItemEligible).map((r) => r.id);
+        const eligibleIds = eligibleRecipients.map((r) => r.id);
         onSelectMultiple(eligibleIds);
     };
 
     const handleSelectTeam = (teamIds: string[]) => {
-        onSelectMultiple(teamIds);
+        onSelectMultiple(teamIds.filter((id) => eligibleRecipients.some((recipient) => recipient.id === id)));
         setShowTeamDropdown(false);
     };
 
     const handleDeselectTeam = (teamIds: string[]) => {
         onDeselectMultiple(teamIds);
         setShowTeamDropdown(false);
-    };
-
-    const handleDeselectFiltered = () => {
-        const filteredIds = filteredRecipients.map((r) => r.id);
-        onDeselectMultiple(filteredIds);
     };
 
     return (
@@ -235,52 +235,30 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                     </div>
                     <div>
                         <h4 className="text-sm sm:text-base font-black text-black tracking-tight">{title}</h4>
-                        <div className="text-[11px] font-bold text-neutral-600 flex items-center gap-2">
+                        {showSummary && <div className="text-[11px] font-bold text-neutral-600 flex items-center gap-2">
                             <span>Total Roster: {recipients.length}</span>
                             <span>•</span>
-                            <span className="text-emerald-700">Eligible: {recipients.filter(isItemEligible).length}</span>
+                            <span className="text-emerald-700">Eligible: {eligibleRecipients.length}</span>
                             {uniqueTeams.length > 0 && (
                                 <>
                                     <span>•</span>
                                     <span>Teams: {uniqueTeams.length}</span>
                                 </>
                             )}
-                        </div>
+                        </div>}
                     </div>
                 </div>
 
                 {/* Live Selected Badge */}
-                <div className="flex items-center gap-2">
-                    <div className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
-                        <Check className="w-4 h-4 stroke-[3]" />
-                        <span>
-                            {selectedIds.size} of {recipients.length} Selected
-                        </span>
-                    </div>
-
-                    {selectedIds.size > 0 && (
-                        <button
-                            type="button"
-                            onClick={onDeselectAll}
-                            className="px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black font-black text-xs shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
-                        >
-                            Deselect All
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Quick Actions & Selection Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                    <button
+                    {hasUnselectedEligible && (<button
                         type="button"
                         onClick={handleSelectAllEligible}
                         className="px-3 py-1.5 rounded-xl bg-[#FFE566] hover:bg-[#ebd04e] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                     >
                         <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>Select All Eligible ({recipients.filter(isItemEligible).length})</span>
-                    </button>
+                        <span>Select All Eligible ({eligibleRecipients.length})</span>
+                    </button>)}
 
                     {/* Select by Team Dropdown */}
                     {uniqueTeams.length > 0 && (
@@ -338,31 +316,21 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                         </div>
                     )}
 
-                    {filteredRecipients.length < recipients.length && selectedIds.size > 0 && (
+                    <div className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
+                        <Check className="w-4 h-4 stroke-[3]" />
+                        <span>
+                            {selectedIds.size} selected
+                        </span>
+                    </div>
+
+                    {selectedIds.size > 0 && (
                         <button
                             type="button"
-                            onClick={handleDeselectFiltered}
-                            className="px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 border-2 border-black font-black text-xs flex items-center gap-1.5 cursor-pointer"
+                            onClick={onDeselectAll}
+                            className="px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black font-black text-xs shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
                         >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Deselect Filtered ({filteredRecipients.filter((r) => selectedIds.has(r.id)).length})</span>
+                            Deselect All
                         </button>
-                    )}
-                </div>
-
-                {/* Duplicate & Missing Data Alerts */}
-                <div className="flex items-center gap-2">
-                    {duplicateIdSet.size > 0 && (
-                        <span className="px-2.5 py-1 rounded-xl bg-amber-100 border-2 border-black text-amber-900 text-[11px] font-black flex items-center gap-1 shadow-[1.5px_1.5px_0px_#000]">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                            <span>{duplicateIdSet.size} Duplicate Recipient(s)</span>
-                        </span>
-                    )}
-                    {missingInfoSet.size > 0 && (
-                        <span className="px-2.5 py-1 rounded-xl bg-rose-100 border-2 border-black text-rose-900 text-[11px] font-black flex items-center gap-1 shadow-[1.5px_1.5px_0px_#000]">
-                            <AlertCircle className="w-3.5 h-3.5 text-rose-700" />
-                            <span>{missingInfoSet.size} Missing Data</span>
-                        </span>
                     )}
                 </div>
             </div>
@@ -418,38 +386,47 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                 {/* Filter Pills */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     {[
-                        { id: "all", label: `All (${recipients.length})`, icon: null },
+                        { id: "all", count: recipients.length, label: `All (${recipients.length})`, icon: null },
                         {
                             id: "attended",
+                            count: recipients.filter((r) => r.status === "attended" || r.checkedInAt).length,
                             label: `Attended Only (${recipients.filter((r) => r.status === "attended" || r.checkedInAt).length})`,
                             icon: <Check className="w-3 h-3 text-emerald-600 inline mr-1" />,
                         },
                         {
                             id: "registered",
+                            count: recipients.filter((r) => r.status === "registered").length,
                             label: `Registered (${recipients.filter((r) => r.status === "registered").length})`,
                             icon: null,
                         },
                         {
                             id: "eligible",
-                            label: `Eligible Only (${recipients.filter(isItemEligible).length})`,
+                            count: eligibleRecipients.length,
+                            label: `Eligible Only (${eligibleRecipients.length})`,
                             icon: null,
                         },
                         {
                             id: "missing_info",
+                            count: missingInfoSet.size,
                             label: `Missing Info (${missingInfoSet.size})`,
                             icon: <AlertTriangle className="w-3 h-3 text-amber-600 inline mr-1" />,
                         },
                         {
                             id: "duplicates",
+                            count: duplicateIdSet.size,
                             label: `Duplicates (${duplicateIdSet.size})`,
                             icon: <RotateCcw className="w-3 h-3 text-blue-600 inline mr-1" />,
                         },
                         {
                             id: "already_issued",
+                            count: recipients.filter((r) => r.alreadyHasCert).length,
                             label: `Already Issued (${recipients.filter((r) => r.alreadyHasCert).length})`,
                             icon: <Trophy className="w-3 h-3 text-amber-500 inline mr-1" />,
                         },
-                    ].map((pill) => (
+                    ].filter((pill) => {
+                        if (pill.id === "all" || pill.id === statusFilter) return true;
+                        return pill.count > 0 && (pill.count < recipients.length || ["missing_info", "duplicates", "already_issued"].includes(pill.id));
+                    }).map((pill) => (
                         <button
                             key={pill.id}
                             type="button"
@@ -490,14 +467,13 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                 <th className="p-3">Recipient & Username</th>
                                 <th className="p-3">Team / Affiliation</th>
                                 <th className="p-3">Attendance & Eligibility</th>
-                                <th className="p-3">Award Position / Custom Role</th>
                                 <th className="p-3 text-right">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y-2 divide-neutral-200 text-xs">
                             {paginatedRecipients.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-neutral-500 font-bold">
+                                    <td colSpan={5} className="p-8 text-center text-neutral-500 font-bold">
                                         No recipients match the active search or filters.
                                     </td>
                                 </tr>
@@ -512,7 +488,7 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                     return (
                                         <tr
                                             key={rec.id}
-                                            onClick={() => onToggleSelect(rec.id)}
+                                            onClick={() => { if (isEligible || certType === "attendance") onToggleSelect(rec.id); }}
                                             className={`transition-colors cursor-pointer select-none ${
                                                 isSelected
                                                     ? "bg-[#FFE566]/25 hover:bg-[#FFE566]/35"
@@ -526,6 +502,7 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                                         size="sm"
                                                         colorScheme="yellow"
                                                         checked={isSelected}
+                                                        disabled={!isEligible && certType !== "attendance"}
                                                         onCheckedChange={() => onToggleSelect(rec.id)}
                                                     />
                                                 </div>
@@ -595,23 +572,6 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                                 )}
                                             </td>
 
-                                            {/* Award Position / Custom Role */}
-                                            <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                                                {onUpdateCustomPosition ? (
-                                                    <input
-                                                        type="text"
-                                                        defaultValue={rec.customPosition || rec.role || ""}
-                                                        onBlur={(e) => onUpdateCustomPosition(rec.id, e.target.value)}
-                                                        placeholder="Custom position..."
-                                                        className="px-2 py-1 rounded-lg border-2 border-black/20 focus:border-black text-xs font-bold bg-white w-full max-w-[140px]"
-                                                    />
-                                                ) : (
-                                                    <span className="text-xs font-bold text-neutral-700">
-                                                        {rec.customPosition || rec.role || "—"}
-                                                    </span>
-                                                )}
-                                            </td>
-
                                             {/* Status Badges */}
                                             <td className="p-3 text-right">
                                                 <div className="flex flex-col items-end gap-1">
@@ -657,17 +617,13 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                             Showing {filteredRecipients.length > 0 ? startIndex + 1 : 0} to{" "}
                             {Math.min(startIndex + pageSize, filteredRecipients.length)} of {filteredRecipients.length} recipients
                         </span>
-                        {selectedIds.size > 0 && (
-                            <span className="px-2 py-0.5 rounded bg-[#a2ff86] border border-black font-black text-[10px]">
-                                {selectedIds.size} Selected Total
-                            </span>
-                        )}
+
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    {filteredRecipients.length > 10 && (<div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] text-neutral-500">Per page:</span>
-                            {[10, 25, 50, 100].map((sz) => (
+                            <span className="text-[11px] text-neutral-500">Recipients per page:</span>
+                            {[10, 25, 50, 100].filter((_, index, sizes) => index === 0 || sizes[index - 1] < filteredRecipients.length).map((sz) => (
                                 <button
                                     key={sz}
                                     type="button"
@@ -686,11 +642,12 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                             ))}
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        {totalPages > 1 && (<div className="flex items-center gap-1">
                             <button
                                 type="button"
+                                aria-label="Previous page"
                                 disabled={safeCurrentPage <= 1}
-                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
                                 className="p-1 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <ChevronLeft className="w-4 h-4" />
@@ -700,14 +657,15 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                             </span>
                             <button
                                 type="button"
+                                aria-label="Next page"
                                 disabled={safeCurrentPage >= totalPages}
-                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))}
                                 className="p-1 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <ChevronRight className="w-4 h-4" />
                             </button>
-                        </div>
-                    </div>
+                        </div>)}
+                    </div>)}
                 </div>
             </div>
         </div>

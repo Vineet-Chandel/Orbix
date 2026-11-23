@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -14,11 +14,6 @@ export default function NotFoundPage() {
     ? (user.clubStatus === 'approved' || user.verifiedClub ? '/club/dashboard' : '/club/status')
     : '/dashboard';
 
-  useEffect(() => {
-    const previous = document.title;
-    document.title = 'Page not found · Orbix';
-    return () => { document.title = previous; };
-  }, []);
 
   return (
     <div className="orbix-not-found">

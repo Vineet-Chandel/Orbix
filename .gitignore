@@ -24,3 +24,11 @@ pnpm-debug.log*
 # System & OS
 .DS_Store
 Thumbs.db
+
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Server-rendered frontend build artifacts
+dist-server/

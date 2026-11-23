@@ -55,7 +55,7 @@ export interface DevelopmentAnalyticsState {
 
 const getStoredDevelopmentAnalytics = (): Record<string, DevelopmentAnalyticsData> => {
     try {
-        const stored = localStorage.getItem("orbix_development_analytics");
+        const stored = localStorage.getItem("orbix_development_analytics_connected_v2");
         return stored ? JSON.parse(stored) : {};
     } catch {
         return {};
@@ -64,7 +64,7 @@ const getStoredDevelopmentAnalytics = (): Record<string, DevelopmentAnalyticsDat
 
 const saveStoredDevelopmentAnalytics = (data: Record<string, DevelopmentAnalyticsData>) => {
     try {
-        localStorage.setItem("orbix_development_analytics", JSON.stringify(data));
+        localStorage.setItem("orbix_development_analytics_connected_v2", JSON.stringify(data));
     } catch {
         // Safe fallback
     }

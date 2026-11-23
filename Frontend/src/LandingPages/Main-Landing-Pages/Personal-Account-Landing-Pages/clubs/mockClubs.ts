@@ -146,7 +146,7 @@ export const MOCK_CLUBS_DATA: CollegeClubItem[] = [
         logoUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794761081/8cd940c9-9253-4fe3-9d19-66500da7b42d.png",
         coverImageUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794761105/96eb5c33-f981-4018-a18c-c3f778b75f0b.png",
         websiteUrl: "https://awsswg.psit.ac.in",
-        publicEmail: "aws.swg@psit.ac.in",
+        publicEmail: "a***@psit.ac.in",
         contactPhone: null,
         links: [
             {
@@ -195,7 +195,7 @@ export const MOCK_CLUBS_DATA: CollegeClubItem[] = [
                 isPrimary: true,
                 displayOrder: 1,
                 isPublic: true,
-                contactEmail: "krishna@orbix.dev",
+                contactEmail: "k***@orbix.dev",
                 linkedinUrl: "https://linkedin.com/in/krishnatripathi",
                 linkedUsername: "krishna_tripathi",
                 linkedDisplayName: "Krishna Tripathi",
@@ -238,8 +238,8 @@ export const MOCK_CLUBS_DATA: CollegeClubItem[] = [
         logoUrl: "/avatar_club.webp",
         coverImageUrl: MANDALA_BANNER_URL,
         websiteUrl: "https://awssbg.orbix.dev",
-        publicEmail: "awssbg.chapter@orbix.dev",
-        contactPhone: "+91 98765 43210",
+        publicEmail: "a***@orbix.dev",
+        contactPhone: "91********10",
         links: [
             {
                 platform: "website",
@@ -296,7 +296,7 @@ export const MOCK_CLUBS_DATA: CollegeClubItem[] = [
                 isPrimary: true,
                 displayOrder: 1,
                 isPublic: true,
-                contactEmail: "vineet@orbix.dev",
+                contactEmail: "v***@orbix.dev",
                 linkedinUrl: "https://linkedin.com/in/vineetchandel",
                 linkedUsername: "vineetsinghbitu",
                 linkedDisplayName: "Vineet Singh",
@@ -339,7 +339,7 @@ export const MOCK_CLUBS_DATA: CollegeClubItem[] = [
         logoUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1793855185/acd4f9fe-0a0a-426a-a7f6-04a3983935f7.png",
         coverImageUrl: PRESET_EVENT_BANNERS[3]?.dataUrl || MANDALA_BANNER_URL,
         websiteUrl: "https://gdg.community.dev",
-        publicEmail: "gdg.psit@orbix.dev",
+        publicEmail: "g***@orbix.dev",
         contactPhone: null,
         links: [
             {
@@ -381,7 +381,7 @@ export const MOCK_CLUBS_DATA: CollegeClubItem[] = [
                 isPrimary: true,
                 displayOrder: 1,
                 isPublic: true,
-                contactEmail: "aradhy@orbix.dev",
+                contactEmail: "a***@orbix.dev",
                 linkedinUrl: "https://linkedin.com/in/aradhybajpai",
                 linkedUsername: "aradhy_bajpai",
                 linkedDisplayName: "Aradhy Bajpai",

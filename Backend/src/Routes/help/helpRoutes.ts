@@ -812,6 +812,9 @@ helpRouter.post("/faqs/:id/feedback", async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: "isHelpful must be a boolean." });
         }
 
+        if (typeof id !== "string") {
+            return res.status(400).json({ success: false, message: "A FAQ identifier is required." });
+        }
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
         if (isHelpful) {

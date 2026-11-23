@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock, GraduationCap, Clock, XCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock, GraduationCap, ExternalLink, LoaderCircle } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
-import { useToast } from "../../context/ToastContext";
+import type { User } from "../../store/userSlice";
+import { ToastActionNotice, useToast } from "../../context/ToastContext";
 import { updateProfile, getInstitutionById, updateResumeVisibility, type InstitutionItem } from "../../utils/profileApi";
 import { CollegeAutocomplete } from "../../components/CollegeAutocomplete";
 import { CollegeChangeWarningModal } from "../../components/CollegeChangeWarningModal";
-import { ConfirmationModal } from "../../components/ConfirmationModal";
-import { VerifiedBadge } from "../../components/VerifiedBadge";
-import { openCollegeVerificationModal } from "../../utils/collegeVerificationModalEvents";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
@@ -106,12 +104,20 @@ export default function ProfileManager() {
     const [newSkillInput, setNewSkillInput] = useState("");
     const [isOpenToWork, setIsOpenToWork] = useState(Boolean(user?.isOpenToWork));
     const [isHireable, setIsHireable] = useState(Boolean(user?.isHireable));
-    const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(user?.college || null);
+    const [collegeDraft, setCollegeDraft] = useState<InstitutionItem | null | undefined>();
+    const [resolvedCollege, setResolvedCollege] = useState<InstitutionItem | null>(null);
+    const [collegeSearchRevision, setCollegeSearchRevision] = useState(0);
+    const savedCollegeId = user?.collegeId || user?.college?.id || null;
+    const savedCollege = user?.college ?? (resolvedCollege?.id === savedCollegeId ? resolvedCollege : null);
+    const selectedCollege = collegeDraft === undefined ? savedCollege : collegeDraft;
+    const selectedCollegeId = collegeDraft === undefined ? savedCollegeId : collegeDraft?.id ?? null;
+    const profileFormId = useId();
+    const profileFormRef = useRef<HTMLFormElement>(null);
+    const profileSaveInFlight = useRef(false);
     const [savingProfile, setSavingProfile] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isCollegeConfirmModalOpen, setIsCollegeConfirmModalOpen] = useState(false);
-    const [isPostCollegeChangeModalOpen, setIsPostCollegeChangeModalOpen] = useState(false);
-    const [hasConfirmedCollegeSave, setHasConfirmedCollegeSave] = useState(false);
+
 
     // Connected Platforms from localStorage / sync
     const [connectedPortals, setConnectedPortals] = useState<Record<string, any>>(() => {
@@ -198,17 +204,17 @@ export default function ProfileManager() {
             setLinks(parseInitialLinks(user));
             setIsOpenToWork(Boolean(user.isOpenToWork));
             setIsHireable(Boolean(user.isHireable));
-            if (user.college) {
-                setSelectedCollege(user.college);
-            } else if (user.collegeId) {
-                getInstitutionById(user.collegeId).then((inst) => {
-                    if (inst) setSelectedCollege(inst);
-                });
-            } else {
-                setSelectedCollege(null);
-            }
         }
     }, [user]);
+
+    useEffect(() => {
+        if (!savedCollegeId || user?.college?.id === savedCollegeId) return;
+        let cancelled = false;
+        void getInstitutionById(savedCollegeId).then((institution) => {
+            if (!cancelled) setResolvedCollege(institution);
+        }).catch(() => {});
+        return () => { cancelled = true; };
+    }, [savedCollegeId, user?.college?.id]);
 
     // Live sync when resume-to-profile sync occurs
     useEffect(() => {
@@ -222,13 +228,6 @@ export default function ProfileManager() {
                 if (detail.bio) setBio(detail.bio);
                 if (detail.location) setLocation(detail.location);
                 if (detail.links) setLinks(parseInitialLinks(detail));
-                if (detail.college) {
-                    setSelectedCollege(detail.college);
-                } else if (detail.collegeId) {
-                    getInstitutionById(detail.collegeId).then((inst) => {
-                        if (inst) setSelectedCollege(inst);
-                    });
-                }
             }
         };
 
@@ -444,9 +443,6 @@ export default function ProfileManager() {
         const initialLocation = (user.location || "").trim();
         if (currentLocation !== initialLocation) return true;
 
-        if (Boolean(isOpenToWork) !== Boolean(user.isOpenToWork)) return true;
-        if (Boolean(isHireable) !== Boolean(user.isHireable)) return true;
-
         // Skills comparison
         const currentSkills = skills.map((s) => s.trim()).filter(Boolean);
         const initialSkills = (Array.isArray(user.skills) ? user.skills : [])
@@ -499,15 +495,32 @@ export default function ProfileManager() {
         }
 
         // College comparison
-        const currentCollegeId = selectedCollege?.id || null;
-        const initialCollegeId = user.collegeId || user.college?.id || null;
-        if (currentCollegeId !== initialCollegeId) return true;
+        return selectedCollegeId !== savedCollegeId;
+    }, [user, firstName, lastName, headline, bio, location, skills, links, selectedCollegeId, savedCollegeId]);
 
-        return false;
-    }, [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable, selectedCollege]);
+    const restoreProfileDraft = (profile: User) => {
+        setFirstName(profile.firstName || "");
+        setLastName(profile.lastName || "");
+        setHeadline(profile.headline || "");
+        setBio(profile.bio || "");
+        setLocation(profile.location || "");
+        setSkills(Array.isArray(profile.skills) ? profile.skills : []);
+        setLinks(parseInitialLinks(profile));
+        setNewSkillInput("");
+        setCollegeDraft(undefined);
+        setCollegeSearchRevision((revision) => revision + 1);
+    };
+
+    const cancelProfileChanges = () => {
+        if (!user || profileSaveInFlight.current) return;
+        restoreProfileDraft(user);
+        profileFormRef.current?.focus({ preventScroll: true });
+    };
 
     // Execute profile save after all validations and confirmations
     const executeSaveProfile = async () => {
+        if (!user || profileSaveInFlight.current) return;
+        profileSaveInFlight.current = true;
         setSavingProfile(true);
 
         try {
@@ -528,14 +541,13 @@ export default function ProfileManager() {
                 location: location.trim(),
                 skills,
                 links: sanitizedLinks,
-                isOpenToWork: user?.isPublic === false ? false : isOpenToWork,
-                isHireable: user?.isPublic === false ? false : isHireable,
-                collegeId: selectedCollege?.id || null,
+                collegeId: selectedCollegeId,
             };
 
             const updated = await updateProfile(payload);
             dispatch(updateUserProfile(updated));
-            setHasConfirmedCollegeSave(false);
+            restoreProfileDraft({ ...user, ...updated });
+            profileFormRef.current?.focus({ preventScroll: true });
             toast.success("Your profile details have been saved successfully!", {
                 title: "Profile Updated",
             });
@@ -544,6 +556,7 @@ export default function ProfileManager() {
                 title: "Update Error",
             });
         } finally {
+            profileSaveInFlight.current = false;
             setSavingProfile(false);
         }
     };
@@ -551,17 +564,8 @@ export default function ProfileManager() {
     // Handle profile save form submission
     const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!hasChanges) {
-            toast.info("No profile changes detected to save");
-            return;
-        }
-
-        const initialCollegeId = user?.collegeId || user?.college?.id || null;
-        const currentCollegeId = selectedCollege?.id || null;
-        const isCollegeChanging = currentCollegeId !== initialCollegeId;
-
-        // If setting or changing a college and user has not yet confirmed the warning modal
-        if (isCollegeChanging && selectedCollege?.id && !hasConfirmedCollegeSave) {
+        if (!hasChanges || profileSaveInFlight.current || isCollegeConfirmModalOpen) return;
+        if (selectedCollegeId && selectedCollegeId !== savedCollegeId) {
             setIsCollegeConfirmModalOpen(true);
             return;
         }
@@ -719,7 +723,8 @@ export default function ProfileManager() {
                                     </div>
                                 </div>
 
-                                <form onSubmit={handleSaveProfile} className="space-y-5">
+                                <form id={profileFormId} ref={profileFormRef} tabIndex={-1} onSubmit={handleSaveProfile} className="space-y-5 focus:outline-none">
+                                    <fieldset disabled={savingProfile} className="min-w-0 space-y-5">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">First Name</label>
@@ -785,9 +790,11 @@ export default function ProfileManager() {
                                                 College / University (Verified Directory)
                                             </label>
                                             <CollegeAutocomplete
-                                                value={selectedCollege?.id}
+                                                key={collegeSearchRevision}
+                                                value={selectedCollegeId}
                                                 selectedCollege={selectedCollege}
-                                                onChange={setSelectedCollege}
+                                                onChange={setCollegeDraft}
+                                                disabled={savingProfile}
                                                 canChangeCollege={user?.canChangeCollege}
                                                 collegeUpdatedAt={user?.collegeUpdatedAt}
                                                 collegeLockRemainingMs={user?.collegeLockRemainingMs}
@@ -796,79 +803,23 @@ export default function ProfileManager() {
 
                                             {/* College Verification Entry Point Card */}
                                             {selectedCollege?.id ? (
-                                                <div className="mt-3 p-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <div className="w-7 h-7 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
-                                                                <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
-                                                                    Enrollment Verification
-                                                                </span>
-                                                                <h4 className="text-xs font-black text-black truncate">
-                                                                    {selectedCollege.officialName}
-                                                                </h4>
-                                                            </div>
+                                                <div className="mt-3 p-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <div className="w-7 h-7 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                                            <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
                                                         </div>
-
-                                                        {user?.isCollegeVerified ? (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
-                                                                <VerifiedBadge size="xs" />
-                                                                Verified
+                                                        <div className="min-w-0">
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 block">
+                                                                Selected Institution
                                                             </span>
-                                                        ) : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING" ? (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
-                                                                <Clock className="w-3 h-3 text-amber-800" />
-                                                                Under Review
-                                                            </span>
-                                                        ) : user?.collegeVerificationStatus === "INVALIDATED" ? (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 border border-black text-[10px] font-black text-orange-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
-                                                                <AlertTriangle className="w-3 h-3 text-orange-800" />
-                                                                Re-Verification Required
-                                                            </span>
-                                                        ) : user?.collegeVerificationStatus === "REJECTED" ? (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 border border-black text-[10px] font-black text-rose-950 uppercase shadow-[1px_1px_0px_#000] shrink-0">
-                                                                <XCircle className="w-3 h-3 text-rose-800" />
-                                                                Rejected
-                                                            </span>
-                                                        ) : (selectedCollege?.id || user?.college?.id) ? (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-100 border border-black text-[10px] font-bold text-neutral-700 uppercase shrink-0">
-                                                                Unverified
-                                                            </span>
-                                                        ) : null}
+                                                            <h4 className="text-xs font-black text-black truncate">
+                                                                {selectedCollege.officialName}
+                                                            </h4>
+                                                        </div>
                                                     </div>
-
                                                     <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
-                                                        {user?.isCollegeVerified
-                                                            ? "Your student enrollment is verified by Orbix founders. The College Verified badge is displayed on your public profile."
-                                                            : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING"
-                                                            ? "Your verification application has been submitted and is currently in the founder review queue."
-                                                            : user?.collegeVerificationStatus === "INVALIDATED"
-                                                            ? "Your college affiliation has changed. Please verify your new college to reinstate the College Verified badge."
-                                                            : user?.collegeVerificationStatus === "REJECTED"
-                                                            ? "Your previous verification was rejected. You can resubmit with a clearer student ID or ERP screenshot."
-                                                            : "Upload your student ID card or ERP profile screenshot to receive the official College Verified badge on your profile and leaderboards."}
+                                                        Your profile is linked with {selectedCollege.officialName}. You have access to official campus chapters, college events, and leaderboards.
                                                     </p>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openCollegeVerificationModal({
-                                                            collegeId: selectedCollege?.id || user?.collegeId || user?.college?.id,
-                                                            collegeName: selectedCollege?.officialName || user?.college?.officialName,
-                                                        })}
-                                                        className="w-full py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] cursor-pointer transition-all flex items-center justify-center gap-1.5"
-                                                    >
-                                                        {user?.isCollegeVerified
-                                                            ? "View Verification Details"
-                                                            : user?.collegeVerificationStatus === "PENDING" || user?.collegeVerificationStatus === "PROCESSING"
-                                                            ? "View Application Status"
-                                                            : user?.collegeVerificationStatus === "INVALIDATED"
-                                                            ? "Verify New College Affiliation"
-                                                            : user?.collegeVerificationStatus === "REJECTED"
-                                                            ? "Resubmit Verification Application"
-                                                            : "Verify College Affiliation"}
-                                                    </button>
                                                 </div>
                                             ) : (
                                                 <div className="mt-3 p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-dashed border-black/40 space-y-1.5">
@@ -881,7 +832,7 @@ export default function ProfileManager() {
                                                         </span>
                                                     </div>
                                                     <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
-                                                        Select your college or university from the verified directory above to unlock student enrollment verification and earn the College Verified badge on your profile and leaderboards.
+                                                        Search and select your university above to link your campus. This enables you to access campus clubs and college events.
                                                     </p>
                                                 </div>
                                             )}
@@ -1014,32 +965,7 @@ export default function ProfileManager() {
                                         </div>
                                     </div>
 
-                                    {/* Save Button */}
-                                    <div className="pt-4 border-t-2 border-black/10">
-                                        <button
-                                            type="submit"
-                                            disabled={!hasChanges || savingProfile}
-                                            className={`w-full h-11 flex items-center justify-center rounded-xl text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] ${
-                                                hasChanges && !savingProfile
-                                                    ? "bg-[#a2ff86] hover:bg-[#8ee673] text-black cursor-pointer hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px]"
-                                                    : "bg-neutral-100 text-neutral-400 cursor-not-allowed shadow-none"
-                                            }`}
-                                        >
-                                            {savingProfile ? (
-                                                <div className="flex items-center gap-2">
-                                                    <svg className="h-4 w-4 animate-spin text-black" fill="none" viewBox="0 0 24 24">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                                    </svg>
-                                                    <span>Saving Changes...</span>
-                                                </div>
-                                            ) : hasChanges ? (
-                                                <span>Save Profile Details</span>
-                                            ) : (
-                                                <span>No Changes to Save</span>
-                                            )}
-                                        </button>
-                                    </div>
+                                    </fieldset>
 
                                     {/* OPEN TO WORK, HIRE ME & RESUME VISIBILITY SECTION */}
                                     <div className="space-y-2 pt-4 border-t-2 border-black/10">
@@ -1147,42 +1073,44 @@ export default function ProfileManager() {
                 </section>
             </div>
 
+            <ToastActionNotice
+                open={(hasChanges || savingProfile) && !isCollegeConfirmModalOpen}
+                title={savingProfile ? "Saving profile changes…" : "Unsaved profile changes"}
+                actions={
+                    <>
+                        <button
+                            type="button"
+                            disabled={savingProfile}
+                            onClick={cancelProfileChanges}
+                            className="rounded-xl border-2 border-black bg-white px-3 py-2 text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 disabled:opacity-60"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form={profileFormId}
+                            disabled={savingProfile}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-[#a2ff86] px-3 py-2 text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] disabled:opacity-60"
+                        >
+                            {savingProfile && <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                            Save changes
+                        </button>
+                    </>
+                }
+            />
+
             {/* Warning Modal when saving a new college affiliation */}
             <CollegeChangeWarningModal
                 isOpen={isCollegeConfirmModalOpen}
                 onClose={() => setIsCollegeConfirmModalOpen(false)}
                 onConfirm={() => {
-                    setHasConfirmedCollegeSave(true);
                     setIsCollegeConfirmModalOpen(false);
-                    setTimeout(() => executeSaveProfile(), 50);
+                    void executeSaveProfile();
                 }}
                 currentCollegeName={selectedCollege?.officialName}
                 isLocked={user?.canChangeCollege === false}
                 remainingMs={user?.collegeLockRemainingMs}
                 nextAllowedDate={user?.nextAllowedCollegeChangeAt}
-            />
-
-            {/* Post-College-Change Verification Warning Modal */}
-            <ConfirmationModal
-                isOpen={isPostCollegeChangeModalOpen}
-                onClose={() => setIsPostCollegeChangeModalOpen(false)}
-                onConfirm={() => {
-                    setIsPostCollegeChangeModalOpen(false);
-                    openCollegeVerificationModal({
-                        collegeId: selectedCollege?.id || user?.collegeId || user?.college?.id,
-                        collegeName: selectedCollege?.officialName || user?.college?.officialName,
-                    });
-                }}
-                title="College verification required"
-                description={
-                    <span>
-                        Your college has been changed successfully. Your previous college verification is no longer valid. Please verify your new college to receive the <strong className="text-black font-black">College Verified badge</strong> again.
-                    </span>
-                }
-                confirmText="Verify My College"
-                cancelText="Maybe Later"
-                variant="warning"
-                icon={<GraduationCap className="w-5 h-5 text-amber-700 stroke-[2.5]" />}
             />
         </div>
     );

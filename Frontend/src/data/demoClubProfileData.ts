@@ -6,36 +6,7 @@ export const DEMO_CLUB_SLUG = "aws-swg-psit";
 /**
  * Normalizes and checks if a given slug corresponds to the demo club profile
  */
-export function isDemoClubSlug(slug?: string | null): boolean {
-    if (!slug) return false;
-    const clean = slug.trim().toLowerCase();
-    if (
-        clean === "aws-swg-psit" ||
-        clean === "aws-psit" ||
-        clean === "aws-swg" ||
-        clean === "acm-psit" ||
-        clean === "demo" ||
-        clean === "demo-club" ||
-        clean === "demo/club" ||
-        clean === "acm" ||
-        clean === "acm-student-chapter" ||
-        clean === "aws" ||
-        clean === "aws-student-work-group" ||
-        clean === "aws-student-working-group"
-    ) return true;
-    const collapsed = clean.replace(/[-_.\s]/g, "");
-    return (
-        collapsed === "awsswgpsit" ||
-        collapsed === "awspsit" ||
-        collapsed === "awsswg" ||
-        collapsed === "acmpsit" ||
-        collapsed === "democlub" ||
-        collapsed === "acmstudentchapter" ||
-        collapsed === "psitacm" ||
-        collapsed === "psitaws" ||
-        collapsed === "psitawsswg"
-    );
-}
+export { isDemoClubSlug } from "../../../shared/seo/demoClub";
 
 export interface DemoClubDataBundle {
     club: any;
@@ -78,8 +49,8 @@ The working group maintains active connections with the AWS User Group (UG) netw
     logoUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794761081/8cd940c9-9253-4fe3-9d19-66500da7b42d.png",
     coverImageUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794761105/96eb5c33-f981-4018-a18c-c3f778b75f0b.png",
     websiteUrl: "https://awsswg.psit.ac.in",
-    publicEmail: "aws.swg@psit.ac.in",
-    contactPhone: "+91 98765 43210",
+    publicEmail: "a***@psit.ac.in",
+    contactPhone: "91********10",
     links: [
         {
             platform: "website",
@@ -145,7 +116,7 @@ export const demoClubCoordinators = [
         role: "Lead Coordinator & Cloud Solutions Architect",
         imageUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794761081/8cd940c9-9253-4fe3-9d19-66500da7b42d.png",
         isPrimary: true,
-        contactEmail: "vineet@orbix.dev",
+        contactEmail: "v***@orbix.dev",
         linkedinUrl: "https://linkedin.com/in/vineetchandel",
         linkedUsername: "Vineet-Chandel",
         linkedDisplayName: "Vineet Chandel",
@@ -158,7 +129,7 @@ export const demoClubCoordinators = [
         role: "DevOps & Cloud Infrastructure Lead (AWS SAA-C03)",
         imageUrl: null,
         isPrimary: false,
-        contactEmail: "krishna.tripathi@orbix.dev",
+        contactEmail: "k***@orbix.dev",
         linkedinUrl: "https://linkedin.com/in/krishnatripathi",
         linkedUsername: "krishna_tripathi",
         linkedDisplayName: "Krishna Tripathi",
@@ -171,7 +142,7 @@ export const demoClubCoordinators = [
         role: "Serverless & Cloud-Native Systems Lead",
         imageUrl: null,
         isPrimary: false,
-        contactEmail: "ananya.s@orbix.dev",
+        contactEmail: "a***@orbix.dev",
         linkedinUrl: "https://linkedin.com/in/ananyasharma",
         linkedUsername: "ananya_codes",
         linkedDisplayName: "Ananya Sharma",
@@ -184,7 +155,7 @@ export const demoClubCoordinators = [
         role: "Cloud Community & Certification Mentor",
         imageUrl: null,
         isPrimary: false,
-        contactEmail: "devansh@orbix.dev",
+        contactEmail: "d***@orbix.dev",
         linkedinUrl: "https://linkedin.com/in/devanshverma",
         linkedUsername: "devansh_v",
         linkedDisplayName: "Devansh Verma",

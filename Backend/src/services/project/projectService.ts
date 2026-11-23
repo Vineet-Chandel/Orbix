@@ -71,7 +71,7 @@ export interface ProjectFormatted {
     repoForks: number;
     repoLicense?: string;
     repoLanguage?: string;
-    repoPushedAt?: string;
+    repoPushedAt?: string | undefined;
     liveUrl?: string;
     demoVideoUrl?: string;
     documentationUrl?: string;
@@ -111,9 +111,8 @@ export interface ProjectFormatted {
     };
     rawExtractedData?: Record<string, any>;
     fieldOverrides?: Record<string, boolean>;
-    lastSyncedAt?: string;
+    lastSyncedAt?: string | undefined;
     syncMetadata?: Record<string, any>;
-    shortDescription?: string;
     repositoryProvider?: string;
     repositoryOwner?: string;
     repositoryVisibility?: string;
@@ -261,7 +260,7 @@ export async function getUserProjects(userId: string): Promise<{
         [userId]
     );
 
-    const projects = res.rows.map(formatProjectRow);
+    const projects = res.rows.map((row) => formatProjectRow(row));
     const count = projects.length;
     const maxCapacity = 4;
 
@@ -725,7 +724,7 @@ export async function reorderProjects(userId: string, projectIds: string[]): Pro
         `SELECT * FROM user_projects WHERE user_id = $1 ORDER BY display_order ASC;`,
         [userId]
     );
-    return updatedRes.rows.map(formatProjectRow);
+    return updatedRes.rows.map((row) => formatProjectRow(row));
 }
 
 /**

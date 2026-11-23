@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { OrbixInitialLoader } from "../../components/ui/loader";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch, fetchUserProfile } from "../../store";
+import { buildApiUrl } from "../../api/apiClient";
 
 export const OAuthCallbackPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -26,6 +27,16 @@ export const OAuthCallbackPage: React.FC = () => {
             const readableError = decodeURIComponent(error);
             toast.error(readableError, { title: "Authentication Error" });
             navigate("/auth/signin", { replace: true });
+            return;
+        }
+
+        // Defensive fallback: If OAuth provider redirected directly to frontend SPA route with code and state instead of backend callback endpoint
+        const code = searchParams.get("code");
+        if (code && !token) {
+            const query = new URLSearchParams(window.location.search);
+            // Detect provider by query param if present, defaulting to github
+            const targetProvider = provider === "google" ? "google" : "github";
+            window.location.href = `${buildApiUrl(`/auth/${targetProvider}/callback`)}?${query.toString()}`;
             return;
         }
 

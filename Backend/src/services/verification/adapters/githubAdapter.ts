@@ -167,7 +167,7 @@ export class GitHubAdapter implements PlatformAdapter {
             return {
                 verified: false,
                 errorCode: profileResult.errorCode === 'NOT_FOUND' ? 'NOT_FOUND' : 'NETWORK_ERROR',
-                errorMessage: profileResult.errorMessage,
+                ...(profileResult.errorMessage !== undefined && { errorMessage: profileResult.errorMessage }),
             };
         }
 

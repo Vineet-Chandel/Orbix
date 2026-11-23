@@ -1,3 +1,5 @@
+import { assertProductionDelivery } from "../email/verificationDelivery.js";
+import { requireServerSecret } from "../../config/serverSecrets.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -23,7 +25,7 @@ const MAX_HOURLY_REQUESTS = 5; // Max 5 requests per hour per user
 const MAX_VERIFY_ATTEMPTS = 5; // Max 5 incorrect guesses before invalidating OTP
 const PROOF_TOKEN_TTL_SECONDS = 900; // 15 minutes to complete password change
 
-const JWT_SECRET = process.env.JWT_SECRET || "orbix_secret_fallback_key_2026";
+const JWT_SECRET = requireServerSecret("JWT_SECRET");
 
 export interface FindAccountParams {
     identifier: string;
@@ -313,14 +315,8 @@ export class PasswordResetService {
             otp,
             accountType,
         });
+        assertProductionDelivery(sendResult);
 
-        // Always log OTP in non-production or when simulated
-        if (process.env.NODE_ENV !== "production" || sendResult.simulated || sendResult.sandboxRestricted) {
-            console.log(`\n======================================================`);
-            console.log(`[Orbix Password Reset OTP] Destination: ${normalizedEmail}`);
-            console.log(`[Orbix Password Reset OTP] 6-Digit Code: >>> ${otp} <<<`);
-            console.log(`======================================================\n`);
-        }
 
         // Generate temporary resetSessionToken for client state tracking
         const resetSessionToken = jwt.sign(
@@ -348,8 +344,7 @@ export class PasswordResetService {
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresInSeconds: OTP_TTL_SECONDS,
             simulated: Boolean(sendResult.simulated || sendResult.sandboxRestricted),
-            // Expose devOtp in development so local testing can proceed without real SMTP
-            devOtp: (process.env.NODE_ENV !== "production" || sendResult.simulated || sendResult.sandboxRestricted) ? otp : undefined,
+
         };
     }
 
@@ -465,10 +460,8 @@ export class PasswordResetService {
             otp,
             accountType: decoded.accountType || "personal",
         });
+        assertProductionDelivery(sendResult);
 
-        if (process.env.NODE_ENV !== "production" || sendResult.simulated || sendResult.sandboxRestricted) {
-            console.log(`[Orbix Password Reset Resend OTP] >>> ${otp} <<< for ${normalizedEmail}`);
-        }
 
         const masked = maskEmail(normalizedEmail);
 
@@ -478,7 +471,7 @@ export class PasswordResetService {
             maskedEmail: masked,
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresInSeconds: OTP_TTL_SECONDS,
-            devOtp: (process.env.NODE_ENV !== "production" || sendResult.simulated || sendResult.sandboxRestricted) ? otp : undefined,
+
         };
     }
 

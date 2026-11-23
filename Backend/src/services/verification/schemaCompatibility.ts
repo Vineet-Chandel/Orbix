@@ -7,7 +7,7 @@
  * Guarantees:
  * 1. Checks dynamically if Migration 069 has been applied (cached with lazy TTL).
  * 2. In post-migration environments, strictly enforces `ownership_status = 'VERIFIED'`.
- * 3. In pre-migration environments, falls back safely to `verified = true` without crashing.
+ * 3. In pre-migration environments, ownership checks fail closed and verification stays unavailable.
  * 4. Never allows client-supplied overrides or unproven handles to bypass verification.
  */
 
@@ -21,17 +21,20 @@ interface SchemaState {
 
 let cachedSchemaState: SchemaState | null = null;
 const CACHE_TTL_MS = 60_000; // 1 minute cache TTL
+let schemaInspection: Promise<VerificationSchemaStatus> | null = null;
+interface VerificationSchemaStatus {
+    isMigrated: boolean;
+    hasOwnershipStatusColumn: boolean;
+    hasChallengesTable: boolean;
+}
 
 /**
  * Checks whether Migration 069 is applied to the active database.
  */
-export async function checkVerificationSchemaStatus(): Promise<{
-    isMigrated: boolean;
-    hasOwnershipStatusColumn: boolean;
-    hasChallengesTable: boolean;
-}> {
+async function inspectVerificationSchemaStatus(): Promise<VerificationSchemaStatus> {
     const now = Date.now();
-    if (cachedSchemaState && now - cachedSchemaState.checkedAt < CACHE_TTL_MS) {
+    const ttl = cachedSchemaState?.hasOwnershipStatusColumn && cachedSchemaState?.hasChallengesTable ? CACHE_TTL_MS : 5_000;
+    if (cachedSchemaState && now - cachedSchemaState.checkedAt < ttl) {
         return {
             isMigrated: cachedSchemaState.hasOwnershipStatusColumn && cachedSchemaState.hasChallengesTable,
             hasOwnershipStatusColumn: cachedSchemaState.hasOwnershipStatusColumn,
@@ -69,13 +72,32 @@ export async function checkVerificationSchemaStatus(): Promise<{
             hasChallengesTable: hasTbl,
         };
     } catch (err) {
-        console.warn("[SchemaCompatibility] Failed to inspect schema state, defaulting to unmigrated:", err);
+        console.warn("[SchemaCompatibility] Verification schema inspection unavailable; refusing verification.");
+        cachedSchemaState = { checkedAt: now, hasOwnershipStatusColumn: false, hasChallengesTable: false };
         return {
             isMigrated: false,
             hasOwnershipStatusColumn: false,
             hasChallengesTable: false,
         };
     }
+}
+
+// Coalesce concurrent checks on each replica instead of querying metadata per user.
+export async function checkVerificationSchemaStatus(): Promise<VerificationSchemaStatus> {
+    if (!schemaInspection) {
+        schemaInspection = inspectVerificationSchemaStatus().finally(() => { schemaInspection = null; });
+    }
+    return schemaInspection;
+}
+
+export function verificationSchemaRequiredError(): Error & { code: string; statusCode: number } {
+    return Object.assign(new Error("Account verification is temporarily unavailable. Please try again later."), {
+        code: "MIGRATION_REQUIRED", statusCode: 503,
+    });
+}
+
+export async function assertVerificationSchemaReady(): Promise<void> {
+    if (!(await checkVerificationSchemaStatus()).isMigrated) throw verificationSchemaRequiredError();
 }
 
 /**

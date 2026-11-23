@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 118" fill="none">
+ <style>
+  rect {
+   transform-box: fill-box;
+   transform-origin: center;
+   opacity: .78;
+   fill: #171717;
+   animation: wave 1.8s ease-in-out infinite, palette 5.4s linear infinite;
+   animation-delay: var(--wave-delay), var(--color-delay);
+  }
+  @keyframes wave {
+   0%, 65%, 100% { opacity: .78; transform: scale(.78); }
+   25%, 35% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes palette {
+   0%, 100% { fill: #171717; }
+   33% { fill: #404040; }
+   66% { fill: #666666; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+   rect { animation: none; opacity: 1; transform: none; }
+  }
+ </style>
+  <rect x="3" y="3" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:0.00s"/>
+  <rect x="23" y="3" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:0.00s"/>
+  <rect x="43" y="3" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:0.00s"/>
+  <rect x="63" y="3" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:0.00s"/>
+  <rect x="83" y="3" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:0.00s"/>
+  <rect x="103" y="3" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:0.00s"/>
+  <rect x="3" y="23" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.15s"/>
+  <rect x="23" y="23" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.15s"/>
+  <rect x="43" y="23" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.15s"/>
+  <rect x="63" y="23" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.15s"/>
+  <rect x="83" y="23" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.15s"/>
+  <rect x="103" y="23" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.15s"/>
+  <rect x="3" y="43" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.30s"/>
+  <rect x="23" y="43" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.30s"/>
+  <rect x="43" y="43" width="12" height="12" rx="2.5" style="--wave-delay:0.00s;--color-delay:-0.30s"/>
+  <rect x="63" y="43" width="12" height="12" rx="2.5" style="--wave-delay:0.00s;--color-delay:-0.30s"/>
+  <rect x="83" y="43" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.30s"/>
+  <rect x="103" y="43" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.30s"/>
+  <rect x="3" y="63" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.45s"/>
+  <rect x="23" y="63" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.45s"/>
+  <rect x="43" y="63" width="12" height="12" rx="2.5" style="--wave-delay:0.00s;--color-delay:-0.45s"/>
+  <rect x="63" y="63" width="12" height="12" rx="2.5" style="--wave-delay:0.00s;--color-delay:-0.45s"/>
+  <rect x="83" y="63" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.45s"/>
+  <rect x="103" y="63" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.45s"/>
+  <rect x="3" y="83" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.60s"/>
+  <rect x="23" y="83" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.60s"/>
+  <rect x="43" y="83" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.60s"/>
+  <rect x="63" y="83" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.60s"/>
+  <rect x="83" y="83" width="12" height="12" rx="2.5" style="--wave-delay:0.24s;--color-delay:-0.60s"/>
+  <rect x="103" y="83" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.60s"/>
+  <rect x="3" y="103" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.75s"/>
+  <rect x="23" y="103" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.75s"/>
+  <rect x="43" y="103" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.75s"/>
+  <rect x="63" y="103" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.75s"/>
+  <rect x="83" y="103" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.75s"/>
+  <rect x="103" y="103" width="12" height="12" rx="2.5" style="--wave-delay:0.48s;--color-delay:-0.75s"/>
+</svg>

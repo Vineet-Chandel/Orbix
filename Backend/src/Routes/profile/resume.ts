@@ -1,3 +1,4 @@
+import { getBlockState } from "../../services/relationship/blockService.js";
 import express, { type Request, type Response } from "express";
 import crypto from "node:crypto";
 import https from "node:https";
@@ -23,7 +24,6 @@ import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
 import {
     getCachedResumeMetadata,
     setCachedResumeMetadata,
-    getCachedPublicResumeMetadata,
     setCachedPublicResumeMetadata,
     invalidateAllResumeCaches,
     getCachedPdfBuffer,
@@ -31,7 +31,6 @@ import {
     type ResumePayload,
 } from "../../redis/cache/cache-resume.js";
 import intelligenceRouter from "./resumeIntelligence.js";
-import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 import { parseUploadedDocument } from "../../services/resume/documentParser.js";
 import { analyzeResumeWithGemini, type GeminiAnalysisReport } from "../../services/resume/geminiResumeAnalyzer.js";
 
@@ -181,7 +180,7 @@ const streamPdfWithCache = async (
                 `${disposition}; filename="${encodeURIComponent(filename)}"`
             );
             res.setHeader("ETag", cached.etag);
-            res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+            res.setHeader("Cache-Control", "private, no-store");
             res.setHeader("Accept-Ranges", "bytes");
 
             // HTTP 206 Byte-Range Request Handling
@@ -234,7 +233,7 @@ const streamPdfWithCache = async (
             `${disposition}; filename="${encodeURIComponent(filename)}"`
         );
         res.setHeader("ETag", etag);
-        res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+        res.setHeader("Cache-Control", "private, no-store");
         res.setHeader("Accept-Ranges", "bytes");
 
         if (cldRes.headers["content-length"]) {
@@ -308,6 +307,7 @@ export const handleStreamResume = async (
             }
             querySql = `
                 SELECT
+                    id,
                     resume_public_id AS "resumePublicId",
                     resume_url AS "resumeUrl",
                     resume_filename AS "resumeFilename",
@@ -328,6 +328,7 @@ export const handleStreamResume = async (
             if (authUser.id) {
                 querySql = `
                     SELECT
+                        id,
                         resume_public_id AS "resumePublicId",
                         resume_url AS "resumeUrl",
                         resume_filename AS "resumeFilename",
@@ -340,6 +341,7 @@ export const handleStreamResume = async (
             } else {
                 querySql = `
                     SELECT
+                        id,
                         resume_public_id AS "resumePublicId",
                         resume_url AS "resumeUrl",
                         resume_filename AS "resumeFilename",
@@ -358,6 +360,10 @@ export const handleStreamResume = async (
         }
 
         const row = result.rows[0];
+        if (usernameParam && req.user?.id && req.user.id !== row.id && (await getBlockState(req.user.id, row.id)).isBlocked) {
+            return res.status(404).json({ success: false, message: "Resume unavailable." });
+        }
+
         if (!row.resumePublicId && !row.resumeUrl) {
             return res.status(404).json({ success: false, message: "No resume on file" });
         }
@@ -367,12 +373,12 @@ export const handleStreamResume = async (
         }
 
         const signedUrl = row.resumePublicId
-            ? generateSignedResumeUrl(row.resumePublicId, 7200, isDownload)
+            ? generateSignedResumeUrl(row.resumePublicId, 60, isDownload)
             : row.resumeUrl;
 
         // If redirect mode is requested via ?redirect=true, issue instant 302 Found redirect
         if (req.query.redirect === "true" && signedUrl) {
-            res.setHeader("Cache-Control", "public, max-age=3600");
+            res.setHeader("Cache-Control", "private, no-store");
             return res.redirect(302, signedUrl);
         }
 
@@ -573,17 +579,17 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
         let geminiReport: GeminiAnalysisReport | null = null;
         try {
             const parsedDoc = await parseUploadedDocument(file.buffer, originalName, file.mimetype);
-            const verifiedCondition = await getVerifiedLinksCondition();
+
             const platformsRes = await query(
                 `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
-                 FROM user_links WHERE (username = $1 OR username = $2) AND ${verifiedCondition};`,
+                 FROM user_links WHERE (username = $1 OR username = $2);`,
                 [authUser.username, authUser.gmail]
             );
             const verifiedPlatforms = (platformsRes.rows || []).map((row: any) => ({
                 portal: row.portal,
                 username: row.portalUsername,
                 url: row.url,
-                verified: true,
+                verified: Boolean(row.verified),
                 lastSyncAt: row.lastSyncAt,
                 lastSyncStatus: row.lastSyncStatus,
             }));
@@ -877,24 +883,14 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
                 resumeUpdatedAt: "2026-02-15T00:00:00.000Z",
                 isResumePublic: true,
             };
-            res.setHeader("Cache-Control", "public, max-age=3600");
+            res.setHeader("Cache-Control", "private, no-store");
             return res.status(200).json(demoPayload);
-        }
-
-        // 1. Check Redis Cache First (<2ms)
-        const cachedPayload = await getCachedPublicResumeMetadata(username);
-        if (cachedPayload) {
-            res.setHeader("Cache-Control", "public, max-age=180, stale-while-revalidate=900");
-            res.setHeader("X-Cache", "HIT");
-            return res.status(200).json({
-                success: true,
-                ...cachedPayload,
-            });
         }
 
         // 2. Query DB with functional index on LOWER(username)
         const result = await query(
             `SELECT
+                id,
                 resume_url AS "resumeUrl",
                 resume_public_id AS "resumePublicId",
                 resume_filename AS "resumeFilename",
@@ -913,21 +909,23 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
         }
 
         const row = result.rows[0];
+        if (req.user?.id && req.user.id !== row.id && (await getBlockState(req.user.id, row.id)).isBlocked) {
+            return res.status(404).json({ success: false, message: "Resume unavailable." });
+        }
+
         if (!row.resumeUrl || row.isResumePublic === false || row.isPublic === false) {
             return res.status(404).json({ success: false, message: "Resume is private or not available" });
         }
 
-        const signedUrl = row.resumePublicId
-            ? generateSignedResumeUrl(row.resumePublicId, 86400, false)
-            : row.resumeUrl;
+        const signedUrl = null;
 
         const payload: ResumePayload = {
             hasResume: true,
-            resumeUrl: signedUrl || `/api/profile/resume/view/${encodeURIComponent(username)}`,
+            resumeUrl: `/api/profile/resume/view/${encodeURIComponent(username)}`,
             viewUrl: `/api/profile/resume/view/${encodeURIComponent(username)}`,
             downloadUrl: `/api/profile/resume/download/${encodeURIComponent(username)}`,
             signedUrl,
-            rawUrl: row.resumeUrl,
+            rawUrl: null,
             resumeFilename: row.resumeFilename || "resume.pdf",
             resumeFilesize: row.resumeFilesize,
             resumeUpdatedAt: row.resumeUpdatedAt,
@@ -939,7 +937,7 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
         // Cache in Redis for 1 hour
         setCachedPublicResumeMetadata(username, payload).catch(() => {});
 
-        res.setHeader("Cache-Control", "public, max-age=180, stale-while-revalidate=900");
+        res.setHeader("Cache-Control", "private, no-store");
         res.setHeader("X-Cache", "MISS");
         return res.status(200).json({
             success: true,
@@ -996,17 +994,17 @@ export const handleReAnalyzeResume = async (req: Request, res: Response) => {
         }
 
         const parsedDoc = await parseUploadedDocument(fileBuffer, row.resumeFilename || "resume.pdf", "application/pdf");
-        const verifiedCondition = await getVerifiedLinksCondition();
+
         const platformsRes = await query(
             `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
-             FROM user_links WHERE (username = $1 OR username = $2) AND ${verifiedCondition};`,
+             FROM user_links WHERE (username = $1 OR username = $2);`,
             [authUser.username, authUser.gmail]
         );
         const verifiedPlatforms = (platformsRes.rows || []).map((p: any) => ({
             portal: p.portal,
             username: p.portalUsername,
             url: p.url,
-            verified: true,
+            verified: Boolean(p.verified),
             lastSyncAt: p.lastSyncAt,
             lastSyncStatus: p.lastSyncStatus,
         }));

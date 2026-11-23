@@ -8,6 +8,7 @@
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
+    "paths": { "pdf-lib": ["./node_modules/pdf-lib/es/index.d.ts"] },
     "target": "esnext",
     "types": [],
     // For nodejs:

@@ -1,5 +1,4 @@
 import { query } from "../../database/client.js";
-import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 
 export interface LanguageItem {
     name: string;
@@ -142,7 +141,7 @@ export async function calculateUserDevelopmentAnalytics(
     // 1. Resolve strictly from server-authorized verified user_links
     // Invariant: clientPortals and directHandle overrides are neutralized to prevent identity injection
     try {
-        const verifiedCondition = await getVerifiedLinksCondition();
+
         const dbRes = await query(
             `SELECT portal_username 
              FROM user_links 
@@ -151,7 +150,6 @@ export async function calculateUserDevelopmentAnalytics(
                 OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
              ) 
                AND LOWER(TRIM(portal)) = 'github'
-               AND ${verifiedCondition}
              LIMIT 1`,
             [cleanUsername]
         );

@@ -101,7 +101,7 @@ export interface PracticeAnalyticsState {
 
 const getStoredPracticeAnalytics = (): Record<string, PracticeAnalyticsData> => {
     try {
-        const stored = localStorage.getItem("orbix_practice_analytics");
+        const stored = localStorage.getItem("orbix_practice_analytics_connected_v2");
         return stored ? JSON.parse(stored) : {};
     } catch {
         return {};
@@ -110,7 +110,7 @@ const getStoredPracticeAnalytics = (): Record<string, PracticeAnalyticsData> => 
 
 const saveStoredPracticeAnalytics = (data: Record<string, PracticeAnalyticsData>) => {
     try {
-        localStorage.setItem("orbix_practice_analytics", JSON.stringify(data));
+        localStorage.setItem("orbix_practice_analytics_connected_v2", JSON.stringify(data));
     } catch {
         // Safe fallback
     }

@@ -5,6 +5,7 @@ import {
     confirmVerification,
     cancelVerification,
     VerificationApiError,
+    startGitHubOwnershipVerification,
 } from "./platformVerificationApi";
 
 describe("Platform Verification API Client", () => {
@@ -12,6 +13,30 @@ describe("Platform Verification API Client", () => {
 
     afterEach(() => {
         globalThis.fetch = originalFetch;
+    });
+
+    it("starts GitHub account linking with the selected handle and return page", async () => {
+        globalThis.fetch = async (url, options) => {
+            assert.match(String(url), /\/api\/auth\/github\/link$/);
+            assert.equal(options?.method, "POST");
+            assert.equal(options?.credentials, "include");
+            assert.equal(options?.redirect, "error");
+            assert.deepEqual(JSON.parse(String(options?.body)), { portalUsername: "vineet-chandel", returnTo: "https://orbix.example/onboarding" });
+            return new Response(JSON.stringify({ success: true, url: "https://github.com/login/oauth/authorize?state=bound-session" }));
+        };
+        assert.equal(await startGitHubOwnershipVerification("vineet-chandel", "https://orbix.example/onboarding"), "https://github.com/login/oauth/authorize?state=bound-session");
+    });
+
+    it("surfaces initiation errors without trying a fallback navigation", async () => {
+        let requests = 0;
+        globalThis.fetch = async () => {
+            requests++;
+            return new Response(JSON.stringify({ success: false, message: "Session store unavailable" }), { status: 503 });
+        };
+        await assert.rejects(startGitHubOwnershipVerification("handle", "/onboarding"), /Session store unavailable/);
+        assert.equal(requests, 1);
+        globalThis.fetch = async () => new Response(JSON.stringify({ success: true, url: "https://orbix.example/dashboard?error=failed" }));
+        await assert.rejects(startGitHubOwnershipVerification("handle", "/onboarding"), /Could not open GitHub authorization/);
     });
 
     describe("initiateVerification", () => {

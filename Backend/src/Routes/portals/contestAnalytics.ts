@@ -1,5 +1,4 @@
 import { query } from "../../database/client.js";
-import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 import {
     getCodeforcesTier as getCfTierOfficial,
     getLeetCodeTier as getLtTierOfficial,
@@ -1247,7 +1246,7 @@ export async function calculateUserContestPerformance(
     // Query Postgres for user's verified connected platforms
     let rows: any[] = [];
     try {
-        const verifiedCondition = await getVerifiedLinksCondition();
+
         const result = await query(
             `SELECT portal, portal_username, verified, display_name
              FROM user_links
@@ -1256,7 +1255,6 @@ export async function calculateUserContestPerformance(
                 OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
                 OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) LIMIT 1)
              )
-               AND ${verifiedCondition}
              ORDER BY portal ASC;`,
             [cleanUsername]
         );
