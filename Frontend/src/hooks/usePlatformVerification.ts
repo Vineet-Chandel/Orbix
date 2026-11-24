@@ -106,7 +106,7 @@ export function usePlatformVerification(options: UsePlatformVerificationOptions 
 
             setIsCopied(true);
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-            copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
+            copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 1500);
             return true;
         } catch {
             toast.error("Failed to copy verification token to clipboard. Please copy manually.");

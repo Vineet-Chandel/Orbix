@@ -18,6 +18,27 @@ import { usePlatformVerification } from "../../hooks/usePlatformVerification";
 import { OrbixLoader } from "../ui/loader";
 import { startGitHubOwnershipVerification } from "../../api/platformVerificationApi";
 import type { ConfirmVerificationSuccessResponse } from "../../types/platformVerification";
+import { getPlatformVerificationGuide } from "../../utils/platformVerificationSupport";
+import leetcodeGuideImg from "../../assets/verification/leetcode-verification-guide-cropped.png";
+
+interface CopySuccessIconProps {
+    className?: string;
+}
+
+const CopySuccessIcon: React.FC<CopySuccessIconProps> = ({ className = "w-4 h-4 sm:w-4.5 sm:h-4.5" }) => (
+    <span className={`relative inline-flex items-center justify-center ${className}`}>
+        {/* Rear square: Hollow with crisp white outline and transparent/dark interior */}
+        <Copy className="w-full h-full text-white stroke-[2.5]" aria-hidden="true" />
+
+        {/* Front square: Solid bright white fill with dark contrasting checkmark */}
+        <span
+            className="absolute top-[33.33%] left-[33.33%] w-[58.33%] h-[58.33%] bg-white rounded-[2px] flex items-center justify-center pointer-events-none"
+            aria-hidden="true"
+        >
+            <Check className="w-[82%] h-[82%] text-neutral-900 stroke-[3.5]" aria-hidden="true" />
+        </span>
+    </span>
+);
 
 export interface OwnershipVerificationModalProps {
     isOpen: boolean;
@@ -44,7 +65,6 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
         isInitiating,
         isConfirming,
         isCancelling,
-        isCopied,
         formattedTime,
         isExpired,
         attemptsRemaining,
@@ -68,7 +88,79 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     const [isSuccess, setIsSuccess] = useState(false);
     const [oauthRedirecting, setOauthRedirecting] = useState(false);
     const [oauthError, setOauthError] = useState<string | null>(null);
+    const [showCheck, setShowCheck] = useState(false);
+    const [isRotating, setIsRotating] = useState(false);
+    const [rotationKey, setRotationKey] = useState(0);
     const initiatedIdentity = useRef<string | null>(null);
+
+    const animMidTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const animEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const revertMidTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const revertEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const clearAllCopyTimers = () => {
+        if (animMidTimerRef.current) clearTimeout(animMidTimerRef.current);
+        if (animEndTimerRef.current) clearTimeout(animEndTimerRef.current);
+        if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+        if (revertMidTimerRef.current) clearTimeout(revertMidTimerRef.current);
+        if (revertEndTimerRef.current) clearTimeout(revertEndTimerRef.current);
+    };
+
+    useEffect(() => {
+        return () => {
+            clearAllCopyTimers();
+        };
+    }, []);
+
+    const startRevertAnimation = () => {
+        setRotationKey((k) => k + 1);
+        setIsRotating(true);
+
+        // Near midpoint of 360deg rotation (180ms), transition back to Copy icon
+        revertMidTimerRef.current = setTimeout(() => {
+            setShowCheck(false);
+        }, 180);
+
+        // Complete rotation at 360ms
+        revertEndTimerRef.current = setTimeout(() => {
+            setIsRotating(false);
+        }, 360);
+    };
+
+    const handleCopyClick = async () => {
+        const success = await copyToken();
+        // If clipboard copy fails, do not trigger animation or success state
+        if (!success) return;
+
+        clearAllCopyTimers();
+
+        if (showCheck) {
+            // Re-click while already in success state: cleanly restart the 1.5s hold
+            setIsRotating(false);
+            holdTimerRef.current = setTimeout(() => {
+                startRevertAnimation();
+            }, 1500);
+        } else {
+            // Initial copy: start 360-degree clockwise rotation
+            setRotationKey((k) => k + 1);
+            setIsRotating(true);
+
+            // Near midpoint of 360deg rotation (180ms), switch rendered icon to CopyCheck
+            animMidTimerRef.current = setTimeout(() => {
+                setShowCheck(true);
+            }, 180);
+
+            // Complete first rotation at 360ms
+            animEndTimerRef.current = setTimeout(() => {
+                setIsRotating(false);
+                // Hold visible for ~1.5 seconds, then smoothly rotate back
+                holdTimerRef.current = setTimeout(() => {
+                    startRevertAnimation();
+                }, 1500);
+            }, 360);
+        }
+    };
 
     // Initial initiation when modal opens
     useEffect(() => {
@@ -82,6 +174,9 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
 
     const handleCloseModal = () => {
         if (isConfirming || isCancelling || oauthRedirecting) return;
+        clearAllCopyTimers();
+        setShowCheck(false);
+        setIsRotating(false);
         if (challenge && !isSuccess) {
             cancelChallenge(portalId);
         }
@@ -126,6 +221,10 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
         }
     };
 
+    const guide = challenge
+        ? getPlatformVerificationGuide(portalId, challenge.token, challenge.profileSettingsUrl)
+        : null;
+
     return createPortal(
         <div
             role="dialog"
@@ -135,11 +234,12 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
             className="fixed inset-0 z-[10001] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn"
         >
             <div
-                className="w-full max-w-lg bg-white border-3 border-black rounded-2xl p-5 sm:p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 sm:space-y-5 animate-scaleUp overflow-hidden max-h-[90vh] overflow-y-auto"
+                className={`w-full ${challenge ? "max-w-lg lg:max-w-4xl" : "max-w-lg"
+                    } bg-white border-3 border-black rounded-2xl p-5 sm:p-6 shadow-[8px_8px_0px_#000] text-black animate-scaleUp overflow-hidden max-h-[92vh] flex flex-col`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-start justify-between gap-3 border-b-2 border-black/10 pb-3">
+                <div className="flex items-start justify-between gap-3 border-b-2 border-black/10 pb-3.5 shrink-0">
                     <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-2 shadow-[2px_2px_0px_#000] shrink-0">
                             {getPortalIcon(portalId, "w-full h-full object-contain")}
@@ -228,114 +328,187 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                         </p>
                     </div>
                 ) : challenge ? (
-                    /* State: Active Challenge Presentation */
-                    <div className="space-y-4 animate-fadeIn">
-                        {/* Expiry and Cooldown Bar */}
-                        <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 border-black bg-[#FAF6EE] shadow-[2px_2px_0px_#000]">
-                            <div className="flex items-center gap-1.5 text-xs font-black text-black">
-                                <Clock className="w-4 h-4 stroke-[2.5]" />
-                                <span>Challenge Expiry:</span>
-                                <span className={`font-mono ${isExpired ? "text-rose-600 font-black" : "text-neutral-900"}`}>
-                                    {isExpired ? "EXPIRED" : formattedTime}
-                                </span>
-                            </div>
+                    /* State: Active Challenge Presentation - Desktop Two-Panel Layout */
+                    <div className="flex-1 flex flex-col min-h-0 animate-fadeIn">
+                        {/* Presentational CSS for countdown text pulse & 2D clockwise copy rotation */}
+                        <style>{`
+                            @keyframes orbixExpiryTextPulse {
+                                0%, 100% {
+                                    color: #000000;
+                                }
+                                50% {
+                                    color: #dc2626;
+                                }
+                            }
+                            .animate-expiry-pulse {
+                                animation: orbixExpiryTextPulse 2s ease-in-out infinite;
+                            }
+                            @keyframes copyClockwiseSpin {
+                                from {
+                                    transform: rotate(0deg);
+                                }
+                                to {
+                                    transform: rotate(360deg);
+                                }
+                            }
+                            .copy-rotate-clockwise {
+                                animation: copyClockwiseSpin 360ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                                transform-origin: center;
+                            }
+                            @media (prefers-reduced-motion: reduce) {
+                                .animate-expiry-pulse {
+                                    animation: none !important;
+                                }
+                                .copy-rotate-clockwise {
+                                    animation: none !important;
+                                }
+                            }
+                        `}</style>
 
-                            {attemptsRemaining !== undefined && attemptsRemaining < 5 && (
-                                <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-md border border-black bg-amber-100 text-amber-950">
-                                    {attemptsRemaining} attempts left
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Platform Specific Instructions */}
-                        <div className="space-y-1.5">
-                            <span className="text-xs font-black uppercase tracking-wider text-black">
-                                1. Copy Verification Token
-                            </span>
-                            <div className="relative flex items-center rounded-xl border-2 border-black bg-neutral-900 text-white p-3 font-mono text-xs shadow-[3px_3px_0px_#000] overflow-hidden">
-                                <span className="select-all tracking-wider font-bold truncate pr-16 text-[#FFE566]">
-                                    {challenge.token}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={copyToken}
-                                    className="absolute right-2 px-2.5 py-1 rounded-md border-2 border-white bg-white hover:bg-neutral-100 text-black text-[11px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
-                                >
-                                    {isCopied ? (
-                                        <>
-                                            <Check className="w-3 h-3 stroke-[3] text-emerald-600" />
-                                            <span>Copied</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Copy className="w-3 h-3 stroke-[2.5]" />
-                                            <span>Copy</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Step 2: Placement guidance */}
-                        <div className="space-y-2 rounded-xl border-2 border-black bg-amber-50/70 p-3.5 shadow-[2px_2px_0px_#000]">
-                            <span className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
-                                <span className="w-4 h-4 rounded-full bg-[#FFE566] border border-black flex items-center justify-center text-[10px] font-black">
-                                    2
-                                </span>
-                                Update your {config?.name} Profile
-                            </span>
-                            <p className="text-xs font-bold text-neutral-800 leading-relaxed">
-                                {challenge.instructions}
-                            </p>
-                            <p className="text-[11px] font-bold text-neutral-600">
-                                Place the token in your <strong className="text-black">{challenge.displayFieldName}</strong> field and save changes on {config?.name}.
-                            </p>
-
-                            {challenge.profileSettingsUrl && (
-                                <a
-                                    href={challenge.profileSettingsUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 text-xs font-black text-black underline hover:text-neutral-700 pt-1"
-                                >
-                                    <span>Open {config?.name} Profile Settings</span>
-                                    <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </a>
-                            )}
-                        </div>
-
-                        {/* Error state alert */}
-                        {hookError && (
-                            <div className="p-3 rounded-xl border-2 border-black bg-rose-50 text-rose-950 text-xs font-bold flex items-start gap-2 shadow-[2px_2px_0px_#dc2626]">
-                                <AlertCircle className="w-4 h-4 stroke-[2.5] shrink-0 text-rose-600 mt-0.5" />
-                                <div className="space-y-0.5">
-                                    <p className="font-black text-rose-900">Verification Check Failed</p>
-                                    <p className="text-rose-800">{hookError}</p>
-                                    {cooldownSeconds > 0 && (
-                                        <p className="text-neutral-700 text-[11px] font-mono">
-                                            Rate limit cooldown: {cooldownSeconds}s remaining.
+                        {/* Two-Panel Main Content Area: Scrollable */}
+                        <div className="flex-1 overflow-y-auto py-3 sm:py-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-0">
+                                {/* LEFT COLUMN — TOKEN & INSTRUCTIONS */}
+                                <div className="space-y-5 sm:space-y-6 border-b-2 border-black/10 pb-5 lg:border-b-0 lg:pb-0 lg:border-r-2 lg:border-black/10 lg:pr-6 xl:pr-8 pt-1 sm:pt-1.5">
+                                    {/* Token Section with Descriptive Label */}
+                                    <div className="space-y-3 sm:space-y-3.5">
+                                        <p className=" mb-6 text-xs sm:text-sm font-bold text-neutral-900 tracking-tight">
+                                            Copy the verification token below
                                         </p>
+
+                                        {/* Minimal Token Container with Integrated Lucide Copy Icon */}
+                                        <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-black bg-neutral-900 text-white px-3.5 py-3 font-mono text-xs sm:text-sm shadow-[3px_3px_0px_#000]">
+                                            <span className="select-all tracking-wider font-bold truncate pr-2 text-[#FFE566]">
+                                                {challenge.token}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={handleCopyClick}
+                                                className="p-1.5 -mr-1 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 active:bg-neutral-700 transition-colors cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[#FFE566] shrink-0 flex items-center justify-center"
+                                                aria-label={showCheck ? "Verification token copied" : "Copy verification token"}
+                                                title={showCheck ? "Copied" : "Copy verification token"}
+                                            >
+                                                <span className="sr-only">
+                                                    {showCheck ? "Verification token copied to clipboard" : "Copy verification token"}
+                                                </span>
+                                                <span className="relative w-4 h-4 sm:w-4.5 sm:h-4.5 flex items-center justify-center">
+                                                    <span
+                                                        key={rotationKey}
+                                                        className={`w-full h-full flex items-center justify-center ${isRotating ? "copy-rotate-clockwise" : ""
+                                                            }`}
+                                                    >
+                                                        {showCheck ? (
+                                                            <CopySuccessIcon className="w-full h-full" />
+                                                        ) : (
+                                                            <Copy className="w-full h-full stroke-[2.5]" aria-hidden="true" />
+                                                        )}
+                                                    </span>
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Essential Supporting Verification Description */}
+                                    <div className="space-y-3.5 sm:space-y-4 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                        <p className="text-neutral-900 leading-relaxed">
+                                            Place the verification token in your {guide?.portalName}{" "}
+                                            <strong className="font-black text-black">
+                                                {guide?.targetFieldName}
+                                            </strong>{" "}
+                                            field and save your changes.
+                                        </p>
+                                        <p className="text-neutral-600 leading-relaxed">
+                                            Click <strong className="font-bold text-black">I've Updated My Profile</strong> below to allow Orbix to verify ownership.
+                                        </p>
+                                    </div>
+
+                                    {/* Error state alert */}
+                                    {hookError && (
+                                        <div className="p-3 rounded-xl border-2 border-black bg-rose-50 text-rose-950 text-xs font-bold flex items-start gap-2 shadow-[2px_2px_0px_#dc2626]">
+                                            <AlertCircle className="w-4 h-4 stroke-[2.5] shrink-0 text-rose-600 mt-0.5" />
+                                            <div className="space-y-0.5">
+                                                <p className="font-black text-rose-900">Verification Check Failed</p>
+                                                <p className="text-rose-800">{hookError}</p>
+                                                {cooldownSeconds > 0 && (
+                                                    <p className="text-neutral-700 text-[11px] font-mono">
+                                                        Rate limit cooldown: {cooldownSeconds}s remaining.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
+
+                                {/* RIGHT COLUMN — SETTINGS LINK, COUNTDOWN & VISUAL GUIDE */}
+                                {guide && (
+                                    <div className="space-y-3.5 pt-4 lg:pt-1 sm:lg:pt-1.5 lg:pl-6 xl:pl-8">
+                                        {/* Top Row: Profile Settings Link (Left) + Countdown Timer (Right) */}
+                                        <div className="flex flex-wrap items-center justify-between gap-2.5">
+                                            {guide.settingsUrl ? (
+                                                <a
+                                                    href={guide.settingsUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-black underline hover:text-neutral-700 transition-colors"
+                                                >
+                                                    <span>{guide.settingsUrlLabel}</span>
+                                                    <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                </a>
+                                            ) : <div />}
+
+                                            {/* Simplified Expiry: Clock icon + countdown time only, no box, no border, no label */}
+                                            <div className="flex items-center gap-1.5 ml-auto shrink-0">
+                                                <div
+                                                    className={`inline-flex items-center gap-1.5 text-xs sm:text-sm font-black transition-colors ${isExpired ? "text-rose-600 font-black" : "animate-expiry-pulse"
+                                                        }`}
+                                                    role="status"
+                                                    aria-live="polite"
+                                                    aria-label={`Time remaining: ${isExpired ? "Expired" : formattedTime}`}
+                                                >
+                                                    <Clock className="w-4 h-4 stroke-[2.5] shrink-0" />
+                                                    <span className="font-mono font-black tabular-nums tracking-tight">
+                                                        {isExpired ? "EXPIRED" : formattedTime}
+                                                    </span>
+                                                </div>
+
+                                                {attemptsRemaining !== undefined && attemptsRemaining < 5 && (
+                                                    <span className="text-[10px] sm:text-[11px] font-black uppercase px-1.5 py-0.5 rounded border border-black bg-amber-100 text-amber-950 shadow-[1px_1px_0px_#000]">
+                                                        {attemptsRemaining} left
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Annotated Platform Screenshot: Primary Visual Element */}
+                                        {guide.hasScreenshot && (
+                                            <div className="space-y-1.5 pt-0.5">
+                                                <div className="rounded-xl border-2 border-black overflow-hidden shadow-[3px_3px_0px_#000] bg-neutral-900">
+                                                    <img
+                                                        src={guide.portalId === "leetcode" ? leetcodeGuideImg : undefined}
+                                                        alt={guide.screenshotAlt}
+                                                        className="w-full h-auto object-contain block max-h-[220px] sm:max-h-[235px]"
+                                                        loading="lazy"
+                                                    />
+                                                </div>
+                                                {guide.screenshotCaption && (
+                                                    <p className="text-[11px] font-bold text-neutral-500 italic leading-tight">
+                                                        {guide.screenshotCaption}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
 
-                        {/* Actions */}
-                        <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5 pt-2 border-t-2 border-black/10">
-                            <button
-                                type="button"
-                                onClick={handleCloseModal}
-                                disabled={isConfirming}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black uppercase shadow-[2px_2px_0px_#000] cursor-pointer transition-all"
-                            >
-                                Verify Later
-                            </button>
-
+                        {/* Modal Footer: Full width across the bottom */}
+                        <div className="flex items-center justify-center pt-3.5 border-t-2 border-black/10 shrink-0">
                             {isExpired ? (
                                 <button
                                     type="button"
                                     onClick={handleRestart}
-                                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black uppercase tracking-wide shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none cursor-pointer transition-all"
+                                    className="w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black uppercase tracking-wide shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none cursor-pointer transition-all"
                                 >
                                     <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
                                     <span>Restart Challenge</span>
@@ -345,7 +518,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                     type="button"
                                     onClick={handleConfirm}
                                     disabled={isConfirming || cooldownSeconds > 0}
-                                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#90f274] text-black text-xs font-black uppercase tracking-wide shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#90f274] text-black text-xs font-black uppercase tracking-wide shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isConfirming ? (
                                         <>
