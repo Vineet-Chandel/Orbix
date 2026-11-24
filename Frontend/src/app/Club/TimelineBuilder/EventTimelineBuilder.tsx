@@ -12,6 +12,7 @@ import {
     Sparkles,
     FileCheck,
     Layers,
+    X,
 } from "lucide-react";
 import type { ConfiguredStage, StageType, StageEligibility, StageActionType } from "./types";
 import { STAGE_TEMPLATES, type StageTemplateDefinition } from "./StageTemplates";
@@ -365,9 +366,10 @@ export const EventTimelineBuilder: React.FC<EventTimelineBuilderProps> = ({
                         <button
                             type="button"
                             onClick={() => setShowTemplatePicker(false)}
-                            className="text-xs font-black text-neutral-500 hover:text-black cursor-pointer"
+                            className="text-xs font-black text-neutral-500 hover:text-black cursor-pointer inline-flex items-center gap-1"
                         >
-                            ✕ Close
+                            <X className="w-3.5 h-3.5" />
+                            <span>Close</span>
                         </button>
                     </div>
 

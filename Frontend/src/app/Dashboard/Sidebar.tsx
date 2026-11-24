@@ -61,6 +61,14 @@ export const Sidebar = ({
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
 
+    // Notify document body that personal bottom nav is active (removes sticky top hamburger button on mobile)
+    useEffect(() => {
+        document.body.classList.add("orbix-has-bottom-nav");
+        return () => {
+            document.body.classList.remove("orbix-has-bottom-nav");
+        };
+    }, []);
+
     // Hover-driven expansion: collapsed by default (Image 2), expands on hovering or when profile menu is open
     const [isHovered, setIsHovered] = useState(false);
     const isExpanded = isOpen || isHovered || isProfileMenuOpen;

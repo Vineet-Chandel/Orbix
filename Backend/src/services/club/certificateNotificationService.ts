@@ -57,7 +57,7 @@ export class CertificateNotificationService {
                 if (certs.length === 1) {
                     const cert = certs[0];
                     if (!cert) continue;
-                    const notifTitle = `🎓 You've received a certificate!`;
+                    const notifTitle = `You've received a certificate!`;
                     const typeLabel = `Certificate of ${this.formatType(cert.certificate_type)}`;
                     const notifBody = eventRecord
                         ? `${club.name} has awarded you a ${typeLabel} for ${eventRecord.title}.`
@@ -114,7 +114,7 @@ export class CertificateNotificationService {
                     );
                 } else {
                     // Grouped bulk notification (Phase 15: "You received 3 certificates from ABC Coding Club.")
-                    const notifTitle = `🎓 You received ${certs.length} certificates from ${club.name}!`;
+                    const notifTitle = `You received ${certs.length} certificates from ${club.name}!`;
                     const notifBody = `You received ${certs.length} certificates from ${club.name}${
                         eventRecord ? ` for ${eventRecord.title}` : ""
                     }. Tap to reveal your achievements.`;

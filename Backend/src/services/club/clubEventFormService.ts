@@ -3902,7 +3902,7 @@ Organizer Request: ${userPrompt}`;
                             user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
                         ) VALUES (
                             $1::uuid, $1::uuid, $2,
-                            'Application Accepted! 🎉',
+                            'Application Accepted!',
                             $3,
                             'club_event',
                             'application_approved',

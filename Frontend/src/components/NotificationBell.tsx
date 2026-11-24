@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Bell, Mail, Trash2, X, Inbox, ArrowUpRight } from "lucide-react";
+import {
+    Bell,
+    Mail,
+    Trash2,
+    X,
+    Inbox,
+    ArrowUpRight,
+    ShieldCheck,
+    Award,
+    Calendar,
+    CheckCircle2,
+    Ticket,
+    Laptop,
+} from "lucide-react";
 import { OrbixLoader } from "./ui/loader";
 import { useAppSelector } from "../store";
 import {
@@ -13,6 +27,64 @@ import {
 interface NotificationBellProps {
     variant?: "dark" | "light" | "neo";
     className?: string;
+}
+
+function cleanEmojiText(text: string): string {
+    if (!text) return "";
+    return text
+        .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1FA70}-\u{1FAFF}]/gu, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function getNotificationIcon(title: string, body?: string) {
+    const lower = `${title} ${body || ""}`.toLowerCase();
+    if (lower.includes("login") || lower.includes("device") || lower.includes("macbook") || lower.includes("windows") || lower.includes("session")) {
+        return {
+            Icon: Laptop,
+            bg: "bg-sky-100 text-sky-900",
+        };
+    }
+    if (lower.includes("security") || lower.includes("password") || lower.includes("alert")) {
+        return {
+            Icon: ShieldCheck,
+            bg: "bg-amber-100 text-amber-900",
+        };
+    }
+    if (lower.includes("certificate") || lower.includes("award") || lower.includes("credential")) {
+        return {
+            Icon: Award,
+            bg: "bg-[#FFE566] text-black",
+        };
+    }
+    if (lower.includes("application") || lower.includes("accepted") || lower.includes("approved")) {
+        return {
+            Icon: CheckCircle2,
+            bg: "bg-[#a2ff86] text-black",
+        };
+    }
+    if (lower.includes("ticket") || lower.includes("pass") || lower.includes("check in") || lower.includes("checked in")) {
+        return {
+            Icon: Ticket,
+            bg: "bg-[#a2ff86] text-black",
+        };
+    }
+    if (lower.includes("event") || lower.includes("workshop") || lower.includes("campus") || lower.includes("session")) {
+        return {
+            Icon: Calendar,
+            bg: "bg-[#a2ff86] text-black",
+        };
+    }
+    if (lower.includes("recruiter") || lower.includes("inquiry") || lower.includes("message") || lower.includes("mail")) {
+        return {
+            Icon: Mail,
+            bg: "bg-purple-100 text-purple-900",
+        };
+    }
+    return {
+        Icon: Bell,
+        bg: "bg-[#FAF6EE] text-black",
+    };
 }
 
 function formatRelativeTime(dateString: string): string {
@@ -44,6 +116,53 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const [dropdownStyle, setDropdownStyle] = useState<{
+        top: number;
+        left: number;
+        width: number;
+        maxHeight: number;
+    } | null>(null);
+
+    const updateDropdownPosition = useCallback(() => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        // Bounded width with safety margins
+        const width = Math.min(420, Math.max(300, vw - 24));
+
+        // Horizontal position:
+        // Anchor relative to button, flipping cleanly based on screen half
+        let left: number;
+        if (rect.left > vw / 2) {
+            left = rect.right - width;
+        } else {
+            left = rect.left;
+        }
+
+        // Clamp strictly within viewport boundaries [12px, vw - width - 12px]
+        left = Math.max(12, Math.min(vw - width - 12, left));
+
+        // Vertical position:
+        let top = rect.bottom + 8;
+        let maxHeight = vh - top - 16;
+
+        // If space below is constrained (< 220px) and there is ample room above, flip above the button
+        if (maxHeight < 220 && rect.top > 250) {
+            maxHeight = Math.min(480, rect.top - 24);
+            top = rect.top - maxHeight - 8;
+        } else {
+            maxHeight = Math.min(480, Math.max(180, maxHeight));
+        }
+
+        setDropdownStyle({
+            top,
+            left,
+            width,
+            maxHeight,
+        });
+    }, []);
 
     // 1. Automatic unread count polling
     const updateUnreadCount = useCallback(async () => {
@@ -74,12 +193,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         };
     }, [user, updateUnreadCount]);
 
-    // 2. When dropdown opens, automatically fetch notifications and mark as read
+    // 2. When dropdown opens, calculate position and load notifications
     const handleOpenDropdown = async () => {
         const nextState = !isOpen;
         setIsOpen(nextState);
 
         if (nextState && user) {
+            updateDropdownPosition();
             setUnreadCount(0);
             setLoading(true);
 
@@ -98,14 +218,26 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         }
     };
 
-    // Close when clicking outside or pressing Escape
+    // Recompute dropdown position on resize or scroll
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
+        if (!isOpen) return;
+        updateDropdownPosition();
+
+        const handleResizeOrScroll = () => {
+            updateDropdownPosition();
         };
 
+        window.addEventListener("resize", handleResizeOrScroll);
+        window.addEventListener("scroll", handleResizeOrScroll, true);
+
+        return () => {
+            window.removeEventListener("resize", handleResizeOrScroll);
+            window.removeEventListener("scroll", handleResizeOrScroll, true);
+        };
+    }, [isOpen, updateDropdownPosition]);
+
+    // Close when clicking outside or pressing Escape
+    useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 setIsOpen(false);
@@ -113,29 +245,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         };
 
         if (isOpen) {
-            document.addEventListener("mousedown", handleClickOutside);
             document.addEventListener("keydown", handleKeyDown);
         }
 
         return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
             document.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [isOpen]);
-
-    // Prevent background page scrolling while mobile modal overlay is open (< 640px)
-    useEffect(() => {
-        if (!isOpen || typeof window === "undefined") return;
-        if (window.innerWidth >= 640) return;
-
-        const prevBodyOverflow = document.body.style.overflow;
-        const prevHtmlOverflow = document.documentElement.style.overflow;
-        document.body.style.overflow = "hidden";
-        document.documentElement.style.overflow = "hidden";
-
-        return () => {
-            document.body.style.overflow = prevBodyOverflow;
-            document.documentElement.style.overflow = prevHtmlOverflow;
         };
     }, [isOpen]);
 
@@ -217,18 +331,28 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                 )}
             </button>
 
-            {/* Notification Dropdown Flyout (Desktop >= 640px) / Centered Modal (Mobile < 640px) */}
-            {isOpen && (
-                <div
-                    className="orbix-notif-modal-overlay fixed inset-0 z-[75] flex items-center justify-center bg-black/40 p-3 sm:p-0 overscroll-contain sm:contents"
-                    onClick={() => setIsOpen(false)}
-                >
+            {/* Notification Dropdown Portal — Intelligent Viewport-Clamped Flyout */}
+            {isOpen && dropdownStyle && typeof document !== "undefined" && createPortal(
+                <>
+                    {/* Outside Click Catcher Backdrop */}
+                    <div
+                        className="fixed inset-0 z-[99990] bg-black/15 backdrop-blur-[1px]"
+                        onClick={() => setIsOpen(false)}
+                    />
+
+                    {/* Notification Dropdown Container */}
                     <div
                         role="dialog"
                         aria-modal="true"
                         aria-label="Notifications"
                         onClick={(e) => e.stopPropagation()}
-                        className={`orbix-notif-modal relative w-full max-w-[380px] flex flex-col sm:absolute sm:right-0 sm:mt-3 sm:w-[420px] sm:max-w-[94vw] sm:block sm:z-50 rounded-2xl border-2 border-black overflow-hidden animate-in fade-in zoom-in-95 duration-150 select-none ${
+                        style={{
+                            top: `${dropdownStyle.top}px`,
+                            left: `${dropdownStyle.left}px`,
+                            width: `${dropdownStyle.width}px`,
+                            maxHeight: `${dropdownStyle.maxHeight}px`,
+                        }}
+                        className={`fixed z-[99995] flex flex-col rounded-2xl border-2 border-black overflow-hidden animate-in fade-in zoom-in-95 duration-150 select-none ${
                             isDark
                                 ? "bg-[#0B0F17] text-neutral-100 shadow-[6px_6px_0px_#000]"
                                 : "bg-white text-black shadow-[6px_6px_0px_#000]"
@@ -276,7 +400,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                         </div>
 
                         {/* Notification Items List */}
-                        <div className={`flex-1 min-h-0 sm:max-h-[380px] overflow-y-auto overflow-x-hidden overscroll-contain divide-y-2 ${isDark ? "divide-neutral-800" : "divide-black/10"}`}>
+                        <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain divide-y-2 ${isDark ? "divide-neutral-800" : "divide-black/10"}`}>
                             {loading && notifications.length === 0 ? (
                                 <div className="py-8 flex flex-col items-center justify-center">
                                     <OrbixLoader size="sm" />
@@ -296,11 +420,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                             ) : (
                                 notifications.map((item) => {
                                     const meta = item.metadata || {};
-                                    const senderName = meta.senderName || item.title || "Inquiry";
-                                    const company = meta.company || "";
+                                    const rawTitle = item.title || "Inquiry";
+                                    const cleanTitle = cleanEmojiText(rawTitle);
+                                    const senderName = cleanEmojiText(meta.senderName || cleanTitle);
+                                    const company = cleanEmojiText(meta.company || "");
                                     const commEmail = meta.communicationEmail || meta.senderEmail || "";
-                                    const snippet = meta.fullMessage || item.body || "";
+                                    const snippet = cleanEmojiText(meta.fullMessage || item.body || "");
                                     const isDeleting = deletingId === item.id;
+                                    const { Icon: NotifIcon, bg: iconBg } = getNotificationIcon(rawTitle, snippet);
 
                                     const mailSubject = encodeURIComponent(`Re: Opportunity at ${company} for ${user.firstName || user.username}`);
                                     const mailBody = encodeURIComponent(`Hi ${senderName},\n\nThank you for reaching out regarding the opportunity at ${company}.\n\n`);
@@ -310,12 +437,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                                         <div
                                             key={item.id}
                                             onClick={() => handleOpenItem(item.id)}
-                                            className={`group p-3.5 transition-colors text-left cursor-pointer min-w-0 ${
+                                            className={`group p-3 sm:p-3.5 transition-colors text-left cursor-pointer min-w-0 ${
                                                 isDark ? "hover:bg-neutral-900" : "hover:bg-[#FAF6EE]"
                                             }`}
                                         >
-                                            <div className="flex items-start justify-between gap-2.5 min-w-0">
-                                                {/* Left: Sender & Company */}
+                                            <div className="flex items-start gap-3 min-w-0">
+                                                {/* Lucide React Notification Type Icon */}
+                                                <div className={`w-8 h-8 rounded-xl border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000] mt-0.5 ${iconBg}`}>
+                                                    <NotifIcon className="w-4 h-4 stroke-[2.4]" />
+                                                </div>
+
+                                                {/* Middle: Sender & Company & Snippet */}
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                                                         <span className={`text-xs font-black truncate max-w-full ${
@@ -398,7 +530,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                             </div>
                         )}
                     </div>
-                </div>
+                </>,
+                document.body
             )}
         </div>
     );

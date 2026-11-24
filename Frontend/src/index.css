@@ -585,6 +585,17 @@ html.dark body:has(.blog-container) {
    Guarantees opaque background, consistent Neo-Brutalist styling, and safe-area insets.
    ========================================================================== */
 @media (max-width: 1023px) {
+  /* When Mobile Bottom Navigation is active, immediately remove the top-left sidebar toggle button */
+  body.orbix-has-bottom-nav button[aria-label="Open sidebar"],
+  body:has(#orbix-mobile-bottom-nav) button[aria-label="Open sidebar"] {
+    display: none !important;
+  }
+
+  body.orbix-has-bottom-nav button[aria-label="Open sidebar"] + *,
+  body:has(#orbix-mobile-bottom-nav) button[aria-label="Open sidebar"] + * {
+    margin-left: 0 !important;
+  }
+
   button[aria-label="Open sidebar"] {
     position: fixed !important;
     top: calc(env(safe-area-inset-top, 0px) + 1.625rem) !important;

@@ -470,7 +470,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             {/* Sticky Bottom Navigation Container (Mobile only, overlay on full screen) */}
             <div
                 ref={navRef}
-                className="fixed bottom-2 sm:bottom-3 inset-x-0 mx-auto z-[9999] w-[calc(100%-1rem)] max-w-[420px] lg:hidden select-none"
+                id="orbix-mobile-bottom-nav"
+                className="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:bottom-3 inset-x-0 mx-auto z-[9990] w-[calc(100%-1rem)] max-w-[420px] lg:hidden select-none"
             >
                 {/* Radial Circular Circumference Menu Overlay */}
                 <AnimatePresence>
@@ -596,18 +597,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                                             : "text-neutral-700 hover:text-black font-bold"
                                     }`}
                                 >
-                                    {tab.icon}
+                                    <div className="relative flex items-center justify-center">
+                                        {tab.icon}
+                                        {tab.badge !== undefined && (
+                                            <span className="absolute -top-1 -right-2 z-20 px-1 h-3.5 min-w-[14px] flex items-center justify-center rounded-full text-[8.5px] font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] leading-none pointer-events-none">
+                                                {tab.badge}
+                                            </span>
+                                        )}
+                                    </div>
                                     <span className="text-[10px] tracking-tight mt-0.5 leading-none">
                                         {tab.label}
                                     </span>
                                 </div>
-
-                                {/* Optional Badge indicator (e.g. notifications / workspaces count) */}
-                                {tab.badge !== undefined && (
-                                    <span className="absolute top-1 right-2 z-20 px-1 rounded-full text-[9px] font-black bg-[#FFE566] text-black border border-black shadow-[0.5px_0.5px_0px_#000]">
-                                        {tab.badge}
-                                    </span>
-                                )}
                             </button>
                         );
                     })}

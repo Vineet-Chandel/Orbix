@@ -16,6 +16,7 @@ import {
     ClockCheck,
     Lock,
     ShieldAlert,
+    Building2,
 } from "lucide-react";
 import type {
     WorkspaceRecognitionLedgerEntry,
@@ -274,8 +275,9 @@ export const AwardHistoryView: React.FC<AwardHistoryViewProps> = ({
                                                 <span className="font-bold text-black inline-flex items-center gap-1">
                                                     {getDisplayName(entry.issuer)}
                                                     {entry.issuer?.isClub && (
-                                                        <span className="px-1.5 py-0.2 bg-amber-100 border border-amber-500 text-amber-900 rounded text-[9px] font-black uppercase">
-                                                            🏛️ Club
+                                                        <span className="px-1.5 py-0.5 bg-amber-100 border border-amber-500 text-amber-900 rounded text-[9px] font-black uppercase inline-flex items-center gap-1">
+                                                            <Building2 className="w-2.5 h-2.5" />
+                                                            <span>Club</span>
                                                         </span>
                                                     )}
                                                 </span>

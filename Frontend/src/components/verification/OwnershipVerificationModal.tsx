@@ -132,7 +132,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
             aria-modal="true"
             aria-labelledby="ownershipVerificationTitle"
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn"
+            className="fixed inset-0 z-[10001] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn"
         >
             <div
                 className="w-full max-w-lg bg-white border-3 border-black rounded-2xl p-5 sm:p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 sm:space-y-5 animate-scaleUp overflow-hidden max-h-[90vh] overflow-y-auto"

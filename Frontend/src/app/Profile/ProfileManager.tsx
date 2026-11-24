@@ -642,7 +642,7 @@ export default function ProfileManager() {
                     aria-label="Profile & Card Studio"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
-                    <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6">
+                    <div className="p-4 sm:p-6 lg:p-8 pb-36 sm:pb-36 lg:pb-8 flex-1 space-y-6">
                         {/* ========================================================================= */}
                         {/* PAGE HEADER: Neo-Brutalist Heading */}
                         {/* ========================================================================= */}
@@ -683,63 +683,42 @@ export default function ProfileManager() {
                                     <p className="text-xs font-medium text-neutral-600 mt-0.5">Manage your showcase details and profile photo.</p>
                                 </div>
 
-                                {/* Profile Photo Interactive Frame */}
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-5 p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black mb-6 shadow-[2px_2px_0px_#000]">
-                                    <ProfilePhotoFrame
-                                        currentPhotoUrl={user?.photoUrl || user?.avatarUrl}
-                                        hasPreviousPhoto={user?.hasPreviousPhoto}
-                                        previousPhotoUrl={user?.previousPhotoUrl}
-                                        displayName={`${firstName} ${lastName}`.trim() || user?.username || "User"}
-                                        username={user?.username || ""}
-                                        size="lg"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="text-sm font-black text-black truncate">
-                                                Profile Photo
-                                            </h3>
-                                            {user?.photoUrl ? (
-                                                <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
-                                                    Custom
-                                                </span>
-                                            ) : (
-                                                <span className="px-2 py-0.5 rounded-full bg-neutral-100 border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
-                                                    Default
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-xs font-medium text-neutral-600 mt-1 leading-relaxed">
-                                            Tap avatar to view. Use the menu to upload, restore, or reset photo. Images are optimized and face-cropped automatically.
-                                        </p>
-                                        {user?.hasPreviousPhoto && (
-                                            <span className="inline-flex items-center gap-1.5 text-[11px] text-black font-bold mt-2">
-                                                <span className="w-2 h-2 rounded-full bg-emerald-500 border border-black" />
-                                                <span>Previous photo available for instant restoration</span>
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
                                 <form id={profileFormId} ref={profileFormRef} tabIndex={-1} onSubmit={handleSaveProfile} className="space-y-5 focus:outline-none">
                                     <fieldset disabled={savingProfile} className="min-w-0 space-y-5">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">First Name</label>
-                                            <input
-                                                type="text"
-                                                value={firstName}
-                                                onChange={(e) => setFirstName(e.target.value)}
-                                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
-                                                required
-                                            />
+                                    {/* First Name & Last Name (Left) and Avatar Profile Photo (Right) — Responsive Full-Width Stacked on Mobile */}
+                                    <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-5">
+                                        {/* First Name & Last Name Fields (at the left of the avatar) */}
+                                        <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4 order-2 sm:order-1">
+                                            <div>
+                                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">First Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={firstName}
+                                                    onChange={(e) => setFirstName(e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Last Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={lastName}
+                                                    onChange={(e) => setLastName(e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                                />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Last Name</label>
-                                            <input
-                                                type="text"
-                                                value={lastName}
-                                                onChange={(e) => setLastName(e.target.value)}
-                                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+
+                                        {/* Avatar with all functionalities (Full-width responsive centered presentation on mobile) */}
+                                        <div className="w-full sm:w-auto flex justify-center shrink-0 order-1 sm:order-2 pb-2 sm:pb-0">
+                                            <ProfilePhotoFrame
+                                                currentPhotoUrl={user?.photoUrl || user?.avatarUrl}
+                                                hasPreviousPhoto={user?.hasPreviousPhoto}
+                                                previousPhotoUrl={user?.previousPhotoUrl}
+                                                displayName={`${firstName} ${lastName}`.trim() || user?.username || "User"}
+                                                username={user?.username || ""}
+                                                size="lg"
                                             />
                                         </div>
                                     </div>
