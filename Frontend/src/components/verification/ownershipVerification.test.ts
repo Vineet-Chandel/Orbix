@@ -8,6 +8,7 @@ import {
     SUPPORTED_VERIFICATION_PLATFORMS,
 } from "../../utils/platformVerificationSupport.ts";
 import type { OwnershipStatus, ActiveVerificationChallenge } from "../../types/platformVerification.ts";
+import { normalizePortalError } from "../../LandingPages/Auth-Pages/portalErrorMapping.ts";
 
 test("Ownership Verification Support & Registry", async (t) => {
     await t.test("correctly identifies supported platforms with whitespace and casing tolerance", () => {
@@ -16,13 +17,26 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(isPlatformVerificationSupported("CODEFORCES"), true);
         assert.equal(isPlatformVerificationSupported("  hackerrank  "), true);
         assert.equal(isPlatformVerificationSupported("GitHub"), true);
+        assert.equal(isPlatformVerificationSupported("Kaggle"), true);
+        assert.equal(isPlatformVerificationSupported("  kaggle  "), true);
+        assert.equal(isPlatformVerificationSupported("atcoder"), true);
+        assert.equal(isPlatformVerificationSupported("  AtCoder  "), true);
+        assert.equal(isPlatformVerificationSupported("codechef"), true);
+        assert.equal(isPlatformVerificationSupported("CodeChef "), true);
+        assert.equal(isPlatformVerificationSupported("topcoder"), true);
+        assert.equal(isPlatformVerificationSupported(" TopCoder "), true);
+        assert.equal(isPlatformVerificationSupported("geeksforgeeks"), true);
+        assert.equal(isPlatformVerificationSupported("GeeksforGeeks "), true);
+        assert.equal(isPlatformVerificationSupported(" GEEKSFORGEEKS "), true);
+        assert.equal(isPlatformVerificationSupported("hackerearth"), true);
+        assert.equal(isPlatformVerificationSupported("HackerEarth "), true);
+        assert.equal(isPlatformVerificationSupported("  HACKEREARTH  "), true);
     });
 
     await t.test("rejects unsupported platforms and edge cases", () => {
-        assert.equal(isPlatformVerificationSupported("codechef"), false);
+        assert.equal(isPlatformVerificationSupported("cses"), false);
         assert.equal(isPlatformVerificationSupported("gfg"), false);
-        assert.equal(isPlatformVerificationSupported("kaggle"), false);
-        assert.equal(isPlatformVerificationSupported("atcoder"), false);
+        assert.equal(isPlatformVerificationSupported("interviewbit"), false);
         assert.equal(isPlatformVerificationSupported(""), false);
         assert.equal(isPlatformVerificationSupported(null as unknown as string), false);
         assert.equal(isPlatformVerificationSupported(undefined as unknown as string), false);
@@ -34,23 +48,42 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(getPlatformVerificationMethod("leetcode"), "token");
         assert.equal(getPlatformVerificationMethod("codeforces"), "token");
         assert.equal(getPlatformVerificationMethod("hackerrank"), "token");
-        assert.equal(getPlatformVerificationMethod("codechef"), null);
+        assert.equal(getPlatformVerificationMethod("kaggle"), "token");
+        assert.equal(getPlatformVerificationMethod("atcoder"), "token");
+        assert.equal(getPlatformVerificationMethod("codechef"), "token");
+        assert.equal(getPlatformVerificationMethod("topcoder"), "token");
+        assert.equal(getPlatformVerificationMethod("geeksforgeeks"), "token");
+        assert.equal(getPlatformVerificationMethod("hackerearth"), "token");
+        assert.equal(getPlatformVerificationMethod("cses"), null);
     });
 
     await t.test("returns exact target profile fields for token verification", () => {
         assert.equal(getPlatformVerificationField("leetcode"), "aboutMe");
         assert.equal(getPlatformVerificationField("codeforces"), "organization");
-        assert.equal(getPlatformVerificationField("hackerrank"), "short_bio");
+        assert.equal(getPlatformVerificationField("hackerrank"), "headline");
         assert.equal(getPlatformVerificationField("github"), "oauth_identity");
-        assert.equal(getPlatformVerificationField("gfg"), null);
+        assert.equal(getPlatformVerificationField("kaggle"), "bio");
+        assert.equal(getPlatformVerificationField("atcoder"), "affiliation");
+        assert.equal(getPlatformVerificationField("codechef"), "highest_degree");
+        assert.notEqual(getPlatformVerificationField("codechef"), "institution");
+        assert.equal(getPlatformVerificationField("topcoder"), "description");
+        assert.equal(getPlatformVerificationField("geeksforgeeks"), "bio");
+        assert.equal(getPlatformVerificationField("hackerearth"), "bio");
+        assert.equal(getPlatformVerificationField("cses"), null);
     });
 
-    await t.test("registry contains exactly the 4 Phase 2-3 verified adapters", () => {
+    await t.test("registry contains exactly the 10 verified adapters", () => {
         assert.deepEqual([...SUPPORTED_VERIFICATION_PLATFORMS], [
             "leetcode",
             "codeforces",
             "hackerrank",
             "github",
+            "kaggle",
+            "atcoder",
+            "codechef",
+            "topcoder",
+            "geeksforgeeks",
+            "hackerearth",
         ]);
     });
 
@@ -79,17 +112,125 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(cfGuide.settingsUrl, "https://codeforces.com/settings/social");
         assert.ok(cfGuide.instruction.includes("Organization"));
         assert.ok(!cfGuide.instruction.includes(testToken));
-        assert.equal(cfGuide.hasScreenshot, false);
+        assert.equal(cfGuide.hasScreenshot, true);
+        assert.ok(cfGuide.screenshotAlt?.includes("Organization"));
+        assert.ok(cfGuide.screenshotCaption?.includes("Organization"));
 
-        // HackerRank: must target Short Bio and settings/profile
-        const hrGuide = getPlatformVerificationGuide("hackerrank", testToken);
+        // HackerRank: must target Headline and profile/{username}
+        const hrGuide = getPlatformVerificationGuide("hackerrank", testToken, undefined, "alice_hr");
         assert.equal(hrGuide.portalId, "hackerrank");
         assert.equal(hrGuide.portalName, "HackerRank");
-        assert.equal(hrGuide.targetFieldName, "Short Bio");
-        assert.equal(hrGuide.settingsUrl, "https://www.hackerrank.com/settings/profile");
-        assert.ok(hrGuide.instruction.includes("Short Bio"));
+        assert.equal(hrGuide.targetFieldName, "Headline");
+        assert.equal(hrGuide.settingsUrl, "https://www.hackerrank.com/profile/alice_hr");
+        assert.equal(hrGuide.settingsUrlLabel, "Open HackerRank Profile");
+        assert.ok(hrGuide.instruction.includes("Headline"));
+        assert.ok(!hrGuide.instruction.includes("Short Bio"));
+        assert.ok(!hrGuide.instruction.includes("short_bio"));
         assert.ok(!hrGuide.instruction.includes(testToken));
-        assert.equal(hrGuide.hasScreenshot, false);
+        assert.ok(hrGuide.detailText.includes("Headline"));
+        assert.equal(hrGuide.hasScreenshot, true);
+        assert.ok(hrGuide.screenshotAlt?.includes("Headline"));
+        assert.ok(hrGuide.screenshotCaption?.includes("Headline"));
+
+        // Kaggle: must target Bio and profile/{username}
+        const kaggleGuide = getPlatformVerificationGuide("kaggle", testToken, undefined, "alexis_test");
+        assert.equal(kaggleGuide.portalId, "kaggle");
+        assert.equal(kaggleGuide.portalName, "Kaggle");
+        assert.equal(kaggleGuide.targetFieldName, "Bio");
+        assert.equal(kaggleGuide.settingsUrl, "https://www.kaggle.com/alexis_test");
+        assert.equal(kaggleGuide.settingsUrlLabel, "Open Kaggle Profile");
+        assert.ok(kaggleGuide.instruction.includes("Bio"));
+        assert.ok(kaggleGuide.instruction.includes("Home tab"));
+        assert.ok(kaggleGuide.instruction.includes("Edit control"));
+        assert.ok(!kaggleGuide.instruction.includes(testToken));
+        assert.ok(kaggleGuide.detailText.includes("Bio"));
+        assert.equal(kaggleGuide.hasScreenshot, false);
+
+        // AtCoder: must target Affiliation and settings
+        const atcoderGuide = getPlatformVerificationGuide("atcoder", testToken, undefined, "chokudai");
+        assert.equal(atcoderGuide.portalId, "atcoder");
+        assert.equal(atcoderGuide.portalName, "AtCoder");
+        assert.equal(atcoderGuide.targetFieldName, "Affiliation");
+        assert.equal(atcoderGuide.settingsUrl, "https://atcoder.jp/settings");
+        assert.ok(atcoderGuide.instruction.includes("Affiliation"));
+        assert.ok(!atcoderGuide.instruction.includes(testToken));
+        assert.ok(atcoderGuide.detailText.includes("Affiliation"));
+        assert.equal(atcoderGuide.hasScreenshot, false);
+
+        // CodeChef: must target Highest Degree Earned, Professional section, and dynamic user edit URL
+        const codechefGuide = getPlatformVerificationGuide("codechef", testToken, undefined, "chef_user");
+        assert.equal(codechefGuide.portalId, "codechef");
+        assert.equal(codechefGuide.portalName, "CodeChef");
+        assert.equal(codechefGuide.targetFieldName, "Highest Degree Earned");
+        assert.equal(codechefGuide.settingsUrl, "https://www.codechef.com/users/chef_user/edit");
+        assert.equal(codechefGuide.settingsUrlLabel, "Open CodeChef Edit Profile");
+        assert.ok(codechefGuide.instruction.includes("Highest Degree Earned"));
+        assert.ok(codechefGuide.instruction.includes("Professional"));
+        assert.ok(!codechefGuide.instruction.includes("Institution"));
+        assert.ok(!codechefGuide.instruction.includes(testToken));
+        assert.ok(codechefGuide.detailText.includes("Highest Degree Earned"));
+        assert.equal(codechefGuide.hasScreenshot, true);
+        assert.ok(codechefGuide.screenshotAlt?.includes("Highest Degree Earned"));
+        assert.ok(codechefGuide.screenshotCaption?.includes("Highest Degree Earned"));
+
+        // CodeChef fallback when username is absent: must NOT resolve to misleading 'edit' username
+        const codechefFallbackGuide = getPlatformVerificationGuide("codechef", testToken);
+        assert.equal(codechefFallbackGuide.settingsUrl, "https://www.codechef.com/");
+        assert.equal(codechefFallbackGuide.settingsUrlLabel, "Open CodeChef");
+        assert.notEqual(codechefFallbackGuide.settingsUrl, "https://www.codechef.com/users/edit");
+
+        // TopCoder: must target Short Bio and settings/profile
+        const topcoderGuide = getPlatformVerificationGuide("topcoder", testToken, undefined, "tc_coder");
+        assert.equal(topcoderGuide.portalId, "topcoder");
+        assert.equal(topcoderGuide.portalName, "TopCoder");
+        assert.equal(topcoderGuide.targetFieldName, "Short Bio");
+        assert.equal(topcoderGuide.settingsUrl, "https://www.topcoder.com/settings/profile");
+        assert.ok(topcoderGuide.instruction.includes("Short Bio"));
+        assert.ok(!topcoderGuide.instruction.includes(testToken));
+        assert.ok(topcoderGuide.detailText.includes("Short Bio"));
+        assert.equal(topcoderGuide.hasScreenshot, false);
+
+        // GeeksforGeeks: must target About/Bio and profile/edit
+        const gfgGuide = getPlatformVerificationGuide("geeksforgeeks", testToken, undefined, "gfg_coder");
+        assert.equal(gfgGuide.portalId, "geeksforgeeks");
+        assert.equal(gfgGuide.portalName, "GeeksforGeeks");
+        assert.equal(gfgGuide.targetFieldName, "About/Bio");
+        assert.equal(gfgGuide.settingsUrl, "https://www.geeksforgeeks.org/profile/edit");
+        assert.equal(gfgGuide.settingsUrlLabel, "Open GeeksforGeeks Profile Settings");
+        assert.ok(gfgGuide.instruction.includes("About/Bio"));
+        assert.ok(gfgGuide.instruction.includes("Headline"));
+        assert.ok(!gfgGuide.instruction.includes(testToken));
+        assert.ok(gfgGuide.detailText.includes("About/Bio"));
+        assert.equal(gfgGuide.hasScreenshot, true);
+        assert.ok(gfgGuide.screenshotAlt?.includes("Headline"));
+        assert.ok(gfgGuide.screenshotAlt?.includes("About/Bio"));
+        assert.ok(gfgGuide.screenshotCaption?.includes("About/Bio"));
+
+        // HackerEarth: must target Bio and profile settings URL
+        const heGuide = getPlatformVerificationGuide("hackerearth", testToken, undefined, "rahultripathi");
+        assert.equal(heGuide.portalId, "hackerearth");
+        assert.equal(heGuide.portalName, "HackerEarth");
+        assert.equal(heGuide.targetFieldName, "Bio");
+        assert.equal(heGuide.settingsUrl, "https://www.hackerearth.com/@rahultripathi/");
+        assert.equal(heGuide.settingsUrlLabel, "Open HackerEarth Profile");
+        assert.ok(heGuide.instruction.includes("Bio"));
+        assert.ok(heGuide.instruction.includes("Verify"));
+        assert.ok(heGuide.detailText.includes("Bio"));
+
+        // Unsupported platforms (e.g. CSES): must NOT return fake token placement instructions
+        const csesGuide = getPlatformVerificationGuide("cses", testToken, undefined, "cses_user");
+        assert.equal(csesGuide.portalId, "cses");
+        assert.ok(!csesGuide.instruction.includes("verification code"));
+        assert.ok(!csesGuide.detailText.includes("Place the token"));
+    });
+
+    await t.test("standardizes verification action button instructions to Verify across all active challenge platforms", () => {
+        const testToken = "orbix-v-testToken123456789";
+        for (const portal of ["leetcode", "codeforces", "hackerrank", "codechef", "geeksforgeeks", "hackerearth"]) {
+            const guide = getPlatformVerificationGuide(portal, testToken);
+            assert.ok(guide.instruction.includes("Verify"), `${portal} instruction must direct user to click Verify`);
+            assert.ok(!guide.instruction.includes("Updated My Profile"), `${portal} instruction must not mention Updated My Profile`);
+        }
     });
 });
 
@@ -259,5 +400,43 @@ test("Security & Non-Persistence Invariants", async (t) => {
 
         assert.equal(new Date(pastExpiresAt).getTime() <= now, true);
         assert.equal(new Date(futureExpiresAt).getTime() > now, true);
+    });
+});
+
+test("Platform Fetch Failure Classification & Anti-Bot Differentiation", async (t) => {
+    await t.test("CRITICAL: anti-bot interception (503 / PLATFORM_UNAVAILABLE) is never labeled Account Not Found", () => {
+        const normalized = normalizePortalError(503, {
+            code: "PLATFORM_UNAVAILABLE",
+            message: "Kaggle is temporarily unavailable due to anti-bot verification. Please try again shortly."
+        }, "Kaggle");
+
+        assert.ok(normalized.message.includes("anti-bot verification") || normalized.message.includes("temporarily unavailable"));
+        assert.ok(!normalized.message.includes("Account not found"), "Must NOT state account not found when blocked by anti-bot gate");
+        assert.equal(normalized.badgeLabel, "Platform Unavailable");
+        assert.notEqual(normalized.badgeLabel, "Account Not Found");
+    });
+
+    await t.test("Rate limit (429) maps to Rate Limited badge and message", () => {
+        const normalized = normalizePortalError(429, { code: "RATE_LIMITED" }, "Kaggle");
+        assert.ok(normalized.message.includes("Too many requests") || normalized.message.includes("Rate limit"));
+        assert.equal(normalized.badgeLabel, "Rate Limited");
+    });
+
+    await t.test("Network timeout (504) maps to Network Error badge and message", () => {
+        const normalized = normalizePortalError(504, { code: "NETWORK_ERROR", message: "Connection to Kaggle timed out." }, "Kaggle");
+        assert.ok(normalized.message.includes("timed out") || normalized.message.includes("Unable to connect"));
+        assert.equal(normalized.badgeLabel, "Network Error");
+    });
+
+    await t.test("Parse error (502) maps to Parse Error badge and message", () => {
+        const normalized = normalizePortalError(502, { code: "PARSE_ERROR" }, "Kaggle");
+        assert.ok(normalized.message.includes("could not be interpreted") || normalized.message.includes("parse"));
+        assert.equal(normalized.badgeLabel, "Parse Error");
+    });
+
+    await t.test("Genuine missing account (404) maps to Account Not Found badge and message", () => {
+        const normalized = normalizePortalError(404, { code: "ACCOUNT_NOT_FOUND" }, "Kaggle");
+        assert.ok(normalized.message.includes("Account not found"));
+        assert.equal(normalized.badgeLabel, "Account Not Found");
     });
 });

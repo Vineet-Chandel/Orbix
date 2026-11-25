@@ -15,6 +15,7 @@ import { OwnershipStatusBadge } from "../../components/verification/OwnershipSta
 import { OwnershipVerificationModal } from "../../components/verification/OwnershipVerificationModal";
 import { isPlatformVerificationSupported } from "../../utils/platformVerificationSupport";
 import type { OwnershipStatus } from "../../types/platformVerification";
+import { normalizePortalError, type NormalizedPortalError } from "../../LandingPages/Auth-Pages/portalErrorMapping";
 
 export interface PortalProfileData {
     success: boolean;
@@ -399,7 +400,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     const [connectingPortalId, setConnectingPortalId] = useState<string | null>(null);
     const [inputValue, setInputValue] = useState("");
     const [isVerifying, setIsVerifying] = useState(false);
-    const [connectError, setConnectError] = useState<string | null>(null);
+    const [connectError, setConnectError] = useState<NormalizedPortalError | null>(null);
     const [verifiedProfile, setVerifiedProfile] = useState<PortalProfileData | null>(null);
     const [isSavingConnect, setIsSavingConnect] = useState(false);
 
@@ -535,7 +536,11 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         const judgment = judgePortalInput(connectingPortalId, trimmed);
         if (!judgment.isValid || !judgment.username) {
             setVerifiedProfile(null);
-            setConnectError(judgment.message || "Invalid handle format");
+            setConnectError({
+                category: "UNKNOWN_ERROR",
+                badgeLabel: "Invalid Handle",
+                message: judgment.message || "Invalid handle format",
+            });
             setIsVerifying(false);
             return;
         }
@@ -552,7 +557,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         const timer = setTimeout(async () => {
             const endpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`);
             let data: PortalProfileData | null = null;
-            let errorMessage: string | null = null;
+            let normalizedError: NormalizedPortalError | null = null;
 
             try {
                 const res = await fetch(endpoint, { signal: controller.signal });
@@ -561,12 +566,13 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                     if (json && json.success) {
                         data = json;
                     }
-                } else if (res.status === 404) {
+                } else {
                     const errJson = await res.json().catch(() => ({}));
-                    errorMessage = errJson.message || `Account '@${username}' not found on ${config.name}.`;
+                    normalizedError = normalizePortalError(res.status, errJson, config.name);
                 }
-            } catch {
-                // Network error or timeout
+            } catch (err: any) {
+                if (err?.name === "AbortError") return;
+                normalizedError = normalizePortalError(0, { message: err?.message }, config.name);
             }
 
             if (!isMounted) return;
@@ -577,7 +583,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                 setConnectError(null);
             } else {
                 setVerifiedProfile(null);
-                setConnectError(errorMessage || `Account '@${username}' not found on ${config.name}.`);
+                setConnectError(normalizedError || normalizePortalError(404, null, config.name));
             }
         }, 400);
 
@@ -1171,14 +1177,16 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                 </div>
                             )}
 
-                            {/* Error Banner when Account Not Found — Connect button is completely hidden! */}
+                            {/* Error Banner when Account Not Found or Platform Issue — Connect button is completely hidden! */}
                             {connectError && !isVerifying && (
                                 <div className="p-3 rounded-xl bg-rose-50 border border-rose-200/90 text-xs font-semibold text-rose-700 flex items-start gap-2.5 animate-fadeIn">
                                     <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
                                     <div className="flex-1">
-                                        <p>{connectError}</p>
+                                        <p>{connectError.message}</p>
                                         <p className="text-[11px] font-normal text-rose-600/80 mt-0.5">
-                                            Make sure the username exists publicly on {activeConnectingConfig.name}.
+                                            {connectError.category === "ACCOUNT_NOT_FOUND"
+                                                ? `Make sure the username exists publicly on ${activeConnectingConfig.name}.`
+                                                : `You can retry or check your account directly on ${activeConnectingConfig.name}.`}
                                         </p>
                                     </div>
                                 </div>

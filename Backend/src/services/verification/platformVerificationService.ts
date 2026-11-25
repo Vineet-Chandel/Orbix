@@ -264,7 +264,7 @@ export class PlatformVerificationService {
         ]);
 
         const challengeId = insertChallengeRes.rows[0].id;
-        const instructions = adapter.getInstructions(tokenBundle.plaintextToken, targetField);
+        const instructions = adapter.getInstructions(tokenBundle.plaintextToken, targetField, cleanUsername);
 
         return {
             success: true,

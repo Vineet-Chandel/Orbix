@@ -10,6 +10,12 @@ import { LeetCodeAdapter } from "./leetcodeAdapter.js";
 import { CodeforcesAdapter } from "./codeforcesAdapter.js";
 import { HackerRankAdapter } from "./hackerrankAdapter.js";
 import { GitHubAdapter } from "./githubAdapter.js";
+import { KaggleAdapter } from "./kaggleAdapter.js";
+import { AtCoderAdapter } from "./atcoderAdapter.js";
+import { CodeChefAdapter } from "./codechefAdapter.js";
+import { TopCoderAdapter } from "./topcoderAdapter.js";
+import { GeeksforGeeksAdapter } from "./geeksforgeeksAdapter.js";
+import { HackerEarthAdapter } from "./hackerearthAdapter.js";
 
 class AdapterRegistry {
     private readonly adapters: Map<string, PlatformAdapter> = new Map();
@@ -19,6 +25,12 @@ class AdapterRegistry {
         this.register(new CodeforcesAdapter());
         this.register(new HackerRankAdapter());
         this.register(new GitHubAdapter());
+        this.register(new KaggleAdapter());
+        this.register(new AtCoderAdapter());
+        this.register(new CodeChefAdapter());
+        this.register(new TopCoderAdapter());
+        this.register(new GeeksforGeeksAdapter());
+        this.register(new HackerEarthAdapter());
     }
 
     public register(adapter: PlatformAdapter): void {

@@ -10,6 +10,7 @@ import {
     ShieldCheck,
     AlertTriangle,
     RefreshCw,
+    ZoomIn,
 } from "lucide-react";
 import { PORTALS } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
@@ -20,6 +21,27 @@ import { startGitHubOwnershipVerification } from "../../api/platformVerification
 import type { ConfirmVerificationSuccessResponse } from "../../types/platformVerification";
 import { getPlatformVerificationGuide } from "../../utils/platformVerificationSupport";
 import leetcodeGuideImg from "../../assets/verification/leetcode-verification-guide-cropped.png";
+import codeforcesGuideImg from "../../assets/verification/codeforces-verification-guide.png";
+import hackerrankGuideImg from "../../assets/verification/hackerrank-verification-guide.png";
+import geeksforgeeksGuideImg from "../../assets/verification/geeksforgeeks-verification-guide.png";
+import codechefGuideImg from "../../assets/verification/codechef-verification-guide.png";
+
+const getGuideScreenshot = (portalId?: string): string | undefined => {
+    switch (portalId) {
+        case "leetcode":
+            return leetcodeGuideImg;
+        case "codeforces":
+            return codeforcesGuideImg;
+        case "hackerrank":
+            return hackerrankGuideImg;
+        case "geeksforgeeks":
+            return geeksforgeeksGuideImg;
+        case "codechef":
+            return codechefGuideImg;
+        default:
+            return undefined;
+    }
+};
 
 interface CopySuccessIconProps {
     className?: string;
@@ -39,6 +61,88 @@ const CopySuccessIcon: React.FC<CopySuccessIconProps> = ({ className = "w-4 h-4 
         </span>
     </span>
 );
+
+interface ScreenshotPreviewModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    imageSrc: string;
+    altText?: string;
+    caption?: string | null;
+}
+
+const ScreenshotPreviewModal: React.FC<ScreenshotPreviewModalProps> = ({
+    isOpen,
+    onClose,
+    imageSrc,
+    altText,
+    caption,
+}) => {
+    const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose,
+    });
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const rafId = window.requestAnimationFrame(() => {
+            closeBtnRef.current?.focus();
+        });
+        return () => window.cancelAnimationFrame(rafId);
+    }, [isOpen]);
+
+    if (!isOpen || typeof document === "undefined") return null;
+
+    return createPortal(
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={altText || "Reference screenshot preview"}
+            onClick={handleBackdropClick}
+            className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/85 backdrop-blur-xs animate-fadeIn"
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative max-w-5xl w-full max-h-[94vh] flex flex-col items-center animate-scaleUp"
+            >
+                {/* Header bar: title + close button */}
+                <div className="w-full flex items-center justify-between pb-2 shrink-0">
+                    <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wider bg-black/70 px-2.5 py-1 rounded-lg border border-white/20 shadow-[2px_2px_0px_#000]">
+                        Reference Guide Preview
+                    </span>
+                    <button
+                        ref={closeBtnRef}
+                        type="button"
+                        onClick={onClose}
+                        className="p-1.5 text-black bg-[#FFE566] hover:bg-[#ffd93d] rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none cursor-pointer transition-all shrink-0"
+                        aria-label="Close screenshot preview"
+                        title="Close preview (Esc)"
+                    >
+                        <X className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                    </button>
+                </div>
+
+                {/* Screenshot Container */}
+                <div className="w-full rounded-2xl border-3 border-black overflow-hidden shadow-[8px_8px_0px_#000] bg-neutral-900 flex flex-col items-center">
+                    <img
+                        src={imageSrc}
+                        alt={altText || "Reference screenshot"}
+                        className="w-full h-auto max-h-[78vh] object-contain block select-none"
+                    />
+                    {caption && (
+                        <div className="w-full px-4 py-2.5 bg-neutral-950 border-t-2 border-black/40 text-center">
+                            <p className="text-xs font-bold text-neutral-300 italic">
+                                {caption}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
 
 export interface OwnershipVerificationModalProps {
     isOpen: boolean;
@@ -91,6 +195,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     const [showCheck, setShowCheck] = useState(false);
     const [isRotating, setIsRotating] = useState(false);
     const [rotationKey, setRotationKey] = useState(0);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const initiatedIdentity = useRef<string | null>(null);
 
     const animMidTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,7 +269,11 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
 
     // Initial initiation when modal opens
     useEffect(() => {
-        if (!isOpen) { initiatedIdentity.current = null; return; }
+        if (!isOpen) {
+            initiatedIdentity.current = null;
+            setIsPreviewOpen(false);
+            return;
+        }
         const identity = `${portalId}:${username}`;
         if (portalId && username && !isGitHub && initiatedIdentity.current !== identity) {
             initiatedIdentity.current = identity;
@@ -177,6 +286,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
         clearAllCopyTimers();
         setShowCheck(false);
         setIsRotating(false);
+        setIsPreviewOpen(false);
         if (challenge && !isSuccess) {
             cancelChallenge(portalId);
         }
@@ -188,8 +298,8 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     const { handleBackdropClick } = useModalDismiss({
         isOpen,
         onClose: handleCloseModal,
-        disableEscape: isConfirming || isCancelling || oauthRedirecting,
-        disableBackdrop: isConfirming || isCancelling || oauthRedirecting,
+        disableEscape: isConfirming || isCancelling || oauthRedirecting || isPreviewOpen,
+        disableBackdrop: isConfirming || isCancelling || oauthRedirecting || isPreviewOpen,
     });
 
     if (!isOpen || typeof document === "undefined") return null;
@@ -222,10 +332,36 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
     };
 
     const guide = challenge
-        ? getPlatformVerificationGuide(portalId, challenge.token, challenge.profileSettingsUrl)
+        ? getPlatformVerificationGuide(portalId, challenge.token, challenge.profileSettingsUrl, username || challenge.portalUsername)
         : null;
 
-    return createPortal(
+    const renderCountdownTimer = (className: string) => (
+        <div className={`items-center gap-1.5 ml-auto shrink-0 ${className}`}>
+            <div
+                className={`inline-flex items-center gap-1.5 text-xs sm:text-sm font-black transition-colors ${
+                    isExpired ? "text-rose-600 font-black" : "animate-expiry-pulse"
+                }`}
+                role="status"
+                aria-live="polite"
+                aria-label={`Time remaining: ${isExpired ? "Expired" : formattedTime}`}
+            >
+                <Clock className="w-4 h-4 stroke-[2.5] shrink-0" />
+                <span className="font-mono font-black tabular-nums tracking-tight">
+                    {isExpired ? "EXPIRED" : formattedTime}
+                </span>
+            </div>
+
+            {attemptsRemaining !== undefined && attemptsRemaining < 5 && (
+                <span className="text-[10px] sm:text-[11px] font-black uppercase px-1.5 py-0.5 rounded border border-black bg-amber-100 text-amber-950 shadow-[1px_1px_0px_#000]">
+                    {attemptsRemaining} left
+                </span>
+            )}
+        </div>
+    );
+
+    return (
+        <>
+            {createPortal(
         <div
             role="dialog"
             aria-modal="true"
@@ -372,9 +508,12 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                 <div className="space-y-5 sm:space-y-6 border-b-2 border-black/10 pb-5 lg:border-b-0 lg:pb-0 lg:border-r-2 lg:border-black/10 lg:pr-6 xl:pr-8 pt-1 sm:pt-1.5">
                                     {/* Token Section with Descriptive Label */}
                                     <div className="space-y-3 sm:space-y-3.5">
-                                        <p className=" mb-6 text-xs sm:text-sm font-bold text-neutral-900 tracking-tight">
-                                            Copy the verification token below
-                                        </p>
+                                        <div className="flex items-center justify-between gap-2.5">
+                                            <p className="text-xs sm:text-sm font-bold text-neutral-900 tracking-tight">
+                                                Copy the verification token below
+                                            </p>
+                                            {renderCountdownTimer("flex lg:hidden")}
+                                        </div>
 
                                         {/* Minimal Token Container with Integrated Lucide Copy Icon */}
                                         <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-black bg-neutral-900 text-white px-3.5 py-3 font-mono text-xs sm:text-sm shadow-[3px_3px_0px_#000]">
@@ -409,18 +548,152 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                     </div>
 
                                     {/* Essential Supporting Verification Description */}
-                                    <div className="space-y-3.5 sm:space-y-4 text-xs sm:text-sm pt-1.5 sm:pt-2">
-                                        <p className="text-neutral-900 leading-relaxed">
-                                            Place the verification token in your {guide?.portalName}{" "}
-                                            <strong className="font-black text-black">
-                                                {guide?.targetFieldName}
-                                            </strong>{" "}
-                                            field and save your changes.
-                                        </p>
-                                        <p className="text-neutral-600 leading-relaxed">
-                                            Click <strong className="font-bold text-black">I've Updated My Profile</strong> below to allow Orbix to verify ownership.
-                                        </p>
-                                    </div>
+                                    {guide?.portalId === "leetcode" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>In profile settings, locate the <strong className="font-bold text-black">ReadMe</strong> section.</li>
+                                                <li>Paste the token into the <strong className="font-bold text-black">ReadMe</strong> field.</li>
+                                                <li>Click the save checkmark, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "codeforces" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>In settings, select the <strong className="font-bold text-black">Social</strong> tab.</li>
+                                                <li>Locate <strong className="font-bold text-black">Organization</strong> and paste the token into the field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "hackerrank" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>On your profile, click the <strong className="font-bold text-black">edit icon</strong> beside your name to open <strong className="font-bold text-black">Personal Information</strong>.</li>
+                                                <li>Locate <strong className="font-bold text-black">Headline</strong> and paste the token into the field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "kaggle" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-1.5 text-neutral-900 leading-relaxed font-medium">
+                                                <li>Copy the verification token above.</li>
+                                                <li>
+                                                    Open your Kaggle profile using the{" "}
+                                                    {guide.settingsUrl ? (
+                                                        <a
+                                                            href={guide.settingsUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="underline font-bold text-black hover:text-neutral-700 inline-flex items-center gap-0.5"
+                                                        >
+                                                            <span>provided link</span>
+                                                            <ExternalLink className="w-3 h-3 inline stroke-[2.5]" />
+                                                        </a>
+                                                    ) : (
+                                                        "provided link"
+                                                    )} (sign in if prompted).
+                                                </li>
+                                                <li>Select the <strong className="font-bold text-black">Home</strong> tab on your profile page and locate the <strong className="font-bold text-black">Bio</strong> section.</li>
+                                                <li>Click the <strong className="font-bold text-black">Edit</strong> (pencil) control associated with Bio.</li>
+                                                <li>Append the copied verification token to your existing Bio.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong> to save your changes.</li>
+                                                <li>Return to Orbix and click <strong className="font-bold text-black">I've Updated My Profile</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "atcoder" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-1.5 text-neutral-900 leading-relaxed font-medium">
+                                                <li>Copy the verification token above.</li>
+                                                <li>
+                                                    Open AtCoder settings using the{" "}
+                                                    {guide.settingsUrl ? (
+                                                        <a
+                                                            href={guide.settingsUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="underline font-bold text-black hover:text-neutral-700 inline-flex items-center gap-0.5"
+                                                        >
+                                                            <span>provided link</span>
+                                                            <ExternalLink className="w-3 h-3 inline stroke-[2.5]" />
+                                                        </a>
+                                                    ) : (
+                                                        "provided link"
+                                                    )} (sign in if prompted; you will be redirected to settings).
+                                                </li>
+                                                <li>
+                                                    On the settings page, locate the <strong className="font-bold text-black">Affiliation</strong> field (in Japanese: <strong className="font-bold text-black">所属</strong>), directly below Country/Region.
+                                                </li>
+                                                <li>Paste or append the copied verification token into the Affiliation field.</li>
+                                                <li>Scroll to the bottom of the page and click the green <strong className="font-bold text-black">Update</strong> (or <strong className="font-bold text-black">更新</strong>) button.</li>
+                                                <li>Return to Orbix and click <strong className="font-bold text-black">I've Updated My Profile</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "codechef" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>In the settings sidebar, select <strong className="font-bold text-black">Professional</strong>.</li>
+                                                <li>Under <strong className="font-bold text-black">Professional Information</strong>, paste the token into <strong className="font-bold text-black">Highest Degree Earned</strong>.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "topcoder" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-1.5 text-neutral-900 leading-relaxed font-medium">
+                                                <li>Copy the verification token above.</li>
+                                                <li>
+                                                    Open Topcoder settings using the{" "}
+                                                    {guide.settingsUrl ? (
+                                                        <a
+                                                            href={guide.settingsUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="underline font-bold text-black hover:text-neutral-700 inline-flex items-center gap-0.5"
+                                                        >
+                                                            <span>provided link</span>
+                                                            <ExternalLink className="w-3 h-3 inline stroke-[2.5]" />
+                                                        </a>
+                                                    ) : (
+                                                        "provided link"
+                                                    )} (sign in if prompted).
+                                                </li>
+                                                <li>In Account Settings, navigate to the <strong className="font-bold text-black">Profile</strong> or <strong className="font-bold text-black">About You</strong> section.</li>
+                                                <li>
+                                                    Locate the <strong className="font-bold text-black">Short Bio</strong> field.
+                                                </li>
+                                                <li>Append the copied verification token to your existing Short Bio text.</li>
+                                                <li>Click <strong className="font-bold text-black">Save Changes</strong> to save your profile.</li>
+                                                <li>Return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "geeksforgeeks" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>On the profile edit page, locate the <strong className="font-bold text-black">About/Bio</strong> field.</li>
+                                                <li>Paste the token into the <strong className="font-bold text-black">About/Bio</strong> field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save Changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "hackerearth" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>On your profile, click the <strong className="font-bold text-black">edit icon</strong> / <strong className="font-bold text-black">Edit Profile</strong> to open Settings.</li>
+                                                <li>Under the <strong className="font-bold text-black">Profile</strong> tab, paste the token into the <strong className="font-bold text-black">Bio</strong> field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save Changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3.5 sm:space-y-4 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <p className="text-neutral-900 leading-relaxed">
+                                                Place the verification token in your {guide?.portalName}{" "}
+                                                <strong className="font-black text-black">
+                                                    {guide?.targetFieldName}
+                                                </strong>{" "}
+                                                field and save your changes.
+                                            </p>
+                                            <p className="text-neutral-900 leading-relaxed">
+                                                Click <strong className="font-bold text-black">Verify</strong> below to allow Orbix to verify ownership.
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {/* Error state alert */}
                                     {hookError && (
@@ -456,40 +729,33 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                                 </a>
                                             ) : <div />}
 
-                                            {/* Simplified Expiry: Clock icon + countdown time only, no box, no border, no label */}
-                                            <div className="flex items-center gap-1.5 ml-auto shrink-0">
-                                                <div
-                                                    className={`inline-flex items-center gap-1.5 text-xs sm:text-sm font-black transition-colors ${isExpired ? "text-rose-600 font-black" : "animate-expiry-pulse"
-                                                        }`}
-                                                    role="status"
-                                                    aria-live="polite"
-                                                    aria-label={`Time remaining: ${isExpired ? "Expired" : formattedTime}`}
-                                                >
-                                                    <Clock className="w-4 h-4 stroke-[2.5] shrink-0" />
-                                                    <span className="font-mono font-black tabular-nums tracking-tight">
-                                                        {isExpired ? "EXPIRED" : formattedTime}
-                                                    </span>
-                                                </div>
-
-                                                {attemptsRemaining !== undefined && attemptsRemaining < 5 && (
-                                                    <span className="text-[10px] sm:text-[11px] font-black uppercase px-1.5 py-0.5 rounded border border-black bg-amber-100 text-amber-950 shadow-[1px_1px_0px_#000]">
-                                                        {attemptsRemaining} left
-                                                    </span>
-                                                )}
-                                            </div>
+                                            {/* Simplified Expiry: Clock icon + countdown time only (Desktop only) */}
+                                            {renderCountdownTimer("hidden lg:flex")}
                                         </div>
 
-                                        {/* Annotated Platform Screenshot: Primary Visual Element */}
+                                        {/* Annotated Platform Screenshot: Primary Visual Element (Clickable with Enlarge Preview) */}
                                         {guide.hasScreenshot && (
                                             <div className="space-y-1.5 pt-0.5">
-                                                <div className="rounded-xl border-2 border-black overflow-hidden shadow-[3px_3px_0px_#000] bg-neutral-900">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsPreviewOpen(true)}
+                                                    className="group relative w-full rounded-xl border-2 border-black overflow-hidden shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none bg-neutral-900 transition-all cursor-zoom-in block text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[#FFE566]"
+                                                    aria-label="Enlarge reference screenshot"
+                                                    title="Click to enlarge screenshot"
+                                                >
                                                     <img
-                                                        src={guide.portalId === "leetcode" ? leetcodeGuideImg : undefined}
+                                                        src={getGuideScreenshot(guide.portalId)}
                                                         alt={guide.screenshotAlt}
-                                                        className="w-full h-auto object-contain block max-h-[220px] sm:max-h-[235px]"
+                                                        className="w-full h-auto object-contain block max-h-[220px] sm:max-h-[235px] transition-transform duration-200 group-hover:scale-[1.01]"
                                                         loading="lazy"
                                                     />
-                                                </div>
+
+                                                    {/* Hover affordance pill */}
+                                                    <span className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/75 text-white text-[11px] font-black border border-white/20 shadow-[2px_2px_0px_#000] opacity-80 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                                        <ZoomIn className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        <span>Enlarge</span>
+                                                    </span>
+                                                </button>
                                                 {guide.screenshotCaption && (
                                                     <p className="text-[11px] font-bold text-neutral-500 italic leading-tight">
                                                         {guide.screenshotCaption}
@@ -528,7 +794,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                     ) : (
                                         <>
                                             <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
-                                            <span>I've Updated My Profile</span>
+                                            <span>Verify</span>
                                         </>
                                     )}
                                 </button>
@@ -568,5 +834,16 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
             </div>
         </div>,
         document.body
+    )}
+    {guide?.hasScreenshot && (
+        <ScreenshotPreviewModal
+            isOpen={isPreviewOpen}
+            onClose={() => setIsPreviewOpen(false)}
+            imageSrc={getGuideScreenshot(guide.portalId) || ""}
+            altText={guide.screenshotAlt}
+            caption={guide.screenshotCaption}
+        />
+    )}
+        </>
     );
 };

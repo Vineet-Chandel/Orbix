@@ -1,8 +1,8 @@
-import { useState, useId } from "react";
+import { useState, useId, useEffect } from "react";
 import { AlertCircle, Check, ShieldCheck } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
-import { PortalProfileCard, type PortalProfileData } from "./PortalProfileCard";
+import { PortalProfileCard, type PortalProfileData, type PortalFetchState } from "./PortalProfileCard";
 import { OwnershipStatusBadge } from "../../components/verification/OwnershipStatusBadge";
 import { isPlatformVerificationSupported } from "../../utils/platformVerificationSupport";
 
@@ -90,15 +90,17 @@ export const PortalProfileInput = ({
     const config = PORTALS[portalId];
     const isSupported = isPlatformVerificationSupported(portalId);
     const [isFocused, setIsFocused] = useState(false);
-    const [fetchState, setFetchState] = useState<{
-        loading: boolean;
-        error: string | null;
-        profile: PortalProfileData | null;
-    }>({
+    const [fetchState, setFetchState] = useState<PortalFetchState>({
         loading: false,
         error: null,
+        errorState: null,
         profile: null,
     });
+
+    // Reset transient fetch errors and loading states immediately when switching platform tab
+    useEffect(() => {
+        setFetchState({ loading: false, error: null, errorState: null, profile: null });
+    }, [portalId]);
 
     if (!config) return null;
 
@@ -209,13 +211,13 @@ export const PortalProfileInput = ({
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const nextRaw = e.target.value;
         const nextJudgment = judgePortalInput(portalId, nextRaw);
-        setFetchState({ loading: false, error: null, profile: null });
+        setFetchState({ loading: false, error: null, errorState: null, profile: null });
         onChange(portalId, nextRaw, nextJudgment);
     };
 
     const handleClear = () => {
         const nextJudgment = judgePortalInput(portalId, "");
-        setFetchState({ loading: false, error: null, profile: null });
+        setFetchState({ loading: false, error: null, errorState: null, profile: null });
         onChange(portalId, "", nextJudgment);
     };
 
@@ -246,7 +248,19 @@ export const PortalProfileInput = ({
                         ) : fetchState.error ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-rose-100 text-rose-900 border-2 border-black shadow-[2px_2px_0px_#000]">
                                 <AlertCircle className="w-3 h-3 stroke-[2.5]" />
-                                Account Not Found
+                                {fetchState.errorState?.badgeLabel || (
+                                    fetchState.error.toLowerCase().includes("anti-bot") || fetchState.error.toLowerCase().includes("unavailable")
+                                        ? "Platform Unavailable"
+                                        : fetchState.error.toLowerCase().includes("rate limit")
+                                        ? "Rate Limited"
+                                        : fetchState.error.toLowerCase().includes("network error") || fetchState.error.toLowerCase().includes("timed out")
+                                        ? "Network Error"
+                                        : fetchState.error.toLowerCase().includes("parse")
+                                        ? "Parse Error"
+                                        : fetchState.error.toLowerCase().includes("not found")
+                                        ? "Account Not Found"
+                                        : "Error"
+                                )}
                             </span>
                         ) : judgment.badgeVariant === "error" ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-rose-100 text-rose-900 border-2 border-black shadow-[2px_2px_0px_#000]">
@@ -346,7 +360,7 @@ export const PortalProfileInput = ({
                     {fetchState.error ? (
                         <p className="text-[11px] text-rose-700 font-bold flex items-center gap-1.5 animate-fadeIn">
                             <AlertCircle className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" />
-                            <span>{fetchState.error}</span>
+                            <span>{fetchState.errorState?.message || fetchState.error}</span>
                         </p>
                     ) : judgment.message ? (
                         judgment.isValid ? (

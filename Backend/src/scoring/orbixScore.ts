@@ -795,7 +795,7 @@ export function computeOrbixScoreFromPortals(
         }
 
         // Solves without difficulty (unknownDifficulty)
-        if (!hasDiff && portal !== "github" && portal !== "medium" && portal !== "substack") {
+        if (!hasDiff && portal !== "github" && portal !== "medium" && portal !== "substack" && portal !== "kaggle") {
             let solved = typeof snap.totalSolved === "number" ? snap.totalSolved : (
                 typeof snap.solvedTotal === "number" ? snap.solvedTotal : 0
             );
