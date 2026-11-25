@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -38,7 +39,7 @@ export interface MobileBottomNavProps {
     onOpenJoinClub: () => void;
 }
 
-type ArcMenuKey = "hub" | "events" | "workspaces" | "profile" | null;
+type NavigationMenuKey = "hub" | "events" | "workspaces" | "profile" | null;
 
 interface SubMenuItem {
     id: string;
@@ -57,7 +58,7 @@ interface DockTabItem {
     icon: React.ReactNode;
     shaderColor: string;
     hasSubItems: boolean;
-    arcKey?: ArcMenuKey;
+    menuKey?: NavigationMenuKey;
     path?: string;
     badge?: number | string;
 }
@@ -76,18 +77,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const [activeArc, setActiveArc] = useState<ArcMenuKey>(null);
-    const navRef = useRef<HTMLDivElement>(null);
+    const [activeMenu, setActiveMenu] = useState<NavigationMenuKey>(null);
 
-    // Close arc menu when route changes or outside-tap occurs
+    // Close the menu when route changes or outside-tap occurs
     useEffect(() => {
-        setActiveArc(null);
+        setActiveMenu(null);
     }, [location.pathname]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
-                setActiveArc(null);
+                setActiveMenu(null);
             }
         };
         window.addEventListener("keydown", handleKeyDown);
@@ -95,7 +95,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     }, []);
 
     const handleSelectSubItem = (item: SubMenuItem) => {
-        setActiveArc(null);
+        setActiveMenu(null);
         if (item.action) {
             item.action();
         } else if (item.path) {
@@ -183,7 +183,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             ? [
                   ...clubWorkspaces.slice(0, 4).map((ws, i) => ({
                       id: `ws-${ws.clubId}`,
-                      label: ws.clubName.slice(0, 10),
+                      label: ws.clubName,
                       icon: ws.clubLogoUrl ? (
                           <img src={ws.clubLogoUrl} alt={ws.clubName} className="w-5 h-5 rounded-md object-cover" />
                       ) : (
@@ -262,22 +262,22 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
     // Current active sub-item list
     const activeSubItems: SubMenuItem[] =
-        activeArc === "hub"
+        activeMenu === "hub"
             ? hubSubItems
-            : activeArc === "events"
+            : activeMenu === "events"
             ? eventsSubItems
-            : activeArc === "workspaces"
+            : activeMenu === "workspaces"
             ? workspaceSubItems
-            : activeArc === "profile"
+            : activeMenu === "profile"
             ? profileSubItems
             : [];
 
     // Determine currently active dock item for the sliding toggle shader
     const currentActiveId = useMemo((): "home" | "explore" | "events" | "clubs" | "profile" => {
-        if (activeArc === "hub") return "explore";
-        if (activeArc === "events") return "events";
-        if (activeArc === "workspaces") return "clubs";
-        if (activeArc === "profile") return "profile";
+        if (activeMenu === "hub") return "explore";
+        if (activeMenu === "events") return "events";
+        if (activeMenu === "workspaces") return "clubs";
+        if (activeMenu === "profile") return "profile";
 
         if (location.pathname === "/dashboard" || activeTab === "dashboard") return "home";
         if (
@@ -326,30 +326,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         }
 
         return "home";
-    }, [activeArc, location.pathname, activeTab]);
-
-    // Geometry calculation for circular circumference fan-out:
-    // Orbit container dimensions
-    const CONTAINER_W = 340;
-    const CX = CONTAINER_W / 2; // 170
-    const CY = 155; // Bottom anchor point
-    const RADIUS = 126; // Arc radius in px
-    const BUTTON_SIZE = 46;
-    const HALF_BTN = BUTTON_SIZE / 2; // 23
-    const totalItems = activeSubItems.length;
-    const startAngle = 160; // Left angle (deg)
-    const endAngle = 20;   // Right angle (deg)
-
-    // Calculate SVG dashed path mathematically aligned with the node centers
-    const svgArcPath = useMemo(() => {
-        const radStart = (166 * Math.PI) / 180;
-        const radEnd = (14 * Math.PI) / 180;
-        const x1 = CX + RADIUS * Math.cos(radStart);
-        const y1 = CY - RADIUS * Math.sin(radStart);
-        const x2 = CX + RADIUS * Math.cos(radEnd);
-        const y2 = CY - RADIUS * Math.sin(radEnd);
-        return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${RADIUS} ${RADIUS} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
-    }, [CX, CY, RADIUS]);
+    }, [activeMenu, location.pathname, activeTab]);
 
     // The 5 balanced dock tab items
     const dockTabs: DockTabItem[] = [
@@ -367,7 +344,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             icon: <Compass className="w-5 h-5 stroke-[2.3]" />,
             shaderColor: "#FFE566",
             hasSubItems: true,
-            arcKey: "hub",
+            menuKey: "hub",
         },
         {
             id: "events",
@@ -375,7 +352,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             icon: <CalendarDays className="w-5 h-5 stroke-[2.3]" />,
             shaderColor: "#A6FF70",
             hasSubItems: true,
-            arcKey: "events",
+            menuKey: "events",
         },
         {
             id: "clubs",
@@ -383,7 +360,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             icon: <Briefcase className="w-5 h-5 stroke-[2.3]" />,
             shaderColor: "#38BDF8",
             hasSubItems: true,
-            arcKey: "workspaces",
+            menuKey: "workspaces",
             badge: clubWorkspaces.length > 0 ? clubWorkspaces.length : undefined,
         },
         {
@@ -432,138 +409,85 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             ),
             shaderColor: "#ff80d7ff",
             hasSubItems: true,
-            arcKey: "profile",
+            menuKey: "profile",
             badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
         },
     ];
 
     const handleDockTabClick = (item: DockTabItem) => {
         if (item.id === "home") {
-            setActiveArc(null);
+            setActiveMenu(null);
             navigate("/dashboard");
             if (onTabChange) onTabChange("dashboard");
             return;
         }
 
-        if (item.hasSubItems && item.arcKey) {
-            setActiveArc((prev) => (prev === item.arcKey ? null : item.arcKey!));
+        if (item.hasSubItems && item.menuKey) {
+            setActiveMenu((prev) => (prev === item.menuKey ? null : item.menuKey!));
         }
     };
 
-    return (
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
         <>
-            {/* Backdrop Dimmer when Circular Circumference Arc is Active */}
             <AnimatePresence>
-                {activeArc && (
+                {activeMenu && (
                     <motion.div
-                        key="arc-backdrop"
+                        key="navigation-backdrop"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.18 }}
-                        onClick={() => setActiveArc(null)}
-                        className="fixed inset-0 z-[9990] bg-black/60 backdrop-blur-xs lg:hidden"
+                        onClick={() => setActiveMenu(null)}
+                        className="fixed inset-0 z-[9990] bg-black/50 lg:hidden"
                     />
                 )}
             </AnimatePresence>
 
-            {/* Sticky Bottom Navigation Container (Mobile only, overlay on full screen) */}
-            <div
-                ref={navRef}
+            <nav
                 id="orbix-mobile-bottom-nav"
-                className="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:bottom-3 inset-x-0 mx-auto z-[9990] w-[calc(100%-1rem)] max-w-[420px] lg:hidden select-none"
+                aria-label="Mobile navigation"
+                className="fixed bottom-[var(--mobile-dock-bottom)] inset-x-0 mx-auto z-[9991] w-[calc(100%-1.5rem)] max-w-md lg:hidden"
             >
-                {/* Radial Circular Circumference Menu Overlay */}
                 <AnimatePresence>
-                    {activeArc && (
-                        <div className="absolute bottom-[calc(100%+0.6rem)] inset-x-0 mx-auto flex flex-col items-center pointer-events-none">
-                            {/* Circular Circumference Orbit Area */}
-                            <div className="relative w-[340px] h-[155px] pointer-events-none overflow-visible">
-                                {/* Dashed Orbit Circumference Guideline (100% aligned with node centers) */}
-                                <svg
-                                    className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
-                                    viewBox="0 0 340 155"
+                    {activeMenu && (
+                        <motion.div
+                            key={activeMenu}
+                            id="orbix-mobile-navigation-menu"
+                            initial={{ opacity: 0, scale: 0.97 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.97 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute bottom-[calc(100%+0.75rem)] inset-x-0 grid max-h-[50dvh] grid-cols-2 gap-2 overflow-y-auto rounded-2xl border-2 border-black bg-[#FAF6EE] p-2.5 shadow-[4px_4px_0px_#000]"
+                        >
+                            {activeSubItems.map((item) => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleSelectSubItem(item)}
+                                    aria-current={item.path === location.pathname ? "page" : undefined}
+                                    className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border-2 border-black bg-white px-2 py-1.5 text-left text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black aria-[current=page]:bg-[#FAF6EE]"
                                 >
-                                    <path
-                                        d={svgArcPath}
-                                        fill="none"
-                                        stroke="#000000"
-                                        strokeWidth="2.5"
-                                        strokeDasharray="6 6"
-                                        strokeLinecap="round"
-                                        className="opacity-35"
-                                    />
-                                </svg>
-
-                                {/* Sequence Nodes Placed Along the Circumference */}
-                                {activeSubItems.map((item, idx) => {
-                                    const angleDeg =
-                                        totalItems <= 1
-                                            ? 90
-                                            : startAngle - idx * ((startAngle - endAngle) / (totalItems - 1));
-                                    const angleRad = (angleDeg * Math.PI) / 180;
-                                    const nodeCenterX = CX + RADIUS * Math.cos(angleRad);
-                                    const nodeCenterY = CY - RADIUS * Math.sin(angleRad);
-
-                                    return (
-                                        <motion.div
-                                            key={item.id}
-                                            initial={{
-                                                scale: 0,
-                                                opacity: 0,
-                                            }}
-                                            animate={{
-                                                scale: 1,
-                                                opacity: 1,
-                                            }}
-                                            exit={{
-                                                scale: 0,
-                                                opacity: 0,
-                                                transition: { duration: 0.12 },
-                                            }}
-                                            transition={{
-                                                type: "spring",
-                                                stiffness: 440,
-                                                damping: 24,
-                                                delay: idx * 0.035, // Staggered sequence from corner to corner
-                                            }}
-                                            style={{
-                                                left: `${nodeCenterX - HALF_BTN}px`,
-                                                top: `${nodeCenterY - HALF_BTN}px`,
-                                                width: `${BUTTON_SIZE}px`,
-                                            }}
-                                            className="absolute pointer-events-auto flex flex-col items-center group cursor-pointer"
-                                            onClick={() => handleSelectSubItem(item)}
-                                        >
-                                            {/* Sub-item Button Node (Centered exactly on orbit line) */}
-                                            <div
-                                                className="w-[46px] h-[46px] rounded-full border-2 border-black flex items-center justify-center text-black font-black shadow-[3px_3px_0px_#000] group-hover:scale-110 group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-[1px_1px_0px_#000] transition-transform relative select-none"
-                                                style={{ backgroundColor: item.color }}
-                                            >
-                                                {item.icon}
-
-                                                {/* Optional Notification/Alert Beacon */}
-                                                {item.badge !== undefined && (
-                                                    <span className="absolute -top-1 -right-1 z-30 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#FF6B6B] text-black border border-black text-[9px] font-black shadow-[1px_1px_0px_#000]">
-                                                        {item.badge}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Label Pill Attached Below Node */}
-                                            <span className="mt-1 px-1.5 py-0.5 rounded-md bg-[#FAF6EE] text-black border border-black text-[9.5px] font-black uppercase tracking-tight whitespace-nowrap shadow-[1px_1px_0px_#000] select-none pointer-events-none group-hover:bg-white transition-colors">
-                                                {item.label}
-                                            </span>
-                                        </motion.div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                                    <span
+                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-black"
+                                        style={{ backgroundColor: item.color }}
+                                    >
+                                        {item.icon}
+                                    </span>
+                                    <span className="min-w-0 flex-1 break-words">{item.label}</span>
+                                    {item.badge !== undefined && (
+                                        <span className={`shrink-0 rounded-full border border-black px-1 text-[10px] ${item.badgeVariant === "danger" ? "bg-[#FF6B6B]" : "bg-[#FFE566]"}`}>
+                                            {item.badge}
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
+                        </motion.div>
                     )}
                 </AnimatePresence>
 
                 {/* Main 5-Option Toggle Dock Bar with Moving Shader */}
-                <div className="relative bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:16px_16px] border-2 sm:border-3 border-black shadow-[4px_4px_0px_#000] rounded-2xl px-1.5 py-1 flex items-center justify-between">
+                <div className="grid h-[var(--mobile-dock-height)] grid-cols-5 gap-1 rounded-2xl border-2 border-black bg-[#FAF6EE] p-1.5 shadow-[4px_4px_0px_#000]">
                     {dockTabs.map((tab) => {
                         const isActive = currentActiveId === tab.id;
                         return (
@@ -571,15 +495,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                                 key={tab.id}
                                 type="button"
                                 onClick={() => handleDockTabClick(tab)}
-                                className="relative flex-1 h-12 flex flex-col items-center justify-center cursor-pointer select-none transition-transform active:scale-95"
+                                className="relative flex min-w-0 flex-col items-center justify-center rounded-xl border border-black bg-white text-black shadow-[2px_2px_0px_#000] transition-transform active:scale-95 focus-visible:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
                                 aria-label={tab.label}
-                                aria-expanded={tab.hasSubItems && tab.arcKey ? activeArc === tab.arcKey : undefined}
+                                aria-controls={activeMenu && activeMenu === tab.menuKey ? "orbix-mobile-navigation-menu" : undefined}
+                                aria-current={isActive && !activeMenu && tab.id === "home" ? "page" : undefined}
+                                aria-expanded={tab.hasSubItems && tab.menuKey ? activeMenu === tab.menuKey : undefined}
                             >
                                 {/* Moving Shader / Active Pill Indicator */}
                                 {isActive && (
                                     <motion.div
                                         layoutId="mobileNavShader"
-                                        className="absolute inset-0.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]"
+                                        className="absolute inset-0 rounded-[inherit] pointer-events-none"
                                         style={{ backgroundColor: tab.shaderColor }}
                                         transition={{
                                             type: "spring",
@@ -613,7 +539,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                         );
                     })}
                 </div>
-            </div>
-        </>
+            </nav>
+        </>,
+        document.body
     );
 };
