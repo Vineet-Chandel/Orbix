@@ -19,15 +19,22 @@ import { usePlatformVerification } from "../../hooks/usePlatformVerification";
 import { OrbixLoader } from "../ui/loader";
 import { startGitHubOwnershipVerification } from "../../api/platformVerificationApi";
 import type { ConfirmVerificationSuccessResponse } from "../../types/platformVerification";
-import { getPlatformVerificationGuide } from "../../utils/platformVerificationSupport";
+import {
+    getPlatformVerificationGuide,
+    VERIFICATION_MODAL_Z_INDEX,
+    SCREENSHOT_LIGHTBOX_Z_INDEX,
+} from "../../utils/platformVerificationSupport";
 import leetcodeGuideImg from "../../assets/verification/leetcode-verification-guide-cropped.png";
 import codeforcesGuideImg from "../../assets/verification/codeforces-verification-guide.png";
 import hackerrankGuideImg from "../../assets/verification/hackerrank-verification-guide.png";
 import geeksforgeeksGuideImg from "../../assets/verification/geeksforgeeks-verification-guide.png";
 import codechefGuideImg from "../../assets/verification/codechef-verification-guide.png";
 
-const getGuideScreenshot = (portalId?: string): string | undefined => {
-    switch (portalId) {
+export { VERIFICATION_MODAL_Z_INDEX, SCREENSHOT_LIGHTBOX_Z_INDEX };
+
+export const getGuideScreenshot = (portalId?: string): string | undefined => {
+    const clean = (portalId || "").toLowerCase().trim();
+    switch (clean) {
         case "leetcode":
             return leetcodeGuideImg;
         case "codeforces":
@@ -70,7 +77,7 @@ interface ScreenshotPreviewModalProps {
     caption?: string | null;
 }
 
-const ScreenshotPreviewModal: React.FC<ScreenshotPreviewModalProps> = ({
+export const ScreenshotPreviewModal: React.FC<ScreenshotPreviewModalProps> = ({
     isOpen,
     onClose,
     imageSrc,
@@ -100,11 +107,11 @@ const ScreenshotPreviewModal: React.FC<ScreenshotPreviewModalProps> = ({
             aria-modal="true"
             aria-label={altText || "Reference screenshot preview"}
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/85 backdrop-blur-xs animate-fadeIn"
+            className="fixed inset-0 z-[10020] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/85 backdrop-blur-xs animate-fadeIn overflow-y-auto"
         >
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative max-w-5xl w-full max-h-[94vh] flex flex-col items-center animate-scaleUp"
+                className="relative max-w-5xl w-full max-h-[94vh] flex flex-col items-center animate-scaleUp my-auto"
             >
                 {/* Header bar: title + close button */}
                 <div className="w-full flex items-center justify-between pb-2 shrink-0">
@@ -574,57 +581,18 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                         </div>
                                     ) : guide?.portalId === "kaggle" ? (
                                         <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
-                                            <ol className="list-decimal list-outside ml-4 space-y-1.5 text-neutral-900 leading-relaxed font-medium">
-                                                <li>Copy the verification token above.</li>
-                                                <li>
-                                                    Open your Kaggle profile using the{" "}
-                                                    {guide.settingsUrl ? (
-                                                        <a
-                                                            href={guide.settingsUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="underline font-bold text-black hover:text-neutral-700 inline-flex items-center gap-0.5"
-                                                        >
-                                                            <span>provided link</span>
-                                                            <ExternalLink className="w-3 h-3 inline stroke-[2.5]" />
-                                                        </a>
-                                                    ) : (
-                                                        "provided link"
-                                                    )} (sign in if prompted).
-                                                </li>
-                                                <li>Select the <strong className="font-bold text-black">Home</strong> tab on your profile page and locate the <strong className="font-bold text-black">Bio</strong> section.</li>
-                                                <li>Click the <strong className="font-bold text-black">Edit</strong> (pencil) control associated with Bio.</li>
-                                                <li>Append the copied verification token to your existing Bio.</li>
-                                                <li>Click <strong className="font-bold text-black">Save</strong> to save your changes.</li>
-                                                <li>Return to Orbix and click <strong className="font-bold text-black">I've Updated My Profile</strong>.</li>
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>On your profile, select the <strong className="font-bold text-black">Home</strong> tab and locate the <strong className="font-bold text-black">Bio</strong> section.</li>
+                                                <li>Click the <strong className="font-bold text-black">Edit</strong> (pencil) icon and paste the token into the <strong className="font-bold text-black">Bio</strong> field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
                                     ) : guide?.portalId === "atcoder" ? (
                                         <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
-                                            <ol className="list-decimal list-outside ml-4 space-y-1.5 text-neutral-900 leading-relaxed font-medium">
-                                                <li>Copy the verification token above.</li>
-                                                <li>
-                                                    Open AtCoder settings using the{" "}
-                                                    {guide.settingsUrl ? (
-                                                        <a
-                                                            href={guide.settingsUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="underline font-bold text-black hover:text-neutral-700 inline-flex items-center gap-0.5"
-                                                        >
-                                                            <span>provided link</span>
-                                                            <ExternalLink className="w-3 h-3 inline stroke-[2.5]" />
-                                                        </a>
-                                                    ) : (
-                                                        "provided link"
-                                                    )} (sign in if prompted; you will be redirected to settings).
-                                                </li>
-                                                <li>
-                                                    On the settings page, locate the <strong className="font-bold text-black">Affiliation</strong> field (in Japanese: <strong className="font-bold text-black">所属</strong>), directly below Country/Region.
-                                                </li>
-                                                <li>Paste or append the copied verification token into the Affiliation field.</li>
-                                                <li>Scroll to the bottom of the page and click the green <strong className="font-bold text-black">Update</strong> (or <strong className="font-bold text-black">更新</strong>) button.</li>
-                                                <li>Return to Orbix and click <strong className="font-bold text-black">I've Updated My Profile</strong>.</li>
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>On the settings page, locate the <strong className="font-bold text-black">Affiliation</strong> field (in Japanese: <strong className="font-bold text-black">所属</strong>).</li>
+                                                <li>Paste the token into the <strong className="font-bold text-black">Affiliation</strong> field.</li>
+                                                <li>Click <strong className="font-bold text-black">Update</strong> (or <strong className="font-bold text-black">更新</strong>), then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
                                     ) : guide?.portalId === "codechef" ? (
@@ -637,31 +605,10 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                         </div>
                                     ) : guide?.portalId === "topcoder" ? (
                                         <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
-                                            <ol className="list-decimal list-outside ml-4 space-y-1.5 text-neutral-900 leading-relaxed font-medium">
-                                                <li>Copy the verification token above.</li>
-                                                <li>
-                                                    Open Topcoder settings using the{" "}
-                                                    {guide.settingsUrl ? (
-                                                        <a
-                                                            href={guide.settingsUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="underline font-bold text-black hover:text-neutral-700 inline-flex items-center gap-0.5"
-                                                        >
-                                                            <span>provided link</span>
-                                                            <ExternalLink className="w-3 h-3 inline stroke-[2.5]" />
-                                                        </a>
-                                                    ) : (
-                                                        "provided link"
-                                                    )} (sign in if prompted).
-                                                </li>
-                                                <li>In Account Settings, navigate to the <strong className="font-bold text-black">Profile</strong> or <strong className="font-bold text-black">About You</strong> section.</li>
-                                                <li>
-                                                    Locate the <strong className="font-bold text-black">Short Bio</strong> field.
-                                                </li>
-                                                <li>Append the copied verification token to your existing Short Bio text.</li>
-                                                <li>Click <strong className="font-bold text-black">Save Changes</strong> to save your profile.</li>
-                                                <li>Return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>In profile settings, locate the <strong className="font-bold text-black">Short Bio</strong> field.</li>
+                                                <li>Paste the token into the <strong className="font-bold text-black">Short Bio</strong> field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save Changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
                                     ) : guide?.portalId === "geeksforgeeks" ? (

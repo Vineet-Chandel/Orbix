@@ -1,11 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
     isPlatformVerificationSupported,
     getPlatformVerificationMethod,
     getPlatformVerificationField,
     getPlatformVerificationGuide,
     SUPPORTED_VERIFICATION_PLATFORMS,
+    VERIFICATION_MODAL_Z_INDEX,
+    SCREENSHOT_LIGHTBOX_Z_INDEX,
 } from "../../utils/platformVerificationSupport.ts";
 import type { OwnershipStatus, ActiveVerificationChallenge } from "../../types/platformVerification.ts";
 import { normalizePortalError } from "../../LandingPages/Auth-Pages/portalErrorMapping.ts";
@@ -438,5 +443,95 @@ test("Platform Fetch Failure Classification & Anti-Bot Differentiation", async (
         const normalized = normalizePortalError(404, { code: "ACCOUNT_NOT_FOUND" }, "Kaggle");
         assert.ok(normalized.message.includes("Account not found"));
         assert.equal(normalized.badgeLabel, "Account Not Found");
+    });
+});
+
+test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t) => {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+    await t.test("lightbox z-index is strictly higher than ownership verification modal", () => {
+        assert.ok(
+            SCREENSHOT_LIGHTBOX_Z_INDEX > VERIFICATION_MODAL_Z_INDEX,
+            `Lightbox z-index (${SCREENSHOT_LIGHTBOX_Z_INDEX}) must be strictly greater than modal z-index (${VERIFICATION_MODAL_Z_INDEX})`
+        );
+        assert.equal(VERIFICATION_MODAL_Z_INDEX, 10001);
+        assert.equal(SCREENSHOT_LIGHTBOX_Z_INDEX, 10020);
+    });
+
+    await t.test("OwnershipVerificationModal component source enforces z-[10020] and rejects legacy z-[120]", () => {
+        const modalPath = path.resolve(__dirname, "OwnershipVerificationModal.tsx");
+        const modalSource = fs.readFileSync(modalPath, "utf-8");
+
+        // Lightbox must use z-[10020]
+        assert.ok(
+            modalSource.includes("fixed inset-0 z-[10020]"),
+            "ScreenshotPreviewModal backdrop must use z-[10020]"
+        );
+
+        // Lightbox must NOT use legacy z-[120]
+        assert.ok(
+            !modalSource.includes("z-[120]"),
+            "ScreenshotPreviewModal must NOT use legacy z-[120]"
+        );
+
+        // Modal must use z-[10001]
+        assert.ok(
+            modalSource.includes("fixed inset-0 z-[10001]"),
+            "OwnershipVerificationModal backdrop must use z-[10001]"
+        );
+
+        // Both modals must use createPortal to document.body
+        const createPortalCount = (modalSource.match(/createPortal\(/g) || []).length;
+        const bodyTargetCount = (modalSource.match(/document\.body/g) || []).length;
+        assert.ok(createPortalCount >= 2, "Both ScreenshotPreviewModal and OwnershipVerificationModal must use createPortal");
+        assert.ok(bodyTargetCount >= 2, "Both modals must portal into document.body to break free of parent stacking contexts");
+    });
+
+    await t.test("OwnershipVerificationModal isolates Escape and backdrop dismiss when isPreviewOpen is true", () => {
+        const modalPath = path.resolve(__dirname, "OwnershipVerificationModal.tsx");
+        const modalSource = fs.readFileSync(modalPath, "utf-8");
+
+        assert.ok(
+            modalSource.includes("disableEscape: isConfirming || isCancelling || oauthRedirecting || isPreviewOpen"),
+            "OwnershipVerificationModal must disable its Escape handler when preview is open"
+        );
+        assert.ok(
+            modalSource.includes("disableBackdrop: isConfirming || isCancelling || oauthRedirecting || isPreviewOpen"),
+            "OwnershipVerificationModal must disable its backdrop dismiss when preview is open"
+        );
+    });
+
+    await t.test("validates screenshot guide availability and asset existence for all 10 platforms", () => {
+        const assetsDir = path.resolve(__dirname, "../../assets/verification");
+
+        const screenshotExpectations: Record<string, { hasScreenshot: boolean; assetFile?: string }> = {
+            leetcode: { hasScreenshot: true, assetFile: "leetcode-verification-guide-cropped.png" },
+            codeforces: { hasScreenshot: true, assetFile: "codeforces-verification-guide.png" },
+            hackerrank: { hasScreenshot: true, assetFile: "hackerrank-verification-guide.png" },
+            codechef: { hasScreenshot: true, assetFile: "codechef-verification-guide.png" },
+            geeksforgeeks: { hasScreenshot: true, assetFile: "geeksforgeeks-verification-guide.png" },
+            hackerearth: { hasScreenshot: false },
+            atcoder: { hasScreenshot: false },
+            topcoder: { hasScreenshot: false },
+            kaggle: { hasScreenshot: false },
+            github: { hasScreenshot: false },
+        };
+
+        for (const [platform, exp] of Object.entries(screenshotExpectations)) {
+            const guide = getPlatformVerificationGuide(platform, "test_token", undefined, "test_user");
+            assert.equal(
+                guide.hasScreenshot,
+                exp.hasScreenshot,
+                `Platform '${platform}' hasScreenshot must be ${exp.hasScreenshot}`
+            );
+
+            if (exp.hasScreenshot && exp.assetFile) {
+                const assetPath = path.join(assetsDir, exp.assetFile);
+                assert.ok(
+                    fs.existsSync(assetPath),
+                    `Expected screenshot asset '${exp.assetFile}' for platform '${platform}' must exist at ${assetPath}`
+                );
+            }
+        }
     });
 });

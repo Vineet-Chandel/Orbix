@@ -18,6 +18,13 @@ export const SUPPORTED_VERIFICATION_PLATFORMS = [
 
 export type SupportedVerificationPlatform = (typeof SUPPORTED_VERIFICATION_PLATFORMS)[number];
 
+/**
+ * Layering constants for ownership verification dialogs and lightboxes.
+ * Ensures the lightbox preview always stacks cleanly above the verification modal.
+ */
+export const VERIFICATION_MODAL_Z_INDEX = 10001;
+export const SCREENSHOT_LIGHTBOX_Z_INDEX = 10020;
+
 export function isPlatformVerificationSupported(portalId: string): boolean {
     if (!portalId) return false;
     const clean = portalId.toLowerCase().trim();
@@ -151,7 +158,7 @@ export function getPlatformVerificationGuide(
                 targetFieldName: "Bio",
                 settingsUrl: profileUrl,
                 settingsUrlLabel: "Open Kaggle Profile",
-                instruction: "Open your Kaggle profile, select the Home tab, locate the Bio section, click the Edit control associated with Bio, append the verification code to your existing Bio, save changes, and return to Orbix to verify.",
+                instruction: "Open your Kaggle profile, select the Home tab, locate the Bio section, click the Edit control associated with Bio, paste the verification code into your Bio, save changes, and click Verify.",
                 detailText: "On your Kaggle profile Home tab, locate the Bio section, click Edit, append the token to your Bio, and save changes.",
                 hasScreenshot: false,
             };
