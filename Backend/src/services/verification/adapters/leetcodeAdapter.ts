@@ -153,9 +153,9 @@ export class LeetCodeAdapter implements PlatformAdapter {
     public getInstructions(token: string, targetField: string = this.defaultTargetField): VerificationInstructions {
         return {
             fieldName: 'aboutMe',
-            displayFieldName: 'About Me / Summary',
-            instructions: `Temporarily paste the code '${token}' into your LeetCode About Me / Summary section, save your profile, and click Confirm.`,
-            profileSettingsUrl: 'https://leetcode.com/profile/',
+            displayFieldName: 'ReadMe',
+            instructions: `Open your LeetCode profile settings (https://leetcode.com/settings/profile/), locate the ReadMe section, paste or append '${token}' into your ReadMe text area, save changes, and click Confirm.`,
+            profileSettingsUrl: 'https://leetcode.com/settings/profile/',
         };
     }
 }

@@ -1670,14 +1670,336 @@ async function fetchSubstack(username: string): Promise<PortalProfileData | null
     };
 }
 
-export async function verifyAndFetchPortal(
+export type PortalFetchErrorCode =
+    | "ACCOUNT_NOT_FOUND"
+    | "NETWORK_ERROR"
+    | "RATE_LIMITED"
+    | "PLATFORM_UNAVAILABLE"
+    | "PARSE_ERROR";
+
+export interface PortalFetchSuccess {
+    success: true;
+    data: PortalProfileData;
+}
+
+export interface PortalFetchFailure {
+    success: false;
+    code: PortalFetchErrorCode;
+    statusCode: number;
+    message: string;
+}
+
+export type PortalFetchDetailResult = PortalFetchSuccess | PortalFetchFailure;
+
+export async function fetchKaggleDetailed(username: string): Promise<PortalFetchDetailResult> {
+    const clean = username.trim().replace(/^@+/, "");
+    // Kaggle usernames are alphanumeric with underscores and hyphens (length 3-30)
+    if (!/^[a-zA-Z0-9_\-]{3,30}$/.test(clean)) {
+        return {
+            success: false,
+            code: "ACCOUNT_NOT_FOUND",
+            statusCode: 404,
+            message: `Account not found on kaggle. Please check your username or profile link.`,
+        };
+    }
+
+    // Filter out reserved system routes that are not user accounts
+    const reservedRoutes = new Set([
+        "competitions", "datasets", "code", "models", "discussion", "discussions",
+        "learn", "messages", "rankings", "organizations", "docs", "progression",
+        "terms", "privacy", "contact", "about", "account", "work", "community",
+        "search", "api", "certification", "compliance"
+    ]);
+    if (reservedRoutes.has(clean.toLowerCase())) {
+        return {
+            success: false,
+            code: "ACCOUNT_NOT_FOUND",
+            statusCode: 404,
+            message: `Kaggle identifier '${clean}' is a reserved platform route, not a user account.`,
+        };
+    }
+
+    const profileUrl = `https://www.kaggle.com/${encodeURIComponent(clean)}`;
+    let res: globalThis.Response;
+    try {
+        res = await fetch(profileUrl, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+            signal: AbortSignal.timeout(6000),
+        });
+    } catch (err: any) {
+        if (err.name === "TimeoutError" || err.name === "AbortError") {
+            return {
+                success: false,
+                code: "NETWORK_ERROR",
+                statusCode: 504,
+                message: "Connection to Kaggle timed out. Please check your network and try again.",
+            };
+        }
+        return {
+            success: false,
+            code: "NETWORK_ERROR",
+            statusCode: 504,
+            message: err.message || "Network error connecting to Kaggle. Please check your network and try again.",
+        };
+    }
+
+    if (res.status === 404) {
+        return {
+            success: false,
+            code: "ACCOUNT_NOT_FOUND",
+            statusCode: 404,
+            message: `Account not found on kaggle. Please check your username or profile link.`,
+        };
+    }
+
+    if (res.status === 429) {
+        return {
+            success: false,
+            code: "RATE_LIMITED",
+            statusCode: 429,
+            message: "Kaggle rate limit encountered. Please retry in a few moments.",
+        };
+    }
+
+    if (res.status === 403) {
+        return {
+            success: false,
+            code: "PLATFORM_UNAVAILABLE",
+            statusCode: 503,
+            message: "Kaggle blocked automated access. Please verify the profile directly in your browser.",
+        };
+    }
+
+    if (res.status >= 500) {
+        return {
+            success: false,
+            code: "PLATFORM_UNAVAILABLE",
+            statusCode: 503,
+            message: "Kaggle service is currently unavailable. Please try again later.",
+        };
+    }
+
+    if (!res.ok) {
+        return {
+            success: false,
+            code: "NETWORK_ERROR",
+            statusCode: 502,
+            message: `Kaggle responded with unexpected HTTP ${res.status}.`,
+        };
+    }
+
+    let html: string;
+    try {
+        html = await res.text();
+    } catch (err: any) {
+        return {
+            success: false,
+            code: "NETWORK_ERROR",
+            statusCode: 502,
+            message: "Failed to read response body from Kaggle.",
+        };
+    }
+
+    // Check for explicit 404 or Page Not Found indicators in HTML body
+    if (
+        html.includes("<title>Page Not Found | Kaggle</title>") ||
+        html.includes("<h1>Page Not Found</h1>") ||
+        html.includes("User not found") ||
+        html.includes("404 Not Found")
+    ) {
+        return {
+            success: false,
+            code: "ACCOUNT_NOT_FOUND",
+            statusCode: 404,
+            message: `Account not found on kaggle. Please check your username or profile link.`,
+        };
+    }
+
+    // Check for Google reCAPTCHA Enterprise or Cloudflare bot challenge interstitial
+    if (
+        html.includes("RecaptchaChallengePageUi") ||
+        html.includes("recaptcha/challengepage") ||
+        html.includes("g-recaptcha") ||
+        html.includes("Checking your browser before accessing www.kaggle.com")
+    ) {
+        return {
+            success: false,
+            code: "PLATFORM_UNAVAILABLE",
+            statusCode: 503,
+            message: "Kaggle is temporarily unavailable due to anti-bot verification. Please try again shortly.",
+        };
+    }
+
+    // Extract Display Name from Open Graph or Title
+    let displayName = clean;
+    const ogTitleMatch =
+        html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i) ||
+        html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:title["']/i);
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    const hasJsonLd = html.includes("application/ld+json");
+
+    const rawTitle = ogTitleMatch ? ogTitleMatch[1] : (titleMatch ? titleMatch[1] : "");
+    if (rawTitle) {
+        const cleanedTitle = rawTitle
+            .replace(/\s*[|\-]\s*Kaggle\s*$/i, "")
+            .trim();
+        if (cleanedTitle && !cleanedTitle.toLowerCase().includes("page not found")) {
+            const parts = cleanedTitle.split(/\s*\|\s*/);
+            displayName = parts[0]?.trim() || clean;
+        }
+    }
+
+    // If no Open Graph, Kaggle title signature, or JSON-LD structure exists, structure is unrecognized
+    const hasKaggleSignature = (rawTitle.toLowerCase().includes("kaggle")) || (ogTitleMatch !== null) || hasJsonLd;
+    if (!hasKaggleSignature) {
+        return {
+            success: false,
+            code: "PARSE_ERROR",
+            statusCode: 502,
+            message: "Could not parse Kaggle profile structure. Please verify the profile is public.",
+        };
+    }
+
+    // Extract Avatar
+    let avatar = getFallbackAvatar(clean);
+    const ogImageMatch =
+        html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+        html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']/i);
+    if (ogImageMatch && ogImageMatch[1]) {
+        const candidateAvatar = ogImageMatch[1].trim();
+        if (
+            candidateAvatar.startsWith("http") &&
+            !candidateAvatar.includes("kaggle-logo") &&
+            !candidateAvatar.includes("default-avatar-placeholder")
+        ) {
+            avatar = candidateAvatar;
+        }
+    }
+
+    // Extract Bio / Description
+    const ogDescMatch =
+        html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i) ||
+        html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:description["']/i);
+    const bio = ogDescMatch && ogDescMatch[1] ? ogDescMatch[1].trim() : "";
+
+    // Extract Tier and Stats
+    const stats: Array<{ label: string; value: string }> = [
+        { label: "portal", value: "Kaggle" },
+        { label: "category", value: "Data Science & ML" },
+    ];
+
+    const KAGGLE_TIERS = ["Grandmaster", "Master", "Expert", "Contributor", "Novice"];
+    let detectedTier: string | null = null;
+
+    if (rawTitle) {
+        for (const tier of KAGGLE_TIERS) {
+            if (new RegExp(`\\b${tier}\\b`, "i").test(rawTitle)) {
+                detectedTier = tier;
+                break;
+            }
+        }
+    }
+
+    if (!detectedTier && bio) {
+        for (const tier of KAGGLE_TIERS) {
+            if (new RegExp(`\\b${tier}\\b`, "i").test(bio)) {
+                detectedTier = tier;
+                break;
+            }
+        }
+    }
+
+    try {
+        const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+        let jsonLdMatch;
+        while ((jsonLdMatch = jsonLdRegex.exec(html)) !== null) {
+            const parsed = JSON.parse(jsonLdMatch[1] || "{}");
+            if (parsed["@type"] === "Person" || parsed.name) {
+                if (parsed.name) {
+                    displayName = parsed.name;
+                }
+                if (parsed.image && !avatar.startsWith("https://storage.googleapis.com")) {
+                    avatar = typeof parsed.image === "string" ? parsed.image : (parsed.image.url || avatar);
+                }
+            }
+        }
+    } catch {
+        // Non-fatal JSON parse error
+    }
+
+    if (!detectedTier) {
+        const stateTierMatch = html.match(/["']tier["']\s*:\s*["']([^"']+)["']/i) ||
+            html.match(/["']performanceTier["']\s*:\s*["']([^"']+)["']/i);
+        if (stateTierMatch && stateTierMatch[1]) {
+            const tierVal = stateTierMatch[1].trim();
+            for (const tier of KAGGLE_TIERS) {
+                if (tier.toLowerCase() === tierVal.toLowerCase()) {
+                    detectedTier = tier;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (detectedTier) {
+        stats.push({ label: "tier", value: detectedTier });
+    }
+
+    const followersMatch = html.match(/["']followers["']\s*:\s*(\d+)/i) ||
+        html.match(/(\d+)\s+followers/i);
+    if (followersMatch && followersMatch[1]) {
+        const count = parseInt(followersMatch[1], 10);
+        if (!isNaN(count) && count > 0) {
+            stats.push({ label: "followers", value: `${count} followers` });
+        }
+    }
+
+    const goldMatch = html.match(/["']goldMedals["']\s*:\s*(\d+)/i);
+    const silverMatch = html.match(/["']silverMedals["']\s*:\s*(\d+)/i);
+    const bronzeMatch = html.match(/["']bronzeMedals["']\s*:\s*(\d+)/i);
+    if (goldMatch && goldMatch[1]) stats.push({ label: "goldMedals", value: goldMatch[1] });
+    if (silverMatch && silverMatch[1]) stats.push({ label: "silverMedals", value: silverMatch[1] });
+    if (bronzeMatch && bronzeMatch[1]) stats.push({ label: "bronzeMedals", value: bronzeMatch[1] });
+
+    return {
+        success: true,
+        data: {
+            success: true,
+            portal: "kaggle",
+            username: clean,
+            name: displayName || clean,
+            avatar,
+            stats,
+            profileUrl: `https://www.kaggle.com/${clean}`,
+            verified: false,
+        },
+    };
+}
+
+export async function fetchKaggle(username: string): Promise<PortalProfileData | null> {
+    const res = await fetchKaggleDetailed(username);
+    return res.success ? res.data : null;
+}
+
+export async function verifyAndFetchPortalDetailed(
     portal: string,
     username: string,
     options?: { forceFresh?: boolean; maxAgeSeconds?: number }
-): Promise<PortalProfileData | null> {
+): Promise<PortalFetchDetailResult> {
     const cleanPortal = String(portal || "").toLowerCase().trim();
     const cleanUsername = String(username || "").trim();
-    if (!cleanPortal || !cleanUsername) return null;
+    if (!cleanPortal || !cleanUsername) {
+        return {
+            success: false,
+            code: "ACCOUNT_NOT_FOUND",
+            statusCode: 400,
+            message: "Both portal and username parameters are required",
+        };
+    }
 
     const cacheKey = `portal:profile:${cleanPortal}:${cleanUsername.toLowerCase()}`;
     const forceFresh = options?.forceFresh ?? false;
@@ -1689,7 +2011,7 @@ export async function verifyAndFetchPortal(
             if (cached) {
                 const parsed = JSON.parse(cached) as PortalProfileData;
                 if (parsed && parsed.success) {
-                    return parsed;
+                    return { success: true, data: parsed };
                 }
             }
         } catch {
@@ -1697,67 +2019,99 @@ export async function verifyAndFetchPortal(
         }
     }
 
-    let result: PortalProfileData | null = null;
-    switch (cleanPortal) {
-        case "leetcode":
-            result = await fetchLeetCode(cleanUsername);
-            break;
-        case "codeforces":
-            result = await fetchCodeforces(cleanUsername);
-            break;
-        case "github":
-            result = await fetchGitHub(cleanUsername);
-            break;
-        case "codechef":
-            result = await fetchCodeChef(cleanUsername);
-            break;
-        case "geeksforgeeks":
-            result = await fetchGeeksforGeeks(cleanUsername);
-            break;
-        case "hackerrank":
-            result = await fetchHackerRank(cleanUsername);
-            break;
-        case "atcoder":
-            result = await fetchAtCoder(cleanUsername);
-            break;
-        case "cses":
-            result = await fetchCSES(cleanUsername);
-            break;
-        case "hackerearth":
-            result = await fetchHackerEarth(cleanUsername);
-            break;
-        case "interviewbit":
-            result = await fetchInterviewBit(cleanUsername);
-            break;
-        case "topcoder":
-            result = await fetchTopCoder(cleanUsername);
-            break;
-        case "code360":
-        case "codingninjas":
-            result = await fetchCode360(cleanUsername);
-            break;
-        case "spoj":
-            result = await fetchSPOJ(cleanUsername);
-            break;
-        case "medium":
-            result = await fetchMedium(cleanUsername);
-            break;
-        case "substack":
-            result = await fetchSubstack(cleanUsername);
-            break;
-        default:
-            return null;
+    let detailedResult: PortalFetchDetailResult;
+
+    if (cleanPortal === "kaggle") {
+        detailedResult = await fetchKaggleDetailed(cleanUsername);
+    } else {
+        let result: PortalProfileData | null = null;
+        switch (cleanPortal) {
+            case "leetcode":
+                result = await fetchLeetCode(cleanUsername);
+                break;
+            case "codeforces":
+                result = await fetchCodeforces(cleanUsername);
+                break;
+            case "github":
+                result = await fetchGitHub(cleanUsername);
+                break;
+            case "codechef":
+                result = await fetchCodeChef(cleanUsername);
+                break;
+            case "geeksforgeeks":
+                result = await fetchGeeksforGeeks(cleanUsername);
+                break;
+            case "hackerrank":
+                result = await fetchHackerRank(cleanUsername);
+                break;
+            case "atcoder":
+                result = await fetchAtCoder(cleanUsername);
+                break;
+            case "cses":
+                result = await fetchCSES(cleanUsername);
+                break;
+            case "hackerearth":
+                result = await fetchHackerEarth(cleanUsername);
+                break;
+            case "interviewbit":
+                result = await fetchInterviewBit(cleanUsername);
+                break;
+            case "topcoder":
+                result = await fetchTopCoder(cleanUsername);
+                break;
+            case "code360":
+            case "codingninjas":
+                result = await fetchCode360(cleanUsername);
+                break;
+            case "spoj":
+                result = await fetchSPOJ(cleanUsername);
+                break;
+            case "medium":
+                result = await fetchMedium(cleanUsername);
+                break;
+            case "substack":
+                result = await fetchSubstack(cleanUsername);
+                break;
+            default:
+                return {
+                    success: false,
+                    code: "ACCOUNT_NOT_FOUND",
+                    statusCode: 404,
+                    message: `Platform '${cleanPortal}' is unsupported`,
+                };
+        }
+
+        if (result && result.success) {
+            detailedResult = { success: true, data: result };
+        } else {
+            detailedResult = {
+                success: false,
+                code: "ACCOUNT_NOT_FOUND",
+                statusCode: 404,
+                message: `Account not found on ${cleanPortal}. Please check your username or profile link.`,
+            };
+        }
     }
 
-    if (result && result.success && redis && redis.status === "ready") {
+    // Only cache successful profiles. Transient errors/failures are NEVER cached!
+    if (detailedResult.success && redis && redis.status === "ready") {
         try {
-            await redis.set(cacheKey, JSON.stringify(result), "EX", maxAge);
+            await redis.set(cacheKey, JSON.stringify(detailedResult.data), "EX", maxAge);
         } catch {
             // non-fatal
         }
     }
 
-    return result;
+    return detailedResult;
+}
+
+export async function verifyAndFetchPortal(
+    portal: string,
+    username: string,
+    options?: { forceFresh?: boolean; maxAgeSeconds?: number }
+): Promise<PortalProfileData | null> {
+    const detailed = await verifyAndFetchPortalDetailed(portal, username, options);
+    return detailed.success ? detailed.data : null;
 }
 
 portalsRouter.get("/fetch", async (req: Request, res: Response) => {
@@ -1768,25 +2122,27 @@ portalsRouter.get("/fetch", async (req: Request, res: Response) => {
         if (!portal || !username) {
             return res.status(400).json({
                 success: false,
+                code: "ACCOUNT_NOT_FOUND",
                 message: "Both portal and username parameters are required",
             });
         }
 
-        const profileData = await verifyAndFetchPortal(portal, username);
+        const fetchResult = await verifyAndFetchPortalDetailed(portal, username);
 
-        // If profile was not found on the platform, return 404 Not Found
-        if (!profileData) {
-            return res.status(404).json({
+        if (!fetchResult.success) {
+            return res.status(fetchResult.statusCode).json({
                 success: false,
-                message: `Account not found on ${portal}. Please check your username or profile link.`,
+                code: fetchResult.code,
+                message: fetchResult.message,
             });
         }
 
-        return res.status(200).json(profileData);
+        return res.status(200).json(fetchResult.data);
     } catch (err: any) {
         console.error("Portal fetch error:", err);
         return res.status(500).json({
             success: false,
+            code: "PLATFORM_UNAVAILABLE",
             message: "Failed to fetch profile details",
         });
     }
@@ -3301,6 +3657,7 @@ export function detectPortalFromUrl(url: string): string | null {
     if (low.includes("spoj.com")) return "spoj";
     if (low.includes("medium.com")) return "medium";
     if (low.includes("substack.com")) return "substack";
+    if (low.includes("kaggle.com")) return "kaggle";
 
     return null;
 }
@@ -3392,9 +3749,24 @@ export function extractPortalUsername(portal: string, rawInput: string): string 
             return withoutQuery.split("/").pop() || clean;
         }
         case "kaggle": {
+            const reserved = new Set([
+                "competitions", "datasets", "code", "models", "discussion", "discussions",
+                "learn", "messages", "rankings", "organizations", "docs", "progression",
+                "terms", "privacy", "contact", "about", "account", "work", "community", "search", "api"
+            ]);
             const m = withoutQuery.match(/kaggle\.com\/([a-zA-Z0-9_\-]+)/i);
-            if (m && m[1]) return m[1];
-            return withoutQuery.split("/").pop() || clean;
+            if (m && m[1]) {
+                const candidate = m[1].trim();
+                if (!reserved.has(candidate.toLowerCase())) {
+                    return candidate;
+                }
+                return null;
+            }
+            const candidate = (withoutQuery.split("/").pop() || clean).trim();
+            if (candidate && !reserved.has(candidate.toLowerCase()) && /^[a-zA-Z0-9_\-]{3,30}$/.test(candidate)) {
+                return candidate;
+            }
+            return null;
         }
         default: {
             return withoutQuery.split("/").pop() || clean;

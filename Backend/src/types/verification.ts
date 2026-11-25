@@ -51,6 +51,10 @@ export const SUPPORTED_PORTALS = [
     'hackerrank',
     'geeksforgeeks',
     'github',
+    'kaggle',
+    'atcoder',
+    'topcoder',
+    'hackerearth',
 ] as const;
 
 export type SupportedPortal = typeof SUPPORTED_PORTALS[number];

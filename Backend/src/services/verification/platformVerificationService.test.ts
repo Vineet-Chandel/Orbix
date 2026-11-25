@@ -25,9 +25,15 @@ import {
     normalizePlatformName,
 } from './adapters/adapterRegistry.js';
 import { LeetCodeAdapter } from './adapters/leetcodeAdapter.js';
-import { CodeforcesAdapter } from './adapters/codeforcesAdapter.js';
-import { HackerRankAdapter } from './adapters/hackerrankAdapter.js';
-import { GitHubAdapter } from './adapters/githubAdapter.js';
+import { CodeforcesAdapter } from "./adapters/codeforcesAdapter.js";
+import { HackerRankAdapter } from "./adapters/hackerrankAdapter.js";
+import { GitHubAdapter } from "./adapters/githubAdapter.js";
+import { KaggleAdapter } from "./adapters/kaggleAdapter.js";
+import { AtCoderAdapter } from "./adapters/atcoderAdapter.js";
+import { CodeChefAdapter } from "./adapters/codechefAdapter.js";
+import { TopCoderAdapter } from "./adapters/topcoderAdapter.js";
+import { GeeksforGeeksAdapter } from "./adapters/geeksforgeeksAdapter.js";
+import { HackerEarthAdapter } from "./adapters/hackerearthAdapter.js";
 import {
     checkVerificationRateLimit,
     setRedisClientForTest,
@@ -50,13 +56,19 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
     // 1. ADAPTER REGISTRY & PLATFORM DISCOVERY
     // =========================================================================
     describe('Adapter Registry & Platform Discovery', () => {
-        test('Registers all Tier 1 platforms: LeetCode, Codeforces, HackerRank, GitHub', () => {
+        test('Registers all supported platforms: LeetCode, Codeforces, HackerRank, GitHub, Kaggle, AtCoder, CodeChef, TopCoder, GeeksforGeeks, HackerEarth', () => {
             const supported = getSupportedPlatforms();
             assert.ok(supported.includes('leetcode'), 'LeetCode must be supported');
             assert.ok(supported.includes('codeforces'), 'Codeforces must be supported');
             assert.ok(supported.includes('hackerrank'), 'HackerRank must be supported');
             assert.ok(supported.includes('github'), 'GitHub must be supported');
-            assert.equal(supported.length, 4, 'Exactly 4 Tier 1 platforms should be registered');
+            assert.ok(supported.includes('kaggle'), 'Kaggle must be supported');
+            assert.ok(supported.includes('atcoder'), 'AtCoder must be supported');
+            assert.ok(supported.includes('codechef'), 'CodeChef must be supported');
+            assert.ok(supported.includes('topcoder'), 'TopCoder must be supported');
+            assert.ok(supported.includes('geeksforgeeks'), 'GeeksforGeeks must be supported');
+            assert.ok(supported.includes('hackerearth'), 'HackerEarth must be supported');
+            assert.equal(supported.length, 10, 'Exactly 10 platforms should be registered');
         });
 
         test('Resolves correct adapter instances by case-insensitive name', () => {
@@ -66,13 +78,27 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
             assert.ok(adapterRegistry.getAdapter('codeforces') instanceof CodeforcesAdapter);
             assert.ok(adapterRegistry.getAdapter('hackerrank') instanceof HackerRankAdapter);
             assert.ok(adapterRegistry.getAdapter('github') instanceof GitHubAdapter);
+            assert.ok(adapterRegistry.getAdapter('kaggle') instanceof KaggleAdapter);
+            assert.ok(adapterRegistry.getAdapter('Kaggle') instanceof KaggleAdapter);
+            assert.ok(adapterRegistry.getAdapter('KAGGLE') instanceof KaggleAdapter);
+            assert.ok(adapterRegistry.getAdapter('atcoder') instanceof AtCoderAdapter);
+            assert.ok(adapterRegistry.getAdapter('AtCoder') instanceof AtCoderAdapter);
+            assert.ok(adapterRegistry.getAdapter('codechef') instanceof CodeChefAdapter);
+            assert.ok(adapterRegistry.getAdapter('CodeChef') instanceof CodeChefAdapter);
+            assert.ok(adapterRegistry.getAdapter('topcoder') instanceof TopCoderAdapter);
+            assert.ok(adapterRegistry.getAdapter('TopCoder') instanceof TopCoderAdapter);
+            assert.ok(adapterRegistry.getAdapter('geeksforgeeks') instanceof GeeksforGeeksAdapter);
+            assert.ok(adapterRegistry.getAdapter('GeeksforGeeks') instanceof GeeksforGeeksAdapter);
+            assert.ok(adapterRegistry.getAdapter('GEEKSFORGEEKS') instanceof GeeksforGeeksAdapter);
+            assert.ok(adapterRegistry.getAdapter('hackerearth') instanceof HackerEarthAdapter);
+            assert.ok(adapterRegistry.getAdapter('HackerEarth') instanceof HackerEarthAdapter);
+            assert.ok(adapterRegistry.getAdapter('HACKEREARTH') instanceof HackerEarthAdapter);
         });
 
         test('Rejects unsupported Tier 2/3 platforms with undefined', () => {
-            assert.equal(adapterRegistry.getAdapter('geeksforgeeks'), undefined);
-            assert.equal(adapterRegistry.getAdapter('gfg'), undefined);
-            assert.equal(adapterRegistry.getAdapter('codechef'), undefined);
-            assert.equal(adapterRegistry.getAdapter('hackerearth'), undefined);
+            assert.equal(adapterRegistry.getAdapter('cses'), undefined);
+            assert.equal(adapterRegistry.getAdapter('interviewbit'), undefined);
+            assert.equal(adapterRegistry.getAdapter('spoj'), undefined);
             assert.equal(adapterRegistry.getAdapter('unknown_platform'), undefined);
             assert.equal(adapterRegistry.getAdapter(''), undefined);
         });
@@ -103,8 +129,8 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
             test('Provides clear user instructions pointing to LeetCode profile settings', () => {
                 const instructions = adapter.getInstructions('orbix-v-AbCdEf123456');
                 assert.equal(instructions.fieldName, 'aboutMe');
-                assert.ok(instructions.instructions.includes('About Me'));
-                assert.ok(instructions.profileSettingsUrl?.includes('leetcode.com/profile'));
+                assert.ok(instructions.instructions.includes('ReadMe'));
+                assert.ok(instructions.profileSettingsUrl?.includes('leetcode.com/settings/profile'));
             });
 
             test('Extracts candidate verification tokens from LeetCode GraphQL response', async () => {
@@ -248,18 +274,19 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
         describe('HackerRank Adapter', () => {
             const adapter = new HackerRankAdapter();
 
-            test('Restricts challenge verification exclusively to short_bio (user bio)', () => {
-                assert.equal(adapter.defaultTargetField, 'short_bio');
-                assert.deepEqual(Array.from(adapter.supportedTargetFields), ['short_bio']);
+            test('Restricts challenge verification to Headline (jobs_headline)', () => {
+                assert.equal(adapter.defaultTargetField, 'headline');
+                assert.deepEqual(Array.from(adapter.supportedTargetFields), ['headline', 'jobs_headline']);
             });
 
-            test('Extracts candidate tokens from HackerRank short_bio', async () => {
+            test('Extracts candidate tokens from HackerRank jobs_headline', async () => {
                 const tokenBundle = generateChallengeToken();
                 const mockResponse = {
                     model: {
                         username: 'alice_hr',
                         name: 'Alice',
-                        short_bio: `Developer at tech. ${tokenBundle.plaintextToken}`,
+                        jobs_headline: `Software Engineer ${tokenBundle.plaintextToken}`,
+                        short_bio: null,
                     },
                 };
 
@@ -273,7 +300,8 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
                 try {
                     const fetchResult = await adapter.fetchProfile('alice_hr');
                     assert.ok(fetchResult.success);
-                    assert.equal(fetchResult.targetFieldsContent['short_bio'], `Developer at tech. ${tokenBundle.plaintextToken}`);
+                    assert.equal(fetchResult.targetFieldsContent['headline'], `Software Engineer ${tokenBundle.plaintextToken}`);
+                    assert.equal(fetchResult.targetFieldsContent['jobs_headline'], `Software Engineer ${tokenBundle.plaintextToken}`);
 
                     const candidates = adapter.extractCandidates(fetchResult);
                     assert.ok(candidates.includes(tokenBundle.plaintextToken));
@@ -281,6 +309,16 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
                 } finally {
                     globalThis.fetch = originalFetch;
                 }
+            });
+
+            test('Provides instructions pointing to user profile and Headline', () => {
+                const instructions = adapter.getInstructions('ORBIX-ABCD-1234', 'headline', 'alice_hr');
+                assert.equal(instructions.fieldName, 'headline');
+                assert.equal(instructions.displayFieldName, 'Headline');
+                assert.equal(instructions.profileSettingsUrl, 'https://www.hackerrank.com/profile/alice_hr');
+                assert.ok(instructions.instructions.includes('Headline'));
+                assert.ok(!instructions.instructions.includes('short_bio'));
+                assert.ok(!instructions.instructions.includes('Short Bio'));
             });
 
             test('Handles HackerRank 404', async () => {
@@ -340,6 +378,257 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
                 assert.equal(instructions.fieldName, 'oauth_identity');
                 assert.ok(instructions.instructions.includes('OAuth'));
                 assert.equal(instructions.profileSettingsUrl, '/api/auth/github');
+            });
+        });
+
+        // --- Kaggle Adapter ---
+        describe('Kaggle Adapter', () => {
+            const adapter = new KaggleAdapter();
+
+            test('Targets bio as sole challenge field and rejects other fields', () => {
+                assert.equal(adapter.defaultTargetField, 'bio');
+                assert.deepEqual(Array.from(adapter.supportedTargetFields), ['bio']);
+                assert.ok(!adapter.supportedTargetFields.includes('username' as any));
+            });
+
+            test('Provides clear user instructions pointing to Kaggle profile, Home tab and Bio section', () => {
+                const instructions = adapter.getInstructions('orbix-v-AbCdEf123456', 'bio', 'alexis_test');
+                assert.equal(instructions.fieldName, 'bio');
+                assert.equal(instructions.displayFieldName, 'Bio');
+                assert.ok(instructions.instructions.includes('Home tab'));
+                assert.ok(instructions.instructions.includes('Bio'));
+                assert.ok(instructions.instructions.includes('Edit'));
+                assert.equal(instructions.profileSettingsUrl, 'https://www.kaggle.com/alexis_test');
+            });
+
+            test('Extracts candidate verification tokens from Kaggle Open Graph description', async () => {
+                const tokenBundle = generateChallengeToken();
+                const mockHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Kaggle Grandmaster Profile</title>
+                        <meta property="og:description" content="AI Researcher | Verification: ${tokenBundle.plaintextToken} | Deep learning practitioner" />
+                    </head>
+                    <body></body>
+                    </html>
+                `;
+
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => ({
+                    ok: true,
+                    status: 200,
+                    text: async () => mockHtml,
+                } as any);
+
+                try {
+                    const fetchResult = await adapter.fetchProfile('test_kaggler');
+                    assert.ok(fetchResult.success, 'Fetch must succeed');
+                    assert.equal(fetchResult.handle, 'test_kaggler');
+
+                    const candidates = adapter.extractCandidates(fetchResult);
+                    assert.ok(candidates.includes(tokenBundle.plaintextToken), 'Candidate token must be extracted');
+                    assert.ok(verifyCandidateMatch(candidates[0], tokenBundle.tokenHash));
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
+            });
+
+            test('Extracts candidate verification tokens from Kaggle JSON-LD Schema.org Person description', async () => {
+                const tokenBundle = generateChallengeToken();
+                const mockHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <script type="application/ld+json">
+                        {
+                            "@context": "https://schema.org",
+                            "@type": "Person",
+                            "name": "Alex Kaggler",
+                            "description": "Kaggle Competitions Master. Orbix token ${tokenBundle.plaintextToken} for verification."
+                        }
+                        </script>
+                    </head>
+                    <body></body>
+                    </html>
+                `;
+
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => ({
+                    ok: true,
+                    status: 200,
+                    text: async () => mockHtml,
+                } as any);
+
+                try {
+                    const fetchResult = await adapter.fetchProfile('alex_kaggler');
+                    assert.ok(fetchResult.success);
+
+                    const candidates = adapter.extractCandidates(fetchResult);
+                    assert.ok(candidates.includes(tokenBundle.plaintextToken));
+                    assert.ok(verifyCandidateMatch(candidates[0], tokenBundle.tokenHash));
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
+            });
+
+            test('Extracts candidate verification tokens from Kaggle embedded JSON state (userBio)', async () => {
+                const tokenBundle = generateChallengeToken();
+                const mockHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <script>
+                            window.KaggleState = {
+                                "userBio": "Data scientist exploring NLP. ${tokenBundle.plaintextToken}"
+                            };
+                        </script>
+                    </head>
+                    <body></body>
+                    </html>
+                `;
+
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => ({
+                    ok: true,
+                    status: 200,
+                    text: async () => mockHtml,
+                } as any);
+
+                try {
+                    const fetchResult = await adapter.fetchProfile('nlp_master');
+                    assert.ok(fetchResult.success);
+
+                    const candidates = adapter.extractCandidates(fetchResult);
+                    assert.ok(candidates.includes(tokenBundle.plaintextToken));
+                    assert.ok(verifyCandidateMatch(candidates[0], tokenBundle.tokenHash));
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
+            });
+
+            test('Handles Kaggle 404 user not found', async () => {
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => ({
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found',
+                } as any);
+
+                try {
+                    const result = await adapter.fetchProfile('non_existent_kaggler');
+                    assert.equal(result.success, false);
+                    assert.equal(result.errorCode, 'NOT_FOUND');
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
+            });
+
+            test('Handles Kaggle HTTP 429 rate limit', async () => {
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => ({
+                    ok: false,
+                    status: 429,
+                    statusText: 'Too Many Requests',
+                } as any);
+
+                try {
+                    const result = await adapter.fetchProfile('throttled_kaggler');
+                    assert.equal(result.success, false);
+                    assert.equal(result.errorCode, 'RATE_LIMITED');
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
+            });
+
+            test('Handles reserved handle rejection as NOT_FOUND without network call', async () => {
+                let fetchCalled = false;
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => {
+                    fetchCalled = true;
+                    return {} as any;
+                };
+
+                try {
+                    const result = await adapter.fetchProfile('competitions');
+                    assert.equal(result.success, false);
+                    assert.equal(result.errorCode, 'NOT_FOUND');
+                    assert.equal(fetchCalled, false, 'Fetch must not be called for reserved handles');
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
+            });
+
+            test('Rejects tokens present elsewhere on page (e.g. comments, scripts) when absent from Bio', async () => {
+                const tokenBundle = generateChallengeToken();
+                const mockHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Kaggle Competitions Grandmaster</title>
+                        <meta property="og:description" content="Legitimate bio with NO verification token present." />
+                        <script>
+                            window.unrelatedData = {
+                                "comment": "Token accidentally elsewhere: ${tokenBundle.plaintextToken}"
+                            };
+                        </script>
+                    </head>
+                    <body>
+                        <div class="user-comments">Token in forum comment: ${tokenBundle.plaintextToken}</div>
+                        <div class="user-notebook-title">Notebook title ${tokenBundle.plaintextToken}</div>
+                    </body>
+                    </html>
+                `;
+
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => ({
+                    ok: true,
+                    status: 200,
+                    text: async () => mockHtml,
+                } as any);
+
+                try {
+                    const fetchResult = await adapter.fetchProfile('unrelated_kaggler');
+                    assert.ok(fetchResult.success);
+
+                    // Candidate extractor strictly examines 'bio'
+                    const candidates = adapter.extractCandidates(fetchResult, 'bio');
+                    assert.equal(candidates.length, 0, 'Must NOT extract tokens from outside the Bio field');
+
+                    // If non-bio field is requested, extractor strictly returns empty
+                    assert.deepEqual(adapter.extractCandidates(fetchResult, 'comment' as any), []);
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
+            });
+
+            test('Detects Google reCAPTCHA Enterprise bot challenge page and normalizes as NETWORK_ERROR', async () => {
+                const recaptchaHtml = `
+                    <!doctype html><html lang="en-US" dir="ltr"><head>
+                    <base href="https://www.google.com/recaptcha/challengepage/">
+                    <script>window['ppConfig'] = {productName: 'RecaptchaChallengePageUi'};</script>
+                    </head>
+                    <body>
+                    <div class="fBEGtb">Checking your browser before accessing www.kaggle.com ...</div>
+                    <div class="g-recaptcha" data-sitekey="6Ldxq2IpAAAAAIXyCS5jnxpiPbvmOlpcNu9ovJpc"></div>
+                    </body></html>
+                `;
+
+                const originalFetch = globalThis.fetch;
+                globalThis.fetch = async () => ({
+                    ok: true,
+                    status: 200,
+                    text: async () => recaptchaHtml,
+                } as any);
+
+                try {
+                    const result = await adapter.fetchProfile('bot_gated_kaggler');
+                    assert.equal(result.success, false);
+                    assert.equal(result.errorCode, 'NETWORK_ERROR');
+                    assert.ok(result.errorMessage?.includes('bot protection challenge'));
+                } finally {
+                    globalThis.fetch = originalFetch;
+                }
             });
         });
     });

@@ -54,5 +54,5 @@ export interface PlatformAdapter {
     /**
      * Provides user-facing instructions on where and how to place the challenge token.
      */
-    getInstructions(token: string, targetField?: string): VerificationInstructions;
+    getInstructions(token: string, targetField?: string, handle?: string): VerificationInstructions;
 }

@@ -6,7 +6,7 @@ export const responsePrivacy: RequestHandler = (_req, res, next) => {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     const json = res.json.bind(res);
     res.json = (body: any) => {
-        if (res.statusCode >= 500) {
+        if (res.statusCode === 500 || (res.statusCode >= 500 && (!body || typeof body !== 'object' || !body.code))) {
             body = { success: false, message: 'Something went wrong. Please try again.' };
         } else if (res.statusCode >= 400 && body && typeof body === 'object' && !Array.isArray(body)) {
             const { error, stack, trace, details, debug, ...safe } = body;

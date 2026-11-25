@@ -877,6 +877,16 @@ leaderboardRouter.get("/algorithm", async (_req: Request, res: Response) => {
                 dataCompleteness: "Full",
                 scoreIntegration: "Pillar 6 (Writing 5%)",
             },
+            {
+                platform: "Kaggle",
+                providerId: "kaggle",
+                category: "Data Science & Machine Learning",
+                connectionSource: "user_links",
+                syncMechanism: "Live Profile Scraper / Open Graph Metadata",
+                availableMetrics: "Tiers (Novice-Grandmaster), Medals, Competitions, Datasets, Notebooks",
+                dataCompleteness: "Full",
+                scoreIntegration: "Pillar 4 (Repositories / Portfolio), Profile Showcase",
+            },
         ],
         tieBreakingOrder: [
             "1. Authoritative Orbix Score (DESC)",

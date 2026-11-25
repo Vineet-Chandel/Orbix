@@ -4,6 +4,7 @@ import { PORTALS } from "../../utils/portalParser";
 import { buildApiUrl } from "../../api/apiClient";
 import type { OwnershipStatus } from "../../types/platformVerification";
 import { matchesPortalProfileIdentity } from "./portalProfileIdentity";
+import { normalizePortalError, type NormalizedPortalError } from "./portalErrorMapping";
 
 export interface PortalProfileData {
     success: boolean;
@@ -20,6 +21,13 @@ export interface PortalProfileData {
     verifiedAt?: string | null;
 }
 
+export interface PortalFetchState {
+    loading: boolean;
+    error: string | null;
+    errorState?: NormalizedPortalError | null;
+    profile: PortalProfileData | null;
+}
+
 interface PortalProfileCardProps {
     portalId: string;
     username: string;
@@ -27,11 +35,7 @@ interface PortalProfileCardProps {
     initialProfile?: PortalProfileData | null;
     onConnect: (data: PortalProfileData) => void;
     onDisconnect: () => void;
-    onFetchStateChange?: (state: {
-        loading: boolean;
-        error: string | null;
-        profile: PortalProfileData | null;
-    }) => void;
+    onFetchStateChange?: (state: PortalFetchState) => void;
 }
 
 export const PortalProfileCard = ({
@@ -61,7 +65,7 @@ export const PortalProfileCard = ({
             setProfile(null);
             setLoading(false);
             setFetchError(null);
-            onFetchStateChangeRef.current?.({ loading: false, error: null, profile: null });
+            onFetchStateChangeRef.current?.({ loading: false, error: null, errorState: null, profile: null });
             return;
         }
 
@@ -72,28 +76,28 @@ export const PortalProfileCard = ({
             setProfile(initialProfile);
             setLoading(false);
             setFetchError(null);
-            onFetchStateChangeRef.current?.({ loading: false, error: null, profile: initialProfile });
+            onFetchStateChangeRef.current?.({ loading: false, error: null, errorState: null, profile: initialProfile });
             return;
         }
 
         let isMounted = true;
         const controller = new AbortController();
 
-        // Clear the previous identity before the typing debounce begins.
+        // Clear the previous identity and error before typing debounce begins.
         setProfile(null);
         setLoading(true);
         setFetchError(null);
-        onFetchStateChangeRef.current?.({ loading: true, error: null, profile: null });
+        onFetchStateChangeRef.current?.({ loading: true, error: null, errorState: null, profile: null });
 
         const fetchDetails = async () => {
             setLoading(true);
             setFetchError(null);
-            onFetchStateChangeRef.current?.({ loading: true, error: null, profile: null });
+            onFetchStateChangeRef.current?.({ loading: true, error: null, errorState: null, profile: null });
 
             const endpoints = [buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`)];
 
             let data: PortalProfileData | null = null;
-            let errorMessage: string | null = null;
+            let normalizedError: NormalizedPortalError | null = null;
 
             for (const url of endpoints) {
                 try {
@@ -106,12 +110,17 @@ export const PortalProfileCard = ({
                             data = json;
                             break;
                         }
-                    } else if (res.status === 404) {
+                    } else {
                         const errJson = await res.json().catch(() => ({}));
-                        errorMessage = errJson.message || `Account not found on ${config?.name || portalId}`;
+                        normalizedError = normalizePortalError(res.status, errJson, config?.name || portalId);
                         break;
                     }
-                } catch {
+                } catch (err: any) {
+                    if (err?.name === "AbortError") {
+                        // Request cancelled; don't update state
+                        return;
+                    }
+                    normalizedError = normalizePortalError(0, { message: err?.message }, config?.name || portalId);
                     continue;
                 }
             }
@@ -121,12 +130,17 @@ export const PortalProfileCard = ({
             if (data && data.success) {
                 setProfile(data);
                 setFetchError(null);
-                onFetchStateChangeRef.current?.({ loading: false, error: null, profile: data });
+                onFetchStateChangeRef.current?.({ loading: false, error: null, errorState: null, profile: data });
             } else {
-                const finalErr = errorMessage || `Account not found on ${config?.name || portalId}`;
+                const finalErr = normalizedError || normalizePortalError(404, null, config?.name || portalId);
                 setProfile(null);
-                setFetchError(finalErr);
-                onFetchStateChangeRef.current?.({ loading: false, error: finalErr, profile: null });
+                setFetchError(finalErr.message);
+                onFetchStateChangeRef.current?.({
+                    loading: false,
+                    error: finalErr.message,
+                    errorState: finalErr,
+                    profile: null,
+                });
             }
             setLoading(false);
         };

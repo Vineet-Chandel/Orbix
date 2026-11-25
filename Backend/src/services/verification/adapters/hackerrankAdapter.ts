@@ -9,8 +9,8 @@ import { extractChallengeCandidates } from "../challengeCryptoService.js";
 export class HackerRankAdapter implements PlatformAdapter {
     public readonly portal = 'hackerrank';
     public readonly displayName = 'HackerRank';
-    public readonly defaultTargetField = 'short_bio';
-    public readonly supportedTargetFields = ['short_bio'] as const;
+    public readonly defaultTargetField = 'headline';
+    public readonly supportedTargetFields = ['headline', 'jobs_headline'] as const;
     public readonly supportsChallengeVerification = true;
     public readonly supportsOAuthVerification = false;
 
@@ -88,7 +88,13 @@ export class HackerRankAdapter implements PlatformAdapter {
             }
 
             const user = data.model;
+            const headline = typeof user.jobs_headline === 'string'
+                ? user.jobs_headline
+                : (typeof user.headline === 'string' ? user.headline : null);
+
             const targetFieldsContent: Record<string, string | null | undefined> = {
+                headline,
+                jobs_headline: headline,
                 short_bio: typeof user.short_bio === 'string' ? user.short_bio : null,
             };
 
@@ -134,13 +140,17 @@ export class HackerRankAdapter implements PlatformAdapter {
         return Array.from(new Set(candidates));
     }
 
-    public getInstructions(token: string, targetField: string = this.defaultTargetField): VerificationInstructions {
-        const fieldName = this.supportedTargetFields.includes(targetField as any) ? targetField : this.defaultTargetField;
+    public getInstructions(token: string, targetField: string = this.defaultTargetField, handle?: string): VerificationInstructions {
+        const cleanHandle = (handle || "").trim();
+        const profileUrl = cleanHandle
+            ? `https://www.hackerrank.com/profile/${encodeURIComponent(cleanHandle)}`
+            : 'https://www.hackerrank.com/profile/';
+
         return {
-            fieldName,
-            displayFieldName: fieldName === 'short_bio' ? 'Short Bio' : fieldName,
-            instructions: `Go to your HackerRank Profile Settings (https://www.hackerrank.com/settings/profile), temporarily paste the code '${token}' into your ${fieldName}, save changes, and click Confirm.`,
-            profileSettingsUrl: 'https://www.hackerrank.com/settings/profile',
+            fieldName: 'headline',
+            displayFieldName: 'Headline',
+            instructions: `Open your HackerRank profile (${profileUrl}), click the edit icon beside your profile name, locate the Headline field, append '${token}' to your existing Headline text, save changes, and return to Orbix to verify.`,
+            profileSettingsUrl: profileUrl,
         };
     }
 }
