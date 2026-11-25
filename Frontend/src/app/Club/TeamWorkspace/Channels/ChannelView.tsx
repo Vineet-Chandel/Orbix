@@ -854,9 +854,14 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                                             : msg.senderRole?.color || "#FFE566",
                                                 }}
                                             >
-                                                {msg.sender?.isClub || msg.senderRole?.name === "Club Identity"
-                                                    ? "🏛️ Club Identity"
-                                                    : msg.senderRole?.name}
+                                                {msg.sender?.isClub || msg.senderRole?.name === "Club Identity" ? (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Building2 className="w-3 h-3" />
+                                                        <span>Club Identity</span>
+                                                    </span>
+                                                ) : (
+                                                    msg.senderRole?.name
+                                                )}
                                             </span>
                                         )}
 

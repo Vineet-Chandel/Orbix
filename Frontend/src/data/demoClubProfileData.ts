@@ -32,19 +32,19 @@ export const demoClubProfile = {
 
 The **AWS Student Working Group at Pranveer Singh Institute of Technology (PSIT), Kanpur** is an officially recognized, student-led collegiate cloud community. Dedicated to democratizing cloud engineering and hands-on infrastructure skills, the chapter serves as an institutional launchpad for aspiring Cloud Solutions Architects, DevOps Engineers, and Serverless Developers across North India.
 
-### ☁️ Cloud Architecture & Hands-on Console Labs
+### Cloud Architecture & Hands-on Console Labs
 We believe mastery in cloud systems is developed through active architectural problem-solving, real console deployments, and well-architected cost optimization.
 - **Weekly Cloud Sandboxes:** Every weekend, our members build multi-tier infrastructures covering Amazon EC2, VPC Peering, S3 lifecycle policies, Application Load Balancers, and Aurora Serverless databases.
 - **AWS Certification Accelerators:** Structured study cohorts tailored for **AWS Certified Cloud Practitioner (CLF-C02)** and **AWS Solutions Architect Associate (SAA-C03)**, complete with timed mock exams and hands-on labs.
 - **Well-Architected Review Pods:** Interactive sessions analyzing real enterprise failure modes across the 6 AWS Well-Architected Framework pillars (Security, Reliability, Performance Efficiency, Cost Optimization, Operational Excellence, and Sustainability).
 
-### 🚀 DevOps Automation, Serverless & Infrastructure as Code
+### DevOps Automation, Serverless & Infrastructure as Code
 Beyond basic compute hosting, our students build automated, scalable deployment pipelines:
 - **Infrastructure as Code (IaC):** Writing reproducible cloud topology using **Terraform** and **AWS CDK (TypeScript)** with state locking and automated drift detection.
 - **Serverless & Event-Driven Systems:** Developing microservices with **AWS Lambda**, **Amazon EventBridge**, **SQS/SNS**, and **DynamoDB single-table design** for low-latency, zero-idle-cost campus platforms.
 - **Containerization & Kubernetes:** Packaging microservices in Docker and orchestrating container workloads using **Amazon ECS Fargate** and **Amazon EKS**.
 
-### 🌐 AWS Community Days, DeepRacer & Hackathons
+### AWS Community Days, DeepRacer & Hackathons
 The working group maintains active connections with the AWS User Group (UG) network, AWS Community Builders, and developer communities nationwide. Through Orbix, we orchestrate inter-college cloud hackathons, AWS DeepRacer autonomous racing leagues, and collaborative project showcases.`,
     logoUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794761081/8cd940c9-9253-4fe3-9d19-66500da7b42d.png",
     coverImageUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794761105/96eb5c33-f981-4018-a18c-c3f778b75f0b.png",

@@ -197,7 +197,7 @@ export default function Dashboard() {
                         aria-label="Orbix Inbox"
                         className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
-                        <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6">
+                        <div className="p-4 sm:p-6 lg:p-8 pb-32 sm:pb-32 lg:pb-8 flex-1 space-y-6">
                             <NotificationsView />
                         </div>
                         <SectionBottomIllustration alt="Notifications illustration" />
@@ -207,7 +207,7 @@ export default function Dashboard() {
                         aria-label="Orbix Trends"
                         className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
-                        <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6">
+                        <div className="p-4 sm:p-6 lg:p-8 pb-32 sm:pb-32 lg:pb-8 flex-1 space-y-6">
                             <TrendsView
                                 connectedPortals={connectedPortals}
                                 username={user?.username || ""}
@@ -229,7 +229,7 @@ export default function Dashboard() {
                         aria-label="Orbix Developer Dashboard"
                         className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
-                        <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-24 lg:pb-8 flex-1 space-y-6">
+                        <div className="p-4 sm:p-6 lg:p-8 pb-32 sm:pb-32 lg:pb-8 flex-1 space-y-6">
                             {/* Dashboard Header Bar */}
                             <div className="pb-5 border-b-2 border-black/55 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 {/* Left: Welcome Greeting */}

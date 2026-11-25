@@ -4475,7 +4475,7 @@ clubRouter.patch("/events/:eventId/applications/batch", authenticate, requireClu
                                 user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
                             ) VALUES (
                                 $1::uuid, $1::uuid, $2,
-                                'Application Accepted! 🎉',
+                                'Application Accepted!',
                                 $3,
                                 'club_event',
                                 'application_approved',
@@ -4660,7 +4660,7 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                             user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
                         ) VALUES (
                             $1::uuid, $1::uuid, $2,
-                            'Application Accepted! 🎉',
+                            'Application Accepted!',
                             $3,
                             'club_event',
                             'application_approved',
@@ -5221,7 +5221,7 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, requireClubAcco
                         user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
                     ) VALUES (
                         $1::uuid, $1::uuid, $2,
-                        'Checked In to Event! 🎟️',
+                        'Checked In to Event!',
                         $3,
                         'club_event',
                         'event_checkin',
@@ -6041,7 +6041,7 @@ clubRouter.post("/certificates/issue", authenticate, requireClubAccount, async (
                 });
 
                 // Immediately create notification for the student in user_notifications
-                const notifTitle = `🎓 Certificate Awarded!`;
+                const notifTitle = `Certificate Awarded!`;
                 const notifBody = `${club.name} has awarded you the "${cleanTitle}" certificate.`;
                 const notifMetadata = JSON.stringify({
                     type: "club_certificate",

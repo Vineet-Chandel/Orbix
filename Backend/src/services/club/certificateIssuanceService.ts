@@ -1830,7 +1830,7 @@ export class CertificateIssuanceService {
         );
 
         // 5. Create notification for the user
-        const notifTitle = `🎓 Certificate Claimed Successfully!`;
+        const notifTitle = `Certificate Claimed Successfully!`;
         const notifBody = `You have claimed the "${cert.title}" certificate from ${cert.clubName}. It is now in your certificate wallet.`;
         await query(
             `INSERT INTO user_notifications (

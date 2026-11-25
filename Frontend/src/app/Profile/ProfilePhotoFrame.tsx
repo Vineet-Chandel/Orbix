@@ -1,5 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Eye } from "lucide-react";
+import {
+    Eye,
+    Camera,
+    MoreVertical,
+    Image as ImageIcon,
+    Crop,
+    RotateCcw,
+    Trash2,
+    Loader2,
+} from "lucide-react";
 import { useAppDispatch } from "../../store";
 import { updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
@@ -313,10 +322,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                         className="orbix-avatar-hover-overlay absolute inset-0 bg-black/55 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex flex-col items-center justify-center text-white"
                         aria-hidden="true"
                     >
-                        <svg className="w-5 h-5 mb-0.5 text-white/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+                        <Camera className="w-5 h-5 mb-0.5 text-white/90 stroke-[2.2]" />
                         <span className="text-[10px] font-bold tracking-tight text-white/95">Upload</span>
                     </div>
                 )}
@@ -328,10 +334,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                         role="status"
                         aria-live="polite"
                     >
-                        <svg className="w-6 h-6 animate-spin text-white mb-1" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3.5" />
-                            <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                        </svg>
+                        <Loader2 className="w-6 h-6 animate-spin text-white mb-1" />
                         <span className="text-[10px] font-extrabold tracking-tight leading-none text-white truncate max-w-full">
                             {statusMessage || "Working..."}
                         </span>
@@ -368,9 +371,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                     aria-expanded={isMenuOpen}
                     title="Profile photo actions"
                 >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
+                    <MoreVertical className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
 
                 {/* Dropdown Menu for Touch, Keyboard & Explicit Actions */}
@@ -404,9 +405,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                                 hasViewablePhoto ? "border-t border-neutral-100" : ""
                             }`}
                         >
-                            <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                            <ImageIcon className="w-4 h-4 text-neutral-600 stroke-[2]" />
                             <span>Change photo</span>
                         </button>
 
@@ -422,9 +421,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                                 }}
                                 className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2.5 transition-colors cursor-pointer text-neutral-900 border-t border-neutral-100"
                             >
-                                <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                                </svg>
+                                <Crop className="w-4 h-4 text-neutral-600 stroke-[2]" />
                                 <span>Adjust / Reposition</span>
                             </button>
                         )}
@@ -438,9 +435,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                                 className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center justify-between gap-2.5 transition-colors cursor-pointer text-neutral-900 border-t border-neutral-100"
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <svg className="w-4 h-4 text-neutral-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
+                                    <RotateCcw className="w-4 h-4 text-neutral-600 flex-shrink-0 stroke-[2]" />
                                     <span className="truncate">Restore previous</span>
                                 </div>
                                 {previousPhotoUrl && (
@@ -461,9 +456,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                                 onClick={handleResetToDefault}
                                 className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-700 flex items-center gap-2.5 transition-colors cursor-pointer border-t border-neutral-100"
                             >
-                                <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
+                                <Trash2 className="w-4 h-4 text-rose-500 stroke-[2]" />
                                 <span>Use default avatar</span>
                             </button>
                         )}

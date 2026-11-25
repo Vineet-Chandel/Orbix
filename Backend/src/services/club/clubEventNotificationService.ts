@@ -134,23 +134,23 @@ export async function notifyClubAndCollegeUsers(
         let studentBody = "";
 
         if (action === "published") {
-            clubTitle = `📢 Session Published: ${eventTitle}`;
+            clubTitle = `Session Published: ${eventTitle}`;
             clubBody = `Your session "${eventTitle}" is now live and published to students at ${collegeName}.`;
 
-            studentTitle = `🎉 New Campus Event: ${eventTitle}`;
+            studentTitle = `New Campus Event: ${eventTitle}`;
             studentBody = `${clubName} just published a new event: "${eventTitle}" for ${formattedDate}. Tap to view agenda and RSVP!`;
         } else if (action === "cancelled") {
             const reasonSuffix = reasonDetails ? ` (${reasonDetails.label})` : "";
-            clubTitle = `⚠️ Session Cancelled: ${eventTitle}`;
+            clubTitle = `Session Cancelled: ${eventTitle}`;
             clubBody = `Event "${eventTitle}" has been marked as cancelled${reasonSuffix}. Registered attendees and campus students have been notified.`;
 
-            studentTitle = `❌ Event Cancelled: ${eventTitle}`;
+            studentTitle = `Event Cancelled: ${eventTitle}`;
             studentBody = `Important update: "${eventTitle}" by ${clubName} scheduled for ${formattedDate} has been cancelled.${reasonDetails ? ` Reason: ${reasonDetails.label}.` : ""}`;
         } else if (action === "completed") {
-            clubTitle = `✅ Session Completed: ${eventTitle}`;
+            clubTitle = `Session Completed: ${eventTitle}`;
             clubBody = `Session "${eventTitle}" is marked as completed! You can review the attendee roster and turnout analytics in your club console.`;
 
-            studentTitle = `🎓 Session Completed: ${eventTitle}`;
+            studentTitle = `Session Completed: ${eventTitle}`;
             studentBody = `"${eventTitle}" hosted by ${clubName} has concluded. Thank you for participating in campus activities!`;
         }
 

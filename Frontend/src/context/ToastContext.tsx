@@ -221,7 +221,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
     const toastPortal = (
         <div
-            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[999999] pointer-events-none flex flex-col items-center w-full px-4"
+            className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center w-full px-3 sm:px-4 transition-all duration-200"
         >
             <div aria-live="polite" aria-atomic="true" className="relative w-full max-w-[460px] flex flex-col items-center justify-end">
                 <AnimatePresence mode="popLayout">

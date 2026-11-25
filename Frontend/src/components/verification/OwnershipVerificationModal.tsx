@@ -367,7 +367,7 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
             aria-modal="true"
             aria-labelledby="ownershipVerificationTitle"
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn"
+            className="fixed inset-0 z-[10001] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn"
         >
             <div
                 className={`w-full ${challenge ? "max-w-lg lg:max-w-4xl" : "max-w-lg"

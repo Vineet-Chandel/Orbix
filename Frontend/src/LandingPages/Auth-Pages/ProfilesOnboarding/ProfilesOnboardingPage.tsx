@@ -1,7 +1,7 @@
 import { persistCodingProfiles } from "./saveCodingProfiles";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronUp, ShieldCheck } from "lucide-react";
+import { ChevronUp, ShieldCheck, X } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { PortalProfileInput } from "../PortalProfileInput";
@@ -669,7 +669,7 @@ export default function ProfilesOnboardingPage() {
             <div className="flex-1 min-w-0 flex flex-col min-h-screen p-2 sm:p-3 lg:p-3">
                 {/* Main Scrollable Content Card */}
                 <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between">
-                    <div className={`p-4 sm:p-6 lg:p-8 flex-1 ${isDirty || isSaving ? "pb-28 sm:pb-28 lg:pb-28" : ""}`}>
+                    <div className={`p-4 sm:p-6 lg:p-8 flex-1 ${isDirty || isSaving ? "pb-48 sm:pb-52 lg:pb-28" : "pb-32 sm:pb-36 lg:pb-8"}`}>
                         <div className="mx-auto w-full max-w-7xl my-1">
                             {/* Page Header */}
                             <div className="mb-6 lg:mb-8 pb-5 border-b-2 border-black/55 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -677,7 +677,7 @@ export default function ProfilesOnboardingPage() {
                                     <button
                                         type="button"
                                         onClick={() => setIsMobileSidebarOpen(true)}
-                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer flex-shrink-0"
+                                        className="hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer flex-shrink-0"
                                         aria-label="Open sidebar"
                                     >
                                         <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -987,7 +987,7 @@ export default function ProfilesOnboardingPage() {
             </div>
 
             {(isDirty || isSaving) && !isMobileBucketOpen && (
-                <div className="fixed bottom-5 left-4 right-4 lg:left-32 z-40 flex justify-center pointer-events-none animate-slideUp motion-reduce:animate-none">
+                <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-5 left-4 right-4 lg:left-32 z-40 flex justify-center pointer-events-none animate-slideUp motion-reduce:animate-none">
                     <div className="pointer-events-auto w-full max-w-xl rounded-xl border-2 border-black bg-white shadow-[4px_4px_0px_#000] p-3 flex items-center justify-between gap-3">
                         <span className="text-xs font-bold text-neutral-600">Coding profiles</span>
                         <button type="button" onClick={handleSave} disabled={isSaving}
@@ -1001,8 +1001,8 @@ export default function ProfilesOnboardingPage() {
             )}
 
             {/* Mobile Floating Bucket Trigger Button for small screens */}
-            {connectedCount > 0 && (
-                <div className={`fixed ${isDirty || isSaving ? "bottom-28" : "bottom-5"} right-4 z-40 lg:hidden animate-fadeIn`}>
+            {connectedCount > 0 && !isMobileBucketOpen && (
+                <div className={`fixed ${isDirty || isSaving ? "bottom-[calc(9.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-40" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] sm:bottom-24"} right-4 z-40 lg:hidden animate-fadeIn`}>
                     <button
                         type="button"
                         onClick={() => setIsMobileBucketOpen(true)}
@@ -1028,11 +1028,11 @@ export default function ProfilesOnboardingPage() {
             {/* Mobile Responsive Bucket Drawer / Modal */}
             {isMobileBucketOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fadeIn"
+                    className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fadeIn"
                     onClick={handleMobileBucketBackdropClick}
                 >
                     <div
-                        className="w-full max-w-lg bg-white border-2 border-black rounded-t-3xl sm:rounded-xl text-black p-5 flex flex-col max-h-[85vh] shadow-[8px_8px_0px_#000] animate-slideUp"
+                        className="w-full max-w-lg bg-white border-2 border-black rounded-t-3xl sm:rounded-xl text-black p-5 pb-[max(1.5rem,calc(env(safe-area-inset-bottom,0px)+1rem))] flex flex-col max-h-[85vh] shadow-[8px_8px_0px_#000] animate-slideUp"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Drawer handle for mobile */}
@@ -1055,10 +1055,9 @@ export default function ProfilesOnboardingPage() {
                                 type="button"
                                 onClick={() => setIsMobileBucketOpen(false)}
                                 className="p-1.5 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                aria-label="Close connected accounts bucket"
                             >
-                                <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <X className="w-5 h-5 stroke-[2.5]" />
                             </button>
                         </div>
 
@@ -1123,9 +1122,7 @@ export default function ProfilesOnboardingPage() {
                                                 onClick={() => handleDisconnectProfile(pId)}
                                                 className="px-3 py-1.5 text-xs font-black text-black bg-white hover:bg-rose-100 border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer flex items-center gap-1.5"
                                             >
-                                                <svg className="w-3.5 h-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
+                                                <X className="w-3.5 h-3.5 stroke-[2.5]" />
                                                 <span>Disconnect</span>
                                             </button>
                                         </div>
@@ -1136,11 +1133,10 @@ export default function ProfilesOnboardingPage() {
 
                         {/* Modal Action Buttons */}
                         <div className="pt-3 border-t-2 border-black flex items-center gap-2">
-
                             <button
                                 type="button"
                                 onClick={() => setIsMobileBucketOpen(false)}
-                                className="px-4 h-12 rounded-lg border-2 border-black bg-white text-black font-black text-xs shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                className="w-full h-11 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#92f574] text-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer flex items-center justify-center"
                             >
                                 Done
                             </button>
