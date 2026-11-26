@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-    Save,
     Check,
     ArrowLeft,
     ArrowRight,
@@ -9,6 +8,7 @@ import {
 import type { ClubProfileData, ClubLink, ClubVisibilityTier } from "../../../utils/clubProfileApi";
 import { useAppDispatch, useAppSelector, fetchClubProfile, saveClubProfile } from "../../../store";
 import { useToast } from "../../../context/ToastContext";
+import { ProfileSaveNotice } from "../../common/ProfileSaveNotice";
 import { StepIdentity } from "./StepIdentity";
 import { StepBrandStory } from "./StepBrandStory";
 import { StepPeopleContact } from "./StepPeopleContact";
@@ -203,12 +203,13 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     }, [displayPercentage]);
 
     // Snapshot for dirty-state tracking
-    const initialSnapshotRef = useRef<string>("");
-    const hasPopulatedForClubIdRef = useRef<string | null>(null);
+    const [savedSnapshot, setSavedSnapshot] = useState("");
+    const savedProfileRef = useRef<ClubProfileData | null>(null);
+    const stepContentRef = useRef<HTMLDivElement>(null);
 
     // Synchronize form from club data
     const populateForm = (c: ClubProfileData) => {
-        hasPopulatedForClubIdRef.current = c.id || clubId || null;
+        savedProfileRef.current = c;
         setName(c.name || "");
         setCategory(c.category || "Technical & Coding");
         setFoundedYear(c.foundedYear ? String(c.foundedYear) : "");
@@ -226,23 +227,22 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         setContactPhone(c.contactPhone || "");
 
         // Synthesize links if empty
-        if (Array.isArray(c.links) && c.links.length > 0) {
-            setLinks(c.links);
-        } else {
-            const synth: ClubLink[] = [];
+        let profileLinks = c.links;
+        if (!Array.isArray(profileLinks) || profileLinks.length === 0) {
+            profileLinks = [];
             let ord = 0;
             if (c.websiteUrl) {
-                synth.push({ id: `synth-web`, platform: "website", url: c.websiteUrl, label: "Official Website", displayOrder: ord++ });
+                profileLinks.push({ id: `synth-web`, platform: "website", url: c.websiteUrl, label: "Official Website", displayOrder: ord++ });
             }
             const s = c.socialLinks || {};
             for (const [k, v] of Object.entries(s)) {
                 if (v && typeof v === "string" && v.trim().length > 0) {
                     const plat = k.toLowerCase() === "twitter" ? "x" : k.toLowerCase();
-                    synth.push({ id: `synth-${plat}`, platform: plat, url: v.trim(), displayOrder: ord++ });
+                    profileLinks.push({ id: `synth-${plat}`, platform: plat, url: v.trim(), displayOrder: ord++ });
                 }
             }
-            setLinks(synth);
         }
+        setLinks(profileLinks);
 
         setRecruitmentStatus(c.recruitmentStatus || "closed");
         setRecruitmentAnnouncement(c.recruitmentAnnouncement || "");
@@ -257,7 +257,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         }
         setVisibility(vis);
 
-        initialSnapshotRef.current = JSON.stringify({
+        setSavedSnapshot(JSON.stringify({
             name: c.name || "",
             category: c.category || "Technical & Coding",
             foundedYear: c.foundedYear ? String(c.foundedYear) : "",
@@ -269,17 +269,17 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             focusAreas: Array.isArray(c.focusAreas) ? c.focusAreas : [],
             publicEmail: c.publicEmail || "",
             contactPhone: c.contactPhone || "",
-            links: Array.isArray(c.links) ? c.links : [],
+            links: profileLinks,
             recruitmentStatus: c.recruitmentStatus || "closed",
             recruitmentAnnouncement: c.recruitmentAnnouncement || "",
             recruitmentUrl: c.recruitmentUrl || "",
             visibility: vis,
-        });
+        }));
     };
 
     // Load profile on mount or club change
     useEffect(() => {
-        if (hasPopulatedForClubIdRef.current !== clubId) {
+        if (savedProfileRef.current?.id !== clubId || !savedProfileRef.current) {
             if (!clubState.isInitialized && !clubState.loading) {
                 dispatch(fetchClubProfile({ clubId }))
                     .unwrap()
@@ -293,29 +293,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         }
     }, [clubId, clubState.isInitialized, clubState.loading, clubState.club]);
 
-    // Check if form is dirty
-    const isDirty = useMemo(() => {
-        if (!initialSnapshotRef.current) return false;
-        const currentSnapshot = JSON.stringify({
-            name,
-            category,
-            foundedYear,
-            operatingStatus,
-            logoUrl,
-            coverImageUrl,
-            about,
-            tagline,
-            focusAreas,
-            publicEmail,
-            contactPhone,
-            links,
-            recruitmentStatus,
-            recruitmentAnnouncement,
-            recruitmentUrl,
-            visibility,
-        });
-        return currentSnapshot !== initialSnapshotRef.current;
-    }, [
+    const currentSnapshot = JSON.stringify({
         name,
         category,
         foundedYear,
@@ -332,7 +310,14 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         recruitmentAnnouncement,
         recruitmentUrl,
         visibility,
-    ]);
+    });
+    const isDirty = savedSnapshot !== "" && currentSnapshot !== savedSnapshot;
+
+    const cancelProfileChanges = () => {
+        if (!savedProfileRef.current || isSaving) return;
+        populateForm(savedProfileRef.current);
+        stepContentRef.current?.focus({ preventScroll: true });
+    };
 
     // Client-side publishing requirements checklist
     const checkPublishRequirements = (): { valid: boolean; missing: string[] } => {
@@ -355,8 +340,9 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         };
     };
 
-    const handleSave = async (targetVisibility?: ClubVisibilityTier) => {
-        const effectiveVisibility = targetVisibility || visibility;
+    const handleSave = async () => {
+        if (!isDirty || isSaving) return;
+        const effectiveVisibility = visibility;
 
         // If user is publishing (public or unlisted), enforce publish checks
         if (effectiveVisibility === "public" || effectiveVisibility === "unlisted") {
@@ -682,7 +668,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             </div>
 
             {/* Active Step Canvas Surface */}
-            <div id="club-step-content" className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] scroll-mt-6">
+            <div id="club-step-content" ref={stepContentRef} tabIndex={-1} className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] scroll-mt-6">
                 {currentStep === 1 && (
                     <StepIdentity
                         name={name}
@@ -779,34 +765,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                     <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
                 </button>
 
-                {/* Save Changes Button (green background, black text - active only when changes occur) */}
-                <button
-                    type="button"
-                    onClick={() => handleSave()}
-                    disabled={!isDirty || isSaving}
-                    className={`px-6 py-2.5 rounded-xl border-2 text-xs sm:text-sm font-black transition-all flex items-center gap-2 select-none ${
-                        !isDirty || isSaving
-                            ? "bg-neutral-200 text-neutral-400 border-neutral-300 shadow-none cursor-not-allowed opacity-60"
-                            : "bg-[#a2ff86] text-black hover:bg-[#8ee673] border-black shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                    }`}
-                    title={isDirty ? "Save your changes" : "No changes to save"}
-                >
-                    {isSaving ? (
-                        <>
-                            <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                            <span>Saving Changes...</span>
-                        </>
-                    ) : (
-                        <>
-                            <Save className="w-4 h-4 stroke-[2.5]" />
-                            <span>Save Changes</span>
-                            {isDirty && (
-                                <span className="w-2 h-2 rounded-full bg-black animate-pulse" title="Unsaved changes" />
-                            )}
-                        </>
-                    )}
-                </button>
-
                 {/* Next Button (arrow only pointing right, green background, black icon) */}
                 <button
                     type="button"
@@ -819,6 +777,13 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                     <ArrowRight className="w-5 h-5 stroke-[2.5]" />
                 </button>
             </div>
+
+            <ProfileSaveNotice
+                open={(isDirty || isSaving) && !isValidationModalOpen && !isPreviewOpen}
+                isSaving={isSaving}
+                onCancel={cancelProfileChanges}
+                onSave={handleSave}
+            />
 
             {/* PREVIEW MODAL */}
             <ProfilePreviewModal

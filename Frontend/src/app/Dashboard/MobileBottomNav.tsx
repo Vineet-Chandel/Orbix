@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate } from "react-router-dom";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
     LayoutDashboard,
@@ -14,6 +14,7 @@ import {
     GraduationCap,
     Calendar,
     ClipboardCheck,
+    Check,
     Briefcase,
     UserPlus,
     User,
@@ -460,28 +461,34 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                             transition={{ duration: 0.15 }}
                             className="absolute bottom-[calc(100%+0.75rem)] inset-x-0 grid max-h-[50dvh] grid-cols-2 gap-2 overflow-y-auto rounded-2xl border-2 border-black bg-[#FAF6EE] p-2.5 shadow-[4px_4px_0px_#000]"
                         >
-                            {activeSubItems.map((item) => (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    onClick={() => handleSelectSubItem(item)}
-                                    aria-current={item.path === location.pathname ? "page" : undefined}
-                                    className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border-2 border-black bg-white px-2 py-1.5 text-left text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black aria-[current=page]:bg-[#FAF6EE]"
-                                >
-                                    <span
-                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-black"
-                                        style={{ backgroundColor: item.color }}
+                            {activeSubItems.map((item) => {
+                                const isCurrent = item.path && (
+                                    item.id === activeTab || matchPath({ path: item.path, end: false }, location.pathname)
+                                );
+                                return (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => handleSelectSubItem(item)}
+                                        aria-current={isCurrent ? "page" : undefined}
+                                        className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border-2 border-black bg-white px-2 py-1.5 text-left text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black aria-[current=page]:bg-[#a2ff86]"
                                     >
-                                        {item.icon}
-                                    </span>
-                                    <span className="min-w-0 flex-1 break-words">{item.label}</span>
-                                    {item.badge !== undefined && (
-                                        <span className={`shrink-0 rounded-full border border-black px-1 text-[10px] ${item.badgeVariant === "danger" ? "bg-[#FF6B6B]" : "bg-[#FFE566]"}`}>
-                                            {item.badge}
+                                        <span
+                                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-black"
+                                            style={{ backgroundColor: item.color }}
+                                        >
+                                            {item.icon}
                                         </span>
-                                    )}
-                                </button>
-                            ))}
+                                        <span className="min-w-0 flex-1 break-words">{item.label}</span>
+                                        {item.badge !== undefined && (
+                                            <span className={`shrink-0 rounded-full border border-black px-1 text-[10px] ${item.badgeVariant === "danger" ? "bg-[#FF6B6B]" : "bg-[#FFE566]"}`}>
+                                                {item.badge}
+                                            </span>
+                                        )}
+                                        {isCurrent && <Check aria-hidden="true" className="h-4 w-4 shrink-0 stroke-[3]" />}
+                                    </button>
+                                );
+                            })}
                         </motion.div>
                     )}
                 </AnimatePresence>

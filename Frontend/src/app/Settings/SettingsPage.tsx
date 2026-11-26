@@ -1,6 +1,6 @@
 import { beginSignOut } from "../../api/authRequests";
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useOutletContext } from "react-router-dom";
 import {
     Settings,
     ArrowLeft,
@@ -8,7 +8,6 @@ import {
 import { useAppDispatch, useAppSelector, updateUserProfile, clearUser } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile } from "../../utils/profileApi";
-import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import type { SettingsViewKey } from "./types";
@@ -20,6 +19,7 @@ import { SettingDetailView } from "./SettingDetailView";
 export default function SettingsPage() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
+    const openMobileSidebar = useOutletContext<() => void>();
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
 
@@ -29,7 +29,6 @@ export default function SettingsPage() {
     // Active subview determined by URL ?view= query parameter (defaults to "hub")
     const currentView = (searchParams.get("view") as SettingsViewKey) || "hub";
 
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const [isLoggingOut] = useState(false);
@@ -191,31 +190,7 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
-            {/* Desktop & Mobile Collapsible Navigation Sidebar */}
-            <Sidebar
-                activeTab="settings"
-                isOpen={isMobileSidebarOpen}
-                onClose={() => setIsMobileSidebarOpen(false)}
-                onTabChange={(tab) => {
-                    if (tab === "dashboard") navigate("/dashboard");
-                    if (tab === "profile") navigate("/profile");
-                    if (tab === "connect-platform") navigate("/onboarding");
-                    if (tab === "resume") navigate("/resume");
-                    if (tab === "projects") navigate("/projects");
-                    if (tab === "leaderboard") navigate("/leaderboard");
-                    if (tab === "clubs") navigate("/college-clubs");
-                    if (tab === "college-events") navigate("/college-events");
-                    if (tab === "events") navigate("/events");
-                    if (tab === "activity" || tab === "applications") navigate("/activity");
-                    if (tab === "explore") navigate("/explore");
-                    if (tab === "trends") navigate("/trends");
-                    if (tab === "notifications") navigate("/notifications");
-                    if (tab === "settings") navigate("/settings");
-                    if (tab === ("workspace" as any)) navigate("/workspace");
-                }}
-            />
-
+        <>
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 <section
@@ -250,7 +225,7 @@ export default function SettingsPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <button
                                         type="button"
-                                        onClick={() => setIsMobileSidebarOpen(true)}
+                                        onClick={openMobileSidebar}
                                         className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
                                         aria-label="Open sidebar"
                                     >
@@ -317,6 +292,6 @@ export default function SettingsPage() {
                 cancelText="Cancel"
                 variant="danger"
             />
-        </div>
+        </>
     );
 }

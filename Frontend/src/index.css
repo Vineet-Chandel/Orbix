@@ -976,3 +976,80 @@ html.dark body:has(.blog-container) {
 .public-club-profile-page :where(img, video) {
   max-width: 100%;
 }
+
+/* ==========================================================================
+   PERSONAL DETAILS FORM CONTAINER QUERIES & PROPORTIONAL IDENTITY ROW
+   Ensures DOM order === Visual order === Tab order across every viewport,
+   keeping Name fields on the left and the Avatar on the right (75% / 25%
+   split on tablet & desktop, with the Avatar covering 75% of its slot width).
+   ========================================================================== */
+.orbix-profile-form {
+  container: profile-form / inline-size;
+}
+
+.orbix-profile-identity-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(108px, 32%);
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.orbix-profile-name-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.875rem;
+  min-width: 0;
+}
+
+.orbix-profile-avatar-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.orbix-profile-avatar-frame {
+  width: clamp(84px, 75%, 116px);
+  aspect-ratio: 1 / 1;
+}
+
+.orbix-profile-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.orbix-profile-link-label {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.orbix-profile-link-url {
+  min-width: 0;
+}
+
+@container profile-form (inline-size >= 460px) {
+  .orbix-profile-identity-row {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .orbix-profile-name-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .orbix-profile-avatar-frame {
+    width: clamp(92px, 75%, 140px);
+  }
+
+  .orbix-profile-link-row {
+    grid-template-columns: 8.75rem minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .orbix-profile-link-label {
+    grid-column: auto;
+  }
+}

@@ -9,7 +9,6 @@ import ProtectedRoute, { ClubProtectedRoute } from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import {
   OrbixLoadingProvider,
-  OrbixInitialLoader,
   DashboardRouteSkeleton,
   DocsRouteSkeleton,
   ContentRouteSkeleton,
@@ -18,7 +17,7 @@ import {
 import { OrbixErrorBoundary } from "./components/ui/error/OrbixErrorBoundary";
 import { OrbixOfflineBanner } from "./components/ui/network/OrbixOfflineBanner";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
-import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
+import { useAppDispatch, fetchUserProfile } from "./store";
 import { ScrollToTop } from "./components/ScrollToTop";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -38,6 +37,7 @@ const BlogLanding = lazyWithRetry(() => import("./LandingPages/Blog/Landing"));
 const BlogCollectionPage = lazyWithRetry(() => import("./LandingPages/Blog/BlogCollectionPage"));
 const DocsHubPage = lazyWithRetry(() => import("./LandingPages/Docs/DocsHubPage"));
 const DocsViewerPage = lazyWithRetry(() => import("./LandingPages/Docs/DocsViewerPage"));
+const PersonalWorkspaceLayout = lazyWithRetry(() => import("./app/Dashboard/PersonalWorkspaceLayout"));
 const Dashboard = lazyWithRetry(() => import("./app/Dashboard/Landing"));
 const ProfileManager = lazyWithRetry(() => import("./app/Profile/ProfileManager"));
 const SettingsPage = lazyWithRetry(() => import("./app/Settings/SettingsPage"));
@@ -61,32 +61,6 @@ const GuardianConsentPage = lazyWithRetry(() => import("./LandingPages/Legal/Gua
 const PublicEventRegistrationPage = lazyWithRetry(() => import("./app/Events/PublicEventRegistrationPage"));
 const PublicCertificateVerifyPage = lazyWithRetry(() => import("./app/Certificates/PublicCertificateVerifyPage"));
 const JoinClubPage = lazyWithRetry(() => import("./app/Club/JoinClubPage"));
-
-const WorkspaceRedirect = () => {
-  const { user, isAuthenticated, loading } = useAppSelector((state) => state.user);
-  const isOnline = typeof navigator === "undefined" || navigator.onLine;
-
-  if (loading) {
-    return (
-      <OrbixInitialLoader
-        message="Verifying session…"
-        subMessage="Connecting to your workspace"
-      />
-    );
-  }
-
-  if (!isAuthenticated || !user || !isOnline) {
-    return <Navigate to="/auth/signin" replace />;
-  }
-
-  if (user.accountType === "club") {
-    if (user.clubStatus === "approved" || user.verifiedClub) {
-      return <Navigate to="/club/dashboard" replace />;
-    }
-    return <Navigate to="/club/status" replace />;
-  }
-  return <Dashboard />;
-};
 
 const LegacyProfileRedirect = () => {
   const { username } = useParams<{ username: string }>();
@@ -148,7 +122,8 @@ const App = () => {
   return (
     <OrbixLoadingProvider>
       <ToastProvider>
-        <BrowserRouter>
+        <BrowserRouter useTransitions={false}>
+          {/* Commit location changes so workspace Suspense can show the pending section. */}
           {/* Universal automatic scroll restoration on route navigation */}
           <ScrollToTop />
           <RouteSeo />
@@ -178,7 +153,6 @@ const App = () => {
                 <Route path="/demo-profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
                 <Route path="/demo/club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
                 <Route path="/demo-club" element={<Navigate to="/clubs/aws-swg-psit" replace />} />
-                <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/events" element={<EventsIndex />} />
                 <Route path="/events/:eventId" element={<PublicEventPage />} />
                 <Route path="/about" element={<AboutPage />} />
@@ -224,7 +198,6 @@ const App = () => {
                 <Route path="/forgot-password" element={<Navigate to="/auth/signin?view=forgot-password" replace />} />
                 <Route path="/auth/callback" element={<OAuthCallbackPage />} />
                 <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
-                <Route path="/workspace" element={<WorkspaceRedirect />} />
 
                 {/* Legacy Activity, Tracker & Invitation Redirects */}
                 <Route path="/student/activity" element={<LegacyActivityRedirect />} />
@@ -270,31 +243,34 @@ const App = () => {
                 <Route path="/auth/profiles" element={<ProfilesOnboardingPage />} />
                 <Route path="/profile/setup" element={<ProfilesOnboardingPage />} />
 
-                {/* Protected Routes */}
+                {/* Personal workspace and public leaderboard */}
                 <Route element={<Suspense fallback={<DashboardRouteSkeleton showSidebar />}><ProtectedRoute /></Suspense>}>
                   <Route path="/club-announcements" element={<MemberAnnouncementsPage />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/college-clubs" element={<Dashboard />} />
-                  <Route path="/campus-clubs" element={<Dashboard />} />
-                  <Route path="/college-events" element={<Dashboard />} />
-                  <Route path="/college-events/:eventId" element={<Dashboard />} />
-                  <Route path="/college-events/:eventId/:slug" element={<Dashboard />} />
-                  <Route path="/activity" element={<Dashboard />} />
-                  <Route path="/applications" element={<Dashboard />} />
-                  <Route path="/explore" element={<Dashboard />} />
-                  <Route path="/trends" element={<Dashboard />} />
-                  <Route path="/reports" element={<Dashboard />} />
-                  <Route path="/notifications" element={<Dashboard />} />
-                  <Route path="/inbox" element={<Dashboard />} />
-                  <Route path="/profile" element={<ProfileManager />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/resume" element={<Dashboard />} />
-                  <Route path="/projects" element={<Dashboard />} />
-                  <Route path="/wallet" element={<Navigate to="/activity?tab=certificates" replace />} />
-                  <Route path="/certificates" element={<Navigate to="/activity?tab=certificates" replace />} />
-                  <Route path="/workspace" element={<Dashboard />} />
-                  <Route path="/workspace/:clubId" element={<Dashboard />} />
-                  <Route path="/workspace/:clubId/:section" element={<Dashboard />} />
+                  <Route element={<PersonalWorkspaceLayout />}>
+                    <Route path="/leaderboard" element={<LeaderboardPage />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/college-clubs" element={<Dashboard />} />
+                    <Route path="/campus-clubs" element={<Dashboard />} />
+                    <Route path="/college-events" element={<Dashboard />} />
+                    <Route path="/college-events/:eventId" element={<Dashboard />} />
+                    <Route path="/college-events/:eventId/:slug" element={<Dashboard />} />
+                    <Route path="/activity" element={<Dashboard />} />
+                    <Route path="/applications" element={<Dashboard />} />
+                    <Route path="/explore" element={<Dashboard />} />
+                    <Route path="/trends" element={<Dashboard />} />
+                    <Route path="/reports" element={<Dashboard />} />
+                    <Route path="/notifications" element={<Dashboard />} />
+                    <Route path="/inbox" element={<Dashboard />} />
+                    <Route path="/profile" element={<ProfileManager />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/resume" element={<Dashboard />} />
+                    <Route path="/projects" element={<Dashboard />} />
+                    <Route path="/wallet" element={<Navigate to="/activity?tab=certificates" replace />} />
+                    <Route path="/certificates" element={<Navigate to="/activity?tab=certificates" replace />} />
+                    <Route path="/workspace" element={<Dashboard />} />
+                    <Route path="/workspace/:clubId" element={<Dashboard />} />
+                    <Route path="/workspace/:clubId/:section" element={<Dashboard />} />
+                  </Route>
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

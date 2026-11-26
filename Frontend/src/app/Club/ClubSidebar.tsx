@@ -6,7 +6,7 @@ import {
     CalendarDays,
     TrendingUp,
     Edit3,
-    Mail,
+    Bell,
     LogOut,
     ChevronDown,
     X,
@@ -490,18 +490,18 @@ export const ClubSidebar = ({
                             <ExternalLink className="w-3 h-3 text-neutral-400 shrink-0" />
                         </Link>
 
-                        {/* Unique Action 2: Club Inbox */}
                         <button
                             type="button"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
+                                onClose();
                                 onOpenInbox();
                             }}
                             className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <div className="flex items-center gap-2.5 min-w-0">
-                                <Mail className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Club Inbox</span>
+                                <Bell className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                                <span className="truncate">Notifications</span>
                             </div>
                             {unreadInboxCount > 0 && (
                                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#FF6B6B] text-black border border-black shadow-[1px_1px_0px_#000]">

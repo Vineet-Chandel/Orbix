@@ -1,3 +1,4 @@
+import { preload } from "react-dom";
 import { lazyWithRetry } from "../../utils/lazyWithRetry";
 import { beginSignOut } from "../../api/authRequests";
 import { useEffect, useState, useMemo, useRef, Suspense } from "react";
@@ -7,13 +8,11 @@ import {
     CalendarDays,
     Plus,
     Edit3,
-    Bell,
     Users,
     ArrowRight,
     Building2,
     Mail,
     Settings,
-    TrendingUp,
     Award,
     Layers,
     UserPlus,
@@ -55,6 +54,7 @@ const EventScopeSelectionModal = lazyWithRetry(() => import("./EventScopeSelecti
 const ClubCredibilityWorkspace = lazyWithRetry(() => import("./Credibility/ClubCredibilityWorkspace").then((m) => ({ default: m.ClubCredibilityWorkspace })));
 import { ClubEventCard } from "./ClubEventCard";
 import { DashboardRouteSkeleton } from "../../components/ui/loader";
+import { WorkspacePanelLoader } from "../../components/ui/loader/WorkspacePanelLoader";
 
 interface VerifiedClub {
     id: string;
@@ -163,21 +163,11 @@ export default function ClubDashboardPage() {
     // Navigation & Clean Full Route Sync
     const location = useLocation();
     const [searchParams] = useSearchParams();
-    const [activeTab, setActiveTabState] = useState<ClubTab>(() => {
-        if (!eventId && !location.pathname.startsWith("/club/events")) {
-            const tabQuery = searchParams.get("tab") as ClubTab | null;
-            if (tabQuery && clubTabToPath[tabQuery]) {
-                return tabQuery;
-            }
-        }
-        return getClubTabFromPath(location.pathname);
-    });
+    const tabQuery = searchParams.get("tab") as ClubTab | null;
+    const activeTab = !location.pathname.startsWith("/club/events") && tabQuery && Object.hasOwn(clubTabToPath, tabQuery)
+        ? tabQuery
+        : getClubTabFromPath(location.pathname);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-    // Keep activeTab in sync with route changes (browser back/forward, direct links)
-    useEffect(() => {
-        setActiveTabState(getClubTabFromPath(location.pathname));
-    }, [location.pathname]);
 
     // Backward compatibility: automatically migrate legacy query parameters (?tab=team) to clean full routes (/club/team)
     useEffect(() => {
@@ -185,7 +175,7 @@ export default function ClubDashboardPage() {
             return;
         }
         const tabQuery = searchParams.get("tab") as ClubTab | null;
-        if (tabQuery && clubTabToPath[tabQuery]) {
+        if (tabQuery && Object.hasOwn(clubTabToPath, tabQuery)) {
             navigate(clubTabToPath[tabQuery], { replace: true });
         }
     }, [searchParams, navigate, eventId, location.pathname]);
@@ -199,9 +189,8 @@ export default function ClubDashboardPage() {
 
     // Switch tab by navigating to the full route
     const handleTabChange = (tab: ClubTab) => {
-        setActiveTabState(tab);
         const targetPath = clubTabToPath[tab] || "/club/dashboard";
-        if (location.pathname !== targetPath) {
+        if (location.pathname !== targetPath || activeTab !== tab) {
             navigate(targetPath);
         }
     };
@@ -334,7 +323,6 @@ export default function ClubDashboardPage() {
     const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
         setEditingEvent(null);
         setInitialModalStatus(initialStatus);
-        setActiveTabState("events");
         navigate("/club/events");
         setIsScopeModalOpen(true);
     };
@@ -438,6 +426,8 @@ export default function ClubDashboardPage() {
         year: "numeric",
     }).format(new Date());
 
+    preload("/orbix-pixel-loader.svg", { as: "image" });
+
     if (loading) {
         return <DashboardRouteSkeleton showSidebar />;
     }
@@ -498,9 +488,10 @@ export default function ClubDashboardPage() {
                     aria-label="Orbix Club Space"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-3 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
+                    <Suspense fallback={<WorkspacePanelLoader />}>
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* Dynamic Header Bar tailored to each tab */}
-                        {((!eventId && !isEventModalOpen) || activeTab !== "events") && (
+                        {activeTab !== "clubs" && activeTab !== "analytics" && ((!eventId && !isEventModalOpen) || activeTab !== "events") && (
                             <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             {/* Left: Mobile Toggle & Tab-Specific Title & Badges */}
                             <div className="space-y-1">
@@ -568,17 +559,6 @@ export default function ClubDashboardPage() {
                                         </div>
                                     )}
 
-                                    {activeTab === "analytics" && (
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
-                                                <TrendingUp className="w-4 h-4 stroke-[2.5]" />
-                                            </div>
-                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                                Trends & Analytics
-                                            </h1>
-                                        </div>
-                                    )}
-
                                     {activeTab === "certificates" && (
                                         <div className="flex items-center gap-2.5">
                                             <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
@@ -623,17 +603,6 @@ export default function ClubDashboardPage() {
                                         </div>
                                     )}
 
-
-                                    {activeTab === "clubs" && (
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
-                                                <Building2 className="w-4 h-4 stroke-[2.5]" />
-                                            </div>
-                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                                Campus Chapters & Directory
-                                            </h1>
-                                        </div>
-                                    )}
 
                                     {activeTab === "settings" && (
                                         <div className="flex items-center gap-2.5">
@@ -702,17 +671,6 @@ export default function ClubDashboardPage() {
                                         </span>
                                     )}
 
-                                    {activeTab === "analytics" && (
-                                        <>
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                                Event Intelligence
-                                            </span>
-                                            <span className="text-xs font-bold text-neutral-700">
-                                                · 4-month turnout velocity, participation ratios, and session lifecycle metrics
-                                            </span>
-                                        </>
-                                    )}
-
                                     {activeTab === "certificates" && (
                                         <>
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
@@ -757,22 +715,6 @@ export default function ClubDashboardPage() {
                                         </>
                                     )}
 
-                                    {activeTab === "clubs" && (
-                                        <>
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                                Campus Directory
-                                            </span>
-                                            <span className="text-xs font-bold text-neutral-700">
-                                                · Discover student chapters, cross-club collaborations & peer initiatives
-                                            </span>
-                                            {club.college_name && (
-                                                <span className="text-xs font-bold text-neutral-500 hidden md:inline">
-                                                    · {club.college_name}
-                                                </span>
-                                            )}
-                                        </>
-                                    )}
-
                                     {activeTab === "settings" && (
                                         <>
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
@@ -786,52 +728,36 @@ export default function ClubDashboardPage() {
                                 </div>
                             </div>
 
-                            {/* Right: Tab-Specific Primary Actions & Inbox Bell */}
-                            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
-                                {(activeTab === "events" || activeTab === "analytics") && (
-                                    <button
-                                        type="button"
-                                        onClick={() => openCreateEventModal("published")}
-                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                    >
-                                        <Plus className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Create New Event</span>
-                                    </button>
-                                )}
-
-                                {activeTab === "certificates" && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCertStudioOpen(true)}
-                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                    >
-                                        <Award className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Issue Certificates</span>
-                                    </button>
-                                )}
-
-                                {/* Club Notifications / Inbox Bell Button */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsInboxModalOpen(true)}
-                                    className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-[#FFE566]/20 text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] hover:shadow-[3.5px_3.5px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px] select-none"
-                                    title={`Club Notifications & Inbox ${inboxCounts.unreadCount > 0 ? `(${inboxCounts.unreadCount} unread)` : ""}`}
-                                    aria-label="Club Notifications & Inbox"
-                                >
-                                    <Bell className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2] transition-transform duration-200 group-hover:rotate-12" />
-                                    {inboxCounts.unreadCount > 0 && (
-                                        <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FFE566] rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] pointer-events-none select-none">
-                                            {inboxCounts.unreadCount > 99 ? "99+" : inboxCounts.unreadCount}
-                                        </span>
+                            {(activeTab === "events" || activeTab === "certificates") && (
+                                <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
+                                    {(activeTab === "events") && (
+                                        <button
+                                            type="button"
+                                            onClick={() => openCreateEventModal("published")}
+                                            className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                        >
+                                            <Plus className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Create New Event</span>
+                                        </button>
                                     )}
-                                </button>
-                            </div>
+
+                                    {activeTab === "certificates" && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCertStudioOpen(true)}
+                                            className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                        >
+                                            <Award className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Issue Certificates</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         )}
 
                         {/* TAB: MANAGE CLUB PROFILE */}
                         {activeTab === "profile" && (
-                            <Suspense fallback={<DashboardRouteSkeleton />}>
                                 <ClubProfileManager
                                 clubId={club.id}
                                 onProfileUpdated={(updatedClub) => {
@@ -840,7 +766,6 @@ export default function ClubDashboardPage() {
                                     }
                                 }}
                             />
-                            </Suspense>
                         )}
 
                         {/* TAB: DASHBOARD OVERVIEW */}
@@ -938,9 +863,7 @@ export default function ClubDashboardPage() {
                                 </div>
 
                                 {/* Club Credibility & Accountability Standing (Full Width) */}
-                                <Suspense fallback={<DashboardRouteSkeleton />}>
                                     <ClubCredibilityWorkspace />
-                                </Suspense>
 
                                 {/* Recent Events Preview */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
@@ -994,18 +917,15 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: CLUB TEAM WORKSPACE */}
                         {activeTab === "team-workspace" && (
-                            <Suspense fallback={<DashboardRouteSkeleton />}>
                                 <WorkspaceShell
                                 club={club}
                                 isClubContext={true}
                                 onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
-                            </Suspense>
                         )}
 
                         {/* TAB: CLUB TEAM & ORGANISATION */}
                         {(activeTab === "team" || activeTab === "recruitment") && (
-                            <Suspense fallback={<DashboardRouteSkeleton />}>
                                 <ClubTeamWorkspace
                                 club={club}
                                 hideHeaderTitle={true}
@@ -1023,22 +943,18 @@ export default function ClubDashboardPage() {
                                     }
                                 }}
                             />
-                            </Suspense>
                         )}
 
                         {/* TAB: CLUB EVENTS & WORKSHOPS (EXCLUSIVELY FOR EVENTS TAB) */}
                         {activeTab === "events" && (
                             eventId ? (
-                                <Suspense fallback={<DashboardRouteSkeleton />}>
                                     <ClubEventDetailWorkspace
                                     eventId={eventId}
                                     club={club}
                                     onBack={() => navigate("/club/events")}
                                     onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 />
-                                </Suspense>
                             ) : isEventModalOpen ? (
-                                <Suspense fallback={<DashboardRouteSkeleton />}>
                                     <ClubEventModal
                                     isOpen={isEventModalOpen}
                                     onClose={() => {
@@ -1056,7 +972,6 @@ export default function ClubDashboardPage() {
                                     initialStatus={initialModalStatus}
                                     onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 />
-                                </Suspense>
                             ) : (
                                 <div className="space-y-6">
                                     {/* Filter Pills Bar */}
@@ -1160,31 +1075,25 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: TRENDS & ANALYTICS */}
                         {activeTab === "analytics" && (
-                            <div className="space-y-6">
-                                <Suspense fallback={<DashboardRouteSkeleton />}>
-                                    <ClubEventAnalyticsSection
-                                    events={events}
-                                    currentFilter={eventFilter}
-                                    onSelectFilter={(filter) => {
-                                        setEventFilter(filter);
-                                        navigate(`/club/events?filter=${filter}`);
-                                    }}
-                                    onOpenCreateModal={() => openCreateEventModal("published")}
-                                />
-                                </Suspense>
-                            </div>
+                            <ClubEventAnalyticsSection
+                                events={events}
+                                currentFilter={eventFilter}
+                                onSelectFilter={(filter) => {
+                                    setEventFilter(filter);
+                                    navigate(`/club/events?filter=${filter}`);
+                                }}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                            />
                         )}
 
                         {/* TAB: CERTIFICATES & CREDENTIALS STUDIO */}
                         {activeTab === "certificates" && (
-                            <Suspense fallback={<DashboardRouteSkeleton />}>
                                 <CertificateStudioWorkspace
                                 clubId={club.id}
                                 clubName={club.name}
                                 clubLogo={club.logo_url}
                                 onOpenLegacyModal={() => setIsCertStudioOpen(true)}
                             />
-                            </Suspense>
                         )}
 
                         {/* TAB: FEEDBACK & SURVEYS */}
@@ -1209,14 +1118,11 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: ANNOUNCEMENTS */}
                         {activeTab === "announcements" && (
-                            <Suspense fallback={<DashboardRouteSkeleton />}>
                                 <ClubAnnouncementsSection clubId={club.id} clubName={club.name} />
-                            </Suspense>
                         )}
 
                         {/* TAB: CAMPUS CLUBS & DIRECTORY */}
                         {activeTab === "clubs" && (
-                            <Suspense fallback={<DashboardRouteSkeleton />}>
                                 <OtherClubsSection
                                 currentClubId={club.id}
                                 currentClubSlug={club.slug}
@@ -1224,25 +1130,23 @@ export default function ClubDashboardPage() {
                                 collegeName={club.college_name}
                                 currentClubData={club}
                                 onNavigateToEditProfile={() => handleTabChange("profile")}
-                                onNavigateToTab={handleTabChange}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
-                            </Suspense>
                         )}
 
                         {/* TAB: CLUB SETTINGS & PREFERENCES */}
                         {activeTab === "settings" && (
-                            <Suspense fallback={<DashboardRouteSkeleton />}>
                                 <ClubSettingsView
                                 club={club}
                                 user={user}
                                 onSignOut={handleSignOut}
                             />
-                            </Suspense>
                         )}
                     </div>
 
                     {/* Neo-brutalist Section Bottom Illustration matching Personal Account */}
                     <SectionBottomIllustration alt="Orbix club space illustration" />
+                    </Suspense>
                 </section>
             </div>
 

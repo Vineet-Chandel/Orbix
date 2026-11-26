@@ -4,12 +4,10 @@ import {
     Search,
     Building2,
     Radio,
-    RefreshCw,
     X,
     AlertCircle,
     ExternalLink,
-    GraduationCap,
-    Rocket,
+    Menu,
     Share2,
 } from "lucide-react";
 import { fetchCollegeClubs, type CollegeClubItem } from "../../utils/clubProfileApi";
@@ -25,7 +23,7 @@ interface OtherClubsSectionProps {
     collegeName?: string;
     currentClubData?: any;
     onNavigateToEditProfile?: () => void;
-    onNavigateToTab?: (tab: "overview" | "team" | "events" | "profile" | "settings") => void;
+    onOpenMobileSidebar: () => void;
 }
 
 export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
@@ -35,6 +33,7 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
     collegeName,
     currentClubData,
     onNavigateToEditProfile,
+    onOpenMobileSidebar,
 }) => {
     const [clubs, setClubs] = useState<CollegeClubItem[]>([]);
     const [resolvedCollegeName, setResolvedCollegeName] = useState<string>(
@@ -222,104 +221,31 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
 
     return (
         <div className="space-y-6">
-            {/* Header Showcase Card */}
-            <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-2 max-w-2xl">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
-                            <Building2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                            Collegiate Directory
-                        </span>
-                        {displayCollegeName && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
-                                <GraduationCap className="w-3.5 h-3.5 stroke-[2.5]" />
-                                {displayCollegeName}
-                            </span>
-                        )}
+            <header className="space-y-2 border-b-2 border-black/55 pb-5">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={onOpenMobileSidebar}
+                            className="shrink-0 cursor-pointer rounded-lg border-2 border-black bg-white p-2 text-black shadow-[2px_2px_0px_#000] lg:hidden"
+                            aria-label="Open sidebar"
+                        >
+                            <Menu className="h-4 w-4 stroke-[2.5]" />
+                        </button>
+                        <h1 className="text-xl font-black tracking-tight text-black sm:text-3xl">
+                            Campus Chapters &amp; Directory
+                        </h1>
                     </div>
-                    <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                        Campus Chapters & Student Organizations
-                    </h2>
-                    <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
-                        Official directory of verified student organizations at <strong className="text-black">{displayCollegeName}</strong>. Explore peer initiatives, co-host inter-club events, and see how prospective recruits discover campus chapters.
-                    </p>
+                    {!loading && (
+                        <span className="shrink-0 rounded-lg border-2 border-black bg-[#a2ff86] px-2 py-1 text-[11px] font-black text-black sm:px-3 sm:text-sm">
+                            Campus Clubs {clubs.length}
+                        </span>
+                    )}
                 </div>
-
-                {/* Right Quick Summary Badges */}
-                <div className="flex items-center gap-3">
-                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center min-w-[95px] sm:min-w-[110px]">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
-                            Campus Clubs
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-black">
-                            {clubs.length}
-                        </span>
-                    </div>
-
-                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center min-w-[95px] sm:min-w-[110px]">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
-                            Peer Clubs
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-black">
-                            {peerClubs.length}
-                        </span>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={loadClubs}
-                        disabled={loading}
-                        className="p-3 rounded-xl bg-white hover:bg-[#FAF6EE] text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                        title="Refresh Clubs List"
-                        aria-label="Refresh clubs"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Smart Remarkness Banner: When No Other Clubs Are on Campus Yet */}
-            {!loading && peerClubs.length === 0 && (
-                <div className="p-5 sm:p-6 rounded-2xl bg-[#FFE566]/25 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
-                        <div className="space-y-1.5 max-w-2xl">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] border border-black text-[10px] sm:text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                <Rocket className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Pioneer Chapter on Campus</span>
-                            </div>
-                            <h3 className="text-lg sm:text-xl font-black text-black tracking-tight">
-                                Your Chapter is Leading the Way at {displayCollegeName}!
-                            </h3>
-                            <p className="text-xs sm:text-sm text-neutral-800 font-medium leading-relaxed">
-                                Currently, no other student clubs from <strong className="text-black">{displayCollegeName}</strong> have registered on Orbix yet. Your club has exclusive campus visibility! Invite neighboring technical societies, cultural clubs, or council leads to join Orbix to co-host hackathons and cross-promote events.
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => setIsInviteModalOpen(true)}
-                                className="px-3.5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                            >
-                                <Share2 className="w-4 h-4 stroke-[2.5]" />
-                                <span>Invite Peer Clubs</span>
-                            </button>
-
-                            {selfClub && (
-                                <Link
-                                    to={`/clubs/${selfClub.slug}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    <span>Preview Public Page</span>
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                </Link>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+                <p className="text-xs font-bold leading-relaxed text-neutral-700 sm:text-sm">
+                    Discover verified student clubs at {displayCollegeName} and find peers to collaborate with.
+                </p>
+            </header>
 
             {/* Error Message if fetch fails */}
             {error && (
@@ -364,24 +290,6 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
             {/* Section 2: PEER CAMPUS CLUBS */}
             {!loading && (
                 <div className="space-y-4 pt-2">
-                    <div className="flex items-center justify-between px-1">
-                        <div className="space-y-0.5">
-                            <h3 className="text-lg font-black text-black tracking-tight">
-                                Campus Clubs ({clubs.length})
-                            </h3>
-                            <p className="text-xs font-medium text-neutral-600">
-                                Your club appears first, followed by other clubs at {displayCollegeName}
-                            </p>
-                        </div>
-                    </div>
-
-                    {onNavigateToEditProfile && (
-                        <button type="button" onClick={onNavigateToEditProfile}
-                            className="text-xs font-bold underline underline-offset-4 min-h-10">
-                            Edit your club profile
-                        </button>
-                    )}
-
                     {/* Filter & Search Bar - only show if peer clubs exist */}
                     {peerClubs.length > 0 && (
                         <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -444,25 +352,19 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                         </div>
                     )}
 
-                    {/* Filter stats bar */}
-                    {peerClubs.length > 0 && (
-                        <div className="flex items-center justify-between px-1 text-xs font-bold text-neutral-600">
-                            <span>
-                                Showing <strong>{filteredPeerClubs.length}</strong> of <strong>{peerClubs.length}</strong> peer chapter{peerClubs.length === 1 ? "" : "s"}
-                            </span>
-                            {(searchQuery || selectedCategory !== "all" || onlyRecruiting) && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setSearchQuery("");
-                                        setSelectedCategory("all");
-                                        setOnlyRecruiting(false);
-                                    }}
-                                    className="text-black font-black underline hover:no-underline cursor-pointer"
-                                >
-                                    Reset all filters
-                                </button>
-                            )}
+                    {peerClubs.length > 0 && (searchQuery || selectedCategory !== "all" || onlyRecruiting) && (
+                        <div className="flex justify-end px-1">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchQuery("");
+                                    setSelectedCategory("all");
+                                    setOnlyRecruiting(false);
+                                }}
+                                className="cursor-pointer text-xs font-black text-black underline hover:no-underline"
+                            >
+                                Reset all filters
+                            </button>
                         </div>
                     )}
 
@@ -509,28 +411,38 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                         </div>
                     )}
 
-                    {/* When no other clubs exist on campus yet */}
-                    {peerClubs.length === 0 && (
-                        <div className="p-8 rounded-2xl bg-white border-2 border-dashed border-black/30 text-center space-y-3 max-w-lg mx-auto my-4">
-                            <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                                <Building2 className="w-6 h-6 text-neutral-600 stroke-[2]" />
+                    {!error && peerClubs.length === 0 && (
+                        <div className="mx-auto max-w-lg space-y-3 rounded-2xl border-2 border-black bg-[#FFF4CF] p-5 text-center shadow-[3px_3px_0px_#000] sm:p-7">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-[#FFE566] shadow-[2px_2px_0px_#000]">
+                                <Building2 aria-hidden="true" className="h-6 w-6 stroke-[2]" />
                             </div>
-                            <div className="space-y-1">
-                                <h4 className="text-sm sm:text-base font-black text-black">
-                                    No other clubs from {displayCollegeName} yet
-                                </h4>
-                                <p className="text-xs text-neutral-500 font-medium max-w-md mx-auto">
-                                    When other student clubs at your college (IEEE, Coding Club, Cultural Society, Sports Council, etc.) register on Orbix, their profiles and events will show up right here.
-                                </p>
+                            <h2 className="text-base font-black text-black sm:text-lg">
+                                No other clubs from {displayCollegeName} yet
+                            </h2>
+                            <p className="text-xs font-medium leading-relaxed text-neutral-700 sm:text-sm">
+                                Invite other student clubs to join Orbix and collaborate on campus events. Their profiles and events will appear here once they join.
+                            </p>
+                            <div className="flex flex-wrap justify-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsInviteModalOpen(true)}
+                                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-2 border-black bg-[#FFE566] px-4 py-2 text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e]"
+                                >
+                                    <Share2 aria-hidden="true" className="h-3.5 w-3.5 stroke-[2.5]" />
+                                    Share Campus Invite
+                                </button>
+                                {selfClub && (
+                                    <Link
+                                        to={`/clubs/${selfClub.slug}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-xl border-2 border-black bg-white px-4 py-2 text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100"
+                                    >
+                                        Preview Public Page
+                                        <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+                                    </Link>
+                                )}
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsInviteModalOpen(true)}
-                                className="px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ebd04e] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
-                            >
-                                <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Share Campus Invite</span>
-                            </button>
                         </div>
                     )}
                 </div>

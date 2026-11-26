@@ -31,7 +31,7 @@ interface ProfilePhotoFrameProps {
     displayName: string;
     username: string;
     className?: string;
-    size?: "sm" | "md" | "lg";
+    size?: "sm" | "md" | "lg" | "fluid";
 }
 
 export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
@@ -64,11 +64,13 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [editorSource, setEditorSource] = useState<File | string | null>(null);
 
-    // Derived dimensions based on size prop
+    // Derived dimensions based on size prop ("fluid" fills its wrapper so container queries control scale)
+    const isFluid = size === "fluid";
     const sizeClasses = {
         sm: "w-16 h-16 text-xs",
         md: "w-20 h-20 text-sm",
         lg: "w-24 h-24 sm:w-28 sm:h-28 text-base",
+        fluid: "w-full h-full text-base",
     }[size];
 
     // Fallback avatar URL (Cloudinary default avatar)
@@ -269,7 +271,10 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
     const isBusy = isUploading || isRestoring || isResetting;
 
     return (
-        <div ref={containerRef} className={`relative inline-block ${className}`}>
+        <div
+            ref={containerRef}
+            className={`relative ${isFluid ? "block aspect-square" : "inline-block"} ${className}`}
+        >
             {/* Hidden native file input */}
             <input
                 ref={fileInputRef}
@@ -330,7 +335,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                 {/* 3. CRITICAL REQUIREMENT: In-Frame Preloader (Exclusively within avatar frame!) */}
                 {isBusy && (
                     <div
-                        className="absolute inset-0 rounded-full bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center text-white p-2 text-center animate-fadeIn"
+                        className="absolute inset-0 rounded-full bg-black/75 backdrop-blur-[2px] flex flex-col items-center justify-center text-white p-2 text-center animate-fadeIn"
                         role="status"
                         aria-live="polite"
                     >
@@ -365,7 +370,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                         });
                     }}
                     disabled={isBusy}
-                    className="w-7 h-7 rounded-full bg-neutral-900 hover:bg-black text-white border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="relative w-7 h-7 rounded-full bg-neutral-900 hover:bg-black text-white border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 after:content-[''] after:absolute after:-inset-2"
                     aria-label="Profile photo options"
                     aria-haspopup="true"
                     aria-expanded={isMenuOpen}
