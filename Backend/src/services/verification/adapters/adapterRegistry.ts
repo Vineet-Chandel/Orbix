@@ -18,6 +18,7 @@ import { GeeksforGeeksAdapter } from "./geeksforgeeksAdapter.js";
 import { HackerEarthAdapter } from "./hackerearthAdapter.js";
 import { InterviewBitAdapter } from "./interviewbitAdapter.js";
 import { SubstackAdapter } from "./substackAdapter.js";
+import { MediumAdapter } from "./mediumAdapter.js";
 
 class AdapterRegistry {
     private readonly adapters: Map<string, PlatformAdapter> = new Map();
@@ -35,6 +36,7 @@ class AdapterRegistry {
         this.register(new HackerEarthAdapter());
         this.register(new InterviewBitAdapter());
         this.register(new SubstackAdapter());
+        this.register(new MediumAdapter());
     }
 
     public register(adapter: PlatformAdapter): void {

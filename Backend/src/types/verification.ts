@@ -57,6 +57,7 @@ export const SUPPORTED_PORTALS = [
     'hackerearth',
     'interviewbit',
     'substack',
+    'medium',
 ] as const;
 
 export type SupportedPortal = typeof SUPPORTED_PORTALS[number];

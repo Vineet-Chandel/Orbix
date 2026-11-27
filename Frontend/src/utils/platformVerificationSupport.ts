@@ -16,6 +16,7 @@ export const SUPPORTED_VERIFICATION_PLATFORMS = [
     "hackerearth",
     "interviewbit",
     "substack",
+    "medium",
 ] as const;
 
 export type SupportedVerificationPlatform = (typeof SUPPORTED_VERIFICATION_PLATFORMS)[number];
@@ -47,7 +48,8 @@ export function getPlatformVerificationMethod(portalId: string): "token" | "oaut
         clean === "geeksforgeeks" ||
         clean === "hackerearth" ||
         clean === "interviewbit" ||
-        clean === "substack"
+        clean === "substack" ||
+        clean === "medium"
     ) return "token";
     return null;
 }
@@ -79,6 +81,8 @@ export function getPlatformVerificationField(portalId: string): string | null {
             return "bio";
         case "substack":
             return "bio";
+        case "medium":
+            return "short_bio";
         default:
             return null;
     }
@@ -269,7 +273,9 @@ export function getPlatformVerificationGuide(
                 settingsUrlLabel: "Open InterviewBit Settings",
                 instruction: "Temporarily paste the verification code into your InterviewBit Bio field, save changes, ensure your profile is set to Public under Privacy Settings, and click Verify.",
                 detailText: "In your InterviewBit profile settings, locate the Bio field under Profile and paste the verification code.",
-                hasScreenshot: false,
+                screenshotAlt: "InterviewBit Basic Details settings showing the Bio field for verification token placement",
+                screenshotCaption: "In your InterviewBit Profile Settings under Basic Details, locate the Bio field and paste the verification token as shown above.",
+                hasScreenshot: true,
             };
         case "substack":
             return {
@@ -280,7 +286,22 @@ export function getPlatformVerificationGuide(
                 settingsUrlLabel: "Open Substack Settings",
                 instruction: "Temporarily paste the verification code into your Substack Bio field, save changes, and click Verify.",
                 detailText: "In your Substack profile editor, locate the Bio field and paste the verification code.",
-                hasScreenshot: false,
+                screenshotAlt: "Substack Edit Profile settings showing the Bio field and Save button for verification token placement",
+                screenshotCaption: "In your Substack Edit Profile settings, locate the Bio field, paste the verification token, and click Save as shown above.",
+                hasScreenshot: true,
+            };
+        case "medium":
+            return {
+                portalId: "medium",
+                portalName: "Medium",
+                targetFieldName: "Short bio",
+                settingsUrl: "https://medium.com/me/settings/account",
+                settingsUrlLabel: "Open Medium Settings",
+                instruction: "Open your Medium profile settings, select Profile information, paste the verification code into the Short bio field, save changes, and click Verify.",
+                detailText: "In your Medium profile settings under Profile information, paste the token into Short bio and save changes.",
+                screenshotAlt: "Medium Profile information settings showing the Short bio textarea for verification token placement",
+                screenshotCaption: "In your Medium Profile information settings, locate the Short bio textarea, paste the verification token, and click Save as shown above.",
+                hasScreenshot: true,
             };
         default:
             return {

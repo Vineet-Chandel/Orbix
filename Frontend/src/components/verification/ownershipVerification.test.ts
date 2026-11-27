@@ -15,6 +15,8 @@ import {
 import type { OwnershipStatus, ActiveVerificationChallenge } from "../../types/platformVerification.ts";
 import { normalizePortalError } from "../../LandingPages/Auth-Pages/portalErrorMapping.ts";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 test("Ownership Verification Support & Registry", async (t) => {
     await t.test("correctly identifies supported platforms with whitespace and casing tolerance", () => {
         assert.equal(isPlatformVerificationSupported("leetcode"), true);
@@ -42,12 +44,14 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(isPlatformVerificationSupported("substack"), true);
         assert.equal(isPlatformVerificationSupported("Substack "), true);
         assert.equal(isPlatformVerificationSupported("  SUBSTACK  "), true);
+        assert.equal(isPlatformVerificationSupported("medium"), true);
+        assert.equal(isPlatformVerificationSupported("Medium "), true);
+        assert.equal(isPlatformVerificationSupported("  MEDIUM  "), true);
     });
 
     await t.test("rejects unsupported platforms and edge cases", () => {
         assert.equal(isPlatformVerificationSupported("cses"), false);
         assert.equal(isPlatformVerificationSupported("gfg"), false);
-        assert.equal(isPlatformVerificationSupported("medium"), false);
         assert.equal(isPlatformVerificationSupported("spoj"), false);
         assert.equal(isPlatformVerificationSupported(""), false);
         assert.equal(isPlatformVerificationSupported(null as unknown as string), false);
@@ -70,7 +74,8 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(getPlatformVerificationMethod("InterviewBit"), "token");
         assert.equal(getPlatformVerificationMethod("substack"), "token");
         assert.equal(getPlatformVerificationMethod("Substack"), "token");
-        assert.equal(getPlatformVerificationMethod("medium"), null);
+        assert.equal(getPlatformVerificationMethod("medium"), "token");
+        assert.equal(getPlatformVerificationMethod("Medium"), "token");
         assert.equal(getPlatformVerificationMethod("cses"), null);
     });
 
@@ -88,11 +93,11 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(getPlatformVerificationField("hackerearth"), "bio");
         assert.equal(getPlatformVerificationField("interviewbit"), "bio");
         assert.equal(getPlatformVerificationField("substack"), "bio");
-        assert.equal(getPlatformVerificationField("medium"), null);
+        assert.equal(getPlatformVerificationField("medium"), "short_bio");
         assert.equal(getPlatformVerificationField("cses"), null);
     });
 
-    await t.test("registry contains exactly the 12 verified adapters", () => {
+    await t.test("registry contains exactly the 13 verified adapters", () => {
         assert.deepEqual([...SUPPORTED_VERIFICATION_PLATFORMS], [
             "leetcode",
             "codeforces",
@@ -106,6 +111,7 @@ test("Ownership Verification Support & Registry", async (t) => {
             "hackerearth",
             "interviewbit",
             "substack",
+            "medium",
         ]);
     });
 
@@ -269,7 +275,9 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.ok(ibGuide.instruction.includes("Bio"));
         assert.ok(ibGuide.instruction.includes("Verify"));
         assert.ok(ibGuide.instruction.includes("Privacy Settings"));
-        assert.equal(ibGuide.hasScreenshot, false);
+        assert.equal(ibGuide.hasScreenshot, true);
+        assert.ok(ibGuide.screenshotAlt?.includes("Bio"));
+        assert.ok(ibGuide.screenshotCaption?.includes("Bio"));
 
         // Substack: must target Bio and profile/edit
         const substackGuide = getPlatformVerificationGuide("substack", testToken, undefined, "author");
@@ -280,9 +288,29 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(substackGuide.settingsUrlLabel, "Open Substack Settings");
         assert.ok(substackGuide.instruction.includes("Bio"));
         assert.ok(substackGuide.instruction.includes("Verify"));
-        assert.equal(substackGuide.hasScreenshot, false);
+        assert.equal(substackGuide.hasScreenshot, true);
+        assert.ok(substackGuide.screenshotAlt?.includes("Bio"));
+        assert.ok(substackGuide.screenshotCaption?.includes("Bio"));
+        assert.ok(substackGuide.screenshotCaption?.includes("Save"));
 
-        // Unsupported platforms (e.g. CSES, Medium): must NOT return fake token placement instructions
+        // Medium: must target Short bio and settings/account
+        const mediumGuide = getPlatformVerificationGuide("medium", testToken, undefined, "writer");
+        assert.equal(mediumGuide.portalId, "medium");
+        assert.equal(mediumGuide.portalName, "Medium");
+        assert.equal(mediumGuide.targetFieldName, "Short bio");
+        assert.equal(mediumGuide.settingsUrl, "https://medium.com/me/settings/account");
+        assert.equal(mediumGuide.settingsUrlLabel, "Open Medium Settings");
+        assert.ok(mediumGuide.instruction.includes("Short bio"));
+        assert.ok(!mediumGuide.instruction.includes("Name"));
+        assert.ok(mediumGuide.instruction.includes("Verify"));
+        assert.ok(mediumGuide.detailText.includes("Short bio"));
+        assert.ok(!mediumGuide.detailText.includes("Name"));
+        assert.equal(mediumGuide.hasScreenshot, true);
+        assert.ok(mediumGuide.screenshotAlt?.includes("Short bio"));
+        assert.ok(mediumGuide.screenshotCaption?.includes("Short bio"));
+        assert.ok(mediumGuide.screenshotCaption?.includes("Save"));
+
+        // Unsupported platforms (e.g. CSES): must NOT return fake token placement instructions
         const csesGuide = getPlatformVerificationGuide("cses", testToken, undefined, "cses_user");
         assert.equal(csesGuide.portalId, "cses");
         assert.ok(!csesGuide.instruction.includes("verification code"));
@@ -291,11 +319,24 @@ test("Ownership Verification Support & Registry", async (t) => {
 
     await t.test("standardizes verification action button instructions to Verify across all active challenge platforms", () => {
         const testToken = "orbix-v-testToken123456789";
-        for (const portal of ["leetcode", "codeforces", "hackerrank", "codechef", "geeksforgeeks", "hackerearth", "interviewbit", "substack"]) {
+        for (const portal of ["leetcode", "codeforces", "hackerrank", "codechef", "geeksforgeeks", "hackerearth", "interviewbit", "substack", "medium"]) {
             const guide = getPlatformVerificationGuide(portal, testToken);
             assert.ok(guide.instruction.includes("Verify"), `${portal} instruction must direct user to click Verify`);
             assert.ok(!guide.instruction.includes("Updated My Profile"), `${portal} instruction must not mention Updated My Profile`);
         }
+    });
+    await t.test("OwnershipVerificationModal instructions for Medium target Short bio and strictly not Name", () => {
+        const modalPath = path.resolve(__dirname, "OwnershipVerificationModal.tsx");
+        const modalSource = fs.readFileSync(modalPath, "utf-8");
+
+        const mediumBlockMatch = modalSource.match(/guide\?\.portalId === ["']medium["']\s*\?\s*\(([\s\S]*?)\)\s*:/);
+        assert.ok(mediumBlockMatch, "Modal must have a dedicated branch for Medium");
+        const mediumBlock = mediumBlockMatch[1];
+        assert.ok(mediumBlock.includes("Short bio"), "Medium block must instruct user to locate Short bio");
+        // Strip JSX className attributes before checking that Name field is not referenced
+        const instructionContent = mediumBlock.replace(/className="[^"]*"/g, "");
+        assert.ok(!instructionContent.includes("Name"), "Medium block must never instruct user to use Name field");
+        assert.ok(!mediumBlock.includes(">Name<"), "Medium block must never render Name as field label");
     });
 });
 
@@ -575,6 +616,16 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
             /case\s+"hackerearth":\s+return\s+hackerearthGuideImg;/.test(modalSource),
             "getGuideScreenshot must return hackerearthGuideImg for 'hackerearth'"
         );
+
+        // Must import and resolve Medium verification screenshot guide
+        assert.ok(
+            modalSource.includes('import mediumGuideImg from "../../assets/verification/medium-verification-guide.png"'),
+            "OwnershipVerificationModal must import medium-verification-guide.png"
+        );
+        assert.ok(
+            /case\s+"medium":\s+return\s+mediumGuideImg;/.test(modalSource),
+            "getGuideScreenshot must return mediumGuideImg for 'medium'"
+        );
     });
 
     await t.test("OwnershipVerificationModal isolates Escape and backdrop dismiss when isPreviewOpen is true", () => {
@@ -591,7 +642,7 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
         );
     });
 
-    await t.test("validates screenshot guide availability and asset existence for all 10 platforms", () => {
+    await t.test("validates screenshot guide availability and asset existence for all platforms", () => {
         const assetsDir = path.resolve(__dirname, "../../assets/verification");
 
         const screenshotExpectations: Record<string, { hasScreenshot: boolean; assetFile?: string }> = {
@@ -603,6 +654,9 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
             hackerearth: { hasScreenshot: true, assetFile: "hackerearth-verification-guide.png" },
             atcoder: { hasScreenshot: true, assetFile: "atcoder-verification-guide.png" },
             topcoder: { hasScreenshot: true, assetFile: "topcoder-verification-guide.png" },
+            interviewbit: { hasScreenshot: true, assetFile: "interviewbit-verification-guide.png" },
+            substack: { hasScreenshot: true, assetFile: "substack-verification-guide.png" },
+            medium: { hasScreenshot: true, assetFile: "medium-verification-guide.png" },
             kaggle: { hasScreenshot: false },
             github: { hasScreenshot: false },
         };

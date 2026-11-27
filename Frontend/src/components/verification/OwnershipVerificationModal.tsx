@@ -32,6 +32,9 @@ import codechefGuideImg from "../../assets/verification/codechef-verification-gu
 import atcoderGuideImg from "../../assets/verification/atcoder-verification-guide.png";
 import topcoderGuideImg from "../../assets/verification/topcoder-verification-guide.png";
 import hackerearthGuideImg from "../../assets/verification/hackerearth-verification-guide.png";
+import interviewbitGuideImg from "../../assets/verification/interviewbit-verification-guide.png";
+import substackGuideImg from "../../assets/verification/substack-verification-guide.png";
+import mediumGuideImg from "../../assets/verification/medium-verification-guide.png";
 
 export { VERIFICATION_MODAL_Z_INDEX, SCREENSHOT_LIGHTBOX_Z_INDEX };
 
@@ -54,6 +57,12 @@ export const getGuideScreenshot = (portalId?: string): string | undefined => {
             return topcoderGuideImg;
         case "hackerearth":
             return hackerearthGuideImg;
+        case "interviewbit":
+            return interviewbitGuideImg;
+        case "substack":
+            return substackGuideImg;
+        case "medium":
+            return mediumGuideImg;
         default:
             return undefined;
     }
@@ -650,6 +659,14 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                                 <li>On your Substack profile edit page, locate the <strong className="font-bold text-black">Bio</strong> field.</li>
                                                 <li>Paste the token into the <strong className="font-bold text-black">Bio</strong> field.</li>
                                                 <li>Click <strong className="font-bold text-black">Save</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "medium" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>Open Medium profile settings and select <strong className="font-bold text-black">Profile information</strong>.</li>
+                                                <li>Locate <strong className="font-bold text-black">Short bio</strong> and paste the verification token there.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong>, return to Orbix, and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
                                     ) : (
