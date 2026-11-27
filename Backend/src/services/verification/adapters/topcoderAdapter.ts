@@ -149,13 +149,17 @@ export class TopCoderAdapter implements PlatformAdapter {
         return Array.from(new Set(candidates));
     }
 
-    public getInstructions(token: string, targetField: string = this.defaultTargetField): VerificationInstructions {
+    public getInstructions(token: string, targetField: string = this.defaultTargetField, handle?: string): VerificationInstructions {
+        const cleanHandle = (handle || "").trim().replace(/^@+/, "");
+        const profileSettingsUrl = cleanHandle
+            ? `https://profiles.topcoder.com/${encodeURIComponent(cleanHandle)}`
+            : 'https://profiles.topcoder.com/';
         const fieldName = this.supportedTargetFields.includes(targetField as any) ? targetField : this.defaultTargetField;
         return {
             fieldName,
-            displayFieldName: 'Short Bio',
-            instructions: `Temporarily set your Short Bio on TopCoder (https://www.topcoder.com/settings/profile) to '${token}', save changes, and click I've Updated My Profile.`,
-            profileSettingsUrl: 'https://www.topcoder.com/settings/profile',
+            displayFieldName: 'Description',
+            instructions: `Open your TopCoder profile (${profileSettingsUrl}), locate the About Me section, click the edit icon (or 'Add your bio'), enter or append '${token}' into the Description field, save changes, and click Verify.`,
+            profileSettingsUrl,
         };
     }
 }

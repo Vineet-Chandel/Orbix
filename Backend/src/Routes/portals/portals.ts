@@ -1574,43 +1574,78 @@ async function fetchTopCoder(username: string): Promise<PortalProfileData | null
     }
 }
 
-async function fetchCode360(username: string): Promise<PortalProfileData | null> {
-    const clean = username.trim().replace(/^@+/, "");
-    if (!/^[a-zA-Z0-9_\.\-]{3,50}$/.test(clean)) return null;
-
-    let name = clean;
-    const stats: Array<{ label: string; value: string }> = [
-        { label: "portal", value: "Code360" },
-        { label: "practice", value: "Coding Ninjas" },
-    ];
-
+export async function fetchCode360(username: string): Promise<PortalProfileData | null> {
     try {
-        const res = await fetch(`https://www.naukri.com/code360/profile/${encodeURIComponent(clean)}`, {
-            headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
-            signal: AbortSignal.timeout(4000),
-        });
-        if (res.ok) {
-            const html = await res.text();
-            const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-            if (titleMatch && titleMatch[1] && !titleMatch[1].includes("Page Not Found") && !titleMatch[1].includes("404")) {
-                const parts = titleMatch[1].split("|")[0]?.trim();
-                if (parts && !parts.toLowerCase().includes("code360")) name = parts;
-            }
+        let clean = username.trim().replace(/^@+/, "");
+        if (clean.includes("naukri.com") || clean.includes("codingninjas.com")) {
+            const match =
+                clean.match(/(?:code360|codestudio)\/profile\/([a-zA-Z0-9_\.\-]+)/i) ||
+                clean.match(/(?:profile|users?)\/([a-zA-Z0-9_\.\-]+)/i);
+            if (match && match[1]) clean = match[1];
         }
-    } catch {
-        // Fallback to verified username
-    }
+        clean = (clean.replace(/\/+$/, "").split("/")[0] || "").split("?")[0]?.trim() || "";
+        if (!clean || !/^[a-zA-Z0-9_\.\-]{3,60}$/.test(clean)) return null;
 
-    return {
-        success: true,
-        portal: "code360",
-        username: clean,
-        name,
-        avatar: getFallbackAvatar(clean),
-        stats,
-        profileUrl: `https://www.naukri.com/code360/profile/${clean}`,
-        verified: true,
-    };
+        const profileUrl = `https://www.naukri.com/code360/profile/${encodeURIComponent(clean)}`;
+
+        const res = await fetch(`https://www.naukri.com/code360/api/v3/public_section/profile/user_details?uuid=${encodeURIComponent(clean)}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Referer": profileUrl,
+            },
+            signal: AbortSignal.timeout(6000),
+        });
+
+        if (!res.ok) {
+            return null;
+        }
+
+        const json = (await res.json()) as any;
+        const data = json?.data;
+        if (!data || (!data.name && !data.uuid)) {
+            return null;
+        }
+
+        const name = data.name || clean;
+        const stats: Array<{ label: string; value: string }> = [];
+
+        if (data.dsa_domain_data?.problem_count_data?.total_count != null) {
+            stats.push({ label: "solved", value: `${data.dsa_domain_data.problem_count_data.total_count} solved` });
+        }
+        if (data.user_exp != null) {
+            stats.push({ label: "exp", value: `${data.user_exp} exp` });
+        }
+        if (data.user_level_name) {
+            stats.push({ label: "level", value: String(data.user_level_name) });
+        }
+        if (data.followers_count != null) {
+            stats.push({ label: "followers", value: `${data.followers_count} followers` });
+        }
+        if (stats.length === 0) {
+            stats.push({ label: "portal", value: "Code360" }, { label: "practice", value: "Coding Ninjas" });
+        }
+
+        let avatar = "";
+        if (data.image && typeof data.image === "string" && data.image.startsWith("http")) {
+            avatar = data.image;
+        } else {
+            avatar = getFallbackAvatar(name || clean);
+        }
+
+        return {
+            success: true,
+            portal: "code360",
+            username: clean,
+            name,
+            avatar,
+            stats,
+            profileUrl,
+            verified: false,
+        };
+    } catch {
+        return null;
+    }
 }
 
 async function fetchSPOJ(username: string): Promise<PortalProfileData | null> {
@@ -1633,41 +1668,185 @@ async function fetchSPOJ(username: string): Promise<PortalProfileData | null> {
 }
 
 async function fetchMedium(username: string): Promise<PortalProfileData | null> {
-    const clean = username.trim().replace(/^@+/, "");
-    if (!/^[a-zA-Z0-9_\-\.]{2,30}$/.test(clean)) return null;
+    try {
+        const clean = username.trim().replace(/^@+/, "");
+        if (!/^[a-zA-Z0-9_\-\.]{1,50}$/.test(clean)) return null;
 
-    return {
-        success: true,
-        portal: "medium",
-        username: clean,
-        name: `@${clean}`,
-        avatar: getFallbackAvatar(clean),
-        stats: [
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+        const res = await fetch(`https://medium.com/feed/@${encodeURIComponent(clean)}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/rss+xml, application/xml, text/xml; q=0.9, */*; q=0.8",
+            },
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+            return null;
+        }
+
+        const xml = await res.text();
+        if (!xml || !xml.includes("<rss") || !xml.includes("<channel>")) {
+            return null;
+        }
+
+        // Extract author/channel title
+        const titleMatch = xml.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/i);
+        let displayName = "";
+        if (titleMatch && titleMatch[1]) {
+            const rawTitle = titleMatch[1].trim();
+            const storiesMatch = rawTitle.match(/Stories by (.*?) on Medium/i);
+            displayName = storiesMatch && storiesMatch[1] ? storiesMatch[1].trim() : rawTitle;
+        }
+
+        // Extract avatar image URL
+        const imageMatch = xml.match(/<image>\s*<url>(.*?)<\/url>/i);
+        const avatar = imageMatch && imageMatch[1] && imageMatch[1].trim().startsWith("http")
+            ? imageMatch[1].trim()
+            : getFallbackAvatar(clean);
+
+        // Count published articles/stories
+        const itemMatches = xml.match(/<item>/gi);
+        const storyCount = itemMatches ? itemMatches.length : 0;
+
+        const stats: Array<{ label: string; value: string }> = [
             { label: "portal", value: "Medium" },
-            { label: "publication", value: "Writer" },
-        ],
-        profileUrl: `https://medium.com/@${clean}`,
-        verified: true,
-    };
+        ];
+        if (storyCount > 0) {
+            stats.push({ label: "stories", value: `${storyCount} published` });
+        } else {
+            stats.push({ label: "role", value: "Writer" });
+        }
+
+        return {
+            success: true,
+            portal: "medium",
+            username: clean,
+            name: displayName || `@${clean}`,
+            avatar,
+            stats,
+            profileUrl: `https://medium.com/@${clean}`,
+            verified: true,
+        };
+    } catch {
+        return null;
+    }
 }
 
 async function fetchSubstack(username: string): Promise<PortalProfileData | null> {
-    const clean = username.trim().replace(/^@+/, "");
-    if (!/^[a-zA-Z0-9_\-]{2,30}$/.test(clean)) return null;
+    try {
+        const clean = username.trim().replace(/^@+/, "");
+        if (!/^[a-zA-Z0-9_\-\.]{1,50}$/.test(clean)) return null;
 
-    return {
-        success: true,
-        portal: "substack",
-        username: clean,
-        name: clean,
-        avatar: getFallbackAvatar(clean),
-        stats: [
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+        const res = await fetch(`https://substack.com/@${encodeURIComponent(clean)}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+            return null;
+        }
+
+        const html = await res.text();
+        if (!html) return null;
+
+        // Check for non-existent account indicators
+        if (html.includes('name="robots" content="noindex"') && html.includes('property="og:title" content="Search')) {
+            return null;
+        }
+
+        let name = "";
+        let avatar = "";
+        let description = "";
+
+        // Parse JSON-LD metadata for Person schema
+        const jsonLdMatches = html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gis);
+        for (const match of jsonLdMatches) {
+            try {
+                const parsed = JSON.parse(match[1]);
+                if (parsed && typeof parsed === "object") {
+                    const person = parsed["@type"] === "Person"
+                        ? parsed
+                        : (Array.isArray(parsed["@graph"]) ? parsed["@graph"].find((item: any) => item["@type"] === "Person") : null);
+
+                    if (person) {
+                        if (typeof person.name === "string" && person.name.trim()) {
+                            name = person.name.trim();
+                        }
+                        if (typeof person.image === "string" && person.image.trim()) {
+                            avatar = person.image.trim();
+                        }
+                        if (typeof person.description === "string" && person.description.trim()) {
+                            description = person.description.trim();
+                        }
+                        break;
+                    }
+                }
+            } catch {
+                // Ignore JSON parse errors for unrelated JSON-LD blocks
+            }
+        }
+
+        // Fallback to OpenGraph / meta tags if JSON-LD was absent
+        if (!name) {
+            const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["'](.*?)["']/i);
+            if (ogTitleMatch && ogTitleMatch[1]) {
+                const rawOgTitle = ogTitleMatch[1].trim();
+                if (!rawOgTitle.startsWith("Search ") && !rawOgTitle.includes("Substack - A new economic engine")) {
+                    name = rawOgTitle.replace(/\s*\|\s*Substack$/i, "").trim();
+                }
+            }
+        }
+
+        // If no user could be identified, account does not exist
+        if (!name) {
+            return null;
+        }
+
+        if (!avatar) {
+            const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["'](.*?)["']/i);
+            if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].startsWith("http")) {
+                avatar = ogImageMatch[1].trim();
+            } else {
+                avatar = getFallbackAvatar(clean);
+            }
+        }
+
+        const stats: Array<{ label: string; value: string }> = [
             { label: "portal", value: "Substack" },
-            { label: "newsletter", value: "Author" },
-        ],
-        profileUrl: `https://${clean}.substack.com`,
-        verified: true,
-    };
+        ];
+        if (description) {
+            stats.push({ label: "bio", value: description.slice(0, 40) });
+        } else {
+            stats.push({ label: "profile", value: "Author" });
+        }
+
+        return {
+            success: true,
+            portal: "substack",
+            username: clean,
+            name: name || clean,
+            avatar,
+            stats,
+            profileUrl: `https://substack.com/@${clean}`,
+            verified: true,
+        };
+    } catch {
+        return null;
+    }
 }
 
 export type PortalFetchErrorCode =

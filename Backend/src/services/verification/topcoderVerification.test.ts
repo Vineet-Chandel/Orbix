@@ -28,15 +28,21 @@ describe('TopCoder Verification Adapter & Challenge Lifecycle', () => {
         assert.equal(adapterRegistry.isSupported('TOPCODER'), true);
     });
 
-    test('Generates user instructions targeting Short Bio and settings/profile URL', () => {
+    test('Generates user instructions targeting Description and profile URL', () => {
         const testToken = 'orbix-v-testTopcoderToken99';
-        const instructions = adapter.getInstructions(testToken);
+        const instructions = adapter.getInstructions(testToken, undefined, 'tc_coder');
         assert.equal(instructions.fieldName, 'description');
-        assert.equal(instructions.displayFieldName, 'Short Bio');
-        assert.equal(instructions.profileSettingsUrl, 'https://www.topcoder.com/settings/profile');
+        assert.equal(instructions.displayFieldName, 'Description');
+        assert.equal(instructions.profileSettingsUrl, 'https://profiles.topcoder.com/tc_coder');
         assert.ok(instructions.instructions.includes(testToken));
-        assert.ok(instructions.instructions.includes('Short Bio'));
-        assert.ok(instructions.instructions.includes('https://www.topcoder.com/settings/profile'));
+        assert.ok(instructions.instructions.includes('Description'));
+        assert.ok(instructions.instructions.includes('About Me'));
+        assert.ok(!instructions.instructions.includes('Short Bio'));
+        assert.ok(instructions.instructions.includes('https://profiles.topcoder.com/tc_coder'));
+
+        // Fallback when handle is omitted
+        const fallback = adapter.getInstructions(testToken);
+        assert.equal(fallback.profileSettingsUrl, 'https://profiles.topcoder.com/');
     });
 
     test('Rejects invalid or empty handle inputs before network request', async () => {

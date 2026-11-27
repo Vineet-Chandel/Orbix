@@ -34,6 +34,10 @@ import { CodeChefAdapter } from "./adapters/codechefAdapter.js";
 import { TopCoderAdapter } from "./adapters/topcoderAdapter.js";
 import { GeeksforGeeksAdapter } from "./adapters/geeksforgeeksAdapter.js";
 import { HackerEarthAdapter } from "./adapters/hackerearthAdapter.js";
+import { InterviewBitAdapter } from "./adapters/interviewbitAdapter.js";
+import { SubstackAdapter } from "./adapters/substackAdapter.js";
+import { MediumAdapter } from "./adapters/mediumAdapter.js";
+import { Code360Adapter } from "./adapters/code360Adapter.js";
 import {
     checkVerificationRateLimit,
     setRedisClientForTest,
@@ -56,7 +60,7 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
     // 1. ADAPTER REGISTRY & PLATFORM DISCOVERY
     // =========================================================================
     describe('Adapter Registry & Platform Discovery', () => {
-        test('Registers all supported platforms: LeetCode, Codeforces, HackerRank, GitHub, Kaggle, AtCoder, CodeChef, TopCoder, GeeksforGeeks, HackerEarth', () => {
+        test('Registers all supported platforms: LeetCode, Codeforces, HackerRank, GitHub, Kaggle, AtCoder, CodeChef, TopCoder, GeeksforGeeks, HackerEarth, InterviewBit, Substack, Medium, Code360', () => {
             const supported = getSupportedPlatforms();
             assert.ok(supported.includes('leetcode'), 'LeetCode must be supported');
             assert.ok(supported.includes('codeforces'), 'Codeforces must be supported');
@@ -68,7 +72,11 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
             assert.ok(supported.includes('topcoder'), 'TopCoder must be supported');
             assert.ok(supported.includes('geeksforgeeks'), 'GeeksforGeeks must be supported');
             assert.ok(supported.includes('hackerearth'), 'HackerEarth must be supported');
-            assert.equal(supported.length, 10, 'Exactly 10 platforms should be registered');
+            assert.ok(supported.includes('interviewbit'), 'InterviewBit must be supported');
+            assert.ok(supported.includes('substack'), 'Substack must be supported');
+            assert.ok(supported.includes('medium'), 'Medium must be supported');
+            assert.ok(supported.includes('code360'), 'Code360 must be supported');
+            assert.equal(supported.length, 14, 'Exactly 14 platforms should be registered');
         });
 
         test('Resolves correct adapter instances by case-insensitive name', () => {
@@ -93,11 +101,22 @@ describe('Phase 2 Platform Account Ownership Verification Engine', () => {
             assert.ok(adapterRegistry.getAdapter('hackerearth') instanceof HackerEarthAdapter);
             assert.ok(adapterRegistry.getAdapter('HackerEarth') instanceof HackerEarthAdapter);
             assert.ok(adapterRegistry.getAdapter('HACKEREARTH') instanceof HackerEarthAdapter);
+            assert.ok(adapterRegistry.getAdapter('interviewbit') instanceof InterviewBitAdapter);
+            assert.ok(adapterRegistry.getAdapter('InterviewBit') instanceof InterviewBitAdapter);
+            assert.ok(adapterRegistry.getAdapter('INTERVIEWBIT') instanceof InterviewBitAdapter);
+            assert.ok(adapterRegistry.getAdapter('substack') instanceof SubstackAdapter);
+            assert.ok(adapterRegistry.getAdapter('Substack') instanceof SubstackAdapter);
+            assert.ok(adapterRegistry.getAdapter('SUBSTACK') instanceof SubstackAdapter);
+            assert.ok(adapterRegistry.getAdapter('medium') instanceof MediumAdapter);
+            assert.ok(adapterRegistry.getAdapter('Medium') instanceof MediumAdapter);
+            assert.ok(adapterRegistry.getAdapter('MEDIUM') instanceof MediumAdapter);
+            assert.ok(adapterRegistry.getAdapter('code360') instanceof Code360Adapter);
+            assert.ok(adapterRegistry.getAdapter('Code360') instanceof Code360Adapter);
+            assert.ok(adapterRegistry.getAdapter('CODE360') instanceof Code360Adapter);
         });
 
         test('Rejects unsupported Tier 2/3 platforms with undefined', () => {
             assert.equal(adapterRegistry.getAdapter('cses'), undefined);
-            assert.equal(adapterRegistry.getAdapter('interviewbit'), undefined);
             assert.equal(adapterRegistry.getAdapter('spoj'), undefined);
             assert.equal(adapterRegistry.getAdapter('unknown_platform'), undefined);
             assert.equal(adapterRegistry.getAdapter(''), undefined);
