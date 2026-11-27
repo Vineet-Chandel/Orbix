@@ -5865,3 +5865,30 @@ CREATE TABLE IF NOT EXISTS public.club_announcement_audit (
     action TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Certificate template discovery schema (migration 072).
+ALTER TABLE public.certificate_templates
+    ADD COLUMN IF NOT EXISTS official_template_id UUID REFERENCES public.certificate_templates(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS is_starter_copy BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS creation_key UUID,
+    ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_certificate_template_starter_copy
+    ON public.certificate_templates (club_id, official_template_id)
+    WHERE is_starter_copy AND status <> 'archived';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_certificate_template_creation_key
+    ON public.certificate_templates (club_id, creation_key);
+CREATE INDEX IF NOT EXISTS idx_certificate_template_official_source
+    ON public.certificate_templates (official_template_id) WHERE official_template_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_certificate_discovery_recent_issues
+    ON public.club_certificates (created_at DESC, template_id)
+    WHERE template_id IS NOT NULL AND is_revoked = false;
+
+CREATE TABLE IF NOT EXISTS public.certificate_template_view_history (
+    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    template_ids UUID[] NOT NULL CHECK (cardinality(template_ids) <= 10),
+    PRIMARY KEY (club_id, user_id)
+);
+
+ALTER TABLE public.certificate_template_view_history ENABLE ROW LEVEL SECURITY;

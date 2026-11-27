@@ -5787,10 +5787,12 @@ clubRouter.get("/certificates/eligible-recipients", authenticate, requireClubAcc
                 GROUP BY user_id
             ) reg ON reg.user_id = u.id
             LEFT JOIN (
-                SELECT DISTINCT ON (user_id) user_id, title AS role_title, id
+                SELECT DISTINCT ON (user_id) user_id,
+                    COALESCE(team_title, team_role, position_title, 'Member') AS role_title,
+                    id
                 FROM club_team_members
                 WHERE club_id = $1 AND status = 'active'
-                ORDER BY user_id, created_at DESC
+                ORDER BY user_id, created_at DESC, id
             ) tm ON tm.user_id = u.id
             LEFT JOIN (
                 SELECT DISTINCT ON (r.user_id) r.user_id, e.title AS latest_event_title, e.starts_at AS latest_event_date

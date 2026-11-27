@@ -12,7 +12,7 @@ import {
   DashboardRouteSkeleton,
   DocsRouteSkeleton,
   ContentRouteSkeleton,
-  AuthRouteSkeleton,
+  AuthRouteLoader,
 } from "./components/ui/loader";
 import { OrbixErrorBoundary } from "./components/ui/error/OrbixErrorBoundary";
 import { OrbixOfflineBanner } from "./components/ui/network/OrbixOfflineBanner";
@@ -192,8 +192,8 @@ const App = () => {
                 <Route path="/verify" element={<PublicCertificateVerifyPage />} />
 
                 {/* Auth Pages */}
-                <Route path="/auth/signup" element={<Suspense fallback={<AuthRouteSkeleton />}><SignUpPage /></Suspense>} />
-                <Route path="/auth/signin" element={<Suspense fallback={<AuthRouteSkeleton />}><SignInPage /></Suspense>} />
+                <Route path="/auth/signup" element={<Suspense fallback={<AuthRouteLoader label="Loading the sign-up form…" />}><SignUpPage /></Suspense>} />
+                <Route path="/auth/signin" element={<Suspense fallback={<AuthRouteLoader label="Loading the sign-in form…" />}><SignInPage /></Suspense>} />
                 <Route path="/auth/forgot-password" element={<Navigate to="/auth/signin?view=forgot-password" replace />} />
                 <Route path="/forgot-password" element={<Navigate to="/auth/signin?view=forgot-password" replace />} />
                 <Route path="/auth/callback" element={<OAuthCallbackPage />} />

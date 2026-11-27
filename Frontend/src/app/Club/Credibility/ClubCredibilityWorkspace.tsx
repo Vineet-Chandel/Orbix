@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
     CheckCircle2,
@@ -13,14 +13,13 @@ import {
     ChevronLeft,
     ChevronRight,
 } from "lucide-react";
+import type { CredibilityLedgerEntry } from "../../../api/clubCredibilityApi";
 import {
-    fetchClubCredibility,
-    fetchClubCredibilityHistory,
-    submitCredibilityAppeal,
-    recalculateClubCredibility,
-    type ClubCredibilitySnapshot,
-    type CredibilityLedgerEntry,
-} from "../../../api/clubCredibilityApi";
+    useClubCredibilityQuery,
+    useClubCredibilityLedgerQuery,
+    useSyncClubCredibilityMutation,
+    useAppealClubCredibilityMutation,
+} from "../../../store/personalDataApi";
 import { getScoreBadge } from "./ClubCredibilityOverviewCard";
 import { OrbixLoader } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
@@ -29,81 +28,41 @@ function formatLedgerLabel(code: string) {
     return code.replace(/_+/g, " ").trim();
 }
 
-export const ClubCredibilityWorkspace: React.FC = () => {
+export const ClubCredibilityWorkspace: React.FC<{ clubId: string }> = ({ clubId }) => {
     const toast = useToast();
-    const [snapshot, setSnapshot] = useState<ClubCredibilitySnapshot | null>(null);
-    const [history, setHistory] = useState<CredibilityLedgerEntry[]>([]);
-    const [totalHistoryCount, setTotalHistoryCount] = useState(0);
-    const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(true);
-    const [recalculating, setRecalculating] = useState(false);
+    const { currentData, isFetching, isError, refetch } = useClubCredibilityQuery(clubId, { refetchOnMountOrArgChange: false });
+    const snapshot = currentData?.overview.snapshot;
+    const history = currentData?.ledger.history ?? [];
+    const totalHistoryCount = currentData?.ledger.total ?? 0;
+    const [syncCredibility, { isLoading: recalculating }] = useSyncClubCredibilityMutation();
+    const [submitAppeal, { isLoading: isSubmittingAppeal }] = useAppealClubCredibilityMutation();
 
-    // Appeal Modal State
     const [appealTarget, setAppealTarget] = useState<CredibilityLedgerEntry | null>(null);
     const [appealReason, setAppealReason] = useState("");
-    const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
-
-    // Full Ledger Screen Modal State
     const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
     const [modalPage, setModalPage] = useState(1);
-    const [modalEntries, setModalEntries] = useState<CredibilityLedgerEntry[]>([]);
-    const [modalTotal, setModalTotal] = useState(0);
-    const [isModalLoading, setIsModalLoading] = useState(false);
-
-    const loadModalPage = async (targetPage = 1) => {
-        try {
-            setIsModalLoading(true);
-            const data = await fetchClubCredibilityHistory(targetPage, 20);
-            setModalEntries(data.history);
-            setModalTotal(data.total);
-            setModalPage(targetPage);
-        } catch (err: any) {
-            console.error("Failed to load full ledger history:", err);
-            toast.error("Failed to load credibility ledger entries.");
-        } finally {
-            setIsModalLoading(false);
-        }
-    };
+    const {
+        currentData: modalLedger, isFetching: isModalFetching, isError: isModalError, refetch: refetchModal,
+    } = useClubCredibilityLedgerQuery(
+        { clubId, page: modalPage },
+        { skip: !isLedgerModalOpen, refetchOnMountOrArgChange: false },
+    );
+    const isModalLoading = !modalLedger && isModalFetching;
+    const modalEntries = modalLedger?.history ?? [];
+    const modalTotal = modalLedger?.total ?? totalHistoryCount;
 
     const handleOpenLedgerModal = () => {
+        setModalPage(1);
         setIsLedgerModalOpen(true);
-        loadModalPage(1);
     };
-
-    const loadData = async (targetPage = 1) => {
-        try {
-            setLoading(true);
-            const [overview, historyData] = await Promise.all([
-                fetchClubCredibility(),
-                fetchClubCredibilityHistory(targetPage, 15),
-            ]);
-            setSnapshot(overview.snapshot);
-            setHistory(historyData.history);
-            setTotalHistoryCount(historyData.total);
-            setPage(targetPage);
-        } catch (err: any) {
-            console.error("Failed to load credibility workspace:", err);
-            toast.error(err.response?.data?.message || "Failed to load club credibility.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadData(1);
-    }, []);
 
     const handleRecalculate = async () => {
         try {
-            setRecalculating(true);
-            const res = await recalculateClubCredibility();
-            setSnapshot(res.snapshot);
+            await syncCredibility(clubId).unwrap();
             toast.success("Credibility standing recalculated successfully from verified ledger.");
-            await loadData(page);
-        } catch (err: any) {
-            toast.error(err.response?.data?.message || "Failed to recalculate credibility.");
-        } finally {
-            setRecalculating(false);
+        } catch (err) {
+            toast.error(err && typeof err === "object" && "message" in err
+                ? String(err.message) : "Failed to recalculate credibility.");
         }
     };
 
@@ -122,21 +81,12 @@ export const ClubCredibilityWorkspace: React.FC = () => {
         }
 
         try {
-            setIsSubmittingAppeal(true);
-            await submitCredibilityAppeal({
-                ledgerId: appealTarget.id,
-                reason: appealReason.trim(),
-            });
+            await submitAppeal({ clubId, ledgerId: appealTarget.id, reason: appealReason.trim() }).unwrap();
             toast.success("Credibility appeal submitted to platform moderators for review.");
             setAppealTarget(null);
-            await loadData(page);
-            if (isLedgerModalOpen) {
-                await loadModalPage(modalPage);
-            }
-        } catch (err: any) {
-            toast.error(err.response?.data?.message || "Failed to submit appeal.");
-        } finally {
-            setIsSubmittingAppeal(false);
+        } catch (err) {
+            toast.error(err && typeof err === "object" && "message" in err
+                ? String(err.message) : "Failed to submit appeal.");
         }
     };
 
@@ -238,7 +188,7 @@ export const ClubCredibilityWorkspace: React.FC = () => {
         </div>
     );
 
-    if (loading && !snapshot) {
+    if (isFetching && !snapshot) {
         return (
             <div className="p-16 flex flex-col items-center justify-center gap-3">
                 <OrbixLoader size="md" variant="centered" color="#000" />
@@ -249,7 +199,14 @@ export const ClubCredibilityWorkspace: React.FC = () => {
         );
     }
 
-    if (!snapshot) return null;
+    if (!snapshot) {
+        return isError ? (
+            <div role="status" className="flex items-center gap-3 py-4 text-sm font-bold">
+                Could not load club credibility.
+                <button type="button" className="underline" onClick={() => void refetch()}>Retry</button>
+            </div>
+        ) : null;
+    }
 
     const badge = getScoreBadge(snapshot.currentScore, snapshot.scoreLevel, snapshot.isProvisional);
 
@@ -289,7 +246,7 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                     <button
                         type="button"
                         onClick={handleRecalculate}
-                        disabled={recalculating}
+                        disabled={recalculating || isFetching}
                         className="px-4 py-2 rounded-xl bg-white dark:bg-neutral-800 hover:bg-neutral-100 text-black dark:text-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-50"
                         title="Recompute cached snapshot from append-only ledger"
                     >
@@ -561,7 +518,7 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                                             Credibility History Ledger
                                         </h3>
                                         <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] shrink-0 whitespace-nowrap">
-                                            {modalTotal || totalHistoryCount} Total Entries
+                                            {modalTotal} Total Entries
                                         </span>
                                     </div>
                                     <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 mt-0.5 leading-relaxed">
@@ -590,28 +547,33 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                                         Loading Ledger History...
                                     </span>
                                 </div>
-                            ) : (modalEntries.length > 0 ? modalEntries : history).length === 0 ? (
+                            ) : isModalError && !modalLedger ? (
+                                <div role="status" className="flex items-center gap-3 p-4 text-sm font-bold">
+                                    Could not load ledger history.
+                                    <button type="button" className="underline" onClick={() => void refetchModal()}>Retry</button>
+                                </div>
+                            ) : modalEntries.length === 0 ? (
                                 <div className="p-12 text-center rounded-2xl border-2 border-dashed border-black/20 space-y-2">
                                     <CheckCircle2 className="w-10 h-10 text-neutral-400 mx-auto" />
                                     <h4 className="text-sm font-black text-black dark:text-white">No Ledger Entries</h4>
                                 </div>
                             ) : (
-                                (modalEntries.length > 0 ? modalEntries : history).map((entry) => renderLedgerCard(entry))
+                                modalEntries.map((entry) => renderLedgerCard(entry))
                             )}
                         </div>
 
                         {/* Modal Sticky Pagination Footer */}
-                        {Math.ceil((modalTotal || totalHistoryCount) / 20) > 1 && (
+                        {Math.ceil(modalTotal / 20) > 1 && (
                             <div className="p-4 sm:p-5 border-t-2 border-black/10 dark:border-white/10 bg-[#FAF6EE] dark:bg-[#1a1a1a] flex flex-col sm:flex-row items-center justify-between gap-3">
                                 <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">
-                                    Showing {(modalPage - 1) * 20 + 1} – {Math.min(modalPage * 20, modalTotal || totalHistoryCount)} of {modalTotal || totalHistoryCount} entries
+                                    Showing {(modalPage - 1) * 20 + 1} – {Math.min(modalPage * 20, modalTotal)} of {modalTotal} entries
                                 </span>
 
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         disabled={modalPage <= 1 || isModalLoading}
-                                        onClick={() => loadModalPage(modalPage - 1)}
+                                        onClick={() => setModalPage(modalPage - 1)}
                                         className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                     >
                                         <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
@@ -619,13 +581,13 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                                     </button>
 
                                     <span className="px-3 py-1.5 rounded-xl bg-black text-[#FFE566] border border-black font-mono font-black text-xs">
-                                        {modalPage} / {Math.ceil((modalTotal || totalHistoryCount) / 20)}
+                                        {modalPage} / {Math.ceil(modalTotal / 20)}
                                     </span>
 
                                     <button
                                         type="button"
-                                        disabled={modalPage >= Math.ceil((modalTotal || totalHistoryCount) / 20) || isModalLoading}
-                                        onClick={() => loadModalPage(modalPage + 1)}
+                                        disabled={modalPage >= Math.ceil(modalTotal / 20) || isModalLoading}
+                                        onClick={() => setModalPage(modalPage + 1)}
                                         className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                     >
                                         <span>Next</span>

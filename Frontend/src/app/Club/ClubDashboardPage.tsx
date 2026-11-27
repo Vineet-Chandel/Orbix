@@ -167,7 +167,6 @@ export default function ClubDashboardPage() {
     const activeTab = !location.pathname.startsWith("/club/events") && tabQuery && Object.hasOwn(clubTabToPath, tabQuery)
         ? tabQuery
         : getClubTabFromPath(location.pathname);
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     // Backward compatibility: automatically migrate legacy query parameters (?tab=team) to clean full routes (/club/team)
     useEffect(() => {
@@ -467,48 +466,31 @@ export default function ClubDashboardPage() {
     }
 
     return (
-        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
+        <div className="flex h-dvh bg-white text-neutral-900 lg:h-screen overflow-hidden font-sans">
             {/* Club Sidebar — Dashboard, Team, Events, and Manage Profile */}
             <ClubSidebar
                 club={club}
                 activeTab={activeTab}
-                onTabChange={handleTabChange}
-                isOpen={isMobileSidebarOpen}
-                onClose={() => setIsMobileSidebarOpen(false)}
                 unreadInboxCount={inboxCounts.unreadCount}
                 teamPendingCount={teamPendingCount}
-                eventsCount={events.length}
                 onOpenInbox={() => setIsInboxModalOpen(true)}
                 onSignOut={handleSignOut}
             />
 
             {/* Main Content Area Container matching Personal Account */}
-            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden min-w-0 p-2 sm:p-3">
                 <section
                     aria-label="Orbix Club Space"
-                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-3 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-3 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between pb-[var(--mobile-dock-clearance)] lg:pb-0"
                 >
                     <Suspense fallback={<WorkspacePanelLoader />}>
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* Dynamic Header Bar tailored to each tab */}
                         {activeTab !== "clubs" && activeTab !== "analytics" && ((!eventId && !isEventModalOpen) || activeTab !== "events") && (
                             <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            {/* Left: Mobile Toggle & Tab-Specific Title & Badges */}
+                            {/* Tab-specific title and badges */}
                             <div className="space-y-1">
                                 <div className="flex items-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsMobileSidebarOpen(true)}
-                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
-                                        aria-label="Open sidebar"
-                                    >
-                                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <line x1="3" y1="12" x2="21" y2="12" />
-                                            <line x1="3" y1="6" x2="21" y2="6" />
-                                            <line x1="3" y1="18" x2="21" y2="18" />
-                                        </svg>
-                                    </button>
-
                                     {activeTab === "overview" && (
                                         <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                                             Welcome, {club.name}!
@@ -863,7 +845,7 @@ export default function ClubDashboardPage() {
                                 </div>
 
                                 {/* Club Credibility & Accountability Standing (Full Width) */}
-                                    <ClubCredibilityWorkspace />
+                                    <ClubCredibilityWorkspace clubId={club.id} />
 
                                 {/* Recent Events Preview */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
@@ -920,7 +902,6 @@ export default function ClubDashboardPage() {
                                 <WorkspaceShell
                                 club={club}
                                 isClubContext={true}
-                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
                         )}
 
@@ -935,7 +916,6 @@ export default function ClubDashboardPage() {
                                         : "overview"
                                 }
                                 onOpenInbox={() => setIsInboxModalOpen(true)}
-                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 onStatsLoaded={(stats: TeamStats) => {
                                     setTeamStats(stats);
                                     if (typeof stats.pendingInvitations === "number") {
@@ -952,7 +932,6 @@ export default function ClubDashboardPage() {
                                     eventId={eventId}
                                     club={club}
                                     onBack={() => navigate("/club/events")}
-                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 />
                             ) : isEventModalOpen ? (
                                     <ClubEventModal
@@ -970,7 +949,6 @@ export default function ClubDashboardPage() {
                                     collegeName={club?.college_name}
                                     collegeId={club?.college_id}
                                     initialStatus={initialModalStatus}
-                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 />
                             ) : (
                                 <div className="space-y-6">
@@ -1082,7 +1060,6 @@ export default function ClubDashboardPage() {
                                     setEventFilter(filter);
                                     navigate(`/club/events?filter=${filter}`);
                                 }}
-                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
                         )}
 
@@ -1130,7 +1107,6 @@ export default function ClubDashboardPage() {
                                 collegeName={club.college_name}
                                 currentClubData={club}
                                 onNavigateToEditProfile={() => handleTabChange("profile")}
-                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
                         )}
 

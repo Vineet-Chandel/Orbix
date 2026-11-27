@@ -1,3 +1,6 @@
+import { resizeCertificateDesign } from "./resizeCertificateDesign";
+import { useCertificateCanvasZoom } from "./useCertificateCanvasZoom";
+import { CertificateText } from "./CertificateText";
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
     Type,
@@ -93,7 +96,6 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
 
     // UI state
     const [activeLeftTab, setActiveLeftTab] = useState<"elements" | "fields" | "layers" | "background">("elements");
-    const [zoom, setZoom] = useState<number>(0.85);
     const [isSaving, setIsSaving] = useState(false);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
@@ -163,8 +165,9 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
     const canvasRef = useRef<HTMLDivElement>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-    const canvasWidth = design.page?.width || 842;
-    const canvasHeight = design.page?.height || 595;
+    const canvasWidth = design.page?.width || design.dimensions?.width || 842;
+    const canvasHeight = design.page?.height || design.dimensions?.height || 595;
+    const { zoom, changeZoom, fitToScreen: handleFitToScreen } = useCertificateCanvasZoom(canvasContainerRef, canvasWidth, canvasHeight);
 
     // Push new state to history
     const updateDesignWithHistory = useCallback((newDesign: CertificateDesign) => {
@@ -398,22 +401,6 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
             updateElement(id, { zIndex: Math.max(0, targetZ - 1) });
         }
     };
-
-    // Auto-fit canvas to container
-    const handleFitToScreen = useCallback(() => {
-        if (!canvasContainerRef.current) return;
-        const container = canvasContainerRef.current;
-        const availableWidth = container.clientWidth - 80;
-        const availableHeight = container.clientHeight - 80;
-        if (availableWidth <= 0 || availableHeight <= 0) return;
-
-        const scaleX = availableWidth / canvasWidth;
-        const scaleY = availableHeight / canvasHeight;
-        const optimalZoom = Math.min(scaleX, scaleY);
-        const clampedZoom = Math.max(0.35, Math.min(1.4, Number(optimalZoom.toFixed(2))));
-        setZoom(clampedZoom);
-        toast.info(`Fitted canvas to view (${Math.round(clampedZoom * 100)}%)`);
-    }, [canvasWidth, canvasHeight, toast]);
 
     // Add new element
     const addElement = (type: CertificateElement["type"], options?: Partial<CertificateElement>) => {
@@ -1143,7 +1130,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
     };
 
     return (
-        <div className="flex flex-col h-[88vh] bg-[#FAF6EE] rounded-2xl border-4 border-black overflow-hidden shadow-[8px_8px_0px_#000]">
+        <div className="flex min-w-0 flex-col 2xl:h-[88dvh] bg-[#FAF6EE] rounded-2xl border-4 border-black overflow-hidden shadow-[8px_8px_0px_#000]">
             {/* Top Toolbar */}
             <div className="px-5 py-3 bg-white border-b-3 border-black flex flex-wrap items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
@@ -1259,7 +1246,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                     {/* Zoom & Fit-to-Screen Controls */}
                     <div className="flex items-center border-2 border-black rounded-lg overflow-hidden shadow-[2px_2px_0px_#000] bg-white">
                         <button
-                            onClick={() => setZoom((z) => Math.max(0.35, Number((z - 0.1).toFixed(2))))}
+                            onClick={() => changeZoom(-0.1)}
                             className="p-1.5 hover:bg-neutral-100 border-r border-black"
                             title="Zoom Out"
                         >
@@ -1269,7 +1256,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                             {Math.round(zoom * 100)}%
                         </span>
                         <button
-                            onClick={() => setZoom((z) => Math.min(1.4, Number((z + 0.1).toFixed(2))))}
+                            onClick={() => changeZoom(0.1)}
                             className="p-1.5 hover:bg-neutral-100 border-r border-black"
                             title="Zoom In"
                         >
@@ -1352,9 +1339,9 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
             </div>
 
             {/* Main 3-Column Workspace */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col 2xl:flex-row 2xl:overflow-hidden">
                 {/* LEFT PANEL: Elements & Layers */}
-                <div className="w-80 bg-white border-r-3 border-black flex flex-col shrink-0">
+                <div className="flex max-h-[48dvh] min-h-0 w-full shrink-0 flex-col overflow-hidden border-t-2 border-black bg-white 2xl:max-h-none 2xl:w-80 2xl:border-r-3 2xl:border-t-0">
                     {/* Left Sub-tabs */}
                     <div className="grid grid-cols-4 border-b-2 border-black bg-[#F5F1E6]">
                         <button
@@ -1877,15 +1864,15 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                         }
                                         onChange={(val) => {
                                             if (val === "a4-landscape") {
-                                                updateDesignWithHistory({ ...design, page: { width: 842, height: 595, orientation: "landscape", unit: "pt" } });
+                                                updateDesignWithHistory(resizeCertificateDesign(design, 842, 595));
                                             } else if (val === "a4-portrait") {
-                                                updateDesignWithHistory({ ...design, page: { width: 595, height: 842, orientation: "portrait", unit: "pt" } });
+                                                updateDesignWithHistory(resizeCertificateDesign(design, 595, 842));
                                             } else if (val === "letter-landscape") {
-                                                updateDesignWithHistory({ ...design, page: { width: 792, height: 612, orientation: "landscape", unit: "pt" } });
+                                                updateDesignWithHistory(resizeCertificateDesign(design, 792, 612));
                                             } else if (val === "letter-portrait") {
-                                                updateDesignWithHistory({ ...design, page: { width: 612, height: 792, orientation: "portrait", unit: "pt" } });
+                                                updateDesignWithHistory(resizeCertificateDesign(design, 612, 792));
                                             } else if (val === "square") {
-                                                updateDesignWithHistory({ ...design, page: { width: 600, height: 600, orientation: "landscape", unit: "pt" } });
+                                                updateDesignWithHistory(resizeCertificateDesign(design, 600, 600));
                                             }
                                         }}
                                         size="sm"
@@ -1910,18 +1897,13 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                             type="number"
                                             min={400}
                                             max={2000}
-                                            value={canvasWidth}
-                                            onChange={(e) => {
-                                                const w = Number(e.target.value) || 842;
-                                                updateDesignWithHistory({
-                                                    ...design,
-                                                    page: {
-                                                        width: w,
-                                                        height: canvasHeight,
-                                                        orientation: w >= canvasHeight ? "landscape" : "portrait",
-                                                        unit: "pt",
-                                                    },
-                                                });
+                                            key={canvasWidth}
+                                            defaultValue={canvasWidth}
+                                            onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                                            onBlur={(event) => {
+                                                const w = Math.max(400, Math.min(2000, Number(event.currentTarget.value) || 842));
+                                                event.currentTarget.value = String(w);
+                                                if (w !== canvasWidth) updateDesignWithHistory(resizeCertificateDesign(design, w, canvasHeight));
                                             }}
                                             className="w-full p-1.5 text-xs font-bold border-2 border-black rounded-lg"
                                         />
@@ -1935,18 +1917,13 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                             type="number"
                                             min={400}
                                             max={2000}
-                                            value={canvasHeight}
-                                            onChange={(e) => {
-                                                const h = Number(e.target.value) || 595;
-                                                updateDesignWithHistory({
-                                                    ...design,
-                                                    page: {
-                                                        width: canvasWidth,
-                                                        height: h,
-                                                        orientation: canvasWidth >= h ? "landscape" : "portrait",
-                                                        unit: "pt",
-                                                    },
-                                                });
+                                            key={canvasHeight}
+                                            defaultValue={canvasHeight}
+                                            onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                                            onBlur={(event) => {
+                                                const h = Math.max(400, Math.min(2000, Number(event.currentTarget.value) || 595));
+                                                event.currentTarget.value = String(h);
+                                                if (h !== canvasHeight) updateDesignWithHistory(resizeCertificateDesign(design, canvasWidth, h));
                                             }}
                                             className="w-full p-1.5 text-xs font-bold border-2 border-black rounded-lg"
                                         />
@@ -2092,7 +2069,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                 {/* CENTER PANEL: Interactive Canvas Workspace with Drag & Drop */}
                 <div
                     ref={canvasContainerRef}
-                    className="flex-1 bg-neutral-200 overflow-auto p-8 flex items-center justify-center select-none relative"
+                    className="relative order-first flex h-[min(54dvh,36rem)] min-w-0 select-none overflow-auto bg-neutral-200 p-3 sm:p-5 2xl:order-none 2xl:h-auto 2xl:flex-1"
                     onMouseDown={handleMouseDownCanvas}
                     onDragOver={(e) => {
                         e.preventDefault();
@@ -2106,7 +2083,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                             width: `${canvasWidth * zoom}px`,
                             height: `${canvasHeight * zoom}px`,
                         }}
-                        className="relative bg-white shadow-2xl border-4 border-black transition-all shrink-0 origin-center"
+                        className="relative m-auto shrink-0 origin-center bg-white shadow-2xl ring-2 ring-black"
                     >
                         {/* Dot Grid Pattern Layer */}
                         {showGrid && (
@@ -2243,20 +2220,6 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
 
                             const displayText = getRenderedDisplayText(elem);
 
-                            // Dynamic auto-scaling font calculation for shrink fitPolicy
-                            const baseFontSize = elem.style?.fontSize || 24;
-                            let effectiveFontSize = baseFontSize * zoom;
-
-                            if (elem.type === "dynamic-text" && elem.fitPolicy === "shrink" && displayText.length > 0) {
-                                const minSize = (elem.minFontSize || 10) * zoom;
-                                const estCharWidth = (baseFontSize * zoom) * 0.58;
-                                const estTextWidth = displayText.length * estCharWidth;
-                                if (width > 0 && estTextWidth > width) {
-                                    const scale = Math.max(minSize / (baseFontSize * zoom), width / estTextWidth);
-                                    effectiveFontSize = Math.max(minSize, baseFontSize * zoom * scale);
-                                }
-                            }
-
                             return (
                                 <div
                                     key={elem.id}
@@ -2367,31 +2330,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                             <QrCode className="w-full h-full text-black stroke-[1.5]" />
                                         </div>
                                     ) : (
-                                        <div
-                                            style={{
-                                                fontSize: `${effectiveFontSize}px`,
-                                                fontWeight: (elem.style?.fontWeight as any) || "normal",
-                                                color: elem.style?.color || "#0F172A",
-                                                textAlign: elem.style?.textAlign || "center",
-                                                letterSpacing: elem.style?.letterSpacing ? `${elem.style.letterSpacing * zoom}px` : undefined,
-                                                textTransform: elem.style?.textTransform || "none",
-                                                fontFamily: getCertificateFontFamily(elem.style?.fontFamily),
-                                                lineHeight: elem.style?.lineHeight || 1.3,
-                                            }}
-                                            className="w-full h-full flex items-center justify-center leading-tight overflow-visible select-none pointer-events-none p-0.5"
-                                        >
-                                            <div
-                                                className="w-full whitespace-pre-wrap break-words select-none"
-                                                style={{
-                                                    wordBreak: "break-word",
-                                                    overflowWrap: "break-word",
-                                                    whiteSpace: "pre-wrap",
-                                                    lineHeight: elem.style?.lineHeight || 1.3,
-                                                }}
-                                            >
-                                                {displayText}
-                                            </div>
-                                        </div>
+                                        <CertificateText element={elem} value={displayText} fillBox />
                                     )}
 
                                     {/* 8 Resize Handles & Rotation Handle */}
@@ -2469,7 +2408,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                 </div>
 
                 {/* RIGHT PANEL: Property Inspector */}
-                <div className="w-80 bg-white border-l-3 border-black flex flex-col shrink-0 overflow-y-auto p-4 space-y-4">
+                <div className="flex max-h-[48dvh] min-h-0 w-full shrink-0 flex-col border-t-2 border-black bg-white 2xl:max-h-none 2xl:w-80 2xl:border-l-3 2xl:border-t-0 overflow-y-auto p-4 space-y-4">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b-2 border-black/15 pb-2">
                         <h4 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-1.5">

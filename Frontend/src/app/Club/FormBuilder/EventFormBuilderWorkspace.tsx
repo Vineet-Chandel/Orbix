@@ -1571,7 +1571,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* Unified & Non-duplicated: AI Assistant, Templates, Theme, Preview, Save Draft, Publish Live */}
             {/* ---------------------------------------------------------------- */}
             {activeTab !== "responses" && (
-                <div className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-2rem)] md:max-w-fit w-auto">
+                <div className="orbix-club-floating-actions fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-2rem)] md:max-w-fit w-auto">
                     <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1 sm:p-1.5 flex items-center gap-1 sm:gap-1.5 md:gap-2">
                         {/* Circular AI Assistant Button */}
                         <button
