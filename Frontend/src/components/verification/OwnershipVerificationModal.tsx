@@ -669,6 +669,14 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                                 <li>Click <strong className="font-bold text-black">Save</strong>, return to Orbix, and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
+                                    ) : guide?.portalId === "code360" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>Open your Code360 profile editor and select <strong className="font-bold text-black">Additional info</strong> (or Personal info).</li>
+                                                <li>Paste the verification token into the <strong className="font-bold text-black">About you</strong> field (or <strong className="font-bold text-black">Name</strong>).</li>
+                                                <li>Click <strong className="font-bold text-black">Save changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
                                     ) : (
                                         <div className="space-y-3.5 sm:space-y-4 text-xs sm:text-sm pt-1.5 sm:pt-2">
                                             <p className="text-neutral-900 leading-relaxed">

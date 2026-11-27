@@ -17,6 +17,7 @@ export const SUPPORTED_VERIFICATION_PLATFORMS = [
     "interviewbit",
     "substack",
     "medium",
+    "code360",
 ] as const;
 
 export type SupportedVerificationPlatform = (typeof SUPPORTED_VERIFICATION_PLATFORMS)[number];
@@ -49,7 +50,8 @@ export function getPlatformVerificationMethod(portalId: string): "token" | "oaut
         clean === "hackerearth" ||
         clean === "interviewbit" ||
         clean === "substack" ||
-        clean === "medium"
+        clean === "medium" ||
+        clean === "code360"
     ) return "token";
     return null;
 }
@@ -83,6 +85,8 @@ export function getPlatformVerificationField(portalId: string): string | null {
             return "bio";
         case "medium":
             return "short_bio";
+        case "code360":
+            return "about";
         default:
             return null;
     }
@@ -302,6 +306,17 @@ export function getPlatformVerificationGuide(
                 screenshotAlt: "Medium Profile information settings showing the Short bio textarea for verification token placement",
                 screenshotCaption: "In your Medium Profile information settings, locate the Short bio textarea, paste the verification token, and click Save as shown above.",
                 hasScreenshot: true,
+            };
+        case "code360":
+            return {
+                portalId: "code360",
+                portalName: "Naukri Code360",
+                targetFieldName: "About you (Bio)",
+                settingsUrl: "https://www.naukri.com/code360/profile/edit",
+                settingsUrlLabel: "Open Code360 Edit Profile",
+                instruction: "Open your Code360 profile editor, select Additional info, paste the verification code into the About you field (or Name under Personal info), save changes, and click Verify.",
+                detailText: "In your Code360 profile editor under Additional info, paste the verification code into About you (or Name under Personal info) and save changes.",
+                hasScreenshot: false,
             };
         default:
             return {

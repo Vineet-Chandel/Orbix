@@ -58,6 +58,7 @@ export const SUPPORTED_PORTALS = [
     'interviewbit',
     'substack',
     'medium',
+    'code360',
 ] as const;
 
 export type SupportedPortal = typeof SUPPORTED_PORTALS[number];

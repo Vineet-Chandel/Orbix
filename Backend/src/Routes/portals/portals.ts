@@ -1574,43 +1574,78 @@ async function fetchTopCoder(username: string): Promise<PortalProfileData | null
     }
 }
 
-async function fetchCode360(username: string): Promise<PortalProfileData | null> {
-    const clean = username.trim().replace(/^@+/, "");
-    if (!/^[a-zA-Z0-9_\.\-]{3,50}$/.test(clean)) return null;
-
-    let name = clean;
-    const stats: Array<{ label: string; value: string }> = [
-        { label: "portal", value: "Code360" },
-        { label: "practice", value: "Coding Ninjas" },
-    ];
-
+export async function fetchCode360(username: string): Promise<PortalProfileData | null> {
     try {
-        const res = await fetch(`https://www.naukri.com/code360/profile/${encodeURIComponent(clean)}`, {
-            headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
-            signal: AbortSignal.timeout(4000),
-        });
-        if (res.ok) {
-            const html = await res.text();
-            const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-            if (titleMatch && titleMatch[1] && !titleMatch[1].includes("Page Not Found") && !titleMatch[1].includes("404")) {
-                const parts = titleMatch[1].split("|")[0]?.trim();
-                if (parts && !parts.toLowerCase().includes("code360")) name = parts;
-            }
+        let clean = username.trim().replace(/^@+/, "");
+        if (clean.includes("naukri.com") || clean.includes("codingninjas.com")) {
+            const match =
+                clean.match(/(?:code360|codestudio)\/profile\/([a-zA-Z0-9_\.\-]+)/i) ||
+                clean.match(/(?:profile|users?)\/([a-zA-Z0-9_\.\-]+)/i);
+            if (match && match[1]) clean = match[1];
         }
-    } catch {
-        // Fallback to verified username
-    }
+        clean = (clean.replace(/\/+$/, "").split("/")[0] || "").split("?")[0]?.trim() || "";
+        if (!clean || !/^[a-zA-Z0-9_\.\-]{3,60}$/.test(clean)) return null;
 
-    return {
-        success: true,
-        portal: "code360",
-        username: clean,
-        name,
-        avatar: getFallbackAvatar(clean),
-        stats,
-        profileUrl: `https://www.naukri.com/code360/profile/${clean}`,
-        verified: true,
-    };
+        const profileUrl = `https://www.naukri.com/code360/profile/${encodeURIComponent(clean)}`;
+
+        const res = await fetch(`https://www.naukri.com/code360/api/v3/public_section/profile/user_details?uuid=${encodeURIComponent(clean)}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Referer": profileUrl,
+            },
+            signal: AbortSignal.timeout(6000),
+        });
+
+        if (!res.ok) {
+            return null;
+        }
+
+        const json = (await res.json()) as any;
+        const data = json?.data;
+        if (!data || (!data.name && !data.uuid)) {
+            return null;
+        }
+
+        const name = data.name || clean;
+        const stats: Array<{ label: string; value: string }> = [];
+
+        if (data.dsa_domain_data?.problem_count_data?.total_count != null) {
+            stats.push({ label: "solved", value: `${data.dsa_domain_data.problem_count_data.total_count} solved` });
+        }
+        if (data.user_exp != null) {
+            stats.push({ label: "exp", value: `${data.user_exp} exp` });
+        }
+        if (data.user_level_name) {
+            stats.push({ label: "level", value: String(data.user_level_name) });
+        }
+        if (data.followers_count != null) {
+            stats.push({ label: "followers", value: `${data.followers_count} followers` });
+        }
+        if (stats.length === 0) {
+            stats.push({ label: "portal", value: "Code360" }, { label: "practice", value: "Coding Ninjas" });
+        }
+
+        let avatar = "";
+        if (data.image && typeof data.image === "string" && data.image.startsWith("http")) {
+            avatar = data.image;
+        } else {
+            avatar = getFallbackAvatar(name || clean);
+        }
+
+        return {
+            success: true,
+            portal: "code360",
+            username: clean,
+            name,
+            avatar,
+            stats,
+            profileUrl,
+            verified: false,
+        };
+    } catch {
+        return null;
+    }
 }
 
 async function fetchSPOJ(username: string): Promise<PortalProfileData | null> {

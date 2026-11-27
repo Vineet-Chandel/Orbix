@@ -47,6 +47,9 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(isPlatformVerificationSupported("medium"), true);
         assert.equal(isPlatformVerificationSupported("Medium "), true);
         assert.equal(isPlatformVerificationSupported("  MEDIUM  "), true);
+        assert.equal(isPlatformVerificationSupported("code360"), true);
+        assert.equal(isPlatformVerificationSupported("Code360 "), true);
+        assert.equal(isPlatformVerificationSupported("  CODE360  "), true);
     });
 
     await t.test("rejects unsupported platforms and edge cases", () => {
@@ -76,6 +79,8 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(getPlatformVerificationMethod("Substack"), "token");
         assert.equal(getPlatformVerificationMethod("medium"), "token");
         assert.equal(getPlatformVerificationMethod("Medium"), "token");
+        assert.equal(getPlatformVerificationMethod("code360"), "token");
+        assert.equal(getPlatformVerificationMethod("Code360"), "token");
         assert.equal(getPlatformVerificationMethod("cses"), null);
     });
 
@@ -94,10 +99,11 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(getPlatformVerificationField("interviewbit"), "bio");
         assert.equal(getPlatformVerificationField("substack"), "bio");
         assert.equal(getPlatformVerificationField("medium"), "short_bio");
+        assert.equal(getPlatformVerificationField("code360"), "about");
         assert.equal(getPlatformVerificationField("cses"), null);
     });
 
-    await t.test("registry contains exactly the 13 verified adapters", () => {
+    await t.test("registry contains exactly the 14 verified adapters", () => {
         assert.deepEqual([...SUPPORTED_VERIFICATION_PLATFORMS], [
             "leetcode",
             "codeforces",
@@ -112,6 +118,7 @@ test("Ownership Verification Support & Registry", async (t) => {
             "interviewbit",
             "substack",
             "medium",
+            "code360",
         ]);
     });
 
@@ -310,6 +317,18 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.ok(mediumGuide.screenshotCaption?.includes("Short bio"));
         assert.ok(mediumGuide.screenshotCaption?.includes("Save"));
 
+        // Code360: must target About you (Bio) and profile/edit
+        const code360Guide = getPlatformVerificationGuide("code360", testToken, undefined, "ninja_coder");
+        assert.equal(code360Guide.portalId, "code360");
+        assert.equal(code360Guide.portalName, "Naukri Code360");
+        assert.equal(code360Guide.targetFieldName, "About you (Bio)");
+        assert.equal(code360Guide.settingsUrl, "https://www.naukri.com/code360/profile/edit");
+        assert.equal(code360Guide.settingsUrlLabel, "Open Code360 Edit Profile");
+        assert.ok(code360Guide.instruction.includes("About you"));
+        assert.ok(code360Guide.instruction.includes("Verify"));
+        assert.ok(code360Guide.detailText.includes("About you"));
+        assert.equal(code360Guide.hasScreenshot, false);
+
         // Unsupported platforms (e.g. CSES): must NOT return fake token placement instructions
         const csesGuide = getPlatformVerificationGuide("cses", testToken, undefined, "cses_user");
         assert.equal(csesGuide.portalId, "cses");
@@ -319,7 +338,7 @@ test("Ownership Verification Support & Registry", async (t) => {
 
     await t.test("standardizes verification action button instructions to Verify across all active challenge platforms", () => {
         const testToken = "orbix-v-testToken123456789";
-        for (const portal of ["leetcode", "codeforces", "hackerrank", "codechef", "geeksforgeeks", "hackerearth", "interviewbit", "substack", "medium"]) {
+        for (const portal of ["leetcode", "codeforces", "hackerrank", "codechef", "geeksforgeeks", "hackerearth", "interviewbit", "substack", "medium", "code360"]) {
             const guide = getPlatformVerificationGuide(portal, testToken);
             assert.ok(guide.instruction.includes("Verify"), `${portal} instruction must direct user to click Verify`);
             assert.ok(!guide.instruction.includes("Updated My Profile"), `${portal} instruction must not mention Updated My Profile`);
