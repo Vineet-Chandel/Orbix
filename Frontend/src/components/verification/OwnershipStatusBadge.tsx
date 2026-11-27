@@ -143,7 +143,7 @@ export const OwnershipStatusBadge: React.FC<OwnershipStatusBadgeProps> = ({
                 className={`inline-flex items-center gap-1.5 select-none ${
                     onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
                 } ${className}`}
-                title="Account is connected but cryptographic ownership has not been proven."
+                title="Ownership verification pending"
             >
                 <AlertCircle className={`${iconSize} text-amber-700 stroke-[2.5] shrink-0`} />
                 {showLabel && <span className="text-[10px] font-black uppercase text-amber-900 tracking-wide">Unverified</span>}
@@ -157,7 +157,7 @@ export const OwnershipStatusBadge: React.FC<OwnershipStatusBadgeProps> = ({
             className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-950 border-2 border-black text-[10px] font-black tracking-wide shadow-[1px_1px_0px_#000] select-none ${
                 onClick ? "cursor-pointer hover:bg-amber-100 hover:shadow-none transition-all" : ""
             } ${className}`}
-            title="Account is connected but cryptographic ownership has not been proven."
+            title="Ownership verification pending"
         >
             <AlertCircle className={`${iconSize} text-amber-700 stroke-[2.5] shrink-0`} />
             {showLabel && <span className="uppercase">Unverified</span>}

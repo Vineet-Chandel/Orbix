@@ -29,6 +29,9 @@ import codeforcesGuideImg from "../../assets/verification/codeforces-verificatio
 import hackerrankGuideImg from "../../assets/verification/hackerrank-verification-guide.png";
 import geeksforgeeksGuideImg from "../../assets/verification/geeksforgeeks-verification-guide.png";
 import codechefGuideImg from "../../assets/verification/codechef-verification-guide.png";
+import atcoderGuideImg from "../../assets/verification/atcoder-verification-guide.png";
+import topcoderGuideImg from "../../assets/verification/topcoder-verification-guide.png";
+import hackerearthGuideImg from "../../assets/verification/hackerearth-verification-guide.png";
 
 export { VERIFICATION_MODAL_Z_INDEX, SCREENSHOT_LIGHTBOX_Z_INDEX };
 
@@ -45,6 +48,12 @@ export const getGuideScreenshot = (portalId?: string): string | undefined => {
             return geeksforgeeksGuideImg;
         case "codechef":
             return codechefGuideImg;
+        case "atcoder":
+            return atcoderGuideImg;
+        case "topcoder":
+            return topcoderGuideImg;
+        case "hackerearth":
+            return hackerearthGuideImg;
         default:
             return undefined;
     }
@@ -606,9 +615,9 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                     ) : guide?.portalId === "topcoder" ? (
                                         <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
                                             <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
-                                                <li>In profile settings, locate the <strong className="font-bold text-black">Short Bio</strong> field.</li>
-                                                <li>Paste the token into the <strong className="font-bold text-black">Short Bio</strong> field.</li>
-                                                <li>Click <strong className="font-bold text-black">Save Changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                                <li>On your profile, locate the <strong className="font-bold text-black">About Me</strong> section and click the <strong className="font-bold text-black">edit icon</strong> (or <strong className="font-bold text-black">Add your bio</strong>).</li>
+                                                <li>Paste the token into the <strong className="font-bold text-black">Description</strong> field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
                                     ) : guide?.portalId === "geeksforgeeks" ? (
@@ -625,6 +634,22 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                                 <li>On your profile, click the <strong className="font-bold text-black">edit icon</strong> / <strong className="font-bold text-black">Edit Profile</strong> to open Settings.</li>
                                                 <li>Under the <strong className="font-bold text-black">Profile</strong> tab, paste the token into the <strong className="font-bold text-black">Bio</strong> field.</li>
                                                 <li>Click <strong className="font-bold text-black">Save Changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "interviewbit" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>On the settings page, locate the <strong className="font-bold text-black">Bio</strong> field under Profile.</li>
+                                                <li>Paste the token into the <strong className="font-bold text-black">Bio</strong> field and click <strong className="font-bold text-black">Save</strong>.</li>
+                                                <li>Ensure your profile is set to <strong className="font-bold text-black">Public</strong> under Privacy Settings, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                            </ol>
+                                        </div>
+                                    ) : guide?.portalId === "substack" ? (
+                                        <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
+                                            <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
+                                                <li>On your Substack profile edit page, locate the <strong className="font-bold text-black">Bio</strong> field.</li>
+                                                <li>Paste the token into the <strong className="font-bold text-black">Bio</strong> field.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
                                     ) : (

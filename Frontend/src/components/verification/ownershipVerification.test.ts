@@ -36,12 +36,19 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(isPlatformVerificationSupported("hackerearth"), true);
         assert.equal(isPlatformVerificationSupported("HackerEarth "), true);
         assert.equal(isPlatformVerificationSupported("  HACKEREARTH  "), true);
+        assert.equal(isPlatformVerificationSupported("interviewbit"), true);
+        assert.equal(isPlatformVerificationSupported("InterviewBit "), true);
+        assert.equal(isPlatformVerificationSupported("  INTERVIEWBIT  "), true);
+        assert.equal(isPlatformVerificationSupported("substack"), true);
+        assert.equal(isPlatformVerificationSupported("Substack "), true);
+        assert.equal(isPlatformVerificationSupported("  SUBSTACK  "), true);
     });
 
     await t.test("rejects unsupported platforms and edge cases", () => {
         assert.equal(isPlatformVerificationSupported("cses"), false);
         assert.equal(isPlatformVerificationSupported("gfg"), false);
-        assert.equal(isPlatformVerificationSupported("interviewbit"), false);
+        assert.equal(isPlatformVerificationSupported("medium"), false);
+        assert.equal(isPlatformVerificationSupported("spoj"), false);
         assert.equal(isPlatformVerificationSupported(""), false);
         assert.equal(isPlatformVerificationSupported(null as unknown as string), false);
         assert.equal(isPlatformVerificationSupported(undefined as unknown as string), false);
@@ -59,6 +66,11 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(getPlatformVerificationMethod("topcoder"), "token");
         assert.equal(getPlatformVerificationMethod("geeksforgeeks"), "token");
         assert.equal(getPlatformVerificationMethod("hackerearth"), "token");
+        assert.equal(getPlatformVerificationMethod("interviewbit"), "token");
+        assert.equal(getPlatformVerificationMethod("InterviewBit"), "token");
+        assert.equal(getPlatformVerificationMethod("substack"), "token");
+        assert.equal(getPlatformVerificationMethod("Substack"), "token");
+        assert.equal(getPlatformVerificationMethod("medium"), null);
         assert.equal(getPlatformVerificationMethod("cses"), null);
     });
 
@@ -74,10 +86,13 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(getPlatformVerificationField("topcoder"), "description");
         assert.equal(getPlatformVerificationField("geeksforgeeks"), "bio");
         assert.equal(getPlatformVerificationField("hackerearth"), "bio");
+        assert.equal(getPlatformVerificationField("interviewbit"), "bio");
+        assert.equal(getPlatformVerificationField("substack"), "bio");
+        assert.equal(getPlatformVerificationField("medium"), null);
         assert.equal(getPlatformVerificationField("cses"), null);
     });
 
-    await t.test("registry contains exactly the 10 verified adapters", () => {
+    await t.test("registry contains exactly the 12 verified adapters", () => {
         assert.deepEqual([...SUPPORTED_VERIFICATION_PLATFORMS], [
             "leetcode",
             "codeforces",
@@ -89,6 +104,8 @@ test("Ownership Verification Support & Registry", async (t) => {
             "topcoder",
             "geeksforgeeks",
             "hackerearth",
+            "interviewbit",
+            "substack",
         ]);
     });
 
@@ -160,7 +177,9 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.ok(atcoderGuide.instruction.includes("Affiliation"));
         assert.ok(!atcoderGuide.instruction.includes(testToken));
         assert.ok(atcoderGuide.detailText.includes("Affiliation"));
-        assert.equal(atcoderGuide.hasScreenshot, false);
+        assert.equal(atcoderGuide.hasScreenshot, true);
+        assert.ok(atcoderGuide.screenshotAlt?.includes("Affiliation"));
+        assert.ok(atcoderGuide.screenshotCaption?.includes("Affiliation"));
 
         // CodeChef: must target Highest Degree Earned, Professional section, and dynamic user edit URL
         const codechefGuide = getPlatformVerificationGuide("codechef", testToken, undefined, "chef_user");
@@ -184,16 +203,29 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.equal(codechefFallbackGuide.settingsUrlLabel, "Open CodeChef");
         assert.notEqual(codechefFallbackGuide.settingsUrl, "https://www.codechef.com/users/edit");
 
-        // TopCoder: must target Short Bio and settings/profile
+        // TopCoder: must target Description and profile URL under About Me
         const topcoderGuide = getPlatformVerificationGuide("topcoder", testToken, undefined, "tc_coder");
         assert.equal(topcoderGuide.portalId, "topcoder");
         assert.equal(topcoderGuide.portalName, "TopCoder");
-        assert.equal(topcoderGuide.targetFieldName, "Short Bio");
-        assert.equal(topcoderGuide.settingsUrl, "https://www.topcoder.com/settings/profile");
-        assert.ok(topcoderGuide.instruction.includes("Short Bio"));
+        assert.equal(topcoderGuide.targetFieldName, "Description");
+        assert.equal(topcoderGuide.settingsUrl, "https://profiles.topcoder.com/tc_coder");
+        assert.equal(topcoderGuide.settingsUrlLabel, "Open TopCoder Profile");
+        assert.ok(topcoderGuide.instruction.includes("Description"));
+        assert.ok(topcoderGuide.instruction.includes("About Me"));
+        assert.ok(!topcoderGuide.instruction.includes("Short Bio"));
         assert.ok(!topcoderGuide.instruction.includes(testToken));
-        assert.ok(topcoderGuide.detailText.includes("Short Bio"));
-        assert.equal(topcoderGuide.hasScreenshot, false);
+        assert.ok(topcoderGuide.detailText.includes("Description"));
+        assert.ok(topcoderGuide.detailText.includes("About Me"));
+        assert.equal(topcoderGuide.hasScreenshot, true);
+        assert.ok(topcoderGuide.screenshotAlt?.includes("Add your bio"));
+        assert.ok(topcoderGuide.screenshotAlt?.includes("Description"));
+        assert.ok(topcoderGuide.screenshotCaption?.includes("Add your bio"));
+        assert.ok(topcoderGuide.screenshotCaption?.includes("Description"));
+
+        // Fallback when handle is absent
+        const topcoderFallbackGuide = getPlatformVerificationGuide("topcoder", testToken);
+        assert.equal(topcoderFallbackGuide.settingsUrl, "https://profiles.topcoder.com/");
+        assert.equal(topcoderFallbackGuide.settingsUrlLabel, "Open TopCoder");
 
         // GeeksforGeeks: must target About/Bio and profile/edit
         const gfgGuide = getPlatformVerificationGuide("geeksforgeeks", testToken, undefined, "gfg_coder");
@@ -221,8 +253,36 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.ok(heGuide.instruction.includes("Bio"));
         assert.ok(heGuide.instruction.includes("Verify"));
         assert.ok(heGuide.detailText.includes("Bio"));
+        assert.equal(heGuide.hasScreenshot, true);
+        assert.ok(heGuide.screenshotAlt?.includes("Bio"));
+        assert.ok(heGuide.screenshotAlt?.includes("Save Changes"));
+        assert.ok(heGuide.screenshotCaption?.includes("Bio"));
+        assert.ok(heGuide.screenshotCaption?.includes("Save Changes"));
 
-        // Unsupported platforms (e.g. CSES): must NOT return fake token placement instructions
+        // InterviewBit: must target Bio and profile/settings/
+        const ibGuide = getPlatformVerificationGuide("interviewbit", testToken, undefined, "ib_user");
+        assert.equal(ibGuide.portalId, "interviewbit");
+        assert.equal(ibGuide.portalName, "InterviewBit");
+        assert.equal(ibGuide.targetFieldName, "Bio");
+        assert.equal(ibGuide.settingsUrl, "https://www.interviewbit.com/profile/settings/");
+        assert.equal(ibGuide.settingsUrlLabel, "Open InterviewBit Settings");
+        assert.ok(ibGuide.instruction.includes("Bio"));
+        assert.ok(ibGuide.instruction.includes("Verify"));
+        assert.ok(ibGuide.instruction.includes("Privacy Settings"));
+        assert.equal(ibGuide.hasScreenshot, false);
+
+        // Substack: must target Bio and profile/edit
+        const substackGuide = getPlatformVerificationGuide("substack", testToken, undefined, "author");
+        assert.equal(substackGuide.portalId, "substack");
+        assert.equal(substackGuide.portalName, "Substack");
+        assert.equal(substackGuide.targetFieldName, "Bio");
+        assert.equal(substackGuide.settingsUrl, "https://substack.com/profile/edit");
+        assert.equal(substackGuide.settingsUrlLabel, "Open Substack Settings");
+        assert.ok(substackGuide.instruction.includes("Bio"));
+        assert.ok(substackGuide.instruction.includes("Verify"));
+        assert.equal(substackGuide.hasScreenshot, false);
+
+        // Unsupported platforms (e.g. CSES, Medium): must NOT return fake token placement instructions
         const csesGuide = getPlatformVerificationGuide("cses", testToken, undefined, "cses_user");
         assert.equal(csesGuide.portalId, "cses");
         assert.ok(!csesGuide.instruction.includes("verification code"));
@@ -231,7 +291,7 @@ test("Ownership Verification Support & Registry", async (t) => {
 
     await t.test("standardizes verification action button instructions to Verify across all active challenge platforms", () => {
         const testToken = "orbix-v-testToken123456789";
-        for (const portal of ["leetcode", "codeforces", "hackerrank", "codechef", "geeksforgeeks", "hackerearth"]) {
+        for (const portal of ["leetcode", "codeforces", "hackerrank", "codechef", "geeksforgeeks", "hackerearth", "interviewbit", "substack"]) {
             const guide = getPlatformVerificationGuide(portal, testToken);
             assert.ok(guide.instruction.includes("Verify"), `${portal} instruction must direct user to click Verify`);
             assert.ok(!guide.instruction.includes("Updated My Profile"), `${portal} instruction must not mention Updated My Profile`);
@@ -485,6 +545,36 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
         const bodyTargetCount = (modalSource.match(/document\.body/g) || []).length;
         assert.ok(createPortalCount >= 2, "Both ScreenshotPreviewModal and OwnershipVerificationModal must use createPortal");
         assert.ok(bodyTargetCount >= 2, "Both modals must portal into document.body to break free of parent stacking contexts");
+
+        // Must import and resolve AtCoder verification screenshot guide
+        assert.ok(
+            modalSource.includes('import atcoderGuideImg from "../../assets/verification/atcoder-verification-guide.png"'),
+            "OwnershipVerificationModal must import atcoder-verification-guide.png"
+        );
+        assert.ok(
+            /case\s+"atcoder":\s+return\s+atcoderGuideImg;/.test(modalSource),
+            "getGuideScreenshot must return atcoderGuideImg for 'atcoder'"
+        );
+
+        // Must import and resolve TopCoder verification screenshot guide
+        assert.ok(
+            modalSource.includes('import topcoderGuideImg from "../../assets/verification/topcoder-verification-guide.png"'),
+            "OwnershipVerificationModal must import topcoder-verification-guide.png"
+        );
+        assert.ok(
+            /case\s+"topcoder":\s+return\s+topcoderGuideImg;/.test(modalSource),
+            "getGuideScreenshot must return topcoderGuideImg for 'topcoder'"
+        );
+
+        // Must import and resolve HackerEarth verification screenshot guide
+        assert.ok(
+            modalSource.includes('import hackerearthGuideImg from "../../assets/verification/hackerearth-verification-guide.png"'),
+            "OwnershipVerificationModal must import hackerearth-verification-guide.png"
+        );
+        assert.ok(
+            /case\s+"hackerearth":\s+return\s+hackerearthGuideImg;/.test(modalSource),
+            "getGuideScreenshot must return hackerearthGuideImg for 'hackerearth'"
+        );
     });
 
     await t.test("OwnershipVerificationModal isolates Escape and backdrop dismiss when isPreviewOpen is true", () => {
@@ -510,9 +600,9 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
             hackerrank: { hasScreenshot: true, assetFile: "hackerrank-verification-guide.png" },
             codechef: { hasScreenshot: true, assetFile: "codechef-verification-guide.png" },
             geeksforgeeks: { hasScreenshot: true, assetFile: "geeksforgeeks-verification-guide.png" },
-            hackerearth: { hasScreenshot: false },
-            atcoder: { hasScreenshot: false },
-            topcoder: { hasScreenshot: false },
+            hackerearth: { hasScreenshot: true, assetFile: "hackerearth-verification-guide.png" },
+            atcoder: { hasScreenshot: true, assetFile: "atcoder-verification-guide.png" },
+            topcoder: { hasScreenshot: true, assetFile: "topcoder-verification-guide.png" },
             kaggle: { hasScreenshot: false },
             github: { hasScreenshot: false },
         };
@@ -533,5 +623,42 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
                 );
             }
         }
+    });
+
+    await t.test("OwnershipStatusBadge defines exact pending tooltip text and preserves other status tooltips", () => {
+        const badgePath = path.resolve(__dirname, "OwnershipStatusBadge.tsx");
+        const badgeSource = fs.readFileSync(badgePath, "utf-8");
+
+        // Must define exactly "Ownership verification pending" for both minimal and boxed variants
+        const pendingMatches = badgeSource.match(/title="Ownership verification pending"/g) || [];
+        assert.equal(
+            pendingMatches.length,
+            2,
+            "OwnershipStatusBadge must have exactly 2 occurrences of title='Ownership verification pending'"
+        );
+
+        // Must completely eradicate the old verbose tooltip
+        assert.ok(
+            !badgeSource.includes("Account is connected but cryptographic ownership has not been proven."),
+            "Legacy pending tooltip must be completely removed from OwnershipStatusBadge"
+        );
+
+        // Other status tooltips must be strictly preserved
+        assert.ok(
+            badgeSource.includes('title="Cryptographic account ownership verified."'),
+            "VERIFIED status tooltip must be preserved"
+        );
+        assert.ok(
+            badgeSource.includes('title="Ownership verification challenge active."'),
+            "PENDING active challenge status tooltip must be preserved"
+        );
+        assert.ok(
+            badgeSource.includes('title="Previously verified ownership was revoked."'),
+            "REVOKED status tooltip must be preserved"
+        );
+        assert.ok(
+            badgeSource.includes('title="Cryptographic ownership verification is not available for this platform."'),
+            "UNSUPPORTED platform status tooltip must be preserved"
+        );
     });
 });
