@@ -19,6 +19,7 @@ import { CollegeChangeWarningModal } from "./CollegeChangeWarningModal";
 import { VerifiedBadge } from "./VerifiedBadge";
 
 export interface CollegeAutocompleteProps {
+    inputId?: string;
     value?: string | null; // collegeId (UUID)
     selectedCollege?: InstitutionItem | null;
     onChange: (college: InstitutionItem | null) => void;
@@ -32,6 +33,7 @@ export interface CollegeAutocompleteProps {
 }
 
 export function CollegeAutocomplete({
+    inputId,
     value: _value,
     selectedCollege,
     onChange,
@@ -323,6 +325,7 @@ export function CollegeAutocomplete({
                     <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 pointer-events-none stroke-[2.5]" />
 
                     <input
+                        id={inputId}
                         ref={inputRef}
                         type="text"
                         role="combobox"
@@ -343,7 +346,10 @@ export function CollegeAutocomplete({
                         }}
                         onKeyDown={handleKeyDown}
                         placeholder={placeholder}
-                        className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        className="w-full min-h-[44px] pl-10 pr-10 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-base sm:text-sm font-bold text-black placeholder:text-neutral-400 placeholder:font-medium focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 shadow-[2px_2px_0px_#000] transition-all"
                     />
 
                     <div className="absolute right-3 flex items-center gap-1.5">
@@ -511,18 +517,18 @@ export function CollegeAutocomplete({
             </div>
 
             {/* Helper label below input */}
-            <div className="flex items-center justify-between text-[11px] text-neutral-600 font-semibold mt-1.5 px-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-neutral-600 font-semibold mt-2 px-0.5">
                 <span>Type at least 2 characters to search by official name, short form (e.g. IIT, NIT, BITS), or city.</span>
                 <button
                     type="button"
                     onClick={() => setIsRequestModalOpen(true)}
-                    className="text-black underline hover:text-neutral-700 font-black transition-colors cursor-pointer"
+                    className="text-black underline hover:text-neutral-700 font-black transition-colors cursor-pointer shrink-0"
                 >
                     Can't find your college?
                 </button>
             </div>
 
-            <div className="flex items-center gap-1.5 px-1 mt-3 mb-1 text-[11px] text-neutral-600 font-semibold">
+            <div className="flex items-center gap-1.5 px-0.5 mt-2 text-[11px] text-neutral-600 font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5 text-black flex-shrink-0 stroke-[2.5]" />
                 <span>Selected college identity will be locked for <b>3 days</b> once saved to your profile.</span>
             </div>

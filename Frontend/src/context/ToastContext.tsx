@@ -33,8 +33,8 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 const ToastActionSlotContext = createContext<HTMLDivElement | null>(null);
 
-const toastEnter = { opacity: 0, y: 50, scale: 0.92 };
-const toastExit = { opacity: 0, y: 25, scale: 0.88 };
+const toastEnter = { opacity: 0, y: -8, scale: 0.92 };
+const toastExit = { opacity: 0, y: -8, scale: 0.88 };
 const toastSpring = { type: "spring", stiffness: 420, damping: 30, mass: 0.8 } as const;
 
 const toastStyles = {
@@ -221,7 +221,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
     const toastPortal = (
         <div
-            className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center w-full px-3 sm:px-4 transition-all duration-200"
+            className="orbix-toast-stack fixed left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center w-full px-3 sm:px-4"
         >
             <div aria-live="polite" aria-atomic="true" className="relative w-full max-w-[460px] flex flex-col items-center justify-end">
                 <AnimatePresence mode="popLayout">

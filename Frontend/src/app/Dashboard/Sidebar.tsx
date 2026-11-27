@@ -1032,7 +1032,7 @@ export const Sidebar = ({
                 </div>
             )}
 
-            {/* Mobile Sticky Floating Bottom Navigation Bar (5 Options + Radial Circumference Menu) */}
+            {/* Mobile bottom navigation */}
             {!isOpen && (
                 <MobileBottomNav
                     activeTab={activeTab}

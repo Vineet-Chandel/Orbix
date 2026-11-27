@@ -25,6 +25,10 @@ import { getScoreBadge } from "./ClubCredibilityOverviewCard";
 import { OrbixLoader } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
 
+function formatLedgerLabel(code: string) {
+    return code.replace(/_+/g, " ").trim();
+}
+
 export const ClubCredibilityWorkspace: React.FC = () => {
     const toast = useToast();
     const [snapshot, setSnapshot] = useState<ClubCredibilitySnapshot | null>(null);
@@ -144,7 +148,7 @@ export const ClubCredibilityWorkspace: React.FC = () => {
             <div className="space-y-1.5 max-w-2xl min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-white shrink-0">
-                        {entry.sourceAction.replace(/_/g, " ")}
+                        {formatLedgerLabel(entry.sourceAction)}
                     </span>
                     {entry.eventScope && (
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black bg-white text-black inline-flex items-center gap-1 shrink-0">
@@ -177,12 +181,15 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                     </span>
                 </div>
 
-                <h4 className="text-sm sm:text-base font-black text-black dark:text-white break-words [overflow-wrap:anywhere]">
-                    {entry.eventTitle ? `Event: ${entry.eventTitle}` : entry.reasonCode}
+                <h4 className="text-sm sm:text-base font-black text-black dark:text-white break-words [overflow-wrap:anywhere] first-letter:uppercase">
+                    {entry.eventTitle ? `Event: ${entry.eventTitle}` : formatLedgerLabel(entry.reasonCode || entry.sourceAction)}
                 </h4>
 
                 <p className="text-xs font-bold text-neutral-600 dark:text-neutral-400 leading-relaxed break-words [overflow-wrap:anywhere]">
-                    {entry.explanation}
+                    {entry.explanation.replace(
+                        /^Reputation update: (\w+)\.$/,
+                        (_, code: string) => `Reputation update: ${formatLedgerLabel(code)}.`
+                    )}
                 </p>
             </div>
 
@@ -655,7 +662,7 @@ export const ClubCredibilityWorkspace: React.FC = () => {
                         </div>
 
                         <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
-                            Disputed incident: <strong>{appealTarget.eventTitle || appealTarget.reasonCode}</strong>. Provide context, emergency documentation, or verifiable proof.
+                            Disputed incident: <strong>{appealTarget.eventTitle || formatLedgerLabel(appealTarget.reasonCode || appealTarget.sourceAction)}</strong>. Provide context, emergency documentation, or verifiable proof.
                         </p>
 
                         <form onSubmit={handleSubmitAppeal} className="space-y-4">

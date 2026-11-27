@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, useOutletContext, useLocation } from "react-router-dom";
+import { Link, Navigate, Outlet, useOutletContext, useLocation, useMatch } from "react-router-dom";
 import { Building2, Lock, ArrowRight } from "lucide-react";
 import { useAppSelector } from "./store";
 import { OrbixInitialLoader } from "./components/ui/loader";
@@ -7,6 +7,20 @@ const ProtectedRoute = () => {
     const { user, loading, isAuthenticated } = useAppSelector((state) => state.user);
     const context = useOutletContext();
     const location = useLocation();
+    const isLeaderboard = useMatch("/leaderboard");
+    const isWorkspaceEntry = useMatch("/workspace");
+
+    // The leaderboard shares the workspace shell and is also accessible to guests.
+    if (isLeaderboard) return <Outlet context={context} />;
+
+    if (isWorkspaceEntry) {
+        if (loading) {
+            return <OrbixInitialLoader message="Verifying session…" subMessage="Connecting to your workspace" />;
+        }
+        if (!isAuthenticated || !user || (typeof navigator !== "undefined" && !navigator.onLine)) {
+            return <Navigate to="/auth/signin" replace />;
+        }
+    }
 
     if (loading && (!user || !isAuthenticated)) {
         return (

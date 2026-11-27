@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useId, useMemo } from "react";
 import {
     UploadCloud,
     Plus,
@@ -798,6 +798,10 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
     // Interactive Filters & Sorting for Club Templates (Phase 8)
     const [myTemplatesSearch, setMyTemplatesSearch] = useState("");
     const [myTemplatesCategory, setMyTemplatesCategory] = useState<string>("all");
+    const [myTemplatesStyle, setMyTemplatesStyle] = useState("all");
+    const [myTemplatesOrientation, setMyTemplatesOrientation] = useState("all");
+    const [expandedFilterTab, setExpandedFilterTab] = useState<typeof startTab | null>(null);
+    const templateFiltersId = useId();
     const [myTemplatesStatus, setMyTemplatesStatus] = useState<string>("all");
     const [myTemplatesSort, setMyTemplatesSort] = useState<"updated" | "name" | "usage">("updated");
 
@@ -1077,7 +1081,15 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
     const filteredClubTemplates = useMemo(() => {
         return clubTemplates
             .filter((tmpl) => {
-                if (myTemplatesCategory !== "all" && tmpl.category !== myTemplatesCategory) {
+                const category = tmpl.category === "workshop" ? "event" : tmpl.category;
+                if (myTemplatesCategory !== "all" && category !== myTemplatesCategory) {
+                    return false;
+                }
+                const style = (tmpl.style || tmpl.design?.style || "classic").toLowerCase().replace(/-/g, "_");
+                if (myTemplatesStyle !== "all" && style !== myTemplatesStyle) {
+                    return false;
+                }
+                if (myTemplatesOrientation !== "all" && tmpl.orientation !== myTemplatesOrientation) {
                     return false;
                 }
                 if (myTemplatesStatus !== "all" && tmpl.status !== myTemplatesStatus) {
@@ -1103,7 +1115,17 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                 }
                 return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
             });
-    }, [clubTemplates, myTemplatesCategory, myTemplatesStatus, myTemplatesSearch, myTemplatesSort]);
+    }, [clubTemplates, myTemplatesCategory, myTemplatesStyle, myTemplatesOrientation, myTemplatesStatus, myTemplatesSearch, myTemplatesSort]);
+
+    const myTemplateFilterCount = [myTemplatesCategory, myTemplatesStyle, myTemplatesOrientation]
+        .filter((value) => value !== "all").length;
+    const resetMyTemplateFilters = () => {
+        setMyTemplatesSearch("");
+        setMyTemplatesCategory("all");
+        setMyTemplatesStyle("all");
+        setMyTemplatesOrientation("all");
+        setMyTemplatesStatus("all");
+    };
 
     // Handle File Drop / Select for Background Upload
     const handleFileSelect = (file: File) => {
@@ -1329,6 +1351,58 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
         { id: "neo_brutalist", label: "Neo-Brutalist" },
     ];
 
+    const ORIENTATIONS = [
+        { id: "all", label: "All" },
+        { id: "landscape", label: "Landscape" },
+        { id: "portrait", label: "Portrait" },
+    ];
+
+    const isLibrary = startTab === "library";
+    const showTemplateFilters = expandedFilterTab === startTab;
+    const templateFilterCount = isLibrary
+        ? [selectedCategory, selectedStyle, selectedOrientation].filter((value) => value !== "all").length
+        : myTemplateFilterCount;
+
+    const templateFilterButton = (
+        <button
+            type="button"
+            aria-expanded={showTemplateFilters}
+            aria-controls={templateFiltersId}
+            onClick={() => setExpandedFilterTab((openTab) => openTab === startTab ? null : startTab)}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-2 border-black bg-white px-3 py-2 text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 aria-expanded:bg-[#FFE566]"
+        >
+            <Filter aria-hidden="true" className="h-3.5 w-3.5" />
+            Filters{templateFilterCount > 0 && ` (${templateFilterCount})`}
+        </button>
+    );
+
+    const templateFilterPanel = (
+        <div id={templateFiltersId} hidden={!showTemplateFilters} className="space-y-4 border-t border-black/10 pt-4">
+            {[
+                { label: "Certificate Categories", options: CATEGORIES, value: isLibrary ? selectedCategory : myTemplatesCategory, select: isLibrary ? setSelectedCategory : setMyTemplatesCategory },
+                { label: "Design Styles", options: STYLES, value: isLibrary ? selectedStyle : myTemplatesStyle, select: isLibrary ? setSelectedStyle : setMyTemplatesStyle },
+                { label: "Orientation", options: ORIENTATIONS, value: isLibrary ? selectedOrientation : myTemplatesOrientation, select: isLibrary ? setSelectedOrientation : setMyTemplatesOrientation },
+            ].map(({ label, options, value, select }) => (
+                <fieldset key={label} className="min-w-0">
+                    <legend className="mb-1.5 text-[11px] font-black uppercase tracking-wider text-neutral-600">{label}</legend>
+                    <div className="flex flex-wrap gap-2">
+                        {options.map((option) => (
+                            <button
+                                key={option.id}
+                                type="button"
+                                aria-pressed={value === option.id}
+                                onClick={() => select(option.id)}
+                                className="cursor-pointer rounded-xl border-2 border-black bg-[#FAF6EE] px-3 py-1.5 text-xs font-black text-black hover:bg-neutral-100 aria-pressed:bg-[#a2ff86] aria-pressed:shadow-[2px_2px_0px_#000]"
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </fieldset>
+            ))}
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             {/* 4 Starting Options Navigation Bar */}
@@ -1432,8 +1506,8 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
 
                     {/* Filter and Search Bar */}
                     <div className="p-5 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        {/* Search & Orientation bar */}
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+                        {/* Search and filter controls */}
+                        <div className="flex flex-wrap items-center gap-3">
                             {/* Search Input */}
                             <div className="relative w-full md:w-80">
                                 <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1455,77 +1529,9 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                                 )}
                             </div>
 
-                            {/* Orientation Selector Pills */}
-                            <div className="flex items-center gap-2 self-start md:self-auto">
-                                <span className="text-xs font-black text-neutral-700 flex items-center gap-1">
-                                    <Filter className="w-3.5 h-3.5" /> Orientation:
-                                </span>
-                                {[
-                                    { id: "all", label: "All" },
-                                    { id: "landscape", label: "Landscape" },
-                                    { id: "portrait", label: "Portrait" },
-                                ].map((o) => (
-                                    <button
-                                        key={o.id}
-                                        type="button"
-                                        onClick={() => setSelectedOrientation(o.id)}
-                                        className={`px-2.5 py-1 rounded-lg border-2 border-black text-[11px] font-black transition-all ${
-                                            selectedOrientation === o.id
-                                                ? "bg-[#FFE566] shadow-[2px_2px_0px_#000]"
-                                                : "bg-white hover:bg-neutral-100"
-                                        }`}
-                                    >
-                                        {o.label}
-                                    </button>
-                                ))}
-                            </div>
+                            {templateFilterButton}
                         </div>
-
-                        {/* Category Pills */}
-                        <div className="space-y-1.5">
-                            <div className="text-[11px] font-black text-neutral-600 uppercase tracking-wider">
-                                Certificate Categories
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                {CATEGORIES.map((c) => (
-                                    <button
-                                        key={c.id}
-                                        type="button"
-                                        onClick={() => setSelectedCategory(c.id)}
-                                        className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all ${
-                                            selectedCategory === c.id
-                                                ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
-                                                : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-                                        }`}
-                                    >
-                                        {c.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Design Style Filter Pills */}
-                        <div className="space-y-1.5 pt-2 border-t border-black/10">
-                            <div className="text-[11px] font-black text-neutral-600 uppercase tracking-wider">
-                                Design Styles
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                {STYLES.map((s) => (
-                                    <button
-                                        key={s.id}
-                                        type="button"
-                                        onClick={() => setSelectedStyle(s.id)}
-                                        className={`px-2.5 py-1 rounded-lg border border-black text-[11px] font-bold transition-all ${
-                                            selectedStyle === s.id
-                                                ? "bg-black text-white shadow-[1px_1px_0px_#000]"
-                                                : "bg-[#FAF6EE] text-neutral-800 hover:bg-neutral-200"
-                                        }`}
-                                    >
-                                        {s.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        {templateFilterPanel}
                     </div>
 
                     {/* Template Gallery Grid */}
@@ -1658,7 +1664,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
             {/* OPTION 2: UPLOAD CERTIFICATE DESIGN */}
             {/* ================================================================ */}
             {startTab === "upload" && (
-                <div className="p-6 sm:p-8 bg-white rounded-2xl border-4 border-black shadow-[6px_6px_0px_#000] space-y-6 max-w-3xl mx-auto">
+                <div className="p-6 sm:p-8 bg-white rounded-2xl border-4 border-black shadow-[6px_6px_0px_#000] w-full space-y-6">
                     {/* 3.2 Upload Guidance Header */}
                     <div className="space-y-3">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#FFE566] border-2 border-black text-xs font-black text-black">
@@ -1981,7 +1987,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
             {/* OPTION 3: CREATE FROM SCRATCH WORKFLOW (PHASE 4) */}
             {/* ================================================================ */}
             {startTab === "scratch" && (
-                <div className="space-y-6 max-w-6xl mx-auto">
+                <div className="w-full space-y-6">
                     {/* Header Banner */}
                     <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div>
@@ -2465,22 +2471,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
 
                             {/* Filters & Sort Controls */}
                             <div className="flex flex-wrap items-center gap-2">
-                                {/* Category Filter */}
-                                <NeoSelect
-                                    value={myTemplatesCategory}
-                                    onChange={(val) => setMyTemplatesCategory(val)}
-                                    size="sm"
-                                    triggerClassName="px-3 py-2 rounded-xl text-xs font-bold shadow-[2px_2px_0px_#000]"
-                                >
-                                    <option value="all">All Categories</option>
-                                    <option value="event">Event</option>
-                                    <option value="achievement">Achievement</option>
-                                    <option value="recognition">Recognition</option>
-                                    <option value="team">Team</option>
-                                    <option value="academic">Academic</option>
-                                    <option value="workshop">Workshop</option>
-                                    <option value="custom">Custom</option>
-                                </NeoSelect>
+                                {templateFilterButton}
 
                                 {/* Status Filter */}
                                 <NeoSelect
@@ -2528,20 +2519,18 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                             </div>
                         </div>
 
+                        {templateFilterPanel}
+
                         {/* Summary Pill Bar */}
                         <div className="flex items-center justify-between pt-2 border-t border-black/10 text-xs">
                             <span className="font-bold text-neutral-600">
                                 Showing <strong className="text-black">{filteredClubTemplates.length}</strong> of{" "}
                                 <strong className="text-black">{clubTemplates.length}</strong> club templates
                             </span>
-                            {(myTemplatesSearch || myTemplatesCategory !== "all" || myTemplatesStatus !== "all") && (
+                            {(myTemplatesSearch || myTemplateFilterCount > 0 || myTemplatesStatus !== "all") && (
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setMyTemplatesSearch("");
-                                        setMyTemplatesCategory("all");
-                                        setMyTemplatesStatus("all");
-                                    }}
+                                    onClick={resetMyTemplateFilters}
                                     className="text-xs font-black text-neutral-700 hover:text-black underline"
                                 >
                                     Reset Filters
@@ -2591,15 +2580,11 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                             <Filter className="w-10 h-10 text-neutral-400 mx-auto" />
                             <h4 className="font-black text-base text-black">No Templates Match Your Filters</h4>
                             <p className="text-xs text-neutral-600">
-                                Try adjusting your search query, category, or status filter to find what you&apos;re looking for.
+                                Try changing your search or filters.
                             </p>
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setMyTemplatesSearch("");
-                                    setMyTemplatesCategory("all");
-                                    setMyTemplatesStatus("all");
-                                }}
+                                onClick={resetMyTemplateFilters}
                                 className="px-4 py-2 rounded-xl border-2 border-black bg-[#FFE566] text-xs font-black shadow-[2px_2px_0px_#000]"
                             >
                                 Clear All Filters

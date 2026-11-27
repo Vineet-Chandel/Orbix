@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock, GraduationCap, ExternalLink, LoaderCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock, GraduationCap, ExternalLink } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import type { User } from "../../store/userSlice";
-import { ToastActionNotice, useToast } from "../../context/ToastContext";
+import { useToast } from "../../context/ToastContext";
+import { ProfileSaveNotice } from "../common/ProfileSaveNotice";
 import { updateProfile, getInstitutionById, updateResumeVisibility, type InstitutionItem } from "../../utils/profileApi";
 import { CollegeAutocomplete } from "../../components/CollegeAutocomplete";
 import { CollegeChangeWarningModal } from "../../components/CollegeChangeWarningModal";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
-import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
 import { ConnectedPlatformsSection } from "../Dashboard/ConnectedPlatformsSection";
 import { ProfileCardStudio } from "./CardStudio/ProfileCardStudio";
@@ -27,6 +27,10 @@ interface LinkRow {
     url: string;
     platform?: string;
 }
+
+const FIELD_LABEL_CLASS = "block text-xs font-black uppercase tracking-wider text-black";
+const FIELD_INPUT_CLASS =
+    "w-full min-h-[44px] px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-base sm:text-sm font-bold text-black placeholder:text-neutral-400 placeholder:font-medium focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 shadow-[2px_2px_0px_#000] transition-all";
 
 function parseInitialLinks(usr: any): LinkRow[] {
     let rawLinks = usr?.links;
@@ -82,7 +86,6 @@ function parseInitialLinks(usr: any): LinkRow[] {
 }
 
 export default function ProfileManager() {
-    const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
@@ -112,10 +115,20 @@ export default function ProfileManager() {
     const selectedCollege = collegeDraft === undefined ? savedCollege : collegeDraft;
     const selectedCollegeId = collegeDraft === undefined ? savedCollegeId : collegeDraft?.id ?? null;
     const profileFormId = useId();
+    const fieldIdPrefix = useId();
+    const personalDetailsHeadingId = `${fieldIdPrefix}-heading`;
+    const firstNameId = `${fieldIdPrefix}-first-name`;
+    const lastNameId = `${fieldIdPrefix}-last-name`;
+    const headlineId = `${fieldIdPrefix}-headline`;
+    const headlineCountId = `${fieldIdPrefix}-headline-count`;
+    const bioId = `${fieldIdPrefix}-bio`;
+    const bioCountId = `${fieldIdPrefix}-bio-count`;
+    const locationId = `${fieldIdPrefix}-location`;
+    const collegeInputId = `${fieldIdPrefix}-college`;
+    const skillInputId = `${fieldIdPrefix}-skill`;
     const profileFormRef = useRef<HTMLFormElement>(null);
     const profileSaveInFlight = useRef(false);
     const [savingProfile, setSavingProfile] = useState(false);
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isCollegeConfirmModalOpen, setIsCollegeConfirmModalOpen] = useState(false);
 
 
@@ -611,38 +624,14 @@ export default function ProfileManager() {
     }), [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable, selectedCollege]);
 
     return (
-        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
-            {/* Desktop & Mobile Floating Sidebar */}
-            <Sidebar
-                activeTab="profile"
-                isOpen={isMobileSidebarOpen}
-                onClose={() => setIsMobileSidebarOpen(false)}
-                onTabChange={(tab) => {
-                    if (tab === "dashboard") navigate("/dashboard");
-                    if (tab === "profile") navigate("/profile");
-                    if (tab === "connect-platform") navigate("/onboarding");
-                    if (tab === "resume") navigate("/resume");
-                    if (tab === "projects") navigate("/projects");
-                    if (tab === "leaderboard") navigate("/leaderboard");
-                    if (tab === "clubs") navigate("/college-clubs");
-                    if (tab === "college-events") navigate("/college-events");
-                    if (tab === "events") navigate("/events");
-                    if (tab === "activity" || tab === "applications") navigate("/activity");
-                    if (tab === "explore") navigate("/explore");
-                    if (tab === "trends") navigate("/trends");
-                    if (tab === "notifications") navigate("/notifications");
-                    if (tab === "settings") navigate("/settings");
-                    if (tab === ("workspace" as any)) navigate("/workspace");
-                }}
-            />
-
+        <>
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 <section
                     aria-label="Profile & Card Studio"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
-                    <div className="p-4 sm:p-6 lg:p-8 pb-36 sm:pb-36 lg:pb-8 flex-1 space-y-6">
+                    <div className="p-3.5 sm:p-6 lg:p-8 pb-36 sm:pb-36 lg:pb-8 flex-1 space-y-6">
                         {/* ========================================================================= */}
                         {/* PAGE HEADER: Neo-Brutalist Heading */}
                         {/* ========================================================================= */}
@@ -677,96 +666,148 @@ export default function ProfileManager() {
                         {/* Split Layout: Left Column = Personal Details, Right Column = Orbix Share Card Studio */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                             {/* LEFT COLUMN: Personal Details Card */}
-                            <div className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-6 sm:p-7">
-                                <div className="pb-4 border-b-2 border-black/10 mb-6">
-                                    <h2 className="text-lg font-black text-black">Personal Details</h2>
-                                    <p className="text-xs font-medium text-neutral-600 mt-0.5">Manage your showcase details and profile photo.</p>
+                            <div className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-4 sm:p-6 lg:p-7">
+                                <div className="pb-4 border-b-2 border-black/10 mb-5">
+                                    <h2 id={personalDetailsHeadingId} className="text-lg font-black text-black">
+                                        Personal Details
+                                    </h2>
+                                    <p className="text-xs font-medium text-neutral-600 mt-0.5">
+                                        Manage your showcase details and profile photo.
+                                    </p>
                                 </div>
 
-                                <form id={profileFormId} ref={profileFormRef} tabIndex={-1} onSubmit={handleSaveProfile} className="space-y-5 focus:outline-none">
+                                <form
+                                    id={profileFormId}
+                                    ref={profileFormRef}
+                                    tabIndex={-1}
+                                    aria-labelledby={personalDetailsHeadingId}
+                                    onSubmit={handleSaveProfile}
+                                    className="orbix-profile-form space-y-5 focus:outline-none"
+                                >
                                     <fieldset disabled={savingProfile} className="min-w-0 space-y-5">
-                                    {/* First Name & Last Name (Left) and Avatar Profile Photo (Right) — Responsive Full-Width Stacked on Mobile */}
-                                    <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-5">
-                                        {/* First Name & Last Name Fields (at the left of the avatar) */}
-                                        <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4 order-2 sm:order-1">
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">First Name</label>
-                                                <input
-                                                    type="text"
-                                                    value={firstName}
-                                                    onChange={(e) => setFirstName(e.target.value)}
-                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
-                                                    required
-                                                />
+                                        <legend className="sr-only">Personal details and showcase fields</legend>
+
+                                        {/* First Name & Last Name (Left, 75% on tablet/desktop) and Avatar Profile Photo (Right, 25%) */}
+                                        <div className="orbix-profile-identity-row !mt-0">
+                                            <div className="orbix-profile-name-fields">
+                                                <div>
+                                                    <label htmlFor={firstNameId} className={`${FIELD_LABEL_CLASS} mb-1.5`}>
+                                                        First Name <span className="text-rose-600" aria-hidden="true">*</span>
+                                                    </label>
+                                                    <input
+                                                        id={firstNameId}
+                                                        name="firstName"
+                                                        type="text"
+                                                        autoComplete="given-name"
+                                                        enterKeyHint="next"
+                                                        placeholder="First name"
+                                                        value={firstName}
+                                                        onChange={(e) => setFirstName(e.target.value)}
+                                                        className={FIELD_INPUT_CLASS}
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label htmlFor={lastNameId} className={`${FIELD_LABEL_CLASS} mb-1.5`}>
+                                                        Last Name
+                                                    </label>
+                                                    <input
+                                                        id={lastNameId}
+                                                        name="lastName"
+                                                        type="text"
+                                                        autoComplete="family-name"
+                                                        enterKeyHint="next"
+                                                        placeholder="Last name"
+                                                        value={lastName}
+                                                        onChange={(e) => setLastName(e.target.value)}
+                                                        className={FIELD_INPUT_CLASS}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Last Name</label>
-                                                <input
-                                                    type="text"
-                                                    value={lastName}
-                                                    onChange={(e) => setLastName(e.target.value)}
-                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+
+                                            <div className="orbix-profile-avatar-slot">
+                                                <ProfilePhotoFrame
+                                                    currentPhotoUrl={user?.photoUrl || user?.avatarUrl}
+                                                    hasPreviousPhoto={user?.hasPreviousPhoto}
+                                                    previousPhotoUrl={user?.previousPhotoUrl}
+                                                    displayName={`${firstName} ${lastName}`.trim() || user?.username || "User"}
+                                                    username={user?.username || ""}
+                                                    size="fluid"
+                                                    className="orbix-profile-avatar-frame"
                                                 />
                                             </div>
                                         </div>
 
-                                        {/* Avatar with all functionalities (Full-width responsive centered presentation on mobile) */}
-                                        <div className="w-full sm:w-auto flex justify-center shrink-0 order-1 sm:order-2 pb-2 sm:pb-0">
-                                            <ProfilePhotoFrame
-                                                currentPhotoUrl={user?.photoUrl || user?.avatarUrl}
-                                                hasPreviousPhoto={user?.hasPreviousPhoto}
-                                                previousPhotoUrl={user?.previousPhotoUrl}
-                                                displayName={`${firstName} ${lastName}`.trim() || user?.username || "User"}
-                                                username={user?.username || ""}
-                                                size="lg"
+                                        <div>
+                                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                <label htmlFor={headlineId} className={FIELD_LABEL_CLASS}>
+                                                    Headline
+                                                </label>
+                                                <span id={headlineCountId} className="text-[11px] font-mono font-bold tabular-nums text-neutral-500">
+                                                    {headline.length}/255
+                                                </span>
+                                            </div>
+                                            <input
+                                                id={headlineId}
+                                                name="headline"
+                                                type="text"
+                                                enterKeyHint="next"
+                                                aria-describedby={headlineCountId}
+                                                placeholder="e.g. Senior Full-Stack Engineer & Competitive Programmer"
+                                                value={headline}
+                                                maxLength={255}
+                                                onChange={(e) => setHeadline(e.target.value)}
+                                                className={FIELD_INPUT_CLASS}
                                             />
                                         </div>
-                                    </div>
 
-                                    <div>
-                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Headline</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Senior Full-Stack Engineer & Competitive Programmer"
-                                            value={headline}
-                                            maxLength={255}
-                                            onChange={(e) => setHeadline(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
-                                        />
-                                        <span className="text-[10px] font-bold text-neutral-500 flex justify-end mt-1">{headline.length}/255</span>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Biography</label>
-                                        <textarea
-                                            rows={3}
-                                            placeholder="Write a brief intro about yourself, your tech stack, and what you're passionate about..."
-                                            value={bio}
-                                            maxLength={2000}
-                                            onChange={(e) => setBio(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all resize-none"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-4">
                                         <div>
-                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Location</label>
+                                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                <label htmlFor={bioId} className={FIELD_LABEL_CLASS}>
+                                                    Biography
+                                                </label>
+                                                <span id={bioCountId} className="text-[11px] font-mono font-bold tabular-nums text-neutral-500">
+                                                    {bio.length}/2000
+                                                </span>
+                                            </div>
+                                            <textarea
+                                                id={bioId}
+                                                name="bio"
+                                                rows={3}
+                                                aria-describedby={bioCountId}
+                                                placeholder="Write a brief intro about yourself, your tech stack, and what you're passionate about..."
+                                                value={bio}
+                                                maxLength={2000}
+                                                onChange={(e) => setBio(e.target.value)}
+                                                className={`${FIELD_INPUT_CLASS} min-h-[96px] resize-y leading-relaxed`}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor={locationId} className={`${FIELD_LABEL_CLASS} mb-1.5`}>
+                                                Location
+                                            </label>
                                             <input
+                                                id={locationId}
+                                                name="location"
                                                 type="text"
+                                                autoComplete="address-level2"
+                                                enterKeyHint="next"
                                                 placeholder="e.g. San Francisco, CA"
                                                 value={location}
                                                 onChange={(e) => setLocation(e.target.value)}
-                                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                                className={FIELD_INPUT_CLASS}
                                             />
                                         </div>
 
                                         {/* Verified College / University Selector */}
-                                        <div className="pb-1">
-                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                                        <div className="pt-5 border-t-2 border-black/10">
+                                            <label htmlFor={collegeInputId} className={`${FIELD_LABEL_CLASS} mb-1.5`}>
                                                 College / University (Verified Directory)
                                             </label>
                                             <CollegeAutocomplete
                                                 key={collegeSearchRevision}
+                                                inputId={collegeInputId}
                                                 value={selectedCollegeId}
                                                 selectedCollege={selectedCollege}
                                                 onChange={setCollegeDraft}
@@ -780,7 +821,7 @@ export default function ProfileManager() {
                                             {/* College Verification Entry Point Card */}
                                             {selectedCollege?.id ? (
                                                 <div className="mt-3 p-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
-                                                    <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="flex items-center gap-2.5 min-w-0">
                                                         <div className="w-7 h-7 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
                                                             <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
                                                         </div>
@@ -798,10 +839,10 @@ export default function ProfileManager() {
                                                     </p>
                                                 </div>
                                             ) : (
-                                                <div className="mt-3 p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-dashed border-black/40 space-y-1.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0">
-                                                            <GraduationCap className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                                <div className="mt-3 p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-dashed border-black/40 space-y-2">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-7 h-7 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
+                                                            <GraduationCap className="w-4 h-4 text-black stroke-[2.5]" />
                                                         </div>
                                                         <span className="text-xs font-black uppercase tracking-wider text-black">
                                                             College Affiliation Required
@@ -815,145 +856,164 @@ export default function ProfileManager() {
                                         </div>
 
                                         {/* Dynamic Links Section */}
-                                        <div className="space-y-3 pt-4 border-t-2 border-black/10">
-                                            <div className="flex items-center justify-between">
+                                        <div className="pt-5 border-t-2 border-black/10 space-y-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2.5">
                                                 <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <label className="block text-xs font-black tracking-wider uppercase text-black">
-                                                            LINKS ({links.length}/4)
-                                                        </label>
-                                                    </div>
+                                                    <h3 className={FIELD_LABEL_CLASS}>
+                                                        Links ({links.length}/4)
+                                                    </h3>
                                                     <p className="text-[11px] text-neutral-600 font-medium mt-0.5">
                                                         Portfolio, blog, X, anything with https://
                                                     </p>
                                                 </div>
+
+                                                {links.length < 4 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddLink}
+                                                        className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 rounded-xl bg-white border-2 border-black hover:bg-[#FAF6EE] text-black text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+                                                    >
+                                                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        <span>Add link</span>
+                                                    </button>
+                                                )}
                                             </div>
 
                                             {/* Platform Autocomplete Datalist */}
                                             <datalist id="platform-suggestions">
                                                 {PLATFORM_REGISTRY.map((p) => (
-                                                     <option key={p.id} value={p.name} />
+                                                    <option key={p.id} value={p.name} />
                                                 ))}
                                             </datalist>
 
                                             {/* Links Rows */}
-                                            <div className="space-y-2.5">
-                                                {links.map((item, index) => (
-                                                    <div
-                                                        key={item.id}
-                                                        className="flex items-center gap-2 group"
-                                                    >
-                                                        {/* Label / Platform Input */}
-                                                        <div className="w-28 sm:w-36 flex-shrink-0">
-                                                            <input
-                                                                type="text"
-                                                                list="platform-suggestions"
-                                                                placeholder="Label"
-                                                                value={item.label}
-                                                                onChange={(e) => handleLinkChange(index, "label", e.target.value)}
-                                                                className="w-full px-3 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
-                                                            />
-                                                        </div>
-
-                                                        {/* URL Input with Live Icon on Left */}
-                                                        <div className="relative flex-1 min-w-0">
-                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-black">
-                                                                {getPlatformIcon(
-                                                                    item.platform || item.label || item.url,
-                                                                    "w-4 h-4 flex-shrink-0"
-                                                                )}
+                                            {links.length > 0 && (
+                                                <div className="space-y-3">
+                                                    {links.map((item, index) => (
+                                                        <div key={item.id} className="orbix-profile-link-row">
+                                                            {/* Label / Platform Input */}
+                                                            <div className="orbix-profile-link-label">
+                                                                <input
+                                                                    type="text"
+                                                                    list="platform-suggestions"
+                                                                    aria-label={`Link ${index + 1} label`}
+                                                                    placeholder="Label (e.g. Portfolio)"
+                                                                    value={item.label}
+                                                                    onChange={(e) => handleLinkChange(index, "label", e.target.value)}
+                                                                    className={FIELD_INPUT_CLASS}
+                                                                />
                                                             </div>
-                                                            <input
-                                                                type="text"
-                                                                placeholder="https://..."
-                                                                value={item.url}
-                                                                onChange={(e) => handleLinkChange(index, "url", e.target.value)}
-                                                                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
-                                                            />
+
+                                                            {/* URL Input with Live Icon on Left */}
+                                                            <div className="orbix-profile-link-url relative">
+                                                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-black">
+                                                                    {getPlatformIcon(
+                                                                        item.platform || item.label || item.url,
+                                                                        "w-4 h-4 flex-shrink-0"
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    inputMode="url"
+                                                                    autoCorrect="off"
+                                                                    autoCapitalize="none"
+                                                                    spellCheck={false}
+                                                                    aria-label={`Link ${index + 1} URL`}
+                                                                    placeholder="https://..."
+                                                                    value={item.url}
+                                                                    onChange={(e) => handleLinkChange(index, "url", e.target.value)}
+                                                                    className={`${FIELD_INPUT_CLASS} pl-10`}
+                                                                />
+                                                            </div>
+
+                                                            {/* Trash / Delete button */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveLink(index)}
+                                                                className="w-11 h-11 rounded-xl border-2 border-black hover:bg-rose-100 bg-white text-black hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+                                                                title="Delete link"
+                                                                aria-label={`Delete link ${index + 1}`}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
                                                         </div>
-
-                                                        {/* Trash / Delete button */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveLink(index)}
-                                                            className="w-9 h-9 rounded-xl border-2 border-black hover:bg-rose-100 bg-white text-black hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px]"
-                                                            title="Delete link"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {/* + Add Link Button */}
-                                            {links.length < 4 && (
-                                                <div className="pt-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleAddLink}
-                                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white border-2 border-black hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer"
-                                                    >
-                                                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                        <span>Add link</span>
-                                                    </button>
+                                                    ))}
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
 
-                                    {/* Skills Tags */}
-                                    <div className="pt-4 border-t-2 border-black/10">
-                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Skills & Technologies</label>
-                                        <div className="flex gap-2 mb-2.5">
-                                            <input
-                                                type="text"
-                                                placeholder="Type skill & press Enter"
-                                                value={newSkillInput}
-                                                onChange={(e) => setNewSkillInput(e.target.value)}
-                                                onKeyDown={handleAddSkill}
-                                                className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={handleAddSkill}
-                                                className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-xs font-black uppercase tracking-wider text-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                                            >
-                                                Add
-                                            </button>
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-2 min-h-[32px]">
-                                            {skills.map((skill) => (
-                                                <span
-                                                    key={skill}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000]"
+                                        {/* Skills Tags */}
+                                        <div className="pt-5 border-t-2 border-black/10">
+                                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                <label htmlFor={skillInputId} className={FIELD_LABEL_CLASS}>
+                                                    Skills & Technologies
+                                                </label>
+                                                {skills.length > 0 && (
+                                                    <span className="text-[11px] font-mono font-bold tabular-nums text-neutral-500">
+                                                        {skills.length} added
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-stretch gap-2">
+                                                <input
+                                                    id={skillInputId}
+                                                    type="text"
+                                                    enterKeyHint="done"
+                                                    placeholder="Type skill & press Enter"
+                                                    value={newSkillInput}
+                                                    onChange={(e) => setNewSkillInput(e.target.value)}
+                                                    onKeyDown={handleAddSkill}
+                                                    className={`flex-1 min-w-0 ${FIELD_INPUT_CLASS}`}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddSkill}
+                                                    className="min-h-[44px] px-5 rounded-xl bg-black hover:bg-neutral-800 text-xs font-black uppercase tracking-wider text-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
                                                 >
-                                                    <span>{skill}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveSkill(skill)}
-                                                        className="text-neutral-500 hover:text-rose-600 font-black cursor-pointer ml-0.5"
-                                                    >
-                                                        &times;
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
+                                                    Add
+                                                </button>
+                                            </div>
 
+                                            {skills.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mt-3">
+                                                    {skills.map((skill) => (
+                                                        <span
+                                                            key={skill}
+                                                            className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000]"
+                                                        >
+                                                            <span>{skill}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveSkill(skill)}
+                                                                aria-label={`Remove ${skill}`}
+                                                                className="w-5 h-5 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-rose-600 hover:bg-rose-100 font-black cursor-pointer transition-colors"
+                                                            >
+                                                                &times;
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </fieldset>
 
                                     {/* OPEN TO WORK, HIRE ME & RESUME VISIBILITY SECTION */}
-                                    <div className="space-y-2 pt-4 border-t-2 border-black/10">
-                                        <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-600">
-                                            {Boolean(user?.resumeUrl) ? "OPEN TO WORK, HIRE ME & RESUME VISIBILITY" : "OPEN TO WORK AND HIRE ME"}
-                                        </label>
+                                    <div className="space-y-3 pt-5 border-t-2 border-black/10">
+                                        <div>
+                                            <h3 className={FIELD_LABEL_CLASS}>
+                                                {user?.resumeUrl ? "Open to Work, Hire Me & Resume Visibility" : "Open to Work & Hire Me"}
+                                            </h3>
+                                            <p className="text-[11px] text-neutral-600 font-medium mt-0.5">
+                                                Control recruiter badges and resume access on your public profile.
+                                            </p>
+                                        </div>
+
                                         <div className="space-y-2.5">
                                             {/* Toggle 1: Open to work */}
-                                            <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
-                                                <div className="flex items-center gap-3">
+                                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
+                                                <div className="flex items-center gap-3 min-w-0">
                                                     <Briefcase className="w-4 h-4 text-black flex-shrink-0 stroke-[2.5]" />
-                                                    <span className="text-xs sm:text-sm font-bold text-black">
+                                                    <span className="text-xs sm:text-sm font-bold text-black leading-snug">
                                                         Show an Open to work tag on your profile
                                                     </span>
                                                 </div>
@@ -970,10 +1030,10 @@ export default function ProfileManager() {
                                             </div>
 
                                             {/* Toggle 2: Hire me */}
-                                            <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
-                                                <div className="flex items-center gap-3">
+                                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
+                                                <div className="flex items-center gap-3 min-w-0">
                                                     <Mail className="w-4 h-4 text-black flex-shrink-0 stroke-[2.5]" />
-                                                    <span className="text-xs sm:text-sm font-bold text-black">
+                                                    <span className="text-xs sm:text-sm font-bold text-black leading-snug">
                                                         Show a Hire me button so recruiters can message you
                                                     </span>
                                                 </div>
@@ -990,16 +1050,16 @@ export default function ProfileManager() {
                                             </div>
 
                                             {/* Toggle 3: Resume Public / Private (only appears when resume is uploaded) */}
-                                            {Boolean(user?.resumeUrl) && (
-                                                <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
+                                            {user?.resumeUrl && (
+                                                <div className="flex items-center justify-between gap-4 px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
                                                     <div className="flex items-center gap-3 min-w-0">
                                                         <FileText className="w-4 h-4 text-black flex-shrink-0 stroke-[2.5]" />
                                                         <div className="flex flex-col min-w-0">
-                                                            <span className="text-xs sm:text-sm font-bold text-black truncate">
+                                                            <span className="text-xs sm:text-sm font-bold text-black leading-snug">
                                                                 Make your attached resume public on your profile
                                                             </span>
                                                             {user?.resumeFilename && (
-                                                                <span className="text-[11px] text-neutral-500 font-medium truncate">
+                                                                <span className="text-[11px] text-neutral-500 font-medium truncate mt-0.5">
                                                                     {user.resumeFilename}
                                                                 </span>
                                                             )}
@@ -1049,30 +1109,11 @@ export default function ProfileManager() {
                 </section>
             </div>
 
-            <ToastActionNotice
+            <ProfileSaveNotice
                 open={(hasChanges || savingProfile) && !isCollegeConfirmModalOpen}
-                title={savingProfile ? "Saving profile changes…" : "Unsaved profile changes"}
-                actions={
-                    <>
-                        <button
-                            type="button"
-                            disabled={savingProfile}
-                            onClick={cancelProfileChanges}
-                            className="inline-flex items-center justify-center rounded-xl border-2 border-black bg-white px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 disabled:opacity-60 cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all select-none"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form={profileFormId}
-                            disabled={savingProfile}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-[#a2ff86] px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-black text-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] disabled:opacity-60 cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all select-none"
-                        >
-                            {savingProfile && <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-                            Save changes
-                        </button>
-                    </>
-                }
+                isSaving={savingProfile}
+                onCancel={cancelProfileChanges}
+                formId={profileFormId}
             />
 
             {/* Warning Modal when saving a new college affiliation */}
@@ -1088,6 +1129,6 @@ export default function ProfileManager() {
                 remainingMs={user?.collegeLockRemainingMs}
                 nextAllowedDate={user?.nextAllowedCollegeChangeAt}
             />
-        </div>
+        </>
     );
 }

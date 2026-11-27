@@ -15,7 +15,6 @@ import {
     getCollegeCacheKey,
 } from "../../store/leaderboardSlice";
 import { useToast } from "../../context/ToastContext";
-import { Sidebar } from "../Dashboard/Sidebar";
 import { LeaderboardVerificationPrompt } from "./LeaderboardVerificationPrompt";
 import { LeaderboardHeader } from "./LeaderboardHeader";
 import { CollegeSelector } from "./CollegeSelector";
@@ -43,8 +42,7 @@ export const LeaderboardPage: React.FC = () => {
     }, []);
     const currentUsername = user?.username || storedUsername || null;
 
-    // Mobile Sidebar & Algorithm Modal (Local UI state)
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    // Algorithm modal state
     const [isAlgorithmModalOpen, setIsAlgorithmModalOpen] = useState<boolean>(false);
 
     // Redux Leaderboard State & Caching
@@ -242,14 +240,7 @@ export const LeaderboardPage: React.FC = () => {
     );
 
     return (
-        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
-            {/* Desktop & Mobile Collapsible Navigation Sidebar */}
-            <Sidebar
-                activeTab="leaderboard"
-                isOpen={isMobileSidebarOpen}
-                onClose={() => setIsMobileSidebarOpen(false)}
-            />
-
+        <>
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 <section
@@ -544,7 +535,7 @@ export const LeaderboardPage: React.FC = () => {
                 isOpen={isAlgorithmModalOpen}
                 onClose={() => setIsAlgorithmModalOpen(false)}
             />
-        </div>
+        </>
     );
 };
 
