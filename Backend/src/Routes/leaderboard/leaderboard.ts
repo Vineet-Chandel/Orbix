@@ -11,8 +11,9 @@ import {
     getCodeChefTier,
     getAtCoderTier,
 } from "../../utils/ratingSystems.js";
-import cacheLeaderboard, { leaderboardDemoEnabled } from "../../redis/cache/cache-leaderboard.js";
+import cacheLeaderboard, { leaderboardDemoEnabled, type InvalidateCacheResult } from "../../redis/cache/cache-leaderboard.js";
 import { requireGovernanceAdmin } from "../../middlewares/staff.middleware.js";
+import { getVerifiedLinksCondition } from "../../services/verification/schemaCompatibility.js";
 
 const leaderboardRouter = express.Router();
 
@@ -53,6 +54,8 @@ export interface LeaderboardEntryDTO {
     }>;
     streak: number;
     updatedAt: string;
+    cacheInvalidated?: boolean;
+    cacheStatus?: "cleared" | "unavailable" | "partial" | "failed" | "skipped";
 }
 
 export interface CollegeMetadataDTO {
@@ -230,11 +233,15 @@ export async function syncLeaderboardForUser(
         await query("UPDATE users SET college = $1, college_id = $2 WHERE id = $3;", [college, collegeId, userId]).catch(() => null);
     }
 
-    // Ownership verification is independent of scoring eligibility.
+    // Authoritative ownership verification required for leaderboard contribution.
+    // Only platform accounts with proven cryptographic ownership (ownership_status = 'VERIFIED')
+    // contribute statistics, ratings, and problem counts to the Orbix leaderboard.
+    // Unverified, pending, failed, or null accounts are strictly excluded.
+    const verifiedCondition = await getVerifiedLinksCondition();
     const linksRes = await query(
         `SELECT id, portal, portal_username, leaderboard_snapshot
          FROM user_links
-         WHERE user_id = $1 AND ${PUBLIC_PLATFORM_LINK};`,
+         WHERE user_id = $1 AND ${PUBLIC_PLATFORM_LINK} AND ${verifiedCondition};`,
         [userId]
     );
 
@@ -485,8 +492,14 @@ export async function syncLeaderboardForUser(
     );
 
     // Invalidate Redis caches
+    let cacheResult: InvalidateCacheResult | undefined;
     if (options.invalidateCache !== false) {
-        await cacheLeaderboard.invalidate(collegeId ? { collegeId } : undefined);
+        cacheResult = await cacheLeaderboard.invalidate(collegeId ? { collegeId } : undefined);
+        if (!cacheResult.success) {
+            console.warn(
+                `[LeaderboardSync] Cache invalidation warning for user ${cleanUser} (${cacheResult.status}): ${cacheResult.error || "incomplete"}`
+            );
+        }
     }
 
     const row = upsertRes.rows[0];
@@ -506,11 +519,13 @@ export async function syncLeaderboardForUser(
         platformRatings: parseRatingsSafe(row.platform_ratings, row.score_breakdown),
         streak: row.streak,
         updatedAt: row.updated_at,
+        cacheInvalidated: cacheResult ? cacheResult.success : undefined,
+        cacheStatus: cacheResult ? cacheResult.status : undefined,
     };
 }
 
-export async function clearLeaderboardCache(): Promise<void> {
-    await cacheLeaderboard.invalidate();
+export async function clearLeaderboardCache(): Promise<InvalidateCacheResult> {
+    return await cacheLeaderboard.invalidate();
 }
 
 /**
@@ -1508,7 +1523,7 @@ leaderboardRouter.post("/sync", authenticate, async (req: Request, res: Response
 
 /**
  * POST /api/leaderboard/recalculate-all
- * Staff-only backfill for public profiles with public platform links.
+ * Staff-only backfill for public profiles with public platform links, existing entries, or scores.
  * Start without a cursor and pass nextAfterUserId as afterUserId until it is null.
  */
 leaderboardRouter.post("/recalculate-all", authenticate, requireGovernanceAdmin, async (req: Request, res: Response) => {
@@ -1517,15 +1532,27 @@ leaderboardRouter.post("/recalculate-all", authenticate, requireGovernanceAdmin,
         return res.status(400).json({ success: false, message: "afterUserId must be a UUID." });
     }
 
-    const batchSize = 10;
+    const rawBatchSize = Number(req.body?.batchSize);
+    const batchSize = Number.isInteger(rawBatchSize) && rawBatchSize >= 1 && rawBatchSize <= 500
+        ? rawBatchSize
+        : 50;
+
     try {
+        // Clean up orphaned entries at the start of recalculation run
+        if (afterUserId === null) {
+            await query(`DELETE FROM leaderboard_entries WHERE user_id NOT IN (SELECT id FROM users);`).catch(() => null);
+        }
+
         const usersRes = await query(
-            `SELECT id
-             FROM users
-             WHERE ($1::uuid IS NULL OR id > $1::uuid)
-               AND is_public = true
-               AND id IN (${leaderboardParticipants(false)})
-             ORDER BY id
+            `SELECT u.id
+             FROM users u
+             WHERE ($1::uuid IS NULL OR u.id > $1::uuid)
+               AND (
+                 u.id IN (SELECT user_id FROM user_links WHERE ${PUBLIC_PLATFORM_LINK})
+                 OR u.id IN (SELECT user_id FROM leaderboard_entries)
+                 OR u.orbix_score > 0
+               )
+             ORDER BY u.id
              LIMIT $2;`,
             [afterUserId, batchSize + 1]
         );
@@ -1538,18 +1565,56 @@ leaderboardRouter.post("/recalculate-all", authenticate, requireGovernanceAdmin,
             if (result) updatedCount++;
         }
 
-        await cacheLeaderboard.invalidate();
+        const cacheResult = await cacheLeaderboard.invalidate();
         return res.json({
             success: true,
             updatedCount,
+            batchSize,
             nextAfterUserId: usersRes.rows.length > batchSize ? batch.at(-1)?.id : null,
+            cacheInvalidated: cacheResult.success,
+            cacheStatus: cacheResult.status,
+            cacheDetails: cacheResult.details,
+            ...(cacheResult.error ? { cacheError: cacheResult.error } : {}),
         });
-    } catch (error) {
-        await cacheLeaderboard.invalidate();
+    } catch (error: any) {
+        const fallbackCacheResult = await cacheLeaderboard.invalidate().catch(() => null);
         console.error("Leaderboard batch recalculation failed:", error);
         return res.status(500).json({
             success: false,
             message: "Failed to recalculate this leaderboard batch. Retry with the same cursor.",
+            cacheInvalidated: fallbackCacheResult?.success ?? false,
+            cacheStatus: fallbackCacheResult?.status ?? "failed",
+        });
+    }
+});
+
+/**
+ * POST /api/leaderboard/cache/invalidate
+ * Staff-only standalone endpoint to flush or retry leaderboard cache invalidation
+ * without recalculating database scores. Safe and idempotent.
+ */
+leaderboardRouter.post("/cache/invalidate", authenticate, requireGovernanceAdmin, async (req: Request, res: Response) => {
+    try {
+        const collegeId = typeof req.body?.collegeId === "string" ? req.body.collegeId.trim() : undefined;
+        const result = await cacheLeaderboard.invalidate(collegeId ? { collegeId } : undefined);
+
+        const httpStatus = result.success ? 200 : 503;
+        return res.status(httpStatus).json({
+            success: result.success,
+            status: result.status,
+            clearedKeysCount: result.clearedKeysCount,
+            details: result.details,
+            error: result.error,
+            message: result.success
+                ? "Leaderboard cache successfully invalidated."
+                : `Leaderboard cache invalidation incomplete (${result.status}): ${result.error || "Redis unavailable"}`,
+        });
+    } catch (err: any) {
+        return res.status(500).json({
+            success: false,
+            status: "failed",
+            error: err.message || String(err),
+            message: "Internal server error during cache invalidation.",
         });
     }
 });

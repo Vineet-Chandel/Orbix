@@ -2,8 +2,9 @@
  * NAUKRI CODE360 CRYPTOGRAPHIC OWNERSHIP VERIFICATION TEST SUITE
  */
 
-import { test, describe } from 'node:test';
+import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
+import redis from '../../redis/client.js';
 import { Code360Adapter } from './adapters/code360Adapter.js';
 import { adapterRegistry } from './adapters/adapterRegistry.js';
 import { generateChallengeToken, verifyCandidateMatch } from './challengeCryptoService.js';
@@ -30,26 +31,25 @@ describe('Naukri Code360 Verification Adapter & Challenge Lifecycle', () => {
         assert.equal(adapterRegistry.isSupported('CODE360'), true);
     });
 
-    test('Generates user instructions targeting About you (Bio) as primary default', () => {
+    test('Generates user instructions targeting Profile summary (Bio) as primary default', () => {
         const testToken = 'orbix-v-testCode360Token12345';
         const instructions = adapter.getInstructions(testToken, undefined, 'code360_user');
         assert.equal(instructions.fieldName, 'about');
-        assert.equal(instructions.displayFieldName, 'About you (Bio)');
-        assert.equal(instructions.profileSettingsUrl, 'https://www.naukri.com/code360/profile/edit');
+        assert.equal(instructions.displayFieldName, 'Profile summary (Bio)');
+        assert.equal(instructions.profileSettingsUrl, 'https://www.naukri.com/mnjuser/profile');
         assert.ok(instructions.instructions.includes(testToken));
-        assert.ok(instructions.instructions.includes('About you'));
-        assert.ok(instructions.instructions.includes('Additional info'));
+        assert.ok(instructions.instructions.includes('Profile summary'));
     });
 
-    test('Generates user instructions targeting Name when requested', () => {
+    test('Generates user instructions targeting Full name when requested', () => {
         const testToken = 'orbix-v-testCode360Token12345';
         const instructions = adapter.getInstructions(testToken, 'name', 'code360_user');
         assert.equal(instructions.fieldName, 'name');
-        assert.equal(instructions.displayFieldName, 'Name');
-        assert.equal(instructions.profileSettingsUrl, 'https://www.naukri.com/code360/profile/edit');
+        assert.equal(instructions.displayFieldName, 'Full name');
+        assert.equal(instructions.profileSettingsUrl, 'https://www.naukri.com/mnjuser/profile');
         assert.ok(instructions.instructions.includes(testToken));
-        assert.ok(instructions.instructions.includes('Name'));
-        assert.ok(instructions.instructions.includes('Personal info'));
+        assert.ok(instructions.instructions.includes('Full name'));
+        assert.ok(instructions.instructions.includes('Basic details'));
     });
 
     test('Rejects invalid or empty handle inputs before network request', async () => {
@@ -327,5 +327,9 @@ describe('Naukri Code360 Verification Adapter & Challenge Lifecycle', () => {
         } finally {
             globalThis.fetch = originalFetch;
         }
+    });
+
+    after(async () => {
+        redis.disconnect();
     });
 });

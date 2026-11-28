@@ -317,17 +317,19 @@ test("Ownership Verification Support & Registry", async (t) => {
         assert.ok(mediumGuide.screenshotCaption?.includes("Short bio"));
         assert.ok(mediumGuide.screenshotCaption?.includes("Save"));
 
-        // Code360: must target About you (Bio) and profile/edit
+        // Code360: must target Profile summary and mnjuser/profile
         const code360Guide = getPlatformVerificationGuide("code360", testToken, undefined, "ninja_coder");
         assert.equal(code360Guide.portalId, "code360");
         assert.equal(code360Guide.portalName, "Naukri Code360");
-        assert.equal(code360Guide.targetFieldName, "About you (Bio)");
-        assert.equal(code360Guide.settingsUrl, "https://www.naukri.com/code360/profile/edit");
-        assert.equal(code360Guide.settingsUrlLabel, "Open Code360 Edit Profile");
-        assert.ok(code360Guide.instruction.includes("About you"));
+        assert.equal(code360Guide.targetFieldName, "Profile summary");
+        assert.equal(code360Guide.settingsUrl, "https://www.naukri.com/mnjuser/profile");
+        assert.equal(code360Guide.settingsUrlLabel, "Open Profile Manager");
+        assert.ok(code360Guide.instruction.includes("Profile summary"));
         assert.ok(code360Guide.instruction.includes("Verify"));
-        assert.ok(code360Guide.detailText.includes("About you"));
-        assert.equal(code360Guide.hasScreenshot, false);
+        assert.ok(code360Guide.detailText.includes("Profile summary"));
+        assert.equal(code360Guide.hasScreenshot, true);
+        assert.ok(code360Guide.screenshotAlt?.includes("Profile summary"));
+        assert.ok(code360Guide.screenshotCaption?.includes("Profile summary"));
 
         // Unsupported platforms (e.g. CSES): must NOT return fake token placement instructions
         const csesGuide = getPlatformVerificationGuide("cses", testToken, undefined, "cses_user");
@@ -356,6 +358,39 @@ test("Ownership Verification Support & Registry", async (t) => {
         const instructionContent = mediumBlock.replace(/className="[^"]*"/g, "");
         assert.ok(!instructionContent.includes("Name"), "Medium block must never instruct user to use Name field");
         assert.ok(!mediumBlock.includes(">Name<"), "Medium block must never render Name as field label");
+    });
+
+    await t.test("OwnershipVerificationModal instructions and navigation for Code360 strictly enforce Profile summary UX journey", () => {
+        const modalPath = path.resolve(__dirname, "OwnershipVerificationModal.tsx");
+        const modalSource = fs.readFileSync(modalPath, "utf-8");
+
+        // 1. Verify Code360 modal branch exists and conforms to required UX journey
+        const code360BlockMatch = modalSource.match(/guide\?\.portalId === ["']code360["']\s*\?\s*\(([\s\S]*?)\)\s*:/);
+        assert.ok(code360BlockMatch, "Modal must have a dedicated branch for Code360");
+        const code360Block = code360BlockMatch[1];
+
+        // 2. Guide identifies Profile summary as the target section and textarea
+        assert.ok(code360Block.includes("Profile summary"), "Code360 block must instruct user to locate Profile summary");
+
+        // 3. Obsolete terms must be strictly absent
+        assert.ok(!code360Block.includes("Additional info"), "Code360 block must not reference Additional info");
+        assert.ok(!code360Block.includes("About you"), "Code360 block must not reference About you");
+        assert.ok(!code360Block.includes("Personal info"), "Code360 block must not reference Personal info");
+        assert.ok(!code360Block.includes("Name*"), "Code360 block must not reference Name*");
+        assert.ok(!code360Block.includes("Full name"), "Code360 block must not reference Full name");
+        assert.ok(!code360Block.includes("Alternative:"), "Code360 block must not contain obsolete Alternative section");
+
+        // 4. Verified settings destination URL and label
+        const testToken = "orbix-v-testToken123456789";
+        const guide = getPlatformVerificationGuide("code360", testToken);
+        assert.equal(guide.settingsUrl, "https://www.naukri.com/mnjuser/profile");
+        assert.equal(guide.settingsUrlLabel, "Open Profile Manager");
+        assert.equal(getPlatformVerificationField("code360"), "about");
+
+        // 5. Screenshot guide behavior: hasScreenshot is true and asset is configured
+        assert.equal(guide.hasScreenshot, true, "Code360 must claim hasScreenshot: true with authentic asset");
+        assert.ok(guide.screenshotAlt, "Screenshot alt must be defined");
+        assert.ok(guide.screenshotCaption, "Screenshot caption must be defined");
     });
 });
 
@@ -645,6 +680,16 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
             /case\s+"medium":\s+return\s+mediumGuideImg;/.test(modalSource),
             "getGuideScreenshot must return mediumGuideImg for 'medium'"
         );
+
+        // Must import and resolve Code360 verification screenshot guide
+        assert.ok(
+            modalSource.includes('import code360GuideImg from "../../assets/verification/code360-verification-guide.png"'),
+            "OwnershipVerificationModal must import code360-verification-guide.png"
+        );
+        assert.ok(
+            /case\s+"code360":\s+return\s+code360GuideImg;/.test(modalSource),
+            "getGuideScreenshot must return code360GuideImg for 'code360'"
+        );
     });
 
     await t.test("OwnershipVerificationModal isolates Escape and backdrop dismiss when isPreviewOpen is true", () => {
@@ -676,6 +721,7 @@ test("Screenshot Lightbox Stacking & Layering Architecture Invariants", async (t
             interviewbit: { hasScreenshot: true, assetFile: "interviewbit-verification-guide.png" },
             substack: { hasScreenshot: true, assetFile: "substack-verification-guide.png" },
             medium: { hasScreenshot: true, assetFile: "medium-verification-guide.png" },
+            code360: { hasScreenshot: true, assetFile: "code360-verification-guide.png" },
             kaggle: { hasScreenshot: false },
             github: { hasScreenshot: false },
         };

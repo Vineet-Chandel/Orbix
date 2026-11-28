@@ -178,14 +178,14 @@ export class Code360Adapter implements PlatformAdapter {
         if (field === 'name') {
             return {
                 fieldName: 'name',
-                displayFieldName: 'Name',
-                profileSettingsUrl: 'https://www.naukri.com/code360/profile/edit',
+                displayFieldName: 'Full name',
+                profileSettingsUrl: 'https://www.naukri.com/mnjuser/profile',
                 instructions: `To verify ownership of your Naukri Code360 account:
 1. Log in to your Naukri Code360 account.
-2. Go to your Profile Edit settings at https://www.naukri.com/code360/profile/edit
-3. Under the "Personal info" tab, locate the "Name" field.
+2. Open the Naukri Profile Manager at https://www.naukri.com/mnjuser/profile (or click "View profile" in Code360 and click the edit pencil icon).
+3. Under Basic details, locate the "Full name" field.
 4. Temporarily paste or append your verification code: ${token}
-5. Click "Save changes".
+5. Click "Save".
 6. Return to Orbix and click "Verify Ownership".
 7. You may restore your original display name once verified.`,
             };
@@ -193,17 +193,16 @@ export class Code360Adapter implements PlatformAdapter {
 
         return {
             fieldName: 'about',
-            displayFieldName: 'About you (Bio)',
-            profileSettingsUrl: 'https://www.naukri.com/code360/profile/edit',
+            displayFieldName: 'Profile summary (Bio)',
+            profileSettingsUrl: 'https://www.naukri.com/mnjuser/profile',
             instructions: `To verify ownership of your Naukri Code360 account:
 1. Log in to your Naukri Code360 account.
-2. Go to your Profile Edit settings at https://www.naukri.com/code360/profile/edit
-3. Click the "Additional info" tab in the left sidebar.
-4. Locate the "About you" (Bio) textarea.
-5. Temporarily paste your verification code: ${token}
-6. Click "Save changes".
-7. Return to Orbix and click "Verify Ownership".
-8. You may restore your original bio once verified.`,
+2. Open the Naukri Profile Manager at https://www.naukri.com/mnjuser/profile (or click "View profile" in Code360 and click the edit pencil icon).
+3. In the "Profile summary" card, click the edit icon or textarea.
+4. Temporarily paste your verification code: ${token}
+5. Click "Save".
+6. Return to Orbix and click "Verify Ownership".
+7. You may restore your original bio summary once verified.`,
         };
     }
 }

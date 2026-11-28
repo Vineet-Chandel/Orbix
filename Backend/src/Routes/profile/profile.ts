@@ -1875,6 +1875,13 @@ profileRouter.delete("/platforms/:portal", authenticate, async (req: Request, re
             gmail: authUser.gmail,
         });
 
+        // Recalculate leaderboard score upon disconnecting a portal
+        if (authUser.username) {
+            syncLeaderboardForUser(authUser.username).catch((sErr: any) => {
+                console.warn(`Disconnect portal leaderboard sync warning for ${authUser.username}:`, sErr?.message);
+            });
+        }
+
         return res.status(200).json({
             success: true,
             message: `Platform '${portal}' disconnected successfully`,
@@ -2071,6 +2078,13 @@ profileRouter.put("/platforms/:portal", authenticate, async (req: Request, res: 
             gmail: authUser.gmail,
             email: authUser.email,
         });
+
+        // Recalculate leaderboard score upon updating a portal
+        if (authUser.username) {
+            syncLeaderboardForUser(authUser.username).catch((sErr: any) => {
+                console.warn(`Update portal leaderboard sync warning for ${authUser.username}:`, sErr?.message);
+            });
+        }
 
         return res.status(200).json({
             success: true,

@@ -311,12 +311,14 @@ export function getPlatformVerificationGuide(
             return {
                 portalId: "code360",
                 portalName: "Naukri Code360",
-                targetFieldName: "About you (Bio)",
-                settingsUrl: "https://www.naukri.com/code360/profile/edit",
-                settingsUrlLabel: "Open Code360 Edit Profile",
-                instruction: "Open your Code360 profile editor, select Additional info, paste the verification code into the About you field (or Name under Personal info), save changes, and click Verify.",
-                detailText: "In your Code360 profile editor under Additional info, paste the verification code into About you (or Name under Personal info) and save changes.",
-                hasScreenshot: false,
+                targetFieldName: "Profile summary",
+                settingsUrl: "https://www.naukri.com/mnjuser/profile",
+                settingsUrlLabel: "Open Profile Manager",
+                instruction: "Open the provided Naukri profile-editing link, find and select Profile summary in the left sidebar, paste the verification token into the large text area, click Save, and click Verify.",
+                detailText: "In the Naukri profile editor, select Profile summary in the left sidebar, paste your verification token into the Profile summary text area, and click Save.",
+                screenshotAlt: "Naukri profile editing interface showing Profile summary in the sidebar (1) and the Profile summary dialog text area (2) for verification token placement",
+                screenshotCaption: "In your Naukri profile editor, select Profile summary in the left sidebar (1), paste the verification token into the large text area (2), and click Save.",
+                hasScreenshot: true,
             };
         default:
             return {

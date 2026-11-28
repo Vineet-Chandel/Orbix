@@ -35,6 +35,7 @@ import hackerearthGuideImg from "../../assets/verification/hackerearth-verificat
 import interviewbitGuideImg from "../../assets/verification/interviewbit-verification-guide.png";
 import substackGuideImg from "../../assets/verification/substack-verification-guide.png";
 import mediumGuideImg from "../../assets/verification/medium-verification-guide.png";
+import code360GuideImg from "../../assets/verification/code360-verification-guide.png";
 
 export { VERIFICATION_MODAL_Z_INDEX, SCREENSHOT_LIGHTBOX_Z_INDEX };
 
@@ -63,6 +64,8 @@ export const getGuideScreenshot = (portalId?: string): string | undefined => {
             return substackGuideImg;
         case "medium":
             return mediumGuideImg;
+        case "code360":
+            return code360GuideImg;
         default:
             return undefined;
     }
@@ -672,9 +675,11 @@ export const OwnershipVerificationModal: React.FC<OwnershipVerificationModalProp
                                     ) : guide?.portalId === "code360" ? (
                                         <div className="space-y-2 text-xs sm:text-sm pt-1.5 sm:pt-2">
                                             <ol className="list-decimal list-outside ml-4 space-y-2 text-neutral-900 leading-relaxed font-medium">
-                                                <li>Open your Code360 profile editor and select <strong className="font-bold text-black">Additional info</strong> (or Personal info).</li>
-                                                <li>Paste the verification token into the <strong className="font-bold text-black">About you</strong> field (or <strong className="font-bold text-black">Name</strong>).</li>
-                                                <li>Click <strong className="font-bold text-black">Save changes</strong>, then return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
+                                                <li>Open the provided <strong className="font-bold text-black">Naukri profile-editing link</strong>.</li>
+                                                <li>Find and select <strong className="font-bold text-black">Profile summary</strong> in the left sidebar.</li>
+                                                <li>Paste the verification token into the large <strong className="font-bold text-black">Profile summary</strong> text area.</li>
+                                                <li>Click <strong className="font-bold text-black">Save</strong>.</li>
+                                                <li>Return to Orbix and click <strong className="font-bold text-black">Verify</strong>.</li>
                                             </ol>
                                         </div>
                                     ) : (

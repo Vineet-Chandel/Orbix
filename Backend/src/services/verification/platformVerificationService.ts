@@ -663,15 +663,52 @@ export class PlatformVerificationService {
         if (!dbClient) await this.refreshOwnershipAfterCommit(userId);
     }
 
-    public async refreshOwnershipAfterCommit(userId: string): Promise<void> {
-        // Finish invalidation before returning success, so immediate profile reads see the commit.
+    /**
+     * Revokes cryptographic ownership verification for a user's platform account.
+     * Safely demotes status to 'REVOKED', invalidates user caches, and triggers score recalculation.
+     */
+    public async revokeOwnership(userId: string, portal: string): Promise<boolean> {
+        const cleanPortal = portal.toLowerCase().trim();
+        const res = await query(`
+            UPDATE public.user_links
+            SET ownership_status = 'REVOKED',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = $1 AND LOWER(TRIM(portal)) = $2 AND ownership_status = 'VERIFIED'
+            RETURNING id;
+        `, [userId, cleanPortal]);
+
+        if (res.rowCount && res.rowCount > 0) {
+            await this.refreshOwnershipAfterCommit(userId);
+            return true;
+        }
+        return false;
+    }
+
+    public async refreshOwnershipAfterCommit(userId: string): Promise<{ profileCacheCleared: boolean; leaderboardSyncTriggered: boolean }> {
+        let profileCacheCleared = false;
         try {
             const user = await query('SELECT username, email FROM public.users WHERE id = $1;', [userId]);
             await invalidateAllUserCaches({ id: userId, username: user.rows[0]?.username, email: user.rows[0]?.email });
-        } catch {
-            await invalidateAllUserCaches({ id: userId });
+            profileCacheCleared = true;
+        } catch (err: any) {
+            console.warn(`[VerificationService] Profile cache invalidation warning for ${userId}:`, err?.message || err);
+            try {
+                await invalidateAllUserCaches({ id: userId });
+                profileCacheCleared = true;
+            } catch {
+                profileCacheCleared = false;
+            }
         }
-        try { void syncLeaderboardForUser(userId).catch(() => {}); } catch { /* Best effort after commit. */ }
+        let leaderboardSyncTriggered = false;
+        try {
+            void syncLeaderboardForUser(userId).catch((syncErr: any) => {
+                console.warn(`[VerificationService] Post-commit leaderboard sync warning for ${userId}:`, syncErr?.message || syncErr);
+            });
+            leaderboardSyncTriggered = true;
+        } catch (err: any) {
+            console.error(`[VerificationService] Post-commit leaderboard sync error for ${userId}:`, err?.message || err);
+        }
+        return { profileCacheCleared, leaderboardSyncTriggered };
     }
 }
 

@@ -13,6 +13,7 @@ const unverifiedLink = {
     portal: "leetcode",
     portal_username: "connected-user",
     verified: false,
+    ownership_status: "CONNECTED_UNVERIFIED",
     is_public: true,
     stats: [],
 };
@@ -38,7 +39,14 @@ beforeEach(() => {
         if (sql.includes("information_schema.")) return { rows: [{ exists: 1 }] };
         if (sql.includes("FROM user_links") && !sql.includes("leaderboard_entries")) {
             const publicOnly = sql.includes("is_public IS NOT FALSE");
-            return { rows: links.filter((link) => !publicOnly || link.is_public !== false) };
+            const verifiedOnly = sql.includes("ownership_status = 'VERIFIED'");
+            return {
+                rows: links.filter((link) => {
+                    if (publicOnly && link.is_public === false) return false;
+                    if (verifiedOnly && link.ownership_status !== "VERIFIED") return false;
+                    return true;
+                }),
+            };
         }
         if (sql.includes("FROM users")) return { rows: [{ id: "user-id", username: "coder", email: "coder@example.test", orbix_score: 9000, total_solved: 9000, total_contests: 100, streak: 365, is_public: true }] };
         if (sql.includes("INSERT INTO leaderboard_entries")) return { rows: [{ user_id: values[0], username: values[1], score: values[7], score_breakdown: JSON.parse(values[8]), total_solved: values[9], total_contests: values[10], platform_ratings: JSON.parse(values[11]), streak: values[12] }] };
@@ -62,34 +70,37 @@ test("an unverified saved connection contributes its real calendar to dashboard 
     assert.doesNotMatch(selection.sql, /ownership_status|verified\s*=\s*true/);
 });
 
-test("unverified public platform activity contributes to the Orbix Score", async () => {
+test("unverified public platform activity contributes zero to the Orbix Score", async () => {
     const result = await syncLeaderboardForUser("coder");
     assert.ok(result);
-    assert.ok(result.score > 0);
-    assert.equal(result.totalSolved, 5);
-    const selection = queries.find(({ sql }) => sql.includes("FROM user_links"));
+    assert.equal(result.score, 0);
+    assert.equal(result.totalSolved, 0);
+    const selection = queries.find(({ sql }) => sql.includes("FROM user_links") && sql.includes("leaderboard_snapshot"));
     assert.ok(selection);
-    assert.match(selection.sql, /WHERE user_id = \$1 AND is_public IS NOT FALSE/);
-    assert.doesNotMatch(selection.sql, /ownership_status|verified/);
+    assert.match(selection.sql, /WHERE user_id = \$1 AND is_public IS NOT FALSE AND ownership_status = 'VERIFIED'/);
     assert.deepEqual(selection.values, ["user-id"]);
 });
 
-test("mixed ownership states contribute while private connections stay out", async () => {
-    const publicOnly = await syncLeaderboardForUser("coder");
+test("mixed ownership states contribute only verified platforms while unverified and private stay out", async () => {
+    const unverifiedOnly = await syncLeaderboardForUser("coder");
+    assert.equal(unverifiedOnly?.score, 0);
+    assert.equal(unverifiedOnly?.totalSolved, 0);
+
     links.push(
-        { portal: "codeforces", portal_username: "cf-user", verified: true, is_public: true, stats: [], leaderboard_snapshot: providerSnapshot("codeforces", "cf-user", { totalSolved: 17, rating: 1400 }) },
-        { portal: "codechef", portal_username: "private-user", verified: true, is_public: false, stats: [], leaderboard_snapshot: providerSnapshot("codechef", "private-user", { totalSolved: 5000, rating: 2800 }) },
+        { portal: "codeforces", portal_username: "cf-user", verified: true, ownership_status: "VERIFIED", is_public: true, stats: [], leaderboard_snapshot: providerSnapshot("codeforces", "cf-user", { totalSolved: 17, rating: 1400 }) },
+        { portal: "codechef", portal_username: "private-user", verified: true, ownership_status: "VERIFIED", is_public: false, stats: [], leaderboard_snapshot: providerSnapshot("codechef", "private-user", { totalSolved: 5000, rating: 2800 }) },
     );
     const result = await syncLeaderboardForUser("user-id");
-    assert.ok(result && publicOnly);
+    assert.ok(result);
     assert.equal(result.username, "coder");
-    assert.equal(result.totalSolved, 22);
-    assert.ok(result.score > publicOnly.score);
+    assert.equal(result.totalSolved, 17);
+    assert.ok(result.score > 0);
     assert.equal(result.platformRatings.codeforces?.rating, 1400);
+    assert.equal(result.platformRatings.leetcode, undefined);
     assert.equal(result.platformRatings.codechef, undefined);
 });
 
-test("a newly linked unverified handle can score using the server's provider data", async (t) => {
+test("a newly linked unverified handle cannot score even if provider data is cached until verified", async (t) => {
     delete links[0]?.leaderboard_snapshot;
     const status = redis.status;
     redis.status = "ready";
@@ -99,12 +110,17 @@ test("a newly linked unverified handle can score using the server's provider dat
         return JSON.stringify({ success: true, stats: [], totalSolved: 8 });
     });
 
-    const result = await syncLeaderboardForUser("coder", { invalidateCache: false });
-    assert.equal(result?.totalSolved, 8);
-    const stored = queries.find(({ sql }) => sql.includes("SET leaderboard_snapshot"));
-    assert.ok(stored);
-    assert.equal(JSON.parse(stored.values[0]).handle, "connected-user");
-    assert.match(stored.sql, /AND portal_username = \$5/);
+    // Unverified handle cannot score
+    const unverifiedResult = await syncLeaderboardForUser("coder", { invalidateCache: false });
+    assert.equal(unverifiedResult?.totalSolved, 0);
+    assert.equal(unverifiedResult?.score, 0);
+
+    // Once ownership is proven (VERIFIED), provider data scores
+    links[0]!.ownership_status = "VERIFIED";
+    links[0]!.verified = true;
+    const verifiedResult = await syncLeaderboardForUser("coder", { invalidateCache: false, refreshProviderStats: true });
+    assert.equal(verifiedResult?.totalSolved, 8);
+    assert.ok((verifiedResult?.score || 0) > 0);
 });
 
 test("client snapshots and cached stats for a replaced handle cannot set the score", async () => {
