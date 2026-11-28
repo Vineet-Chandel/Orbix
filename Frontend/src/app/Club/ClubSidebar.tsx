@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
     LayoutDashboard,
     Users,
@@ -9,7 +9,6 @@ import {
     Bell,
     LogOut,
     ChevronDown,
-    X,
     Settings,
     Building2,
     Award,
@@ -18,8 +17,8 @@ import {
     Megaphone,
     MessageSquareQuote,
     Globe,
-    ExternalLink,
 } from "lucide-react";
+import { MobileNavigationDock, type DockItem } from "../common/MobileNavigationDock";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
 export type ClubTab =
@@ -48,48 +47,33 @@ interface ClubSidebarProps {
         logoUrl?: string | null;
     };
     activeTab: ClubTab;
-    onTabChange: (tab: ClubTab) => void;
-    isOpen: boolean;
-    onClose: () => void;
     unreadInboxCount?: number;
     teamPendingCount?: number;
-    eventsCount?: number;
     onOpenInbox: () => void;
     onSignOut: () => void;
-}
-
-interface ClubCategoryItem {
-    id: ClubTab;
-    label: string;
-    icon: React.ReactNode;
-    path: string;
-    badge?: string | number;
 }
 
 interface ClubNavCategory {
     id: string;
     label: string;
-    items: ClubCategoryItem[];
+    dockLabel: string;
+    color: string;
+    items: (Omit<DockItem, "id" | "color"> & { id: ClubTab; path: string })[];
 }
 
 export const ClubSidebar = ({
     club,
     activeTab,
-    onTabChange,
-    isOpen = false,
-    onClose,
     unreadInboxCount = 0,
     teamPendingCount = 0,
-    eventsCount: _eventsCount = 0,
     onOpenInbox,
     onSignOut,
 }: ClubSidebarProps) => {
-    const location = useLocation();
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
 
-    const isExpanded = isOpen || isHovered || isProfileMenuOpen;
+    const isExpanded = isHovered || isProfileMenuOpen;
 
     // Close profile menu when clicking outside or pressing Escape
     useEffect(() => {
@@ -118,15 +102,12 @@ export const ClubSidebar = ({
         };
     }, [isProfileMenuOpen]);
 
-    const handleItemClick = (tab: ClubTab) => {
-        onTabChange(tab);
-        if (onClose) onClose();
-    };
-
     // Category-wise Sidebar specification matching personal account structure
     const clubCategories: ClubNavCategory[] = [
         {
             id: "command-center",
+            dockLabel: "Home",
+            color: "#a2ff86",
             label: "01 · COMMAND CENTER",
             items: [
                 {
@@ -145,6 +126,8 @@ export const ClubSidebar = ({
         },
         {
             id: "programs-events",
+            dockLabel: "Events",
+            color: "#FFE566",
             label: "02 · PROGRAMS & EVENTS",
             items: [
                 {
@@ -169,6 +152,8 @@ export const ClubSidebar = ({
         },
         {
             id: "people-collaboration",
+            dockLabel: "Team",
+            color: "#38BDF8",
             label: "03 · PEOPLE & COLLABORATION",
             items: [
                 {
@@ -194,6 +179,8 @@ export const ClubSidebar = ({
         },
         {
             id: "club-network",
+            dockLabel: "Network",
+            color: "#A6FF70",
             label: "04 · CLUB NETWORK",
             items: [
                 {
@@ -210,41 +197,39 @@ export const ClubSidebar = ({
                 },
             ],
         },
-        {
-            id: "club-identity",
-            label: "05 · CLUB IDENTITY",
-            items: [
-                {
-                    id: "profile",
-                    label: "Manage Profile",
-                    icon: <Edit3 className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />,
-                    path: "/club/profile",
-                },
-            ],
-        },
     ];
 
-    const renderNavItem = (item: ClubCategoryItem) => {
-        const isCurrentActive =
-            activeTab === item.id ||
-            (item.path && location.pathname === item.path) ||
-            (item.id === "overview" && (location.pathname === "/club/dashboard" || location.pathname === "/club")) ||
-            (item.id === "analytics" && (location.pathname.startsWith("/club/analytics") || location.pathname.startsWith("/club/trends"))) ||
-            (item.id === "events" && location.pathname.startsWith("/club/events")) ||
-            (item.id === "certificates" && location.pathname.startsWith("/club/certificates")) ||
-            (item.id === "feedback-surveys" && (location.pathname.startsWith("/club/feedback") || activeTab === "feedback-surveys")) ||
-            (item.id === "team" && location.pathname === "/club/team" && activeTab === "team") ||
-            (item.id === "team-workspace" && (location.pathname === "/club/team-workspace" || activeTab === "team-workspace")) ||
-            (item.id === "recruitment" && (location.pathname === "/club/recruitment" || activeTab === "recruitment")) ||
-            (item.id === "announcements" && (location.pathname.startsWith("/club/announcement") || activeTab === "announcements")) ||
-            (item.id === "clubs" && (location.pathname.startsWith("/club/clubs") || location.pathname.startsWith("/club/campus-clubs") || location.pathname.startsWith("/club/other-clubs"))) ||
-            (item.id === "profile" && (location.pathname.startsWith("/club/profile") || location.pathname.startsWith("/club/manage-profile")));
+    const accountItems: DockItem[] = [
+        { id: "profile", label: "Manage Profile", icon: <Edit3 size={16} />, path: "/club/profile", color: "#a2ff86", current: activeTab === "profile" },
+        { id: "public-page", label: "Public Club Page", icon: <Globe size={16} />, path: `/clubs/${club.slug || club.clubUsername || club.id}`, color: "#38BDF8" },
+        {
+            id: "notifications",
+            label: "Notifications",
+            icon: <Bell size={16} />,
+            action: onOpenInbox,
+            badge: unreadInboxCount || undefined,
+            badgeVariant: "danger",
+            color: "#FFE566",
+        },
+        { id: "settings", label: "Settings & Permissions", icon: <Settings size={16} />, path: "/club/settings", color: "#FAF6EE", current: activeTab === "settings" },
+        { id: "signout", label: "Sign Out", icon: <LogOut size={16} />, action: onSignOut, color: "#ff80d7ff" },
+    ];
+
+    const clubLogo = club.logo_url || club.logoUrl;
+    const clubAvatar = clubLogo ? (
+        <img src={clubLogo} alt="" className="h-full w-full object-cover" />
+    ) : (
+        <span className="text-xs tracking-tight">{club.name.slice(0, 2).toUpperCase()}</span>
+    );
+
+    const renderNavItem = (item: ClubNavCategory["items"][number]) => {
+        const isCurrentActive = activeTab === item.id;
 
         return (
             <Link
                 key={item.id}
                 to={item.path}
-                onClick={() => handleItemClick(item.id)}
+                aria-current={isCurrentActive ? "page" : undefined}
                 className={`flex items-center h-10 sm:h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
                     isCurrentActive
                         ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
@@ -313,9 +298,7 @@ export const ClubSidebar = ({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 border-black text-black px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                isOpen
-                    ? "orbix-mobile-sidebar fixed top-2 sm:top-3 left-2 sm:left-3 z-[60] w-[280px] max-w-[calc(100vw-1rem)] shadow-[6px_6px_0px_#000]"
-                    : isExpanded
+                isExpanded
                     ? "absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] w-64 sm:w-[264px] shadow-[6px_6px_0px_#000]"
                     : "absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] w-[68px] sm:w-[72px] shadow-[4px_4px_0px_#000]"
             }`}
@@ -328,10 +311,6 @@ export const ClubSidebar = ({
             >
                 <Link
                     to="/club/dashboard"
-                    onClick={() => {
-                        onTabChange("overview");
-                        if (onClose) onClose();
-                    }}
                     className={`flex items-center group cursor-pointer ${
                         isExpanded ? "gap-2.5 min-w-0 flex-1" : "justify-center mx-auto"
                     }`}
@@ -355,21 +334,10 @@ export const ClubSidebar = ({
                     )}
                 </Link>
 
-                {/* Mobile Close Button */}
-                {onClose && isExpanded && (
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="lg:hidden p-1.5 text-black hover:bg-black/10 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[0.5px] active:translate-y-[0.5px] transition-all cursor-pointer flex-shrink-0 ml-1.5"
-                        aria-label="Close Sidebar"
-                    >
-                        <X className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                )}
             </div>
 
             {/* Category-Wise Navigation Groups (Scrollable) */}
-            <div className="orbix-mobile-sidebar-scroll flex-1 min-h-0 overflow-y-auto no-scrollbar overflow-x-hidden pt-2.5 pb-2 px-0.5 pr-1 space-y-1">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar overflow-x-hidden pt-2.5 pb-2 px-0.5 pr-1 space-y-1">
                 {clubCategories.map((category, index) => (
                     <div key={category.id} className="space-y-0.5">
                         {/* Divider between categories */}
@@ -399,7 +367,7 @@ export const ClubSidebar = ({
             </div>
 
             {/* Bottom Section: Club Profile Card (DEAD CENTER avatar when collapsed) */}
-            <div ref={profileMenuRef} className="orbix-mobile-sidebar-profile pt-2.5 border-t-2 border-black/15 relative flex-shrink-0 z-[70]">
+            <div ref={profileMenuRef} className="pt-2.5 border-t-2 border-black/15 relative flex-shrink-0 z-[70]">
                 <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen((prev) => !prev)}
@@ -412,17 +380,7 @@ export const ClubSidebar = ({
                     <div className="w-11 h-11 flex items-center justify-center flex-shrink-0 pl-0.5">
                         <div className="relative">
                             <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center font-black text-black overflow-hidden relative group-hover:scale-105 transition-transform">
-                                {club.logo_url || club.logoUrl ? (
-                                    <img
-                                        src={club.logo_url || club.logoUrl || ""}
-                                        alt={club.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <span className="text-xs tracking-tight">
-                                        {club.name.slice(0, 2).toUpperCase()}
-                                    </span>
-                                )}
+                                {clubAvatar}
                             </div>
                             {unreadInboxCount > 0 && (
                                 <span className="absolute -top-1 -right-1 z-30 flex h-3.5 w-3.5">
@@ -465,83 +423,36 @@ export const ClubSidebar = ({
                     >
                         {/* Club Account Header */}
                         <div className="px-3 py-2 border-b-2 border-black/15 mb-1.5 space-y-0.5">
-                            <div className="flex items-center justify-between gap-2">
-                                <p className="font-black text-black truncate">{club.name}</p>
-                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-[#a2ff86] text-black border border-black shrink-0">
-                                    Club Lead
-                                </span>
-                            </div>
+                            <p className="font-black text-black truncate">{club.name}</p>
                             <p className="text-[10px] font-bold text-neutral-600 truncate">{club.college_name}</p>
                         </div>
 
-                        {/* Unique Action 1: Public Club Page */}
-                        <Link
-                            to={`/clubs/${club.slug || club.clubUsername || club.id}`}
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                if (onClose) onClose();
-                            }}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <Globe className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Public Club Page</span>
-                            </div>
-                            <ExternalLink className="w-3 h-3 text-neutral-400 shrink-0" />
-                        </Link>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onClose();
-                                onOpenInbox();
-                            }}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <Bell className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Notifications</span>
-                            </div>
-                            {unreadInboxCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#FF6B6B] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                    {unreadInboxCount}
-                                </span>
-                            )}
-                        </button>
-
-                        {/* Unique Action 3: Settings & Permissions */}
-                        <Link
-                            to="/club/settings"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onTabChange("settings");
-                                if (onClose) onClose();
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold transition-colors text-left cursor-pointer ${
-                                activeTab === "settings"
-                                    ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000] font-black"
-                                    : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent"
-                            }`}
-                        >
-                            <Settings className={`w-3.5 h-3.5 flex-shrink-0 ${activeTab === "settings" ? "text-black" : "text-neutral-700"}`} />
-                            <span className="truncate">Settings &amp; Permissions</span>
-                        </Link>
-
-                        <div className="my-1.5 h-0.5 bg-black/15" />
-
-                        {/* Sign Out */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onSignOut();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 font-black hover:bg-rose-50 transition-colors text-left cursor-pointer"
-                        >
-                            <LogOut className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" />
-                            <span className="truncate">Sign Out</span>
-                        </button>
+                        {accountItems.map((item) => {
+                            const props = {
+                                className: `flex w-full items-center gap-2.5 rounded-xl border-2 border-transparent px-3 py-2 text-left font-bold transition-colors hover:bg-black/5 aria-[current=page]:border-black aria-[current=page]:bg-[#a2ff86] aria-[current=page]:font-black ${item.id === "signout" ? "text-rose-600" : "text-neutral-800"}`,
+                                "aria-current": item.current ? "page" as const : undefined,
+                                onClick: () => {
+                                    setIsProfileMenuOpen(false);
+                                    item.action?.();
+                                },
+                            };
+                            const content = (
+                                <>
+                                    {item.icon}
+                                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                                    {item.badge !== undefined && (
+                                        <span className="rounded-full border border-black bg-[#FF6B6B] px-1.5 text-[10px] font-black text-black">
+                                            {item.badge}
+                                        </span>
+                                    )}
+                                </>
+                            );
+                            return item.path ? (
+                                <Link key={item.id} to={item.path} {...props}>{content}</Link>
+                            ) : (
+                                <button key={item.id} type="button" {...props}>{content}</button>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -558,15 +469,35 @@ export const ClubSidebar = ({
                 {sidebarContent}
             </div>
 
-            {/* Mobile overlay and backdrop */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 lg:hidden"
-                    onClick={onClose}
-                >
-                    <div onClick={(e) => e.stopPropagation()}>{sidebarContent}</div>
-                </div>
-            )}
+            <MobileNavigationDock
+                layerClassName="z-40"
+                currentTab={
+                    activeTab === "profile" || activeTab === "settings" ? "account" :
+                    clubCategories.find((category) => category.items.some((item) => item.id === activeTab))?.id ?? "command-center"
+                }
+                tabs={[
+                    ...clubCategories.map((category) => ({
+                        id: category.id,
+                        label: category.dockLabel,
+                        icon: category.items[0].icon,
+                        shaderColor: category.color,
+                        badge: category.id === "people-collaboration" ? teamPendingCount || undefined : undefined,
+                        items: category.items.map((item) => ({
+                            ...item,
+                            current: activeTab === item.id,
+                            color: category.color,
+                        })),
+                    })),
+                    {
+                        id: "account",
+                        label: "Account",
+                        icon: <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg border border-black bg-[#FAF6EE]">{clubAvatar}</span>,
+                        shaderColor: "#ff80d7ff",
+                        badge: unreadInboxCount || undefined,
+                        items: accountItems,
+                    },
+                ]}
+            />
         </>
     );
 };

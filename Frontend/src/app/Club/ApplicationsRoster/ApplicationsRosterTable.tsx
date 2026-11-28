@@ -1273,7 +1273,7 @@ export const ApplicationsRosterTable: React.FC<ApplicationsRosterTableProps> = (
 
             {/* FLOATING BOTTOM ACTION DOCK (Visible on Scroll when Items are Selected) */}
             {selectedCounts.total > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[95vw] sm:max-w-xl w-full px-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+                <div className="orbix-club-floating-actions fixed bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[95vw] sm:max-w-xl w-full px-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
                     <div className="p-3 sm:p-3.5 bg-[#FAF6EE] border-3 border-black shadow-[6px_6px_0px_#000] rounded-2xl flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5 min-w-0">
                             <span className="w-7 h-7 rounded-xl bg-black text-[#FFE566] font-black text-xs flex items-center justify-center shadow-[1px_1px_0px_#000] shrink-0">

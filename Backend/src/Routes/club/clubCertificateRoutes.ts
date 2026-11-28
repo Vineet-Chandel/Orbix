@@ -3,6 +3,7 @@ import multer from "multer";
 import { authenticate, optionalAuthenticate, requireClubAccount } from "../../middlewares/auth.middleware.js";
 import { query } from "../../database/client.js";
 import { CertificateTemplateService } from "../../services/club/certificateTemplateService.js";
+import { getCertificateTemplateDiscovery, recordOfficialTemplateView } from "../../services/club/certificateTemplateDiscovery.js";
 import { CertificateUploadService } from "../../services/club/certificateUploadService.js";
 import { CertificateIssuanceService } from "../../services/club/certificateIssuanceService.js";
 import { CertificatePdfService } from "../../services/club/certificatePdfService.js";
@@ -42,16 +43,69 @@ async function getStaffClub(userId: string, targetClubId?: string) {
 // 1. TEMPLATE LIBRARY ENDPOINTS
 // =========================================================================
 
+const templateUuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+function requestedTemplateClub(req: Request) {
+    return typeof req.query.clubId === "string" ? req.query.clubId : undefined;
+}
+
+function respondToMissingTemplateDiscoverySchema(error: unknown, res: Response) {
+    if (!(error instanceof Error) || !("code" in error)) return false;
+    const missingHistory = error.code === "42P01" && error.message.includes("certificate_template_view_history");
+    const missingColumns = error.code === "42703" && /\b(official_template_id|is_starter_copy|creation_key|last_used_at)\b/.test(error.message);
+    const missingIndex = error.code === "42P10" && error.message.includes("ON CONFLICT");
+    if (!missingHistory && !missingColumns && !missingIndex) return false;
+
+    res.status(503).json({
+        success: false,
+        code: "CERTIFICATE_TEMPLATE_SCHEMA_PENDING",
+        message: "Certificate template activity and saving require database migration 072.",
+    });
+    return true;
+}
+
+certificateRouter.get("/templates/discovery", authenticate, requireClubAccount, async (req, res) => {
+    try {
+        const userId = req.user!.id;
+        const club = await getStaffClub(userId, requestedTemplateClub(req));
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+        res.set("Cache-Control", "private, no-store");
+        return res.json(await getCertificateTemplateDiscovery(club.id, userId));
+    } catch (err) {
+        if (respondToMissingTemplateDiscoverySchema(err, res)) return;
+        console.error("Load certificate template discovery error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load template activity." });
+    }
+});
+
+certificateRouter.post("/templates/:templateId/view", authenticate, requireClubAccount, async (req, res) => {
+    try {
+        const templateId = String(req.params.templateId);
+        if (!templateUuid.test(templateId)) return res.status(400).json({ success: false, message: "Invalid template ID." });
+        const userId = req.user!.id;
+        const club = await getStaffClub(userId, requestedTemplateClub(req));
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+        const recentlyViewedIds = await recordOfficialTemplateView(club.id, userId, templateId);
+        if (!recentlyViewedIds) return res.status(404).json({ success: false, message: "Template not found." });
+        return res.json({ recentlyViewedIds });
+    } catch (err) {
+        if (respondToMissingTemplateDiscoverySchema(err, res)) return;
+        console.error("Record certificate template view error:", err);
+        return res.status(500).json({ success: false, message: "Failed to record template view." });
+    }
+});
+
 /**
  * GET /api/club/certificates/templates
  * Lists all system templates and club-owned templates
  */
 certificateRouter.get("/templates", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, requestedTemplateClub(req));
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
         const { category } = req.query as { category?: string };
+        res.set("Cache-Control", "private, no-store");
         const result = await CertificateTemplateService.getTemplates(club.id, category);
 
         return res.json({
@@ -71,7 +125,7 @@ certificateRouter.get("/templates", authenticate, requireClubAccount, async (req
  */
 certificateRouter.get("/templates/:templateId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, requestedTemplateClub(req));
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
         const templateId = String(req.params.templateId);
@@ -94,10 +148,14 @@ certificateRouter.get("/templates/:templateId", authenticate, requireClubAccount
  */
 certificateRouter.post("/templates", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, requestedTemplateClub(req));
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
-        const { name, category, design, backgroundAssetUrl, backgroundFit, orientation, pageWidth, pageHeight } = req.body;
+        const { name, category, design, backgroundAssetUrl, backgroundFit, orientation, pageWidth, pageHeight, creationKey } = req.body;
+
+        if (creationKey !== undefined && (typeof creationKey !== "string" || !templateUuid.test(creationKey))) {
+            return res.status(400).json({ success: false, message: "Invalid creation key." });
+        }
 
         if (!name || typeof name !== "string" || name.trim().length < 2) {
             return res.status(400).json({ success: false, message: "Please provide a valid template name (minimum 2 characters)." });
@@ -116,10 +174,12 @@ certificateRouter.post("/templates", authenticate, requireClubAccount, async (re
             orientation,
             pageWidth,
             pageHeight,
+            creationKey,
         });
 
         return res.status(201).json({ success: true, template: created });
     } catch (err: any) {
+        if (respondToMissingTemplateDiscoverySchema(err, res)) return;
         console.error("Create template error:", err);
         return res.status(500).json({ success: false, message: err.message || "Failed to create template." });
     }
@@ -131,7 +191,7 @@ certificateRouter.post("/templates", authenticate, requireClubAccount, async (re
  */
 certificateRouter.put("/templates/:templateId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, requestedTemplateClub(req));
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
         const templateId = String(req.params.templateId);
@@ -159,21 +219,23 @@ certificateRouter.put("/templates/:templateId", authenticate, requireClubAccount
  */
 certificateRouter.post("/templates/:templateId/duplicate", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, requestedTemplateClub(req));
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
         const templateId = String(req.params.templateId);
-        const { customName } = req.body;
+        const { customName, reuseOfficial } = req.body;
 
         const duplicated = await CertificateTemplateService.duplicateTemplate(
             templateId,
             club.id,
             req.user!.id,
-            customName
+            customName,
+            reuseOfficial === true,
         );
 
         return res.status(201).json({ success: true, template: duplicated });
     } catch (err: any) {
+        if (respondToMissingTemplateDiscoverySchema(err, res)) return;
         console.error("Duplicate template error:", err);
         return res.status(500).json({ success: false, message: err.message || "Failed to duplicate template." });
     }
@@ -185,7 +247,7 @@ certificateRouter.post("/templates/:templateId/duplicate", authenticate, require
  */
 certificateRouter.post("/templates/:templateId/rename", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, requestedTemplateClub(req));
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
         const templateId = String(req.params.templateId);
@@ -208,7 +270,7 @@ certificateRouter.post("/templates/:templateId/rename", authenticate, requireClu
  */
 certificateRouter.delete("/templates/:templateId", authenticate, requireClubAccount, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, requestedTemplateClub(req));
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
         const templateId = String(req.params.templateId);

@@ -25,6 +25,35 @@ export interface TemplateListResponse {
     clubTemplates: CertificateTemplateRecord[];
 }
 
+export interface CertificateTemplateDiscovery {
+    recentlyViewedIds: string[];
+    recentlyUsedIds: string[];
+    usedOfficialIds: string[];
+    trendingIds: string[];
+    popularIds: string[];
+}
+
+async function fetchTemplateActivity<T>(path: string, clubId: string, method = "GET", signal?: AbortSignal): Promise<T> {
+    const query = new URLSearchParams({ clubId });
+    const response = await fetch(`/api/club/certificates/templates/${path}?${query}`, {
+        method, credentials: "include", ...(signal ? { signal } : {}),
+    });
+    if (!response.ok) throw new Error("Could not load certificate template activity.");
+    return response.json();
+}
+
+export function fetchCertificateTemplateDiscovery(clubId: string, signal?: AbortSignal) {
+    return fetchTemplateActivity<CertificateTemplateDiscovery>("discovery", clubId, "GET", signal);
+}
+
+export function recordCertificateTemplateView(templateId: string, clubId: string) {
+    return fetchTemplateActivity<{ recentlyViewedIds: string[] }>(`${encodeURIComponent(templateId)}/view`, clubId, "POST");
+}
+
+function certificateClubQuery(clubId?: string) {
+    return clubId ? `?${new URLSearchParams({ clubId })}` : "";
+}
+
 export interface UploadBackgroundResponse {
     success: boolean;
     assetUrl: string;
@@ -281,13 +310,15 @@ export interface UserWalletResponse {
 /**
  * Lists templates (system templates + club-owned templates)
  */
-export async function fetchCertificateTemplates(category?: string): Promise<TemplateListResponse> {
+export async function fetchCertificateTemplates(category?: string, clubId?: string, signal?: AbortSignal): Promise<TemplateListResponse> {
     const params = new URLSearchParams();
     if (category && category !== "all") params.append("category", category);
+    if (clubId) params.set("clubId", clubId);
 
     const res = await fetch(`/api/club/certificates/templates?${params.toString()}`, {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        ...(signal ? { signal } : {}),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || "Failed to load certificate templates.");
@@ -319,8 +350,9 @@ export async function createCertificateTemplate(payload: {
     orientation?: "landscape" | "portrait";
     pageWidth?: number;
     pageHeight?: number;
-}): Promise<CertificateTemplateRecord> {
-    const res = await fetch("/api/club/certificates/templates", {
+    creationKey?: string;
+}, clubId?: string): Promise<CertificateTemplateRecord> {
+    const res = await fetch(`/api/club/certificates/templates${certificateClubQuery(clubId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -343,9 +375,10 @@ export async function updateCertificateTemplate(
         backgroundAssetUrl?: string | null;
         backgroundFit?: "cover" | "contain" | "stretch";
         status?: "draft" | "published" | "archived";
-    }
+    },
+    clubId?: string,
 ): Promise<CertificateTemplateRecord> {
-    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}`, {
+    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}${certificateClubQuery(clubId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -361,13 +394,14 @@ export async function updateCertificateTemplate(
  */
 export async function duplicateCertificateTemplate(
     templateId: string,
-    customName?: string
+    customName?: string,
+    options?: { clubId: string; reuseOfficial?: boolean },
 ): Promise<CertificateTemplateRecord> {
-    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}/duplicate`, {
+    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}/duplicate${certificateClubQuery(options?.clubId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ customName }),
+        body: JSON.stringify({ customName, reuseOfficial: options?.reuseOfficial }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || "Failed to duplicate template.");
@@ -379,9 +413,10 @@ export async function duplicateCertificateTemplate(
  */
 export async function renameCertificateTemplate(
     templateId: string,
-    name: string
+    name: string,
+    clubId?: string,
 ): Promise<CertificateTemplateRecord> {
-    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}/rename`, {
+    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}/rename${certificateClubQuery(clubId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -395,8 +430,8 @@ export async function renameCertificateTemplate(
 /**
  * Archives a club template
  */
-export async function archiveCertificateTemplate(templateId: string): Promise<void> {
-    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}`, {
+export async function archiveCertificateTemplate(templateId: string, clubId?: string): Promise<void> {
+    const res = await fetch(`/api/club/certificates/templates/${encodeURIComponent(templateId)}${certificateClubQuery(clubId)}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

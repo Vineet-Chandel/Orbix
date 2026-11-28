@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import { useCertificateCanvasZoom } from "./useCertificateCanvasZoom";
+import { CertificateText } from "./CertificateText";
+import React, { useState, useMemo, useRef } from "react";
 import {
     Award,
     CheckCircle2,
@@ -79,13 +81,13 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
     const [inspectedElementId, setInspectedElementId] = useState<string | null>(null);
 
     // Zoom & Viewport
-    const [zoom, setZoom] = useState<number>(0.85);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
     const [pdfSha256, setPdfSha256] = useState<string | null>(null);
 
     const canvasContainerRef = useRef<HTMLDivElement>(null);
-    const canvasWidth = design.page?.width || 842;
-    const canvasHeight = design.page?.height || 595;
+    const canvasWidth = design.page?.width || design.dimensions?.width || 842;
+    const canvasHeight = design.page?.height || design.dimensions?.height || 595;
+    const { zoom, changeZoom, fitToScreen: handleFitToScreen } = useCertificateCanvasZoom(canvasContainerRef, canvasWidth, canvasHeight);
 
     // Phase 7.1: Pre-configured Simulation Scenarios
     const simulationScenarios: SimulationScenario[] = useMemo(() => [
@@ -696,18 +698,6 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
         }
     };
 
-    // Auto-fit canvas to container
-    const handleFitToScreen = useCallback(() => {
-        if (!canvasContainerRef.current) return;
-        const container = canvasContainerRef.current;
-        const availableWidth = container.clientWidth - 60;
-        const availableHeight = container.clientHeight - 60;
-        if (availableWidth <= 0 || availableHeight <= 0) return;
-
-        const optimalZoom = Math.min(availableWidth / canvasWidth, availableHeight / canvasHeight);
-        setZoom(Math.max(0.35, Math.min(1.3, Number(optimalZoom.toFixed(2)))));
-    }, [canvasWidth, canvasHeight]);
-
     // Resolve field value from snapshot
     const resolveFieldValue = (fieldKey: string | undefined, fallback = "") => {
         if (!fieldKey) return fallback;
@@ -721,7 +711,7 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
     };
 
     return (
-        <div className="flex flex-col h-[88vh] bg-[#FAF6EE] rounded-2xl border-4 border-black overflow-hidden shadow-[8px_8px_0px_#000]">
+        <div className="flex min-w-0 flex-col 2xl:h-[88dvh] bg-[#FAF6EE] rounded-2xl border-4 border-black overflow-hidden shadow-[8px_8px_0px_#000]">
             {/* Top Toolbar */}
             <div className="px-5 py-3 bg-white border-b-3 border-black flex flex-wrap items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
@@ -754,7 +744,7 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
                     {/* Zoom Controls */}
                     <div className="flex items-center border-2 border-black rounded-lg overflow-hidden shadow-[2px_2px_0px_#000] bg-white">
                         <button
-                            onClick={() => setZoom((z) => Math.max(0.35, Number((z - 0.1).toFixed(2))))}
+                            onClick={() => changeZoom(-0.1)}
                             className="p-1.5 hover:bg-neutral-100 border-r border-black"
                             title="Zoom Out"
                         >
@@ -764,7 +754,7 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
                             {Math.round(zoom * 100)}%
                         </span>
                         <button
-                            onClick={() => setZoom((z) => Math.min(1.4, Number((z + 0.1).toFixed(2))))}
+                            onClick={() => changeZoom(0.1)}
                             className="p-1.5 hover:bg-neutral-100 border-r border-black"
                             title="Zoom In"
                         >
@@ -812,9 +802,9 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
             </div>
 
             {/* Main Studio Body: 3 Columns (Recipient Navigator, Center Canvas, Validation Checklist) */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col 2xl:flex-row 2xl:overflow-hidden">
                 {/* LEFT COLUMN: Recipient Selector & Data Snapshot */}
-                <div className="w-80 bg-white border-r-3 border-black flex flex-col shrink-0">
+                <div className="flex max-h-[48dvh] min-h-0 w-full shrink-0 flex-col overflow-hidden border-t-2 border-black bg-white 2xl:max-h-none 2xl:w-80 2xl:border-r-3 2xl:border-t-0">
                     {/* Mode Selector Tabs: Simulation vs Real */}
                     <div className="grid grid-cols-2 border-b-2 border-black bg-[#F5F1E6]">
                         <button
@@ -1026,14 +1016,14 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
                 {/* CENTER COLUMN: Live Merged Canvas Preview */}
                 <div
                     ref={canvasContainerRef}
-                    className="flex-1 bg-neutral-200 overflow-auto p-8 flex items-center justify-center select-none relative"
+                    className="relative order-first flex h-[min(54dvh,36rem)] min-w-0 select-none overflow-auto bg-neutral-200 p-3 sm:p-5 2xl:order-none 2xl:h-auto 2xl:flex-1"
                 >
                     <div
                         style={{
                             width: `${canvasWidth * zoom}px`,
                             height: `${canvasHeight * zoom}px`,
                         }}
-                        className="relative bg-white shadow-2xl border-4 border-black transition-all shrink-0 origin-center"
+                        className="relative m-auto shrink-0 origin-center bg-white shadow-2xl ring-2 ring-black"
                     >
                         {/* Background Container */}
                         <div
@@ -1140,19 +1130,6 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
                                     ? resolveFieldValue(elem.fieldKey, elem.fallbackValue || "")
                                     : elem.text || "";
 
-                            const baseFontSize = elem.style?.fontSize || 24;
-                            let effectiveFontSize = baseFontSize * zoom;
-
-                            if (elem.type === "dynamic-text" && elem.fitPolicy === "shrink" && displayText.length > 0) {
-                                const minSize = (elem.minFontSize || 10) * zoom;
-                                const estCharWidth = (baseFontSize * zoom) * 0.58;
-                                const estTextWidth = displayText.length * estCharWidth;
-                                if (width > 0 && estTextWidth > width) {
-                                    const scale = Math.max(minSize / (baseFontSize * zoom), width / estTextWidth);
-                                    effectiveFontSize = Math.max(minSize, baseFontSize * zoom * scale);
-                                }
-                            }
-
                             return (
                                 <div
                                     key={elem.id}
@@ -1253,31 +1230,7 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
                                             <QrCode className="w-full h-full text-black stroke-[1.5]" />
                                         </div>
                                     ) : (
-                                        <div
-                                            style={{
-                                                fontSize: `${effectiveFontSize}px`,
-                                                fontWeight: (elem.style?.fontWeight as any) || "normal",
-                                                color: elem.style?.color || "#0F172A",
-                                                textAlign: elem.style?.textAlign || "center",
-                                                letterSpacing: elem.style?.letterSpacing ? `${elem.style.letterSpacing * zoom}px` : undefined,
-                                                textTransform: elem.style?.textTransform || "none",
-                                                fontFamily: getCertificateFontFamily(elem.style?.fontFamily),
-                                                lineHeight: elem.style?.lineHeight || 1.3,
-                                            }}
-                                            className="w-full h-full flex items-center justify-center leading-tight overflow-visible select-none pointer-events-none p-0.5"
-                                        >
-                                            <div
-                                                className="w-full whitespace-pre-wrap break-words select-none"
-                                                style={{
-                                                    wordBreak: "break-word",
-                                                    overflowWrap: "break-word",
-                                                    whiteSpace: "pre-wrap",
-                                                    lineHeight: elem.style?.lineHeight || 1.3,
-                                                }}
-                                            >
-                                                {displayText}
-                                            </div>
-                                        </div>
+                                        <CertificateText element={elem} value={displayText} fillBox />
                                     )}
                                 </div>
                             );
@@ -1286,7 +1239,7 @@ export const PreviewAndValidationStudio: React.FC<PreviewAndValidationStudioProp
                 </div>
 
                 {/* RIGHT COLUMN: Automated Validation Engine Checklist (Phase 7.3) */}
-                <div className="w-80 bg-white border-l-3 border-black flex flex-col shrink-0">
+                <div className="flex max-h-[48dvh] min-h-0 w-full shrink-0 flex-col border-t-2 border-black bg-white 2xl:max-h-none 2xl:w-80 2xl:border-l-3 2xl:border-t-0">
                     <div className="p-4 border-b-2 border-black/15 bg-white flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <ShieldCheck className="w-5 h-5 text-black" />

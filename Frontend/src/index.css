@@ -19,6 +19,10 @@
     bottom: var(--mobile-dock-clearance);
     z-index: 9989;
   }
+
+  body:has(#orbix-mobile-bottom-nav) .orbix-club-floating-actions {
+    bottom: var(--mobile-dock-clearance);
+  }
 }
 
 

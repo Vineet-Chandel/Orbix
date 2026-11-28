@@ -1,6 +1,6 @@
 import React from "react";
 import type { CertificateDesign } from "../../../types/certificateStudio";
-import { getCertificateFontFamily } from "./certificateFonts";
+import { CertificateText } from "./CertificateText";
 import { hasCertificateContent } from "./templateContent";
 
 export const CertificateThumbnailPreview: React.FC<{
@@ -167,22 +167,6 @@ export const CertificateThumbnailPreview: React.FC<{
                     .sort((a, b) => a.zIndex - b.zIndex)
                     .map((elem) => {
                         const style = { ...elem, ...elem.style };
-                        const fontSize = style.fontSize || 14;
-                        const fontWeight = style.fontWeight || "normal";
-                        const fill = style.color || "#000000";
-                        const textAlign = style.textAlign || "left";
-
-                        let textAnchor: "start" | "middle" | "end" = "start";
-                        let textX = elem.x;
-                        if (textAlign === "center") {
-                            textAnchor = "middle";
-                            textX = elem.x + elem.width / 2;
-                        } else if (textAlign === "right") {
-                            textAnchor = "end";
-                            textX = elem.x + elem.width;
-                        }
-                        const textY = elem.y + elem.height / 2;
-
                         if (["static-text", "dynamic-text", "text", "dynamic_text"].includes(elem.type)) {
                             let displayText = elem.text || elem.content || elem.fallbackValue || (elem.fieldKey ? elem.fieldKey : "");
                             if (elem.fieldKey === "recipient.name" && sampleRecipientName) {
@@ -193,60 +177,7 @@ export const CertificateThumbnailPreview: React.FC<{
                                 displayText = sampleEventTitle;
                             }
 
-                            const lines = displayText.split("\n");
-                            if (lines.length > 1) {
-                                const lineHeight = fontSize * 1.25;
-                                const startY = textY - ((lines.length - 1) * lineHeight) / 2;
-                                return (
-                                    <text
-                                        key={elem.id}
-                                        x={textX}
-                                        y={startY}
-                                        textAnchor={textAnchor}
-                                        dominantBaseline="central"
-                                        fill={fill}
-                                        fontSize={fontSize}
-                                        fontWeight={
-                                            fontWeight === "black"
-                                                ? "900"
-                                                : fontWeight === "bold"
-                                                ? "700"
-                                                : fontWeight
-                                        }
-                                        letterSpacing={style.letterSpacing ? `${style.letterSpacing}px` : undefined}
-                                        fontFamily={getCertificateFontFamily(style.fontFamily)}
-                                    >
-                                        {lines.map((line, lIdx) => (
-                                            <tspan key={lIdx} x={textX} dy={lIdx === 0 ? 0 : lineHeight}>
-                                                {line}
-                                            </tspan>
-                                        ))}
-                                    </text>
-                                );
-                            }
-
-                            return (
-                                <text
-                                    key={elem.id}
-                                    x={textX}
-                                    y={textY}
-                                    textAnchor={textAnchor}
-                                    dominantBaseline="central"
-                                    fill={fill}
-                                    fontSize={fontSize}
-                                    fontWeight={
-                                        fontWeight === "black"
-                                            ? "900"
-                                            : fontWeight === "bold"
-                                            ? "700"
-                                            : fontWeight
-                                    }
-                                    letterSpacing={style.letterSpacing ? `${style.letterSpacing}px` : undefined}
-                                    fontFamily={getCertificateFontFamily(style.fontFamily)}
-                                >
-                                    {displayText}
-                                </text>
-                            );
+                            return <CertificateText key={elem.id} element={elem} value={displayText} x={elem.x} y={elem.y} />;
                         }
 
                         if (elem.type === "shape") {

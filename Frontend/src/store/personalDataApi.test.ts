@@ -50,6 +50,38 @@ test("a response arriving after logout cannot repopulate private section data", 
     }
 });
 
+test("club credibility reuses standings and an empty ledger on dashboard revisit", async () => {
+    const original = globalThis.fetch;
+    const requests: string[] = [];
+    const overview = { success: true, credibility: { score: 90 } };
+    const ledger = { success: true, total: 0, totalPages: 0, history: [] };
+    globalThis.fetch = async (input) => {
+        const url = String(input);
+        requests.push(url);
+        return Response.json(url.includes("/history?") ? ledger : overview);
+    };
+    try {
+        store.dispatch(setUser({ ...user }));
+        const endpoint = personalDataApi.endpoints.clubCredibility;
+        const first = store.dispatch(endpoint.initiate("club-a"));
+        assert.deepEqual(await first.unwrap(), { overview, ledger });
+        first.unsubscribe();
+
+        const returning = store.dispatch(endpoint.initiate("club-a", { forceRefetch: false }));
+        assert.deepEqual(await returning.unwrap(), { overview, ledger });
+        assert.equal(requests.length, 2);
+        assert.equal(endpoint.select("club-b")(store.getState()).data, undefined);
+        returning.unsubscribe();
+
+        store.dispatch(clearUser());
+        assert.equal(endpoint.select("club-a")(store.getState()).data, undefined);
+    } finally {
+        store.dispatch(clearUser());
+        store.dispatch(personalDataApi.util.resetApiState());
+        globalThis.fetch = original;
+    }
+});
+
 test("Event Tracker reuses a fresh empty calendar and respects explicit refresh", async () => {
     const original = globalThis.fetch;
     let calls = 0;

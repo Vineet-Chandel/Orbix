@@ -180,27 +180,3 @@ export const ContentRouteSkeleton: React.FC = () => {
         </div>
     );
 };
-
-/**
- * AuthRouteSkeleton
- *
- * Page skeleton simulating signin and signup dialogs.
- */
-export const AuthRouteSkeleton: React.FC = () => {
-    return (
-        <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-4 select-none">
-            <div className="max-w-md w-full rounded-3xl bg-white border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-8 space-y-6">
-                <div className="flex flex-col items-center space-y-2 text-center">
-                    <OrbixSkeleton variant="avatar" width={48} height={48} rounded="rounded-2xl" />
-                    <OrbixSkeleton variant="text" width={160} height={26} />
-                    <OrbixSkeleton variant="text" width={200} height={16} />
-                </div>
-                <div className="space-y-4">
-                    <OrbixSkeleton variant="text" width="100%" height={44} rounded="rounded-xl" />
-                    <OrbixSkeleton variant="text" width="100%" height={44} rounded="rounded-xl" />
-                    <OrbixSkeleton variant="button" width="100%" height={46} rounded="rounded-xl" />
-                </div>
-            </div>
-        </div>
-    );
-};

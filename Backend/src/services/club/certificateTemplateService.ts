@@ -79,7 +79,7 @@ export class CertificateTemplateService {
         systemTemplates: CertificateTemplateRecord[];
         clubTemplates: CertificateTemplateRecord[];
     }> {
-        const sysCacheKey = `orbix:cert:system_templates:${filterCategory || "all"}`;
+        const sysCacheKey = `orbix:cert:system_templates:branded:${filterCategory || "all"}`;
         let sysRows: any[] | null = null;
 
         // Check Redis non-sensitive system templates cache (Phase 19)
@@ -140,7 +140,7 @@ export class CertificateTemplateService {
             clubParams.push(filterCategory);
             clubQuery += ` AND t.category = $2`;
         }
-        clubQuery += ` ORDER BY t.updated_at DESC;`;
+        clubQuery += ` ORDER BY t.updated_at DESC, t.id;`;
 
         const clubRes = await query(clubQuery, clubParams);
 
@@ -254,7 +254,9 @@ export class CertificateTemplateService {
             orientation?: "landscape" | "portrait" | undefined;
             pageWidth?: number | undefined;
             pageHeight?: number | undefined;
-            sourceTemplateId?: string | undefined;
+            officialTemplateId?: string | null | undefined;
+            starterCopy?: boolean | undefined;
+            creationKey?: string | undefined;
             status?: "draft" | "published" | "archived" | undefined;
         }
     ): Promise<CertificateTemplateRecord> {
@@ -263,13 +265,20 @@ export class CertificateTemplateService {
         const pageHeight = data.pageHeight || (orientation === "portrait" ? 842 : 595);
         const status = data.status || "published";
 
+        const conflictClause = data.starterCopy
+            ? `ON CONFLICT (club_id, official_template_id) WHERE is_starter_copy AND status <> 'archived'
+               DO UPDATE SET last_used_at = NOW()`
+            : `ON CONFLICT (club_id, creation_key) DO UPDATE
+               SET creation_key = certificate_templates.creation_key
+               WHERE certificate_templates.created_by = EXCLUDED.created_by AND certificate_templates.status <> 'archived'`;
         const insertRes = await query(
             `INSERT INTO certificate_templates (
                 club_id, is_system, name, category, design, background_asset_url,
-                background_fit, orientation, page_width, page_height, version, status, created_by
+                background_fit, orientation, page_width, page_height, version, status, created_by,
+                official_template_id, is_starter_copy, creation_key, last_used_at
             ) VALUES (
-                $1, false, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, 1, $10, $11
-            ) RETURNING *;`,
+                $1, false, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, 1, $10, $11, $12, $13, $14, CASE WHEN $13 THEN NOW() END
+            ) ${conflictClause} RETURNING *;`,
             [
                 clubId,
                 data.name.trim(),
@@ -282,10 +291,14 @@ export class CertificateTemplateService {
                 pageHeight,
                 status,
                 userId,
+                data.officialTemplateId || null,
+                data.starterCopy || false,
+                data.creationKey || null,
             ]
         );
 
         const r = insertRes.rows[0];
+        if (!r) throw new Error("Template could not be saved.");
         const resDesign = typeof r.design === "string" ? JSON.parse(r.design) : r.design;
         return {
             id: r.id,
@@ -328,23 +341,6 @@ export class CertificateTemplateService {
             status?: "draft" | "published" | "archived";
         }
     ): Promise<CertificateTemplateRecord> {
-        // Verify ownership and not system template
-        const current = await this.getTemplateById(templateId, clubId);
-        if (!current) throw new Error("Template not found.");
-        if (current.isSystem) throw new Error("Security Alert: System templates cannot be modified directly.");
-
-        // Check if template has already been used to issue certificates
-        const usageCheck = await query(
-            `SELECT COUNT(*)::int AS count FROM club_certificates WHERE template_id = $1;`,
-            [templateId]
-        );
-        const usedCount = usageCheck.rows[0]?.count || 0;
-        const newVersion = usedCount > 0 ? current.version + 1 : current.version;
-
-        const orientation = data.design?.page?.orientation || current.orientation;
-        const pageWidth = data.design?.page?.width || current.pageWidth;
-        const pageHeight = data.design?.page?.height || current.pageHeight;
-
         const updateRes = await query(
             `UPDATE certificate_templates SET
                 name = COALESCE($1, name),
@@ -352,13 +348,15 @@ export class CertificateTemplateService {
                 design = COALESCE($3::jsonb, design),
                 background_asset_url = COALESCE($4, background_asset_url),
                 background_fit = COALESCE($5, background_fit),
-                orientation = $6,
-                page_width = $7,
-                page_height = $8,
-                version = $9,
-                status = COALESCE($10, status),
+                orientation = COALESCE($6, orientation),
+                page_width = COALESCE($7, page_width),
+                page_height = COALESCE($8, page_height),
+                version = version + CASE WHEN $3::jsonb IS DISTINCT FROM design AND $3::jsonb IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM club_certificates WHERE template_id = $10
+                ) THEN 1 ELSE 0 END,
+                status = COALESCE($9, status),
                 updated_at = NOW()
-            WHERE id = $11 AND club_id = $12
+            WHERE id = $10 AND club_id = $11 AND NOT is_system AND (status <> 'archived' OR $9 IS NOT NULL)
             RETURNING *;`,
             [
                 data.name?.trim() || null,
@@ -366,10 +364,9 @@ export class CertificateTemplateService {
                 data.design ? JSON.stringify(data.design) : null,
                 data.backgroundAssetUrl !== undefined ? data.backgroundAssetUrl : null,
                 data.backgroundFit || null,
-                orientation,
-                pageWidth,
-                pageHeight,
-                newVersion,
+                data.design?.page?.orientation || null,
+                data.design?.page?.width || null,
+                data.design?.page?.height || null,
                 data.status || null,
                 templateId,
                 clubId,
@@ -377,6 +374,7 @@ export class CertificateTemplateService {
         );
 
         const r = updateRes.rows[0];
+        if (!r) throw new Error("Template not found or cannot be modified.");
         const resDesign = typeof r.design === "string" ? JSON.parse(r.design) : r.design;
         return {
             id: r.id,
@@ -409,10 +407,15 @@ export class CertificateTemplateService {
         sourceTemplateId: string,
         clubId: string,
         userId: string,
-        customName?: string
+        customName?: string,
+        reuseOfficial = false,
     ): Promise<CertificateTemplateRecord> {
         const source = await this.getTemplateById(sourceTemplateId, clubId);
-        if (!source) throw new Error("Source template not found.");
+        if (!source || source.status === "archived" || (source.isSystem && source.status !== "published")) {
+            throw new Error("Source template not found.");
+        }
+
+        const lineage = await query("SELECT official_template_id FROM certificate_templates WHERE id = $1;", [source.id]);
 
         const newName = customName?.trim() || `${source.name} (Copy)`;
 
@@ -425,7 +428,8 @@ export class CertificateTemplateService {
             orientation: source.orientation,
             pageWidth: source.pageWidth,
             pageHeight: source.pageHeight,
-            sourceTemplateId,
+            officialTemplateId: source.isSystem ? source.id : lineage.rows[0]?.official_template_id,
+            starterCopy: source.isSystem && reuseOfficial,
         });
     }
 

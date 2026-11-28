@@ -1,8 +1,11 @@
 import type { CertificateTemplateRecord } from "../../types/certificateStudio.js";
 
+import { orbixCertificateBrand } from "./certificateBranding.js";
+import { PREMIUM_CERTIFICATE_TEMPLATES } from "./premiumCertificateTemplates.js";
+
 type SystemTemplateSeed = Omit<CertificateTemplateRecord, "id" | "clubId" | "createdAt" | "updatedAt">;
 
-export const SYSTEM_CERTIFICATE_TEMPLATES: SystemTemplateSeed[] = [
+const ORIGINAL_CERTIFICATE_TEMPLATES: SystemTemplateSeed[] = [
     // ==========================================
     // 1. EVENT CERTIFICATES
     // ==========================================
@@ -4100,4 +4103,22 @@ export const SYSTEM_CERTIFICATE_TEMPLATES: SystemTemplateSeed[] = [
             ],
         },
     },
+];
+
+export const SYSTEM_CERTIFICATE_TEMPLATES: SystemTemplateSeed[] = [
+    ...PREMIUM_CERTIFICATE_TEMPLATES,
+    ...ORIGINAL_CERTIFICATE_TEMPLATES.map((template) => ({
+        ...template,
+        design: {
+            ...template.design,
+            elements: [
+                ...template.design.elements,
+                ...orbixCertificateBrand(
+                    (template.pageWidth - 76) / 2,
+                    template.orientation === "portrait" ? 50 : 29,
+                    ["#0F172A", "#18181B"].includes(template.design.background.color ?? ""),
+                ),
+            ],
+        },
+    })),
 ];

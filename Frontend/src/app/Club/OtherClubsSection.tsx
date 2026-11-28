@@ -7,7 +7,6 @@ import {
     X,
     AlertCircle,
     ExternalLink,
-    Menu,
     Share2,
 } from "lucide-react";
 import { fetchCollegeClubs, type CollegeClubItem } from "../../utils/clubProfileApi";
@@ -23,7 +22,6 @@ interface OtherClubsSectionProps {
     collegeName?: string;
     currentClubData?: any;
     onNavigateToEditProfile?: () => void;
-    onOpenMobileSidebar: () => void;
 }
 
 export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
@@ -33,7 +31,6 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
     collegeName,
     currentClubData,
     onNavigateToEditProfile,
-    onOpenMobileSidebar,
 }) => {
     const [clubs, setClubs] = useState<CollegeClubItem[]>([]);
     const [resolvedCollegeName, setResolvedCollegeName] = useState<string>(
@@ -224,14 +221,6 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
             <header className="space-y-2 border-b-2 border-black/55 pb-5">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5">
-                        <button
-                            type="button"
-                            onClick={onOpenMobileSidebar}
-                            className="shrink-0 cursor-pointer rounded-lg border-2 border-black bg-white p-2 text-black shadow-[2px_2px_0px_#000] lg:hidden"
-                            aria-label="Open sidebar"
-                        >
-                            <Menu className="h-4 w-4 stroke-[2.5]" />
-                        </button>
                         <h1 className="text-xl font-black tracking-tight text-black sm:text-3xl">
                             Campus Chapters &amp; Directory
                         </h1>

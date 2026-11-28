@@ -1,43 +1,39 @@
-import React, { useState, useEffect, useId, useMemo } from "react";
+import React, { useState, useEffect, useId, useMemo, useRef } from "react";
 import {
     UploadCloud,
-    Plus,
-    Search,
     Copy,
     Trash2,
     Edit3,
-    FileText,
     Sparkles,
     AlertTriangle,
-    Layers,
     ArrowRight,
     Eye,
     X,
-    Filter,
-    ShieldCheck,
     CheckCircle2,
     RefreshCw,
     Info,
     Sliders,
     Award,
-    Square,
     Lock,
     Check,
-    Calendar,
-    User,
-    Building2,
 } from "lucide-react";
+import { WorkspacePanelLoader } from "../../../components/ui/loader/WorkspacePanelLoader";
 import { useToast } from "../../../context/ToastContext";
 import { NeoColorPicker } from "../../../components/NeoColorPicker";
 import { CertificateThumbnailPreview } from "./CertificateThumbnailPreview";
 import {
     fetchCertificateTemplates,
+    fetchCertificateTemplateDiscovery,
+    recordCertificateTemplateView,
+    type CertificateTemplateDiscovery,
     duplicateCertificateTemplate,
     archiveCertificateTemplate,
     renameCertificateTemplate,
     uploadCertificateBackground,
 } from "../../../api/certificateStudioApi";
 import type { CertificateDesign, CertificateTemplateRecord } from "../../../types/certificateStudio";
+import { CertificateCarousel, CertificateTemplateGallery, ContinueDesigning } from "./CertificateTemplateGallery";
+import { recommendTemplates, templatesById, uniqueTemplates } from "./templateDiscovery";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
@@ -768,21 +764,22 @@ export function createBlankPaperDesign(spec: PaperSizeSpec): CertificateDesign {
 // ============================================================================
 interface TemplateSelectionViewProps {
     onSelectTemplate: (design: CertificateDesign, templateName: string, templateId?: string) => void;
-    onStartScratch?: (orientation: "landscape" | "portrait", themePreset?: string) => void;
-    initialTab?: "library" | "upload" | "scratch" | "my-templates";
+    clubId: string;
+    onBackToLibrary: () => void;
+    initialTab?: "library" | "upload" | "scratch";
     onIssueWithTemplate?: (design: CertificateDesign, templateName: string, templateId?: string) => void;
 }
 
 export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
     onSelectTemplate,
-    onStartScratch: _onStartScratch,
+    clubId,
+    onBackToLibrary,
     initialTab = "library",
     onIssueWithTemplate,
 }) => {
     const toast = useToast();
 
-    // Four starting options: "library" | "upload" | "scratch" | "my-templates"
-    const [startTab, setStartTab] = useState<"library" | "upload" | "scratch" | "my-templates">(initialTab);
+    const startTab = initialTab;
 
     // Templates state
     const [systemTemplates, setSystemTemplates] = useState<CertificateTemplateRecord[]>([]);
@@ -791,19 +788,14 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
 
     // Interactive Filters for System Template Library
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
-    const [selectedStyle, setSelectedStyle] = useState<string>("all");
-    const [selectedOrientation, setSelectedOrientation] = useState<string>("all");
-    const [searchQuery, setSearchQuery] = useState("");
 
-    // Interactive Filters & Sorting for Club Templates (Phase 8)
-    const [myTemplatesSearch, setMyTemplatesSearch] = useState("");
-    const [myTemplatesCategory, setMyTemplatesCategory] = useState<string>("all");
-    const [myTemplatesStyle, setMyTemplatesStyle] = useState("all");
-    const [myTemplatesOrientation, setMyTemplatesOrientation] = useState("all");
-    const [expandedFilterTab, setExpandedFilterTab] = useState<typeof startTab | null>(null);
-    const templateFiltersId = useId();
-    const [myTemplatesStatus, setMyTemplatesStatus] = useState<string>("all");
-    const [myTemplatesSort, setMyTemplatesSort] = useState<"updated" | "name" | "usage">("updated");
+    const [browseAll, setBrowseAll] = useState(false);
+    const [loadError, setLoadError] = useState(false);
+    const [discovery, setDiscovery] = useState<CertificateTemplateDiscovery>({
+        recentlyViewedIds: [], recentlyUsedIds: [], usedOfficialIds: [], trendingIds: [], popularIds: [],
+    });
+    const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>([]);
+    const viewWrites = useRef(Promise.resolve());
 
     // Rename Modal state (Phase 8)
     const [renameModalTemplate, setRenameModalTemplate] = useState<CertificateTemplateRecord | null>(null);
@@ -813,6 +805,12 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
     // Preview Modal state
     const [previewTemplate, setPreviewTemplate] = useState<CertificateTemplateRecord | null>(null);
     const [sampleRecipientIndex, setSampleRecipientIndex] = useState(0);
+    const previewDialog = useRef<HTMLDialogElement>(null);
+    const previewTitleId = useId();
+    useEffect(() => {
+        const dialog = previewDialog.current;
+        if (previewTemplate && dialog && !dialog.open) dialog.showModal();
+    }, [previewTemplate]);
 
     const SAMPLE_RECIPIENTS = [
         { name: "Aarav Sharma", college: "Delhi Technological University", event: "National Hackathon Summit 2026" },
@@ -948,74 +946,74 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
         customCertTitle,
     ]);
 
-    const loadTemplates = async () => {
+    const loadTemplates = async (signal?: AbortSignal) => {
         setLoading(true);
+        setLoadError(false);
         try {
-            const data = await fetchCertificateTemplates();
-            setSystemTemplates(data.systemTemplates || []);
-            setClubTemplates(data.clubTemplates || []);
-        } catch (err: any) {
-            console.error("Load templates error:", err);
-            toast.error(err.message || "Failed to load templates.");
+            const data = await fetchCertificateTemplates(undefined, clubId, signal);
+            if (signal?.aborted) return;
+            setSystemTemplates(uniqueTemplates(data.systemTemplates.filter((template) => template.isSystem && template.status === "published")));
+            setClubTemplates(uniqueTemplates(data.clubTemplates.filter((template) => !template.isSystem && template.clubId === clubId && template.status !== "archived")));
+        } catch {
+            if (!signal?.aborted) setLoadError(true);
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadTemplates();
-    }, []);
+        if (startTab !== "library") return;
+        const controller = new AbortController();
+        void loadTemplates(controller.signal);
+        void fetchCertificateTemplateDiscovery(clubId, controller.signal)
+            .then((activity) => {
+                if (controller.signal.aborted) return;
+                setDiscovery(activity);
+                setRecentlyViewedIds((current) => [...new Set([...current, ...activity.recentlyViewedIds])].slice(0, 10));
+            })
+            .catch((error) => {
+                if (!controller.signal.aborted) console.error("Could not load template discovery.", error);
+            });
+        return () => controller.abort();
+    }, [clubId, startTab]);
 
-    // Filter templates
-    const filteredSystemTemplates = useMemo(() => {
-        return systemTemplates.filter((tmpl) => {
-            // Category filter
-            if (selectedCategory !== "all" && tmpl.category !== selectedCategory) {
-                return false;
-            }
-            // Style filter
-            const tmplStyle = tmpl.style || (tmpl.design as any)?.style || "";
-            if (selectedStyle !== "all" && tmplStyle !== selectedStyle) {
-                return false;
-            }
-            // Orientation filter
-            if (selectedOrientation !== "all" && tmpl.orientation !== selectedOrientation) {
-                return false;
-            }
-            // Search query filter (matches name, category, subcategory, style)
-            if (searchQuery.trim()) {
-                const q = searchQuery.toLowerCase();
-                const matchName = tmpl.name.toLowerCase().includes(q);
-                const matchCategory = tmpl.category.toLowerCase().includes(q);
-                const matchSub = (tmpl.subcategory || (tmpl.design as any)?.subcategory || "").toLowerCase().includes(q);
-                const matchStyle = tmplStyle.toLowerCase().includes(q);
-                if (!matchName && !matchCategory && !matchSub && !matchStyle) {
-                    return false;
-                }
-            }
-            return true;
-        });
-    }, [systemTemplates, selectedCategory, selectedStyle, selectedOrientation, searchQuery]);
+    const openTemplate = (template: CertificateTemplateRecord) => {
+        setSampleRecipientIndex(0);
+        setPreviewTemplate(template);
+        if (!template.isSystem) return;
+
+        setRecentlyViewedIds((current) => [template.id, ...current.filter((id) => id !== template.id)].slice(0, 10));
+        viewWrites.current = viewWrites.current
+            .then(() => recordCertificateTemplateView(template.id, clubId))
+            .then(() => undefined)
+            .catch((error) => console.error("Could not save template view.", error));
+    };
+
+    const filteredSystemTemplates = useMemo(
+        () => selectedCategory === "all"
+            ? systemTemplates
+            : systemTemplates.filter((template) => template.category === selectedCategory),
+        [systemTemplates, selectedCategory],
+    );
 
     // Handle "Use Template" for Built-in System Templates
     // Creates a club-owned editable copy, preserving the immutable system template!
     const handleUseSystemTemplate = async (tmpl: CertificateTemplateRecord) => {
         try {
-            toast.info(`Creating club copy of "${tmpl.name}"...`);
-            const cloned = await duplicateCertificateTemplate(tmpl.id);
+            toast.info(`Opening "${tmpl.name}" in Certificate Studio…`);
+            const cloned = await duplicateCertificateTemplate(tmpl.id, undefined, { clubId, reuseOfficial: true });
             toast.success(`Loaded "${cloned.name}" into Certificate Studio!`);
             onSelectTemplate(cloned.design, cloned.name, cloned.id);
         } catch (err: any) {
             console.error("Duplicate template error:", err);
-            toast.error(err.message || "Failed to clone template. Loading template directly.");
-            onSelectTemplate(tmpl.design, `${tmpl.name} (Custom)`, undefined);
+            toast.error(err.message || "Failed to open this template.");
         }
     };
 
     // Duplicate action for Club Templates
     const handleDuplicateClubTemplate = async (tmplId: string) => {
         try {
-            const copy = await duplicateCertificateTemplate(tmplId);
+            const copy = await duplicateCertificateTemplate(tmplId, undefined, { clubId });
             toast.success(`Created copy "${copy.name}".`);
             await loadTemplates();
         } catch (err: any) {
@@ -1035,7 +1033,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
         if (!templateToArchive) return;
         setIsArchiving(true);
         try {
-            await archiveCertificateTemplate(templateToArchive.id);
+            await archiveCertificateTemplate(templateToArchive.id, clubId);
             toast.success(`Template "${templateToArchive.name}" archived.`);
             await loadTemplates();
             setTemplateToArchive(null);
@@ -1065,7 +1063,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
         }
         setIsRenaming(true);
         try {
-            await renameCertificateTemplate(renameModalTemplate.id, trimmed);
+            await renameCertificateTemplate(renameModalTemplate.id, trimmed, clubId);
             toast.success(`Template renamed to "${trimmed}".`);
             setRenameModalTemplate(null);
             await loadTemplates();
@@ -1075,56 +1073,6 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
         } finally {
             setIsRenaming(false);
         }
-    };
-
-    // Filtered & Sorted Club Templates (Phase 8)
-    const filteredClubTemplates = useMemo(() => {
-        return clubTemplates
-            .filter((tmpl) => {
-                const category = tmpl.category === "workshop" ? "event" : tmpl.category;
-                if (myTemplatesCategory !== "all" && category !== myTemplatesCategory) {
-                    return false;
-                }
-                const style = (tmpl.style || tmpl.design?.style || "classic").toLowerCase().replace(/-/g, "_");
-                if (myTemplatesStyle !== "all" && style !== myTemplatesStyle) {
-                    return false;
-                }
-                if (myTemplatesOrientation !== "all" && tmpl.orientation !== myTemplatesOrientation) {
-                    return false;
-                }
-                if (myTemplatesStatus !== "all" && tmpl.status !== myTemplatesStatus) {
-                    return false;
-                }
-                if (myTemplatesSearch.trim()) {
-                    const q = myTemplatesSearch.toLowerCase();
-                    const matchName = tmpl.name.toLowerCase().includes(q);
-                    const matchCategory = tmpl.category.toLowerCase().includes(q);
-                    const matchCreator = (tmpl.creatorName || "").toLowerCase().includes(q);
-                    if (!matchName && !matchCategory && !matchCreator) {
-                        return false;
-                    }
-                }
-                return true;
-            })
-            .sort((a, b) => {
-                if (myTemplatesSort === "name") {
-                    return a.name.localeCompare(b.name);
-                }
-                if (myTemplatesSort === "usage") {
-                    return (b.usageCount || 0) - (a.usageCount || 0);
-                }
-                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-            });
-    }, [clubTemplates, myTemplatesCategory, myTemplatesStyle, myTemplatesOrientation, myTemplatesStatus, myTemplatesSearch, myTemplatesSort]);
-
-    const myTemplateFilterCount = [myTemplatesCategory, myTemplatesStyle, myTemplatesOrientation]
-        .filter((value) => value !== "all").length;
-    const resetMyTemplateFilters = () => {
-        setMyTemplatesSearch("");
-        setMyTemplatesCategory("all");
-        setMyTemplatesStyle("all");
-        setMyTemplatesOrientation("all");
-        setMyTemplatesStatus("all");
     };
 
     // Handle File Drop / Select for Background Upload
@@ -1339,328 +1287,88 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
         { id: "academic", label: "Academic & Professional" },
     ];
 
-    // Styles definition
-    const STYLES = [
-        { id: "all", label: "All Styles" },
-        { id: "minimal", label: "Minimal" },
-        { id: "classic", label: "Classic" },
-        { id: "modern", label: "Modern" },
-        { id: "academic", label: "Academic" },
-        { id: "professional", label: "Professional" },
-        { id: "creative", label: "Creative" },
-        { id: "neo_brutalist", label: "Neo-Brutalist" },
-    ];
+    const recommendations = useMemo(() => recommendTemplates(
+        systemTemplates, discovery.recentlyViewedIds, discovery.usedOfficialIds, discovery.popularIds, filteredSystemTemplates,
+    ), [systemTemplates, discovery.recentlyViewedIds, discovery.usedOfficialIds, discovery.popularIds, filteredSystemTemplates]);
 
-    const ORIENTATIONS = [
-        { id: "all", label: "All" },
-        { id: "landscape", label: "Landscape" },
-        { id: "portrait", label: "Portrait" },
-    ];
-
-    const isLibrary = startTab === "library";
-    const showTemplateFilters = expandedFilterTab === startTab;
-    const templateFilterCount = isLibrary
-        ? [selectedCategory, selectedStyle, selectedOrientation].filter((value) => value !== "all").length
-        : myTemplateFilterCount;
-
-    const templateFilterButton = (
-        <button
-            type="button"
-            aria-expanded={showTemplateFilters}
-            aria-controls={templateFiltersId}
-            onClick={() => setExpandedFilterTab((openTab) => openTab === startTab ? null : startTab)}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-2 border-black bg-white px-3 py-2 text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 aria-expanded:bg-[#FFE566]"
-        >
-            <Filter aria-hidden="true" className="h-3.5 w-3.5" />
-            Filters{templateFilterCount > 0 && ` (${templateFilterCount})`}
-        </button>
-    );
-
-    const templateFilterPanel = (
-        <div id={templateFiltersId} hidden={!showTemplateFilters} className="space-y-4 border-t border-black/10 pt-4">
-            {[
-                { label: "Certificate Categories", options: CATEGORIES, value: isLibrary ? selectedCategory : myTemplatesCategory, select: isLibrary ? setSelectedCategory : setMyTemplatesCategory },
-                { label: "Design Styles", options: STYLES, value: isLibrary ? selectedStyle : myTemplatesStyle, select: isLibrary ? setSelectedStyle : setMyTemplatesStyle },
-                { label: "Orientation", options: ORIENTATIONS, value: isLibrary ? selectedOrientation : myTemplatesOrientation, select: isLibrary ? setSelectedOrientation : setMyTemplatesOrientation },
-            ].map(({ label, options, value, select }) => (
-                <fieldset key={label} className="min-w-0">
-                    <legend className="mb-1.5 text-[11px] font-black uppercase tracking-wider text-neutral-600">{label}</legend>
-                    <div className="flex flex-wrap gap-2">
-                        {options.map((option) => (
-                            <button
-                                key={option.id}
-                                type="button"
-                                aria-pressed={value === option.id}
-                                onClick={() => select(option.id)}
-                                className="cursor-pointer rounded-xl border-2 border-black bg-[#FAF6EE] px-3 py-1.5 text-xs font-black text-black hover:bg-neutral-100 aria-pressed:bg-[#a2ff86] aria-pressed:shadow-[2px_2px_0px_#000]"
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-                </fieldset>
+    const paperSizes = (
+        <CertificateCarousel title="Predefined paper sizes">
+            {PREDEFINED_PAPER_SIZES.map((spec) => (
+                <button
+                    key={spec.id}
+                    type="button"
+                    onClick={() => onSelectTemplate(createBlankPaperDesign(spec), `Blank ${spec.name}`)}
+                    className="group flex w-64 max-w-[90%] shrink-0 snap-start cursor-pointer flex-col gap-3 self-stretch rounded-xl border-2 border-black bg-white p-4 text-left shadow-[3px_3px_0px_#000] transition-colors hover:bg-[#FAF6EE] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:w-72"
+                >
+                    <span className="flex h-24 w-full items-center justify-center rounded-lg border border-black/20 bg-[#F5F1E6]">
+                        <span
+                            className="flex h-16 items-center justify-center rounded border-2 border-black bg-white px-1 text-[9px] font-black"
+                            style={{ aspectRatio: `${spec.width} / ${spec.height}` }}
+                        >
+                            {spec.aspectRatio}
+                        </span>
+                    </span>
+                    <span className="space-y-1">
+                        <span className="block text-sm font-black">{spec.name}</span>
+                        <span className="block font-mono text-xs font-bold text-neutral-600">{spec.width} × {spec.height} pt</span>
+                        <span className="block text-xs text-neutral-600">{spec.description}</span>
+                    </span>
+                    <span className="mt-auto flex w-full items-center gap-1 border-t border-black/10 pt-2 text-xs font-black group-hover:underline">
+                        Open canvas <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+                    </span>
+                </button>
             ))}
-        </div>
+        </CertificateCarousel>
     );
 
     return (
         <div className="space-y-6">
-            {/* 4 Starting Options Navigation Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <button
-                    type="button"
-                    onClick={() => setStartTab("library")}
-                    className={`p-4 rounded-2xl border-3 border-black text-left transition-all ${
-                        startTab === "library"
-                            ? "bg-[#FFE566] shadow-[4px_4px_0px_#000] font-black"
-                            : "bg-white hover:bg-neutral-50 shadow-[2px_2px_0px_#000]"
-                    }`}
-                >
-                    <div className="w-10 h-10 rounded-xl bg-white border-2 border-black flex items-center justify-center mb-2 shadow-[1px_1px_0px_#000]">
-                        <Sparkles className="w-5 h-5 text-black" />
-                    </div>
-                    <div className="text-sm font-black text-black">1. Orbix Library</div>
-                    <div className="text-xs text-neutral-600 mt-0.5 font-normal">
-                        {systemTemplates.length} verified pro templates
-                    </div>
+            {startTab !== "library" && (
+                <button type="button" onClick={onBackToLibrary} className="rounded-xl border-2 border-black bg-white px-4 py-2 text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#FFE566]">
+                    Back to templates
                 </button>
+            )}
 
-                <button
-                    type="button"
-                    onClick={() => setStartTab("upload")}
-                    className={`p-4 rounded-2xl border-3 border-black text-left transition-all ${
-                        startTab === "upload"
-                            ? "bg-[#FFE566] shadow-[4px_4px_0px_#000] font-black"
-                            : "bg-white hover:bg-neutral-50 shadow-[2px_2px_0px_#000]"
-                    }`}
-                >
-                    <div className="w-10 h-10 rounded-xl bg-white border-2 border-black flex items-center justify-center mb-2 shadow-[1px_1px_0px_#000]">
-                        <UploadCloud className="w-5 h-5 text-black" />
-                    </div>
-                    <div className="text-sm font-black text-black">2. Upload Design</div>
-                    <div className="text-xs text-neutral-600 mt-0.5 font-normal">Import Canva, Figma PNG/SVG</div>
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => setStartTab("scratch")}
-                    className={`p-4 rounded-2xl border-3 border-black text-left transition-all ${
-                        startTab === "scratch"
-                            ? "bg-[#FFE566] shadow-[4px_4px_0px_#000] font-black"
-                            : "bg-white hover:bg-neutral-50 shadow-[2px_2px_0px_#000]"
-                    }`}
-                >
-                    <div className="w-10 h-10 rounded-xl bg-white border-2 border-black flex items-center justify-center mb-2 shadow-[1px_1px_0px_#000]">
-                        <Plus className="w-5 h-5 text-black" />
-                    </div>
-                    <div className="text-sm font-black text-black">3. Blank Canvas</div>
-                    <div className="text-xs text-neutral-600 mt-0.5 font-normal">Start from A4 preset</div>
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => setStartTab("my-templates")}
-                    className={`p-4 rounded-2xl border-3 border-black text-left transition-all ${
-                        startTab === "my-templates"
-                            ? "bg-[#FFE566] shadow-[4px_4px_0px_#000] font-black"
-                            : "bg-white hover:bg-neutral-50 shadow-[2px_2px_0px_#000]"
-                    }`}
-                >
-                    <div className="w-10 h-10 rounded-xl bg-white border-2 border-black flex items-center justify-center mb-2 shadow-[1px_1px_0px_#000]">
-                        <Layers className="w-5 h-5 text-black" />
-                    </div>
-                    <div className="text-sm font-black text-black">
-                        4. My Templates ({clubTemplates.length})
-                    </div>
-                    <div className="text-xs text-neutral-600 mt-0.5 font-normal">Your club-saved designs</div>
-                </button>
-            </div>
-
-            {/* ================================================================ */}
-            {/* OPTION 1: ORBIX TEMPLATE LIBRARY */}
-            {/* ================================================================ */}
             {startTab === "library" && (
-                <div className="space-y-6">
-                    {/* Centrally Governed Immutability Banner */}
-                    <div className="p-4 bg-[#FAF6EE] rounded-2xl border-3 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-xl bg-white border-2 border-black shadow-[1px_1px_0px_#000] shrink-0 mt-0.5">
-                                <Lock className="w-4 h-4 text-neutral-800" />
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-1.5">
-                                    <span>System Templates Library</span>
-                                    <span className="px-2 py-0.5 bg-[#FFE566] text-black text-[9px] rounded font-black border border-black/30">
-                                        IMMUTABLE
-                                    </span>
-                                </h4>
-                                <p className="text-xs text-neutral-600 mt-0.5">
-                                    Centrally managed by Orbix. System templates cannot be overwritten by clubs. Selecting a template duplicates an editable copy to <strong>My Templates</strong>, keeping historical credentials strictly standardized.
-                                </p>
-                            </div>
-                        </div>
-                        <span className="px-3 py-1 rounded-xl bg-white border-2 border-black text-xs font-black shrink-0 shadow-[2px_2px_0px_#000]">
-                            {systemTemplates.length} System Templates
-                        </span>
-                    </div>
+                <div id="certificate-template-overview" className="min-w-0 space-y-8">
+                    {!browseAll && <ContinueDesigning templates={clubTemplates} onOpen={openTemplate} />}
 
-                    {/* Filter and Search Bar */}
-                    <div className="p-5 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        {/* Search and filter controls */}
-                        <div className="flex flex-wrap items-center gap-3">
-                            {/* Search Input */}
-                            <div className="relative w-full md:w-80">
-                                <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search by name, category, style..."
-                                    className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-black text-xs font-bold focus:outline-none bg-[#FAF6EE]"
-                                />
-                                {searchQuery && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSearchQuery("")}
-                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                            </div>
-
-                            {templateFilterButton}
-                        </div>
-                        {templateFilterPanel}
-                    </div>
-
-                    {/* Template Gallery Grid */}
-                    {loading ? (
-                        <div className="p-16 text-center text-sm font-bold text-neutral-600 bg-white rounded-2xl border-3 border-black shadow-[3px_3px_0px_#000]">
-                            Loading authentic template library...
-                        </div>
-                    ) : filteredSystemTemplates.length === 0 ? (
-                        <div className="p-12 bg-white rounded-2xl border-3 border-black text-center space-y-3 shadow-[3px_3px_0px_#000]">
-                            <div className="font-black text-base text-black">No Templates Matched Your Filter</div>
-                            <p className="text-xs text-neutral-600">
-                                Try adjusting your category, style, or search query to browse available templates.
-                            </p>
+                    <section aria-label="Browse certificate categories" className="grid w-full grid-cols-2 gap-3 pr-1 pb-1 sm:grid-cols-3 sm:grid-flow-col sm:grid-rows-2">
+                        {CATEGORIES.map((category) => (
                             <button
+                                key={category.id}
                                 type="button"
-                                onClick={() => {
-                                    setSelectedCategory("all");
-                                    setSelectedStyle("all");
-                                    setSelectedOrientation("all");
-                                    setSearchQuery("");
-                                }}
-                                className="px-3.5 py-1.5 rounded-xl border-2 border-black bg-[#FFE566] text-xs font-black shadow-[2px_2px_0px_#000]"
+                                aria-pressed={selectedCategory === category.id}
+                                onClick={() => setSelectedCategory(category.id)}
+                                className="min-h-14 min-w-0 cursor-pointer rounded-xl border-2 border-black bg-white px-2 py-3 text-xs font-black leading-tight text-black shadow-[3px_3px_0px_#000] hover:bg-neutral-100 aria-pressed:bg-[#a2ff86] sm:px-4 sm:text-sm lg:min-h-16 lg:text-base"
                             >
-                                Reset All Filters
+                                {category.label}
                             </button>
+                        ))}
+                    </section>
+
+                    {loading ? <WorkspacePanelLoader label="Loading templates…" /> : loadError ? (
+                        <div role="status" className="flex flex-wrap items-center gap-3 text-sm font-bold">
+                            Could not load templates.
+                            <button type="button" className="underline" onClick={() => void loadTemplates()}>Retry</button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredSystemTemplates.map((tmpl) => (
-                                <div
-                                    key={tmpl.id}
-                                    className="p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all flex flex-col justify-between group space-y-4"
-                                >
-                                    {/* Authentic Certificate Thumbnail Preview */}
-                                    <div
-                                        onClick={() => setPreviewTemplate(tmpl)}
-                                        className="w-full rounded-xl border-2 border-black bg-neutral-900/5 relative p-2 flex flex-col items-center justify-center cursor-pointer group-hover:scale-[1.01] transition-transform overflow-hidden shadow-inner"
-                                    >
-                                        <div className="w-full rounded-lg overflow-hidden border border-black/30 shadow-md">
-                                            <CertificateThumbnailPreview
-                                                design={tmpl.design}
-                                                sampleRecipientName="Recipient Full Name"
-                                            />
-                                        </div>
-
-                                        {/* Hover Overlay Pill */}
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span className="px-3 py-1.5 rounded-xl bg-white border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
-                                                <Eye className="w-3.5 h-3.5" /> Full Preview
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Template Metadata */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-100 border border-black/30 text-[10px] font-black text-neutral-800">
-                                                <Lock className="w-2.5 h-2.5 text-neutral-600" />
-                                                Orbix System (Immutable)
-                                            </span>
-                                            <span className="text-[10px] font-black text-neutral-600 bg-[#FAF6EE] px-1.5 py-0.5 rounded border border-black/20">
-                                                v{tmpl.version}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FFE566] border border-black/30 text-black">
-                                                {tmpl.category}
-                                            </span>
-                                            {tmpl.subcategory && (
-                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FAF6EE] border border-black/30 text-neutral-800">
-                                                    {tmpl.subcategory.replace("_", " ")}
-                                                </span>
-                                            )}
-                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 border border-black/20 text-neutral-600">
-                                                {tmpl.orientation.toUpperCase()} · {tmpl.pageSizeLabel || `${tmpl.pageWidth} × ${tmpl.pageHeight} pt`}
-                                            </span>
-                                            {tmpl.style && (
-                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 border border-black/20 text-neutral-600 capitalize">
-                                                    {tmpl.style}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <h3 className="font-black text-base text-black leading-tight">
-                                            {tmpl.name}
-                                        </h3>
-
-                                        <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-black/10 text-neutral-600">
-                                            <span className="font-bold flex items-center gap-1 text-[11px]">
-                                                <Building2 className="w-3 h-3 text-neutral-400" />
-                                                {tmpl.ownerClubName || "Orbix Central"}
-                                            </span>
-                                            <span className="font-bold text-emerald-700 flex items-center gap-1 text-[11px]">
-                                                <Award className="w-3 h-3 text-emerald-600" />
-                                                {tmpl.usageCount || 0} issued
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Action Buttons: Preview & Use Template */}
-                                    <div className="pt-3 border-t-2 border-black/10 flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPreviewTemplate(tmpl)}
-                                            className="px-3 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5"
-                                            title="Inspect certificate in full resolution"
-                                        >
-                                            <Eye className="w-3.5 h-3.5 text-black" />
-                                            <span>Preview</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleUseSystemTemplate(tmpl)}
-                                            className="flex-1 py-2 px-3 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                        >
-                                            <span>Use Template</span>
-                                            <ArrowRight className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <CertificateTemplateGallery
+                            browseAll={browseAll}
+                            onBrowseChange={setBrowseAll}
+                            recommendations={recommendations}
+                            afterRecommendations={paperSizes}
+                            recentlyViewed={templatesById(systemTemplates, recentlyViewedIds).slice(0, 10)}
+                            recentlyUsed={templatesById([...clubTemplates, ...systemTemplates], discovery.recentlyUsedIds)}
+                            trending={templatesById(filteredSystemTemplates, discovery.trendingIds)}
+                            popular={templatesById(filteredSystemTemplates, discovery.popularIds)}
+                            onOpen={openTemplate}
+                        />
                     )}
+                    {!browseAll && (loading || loadError) && paperSizes}
                 </div>
             )}
 
-            {/* ================================================================ */}
             {/* OPTION 2: UPLOAD CERTIFICATE DESIGN */}
             {/* ================================================================ */}
             {startTab === "upload" && (
@@ -2034,76 +1742,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                     {scratchMode === "presets" && (
                         <div className="space-y-8">
                             {/* Section 1: Predefined Paper Sizes (Blank Canvas) */}
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h4 className="font-black text-sm text-black uppercase tracking-wider flex items-center gap-2">
-                                            <Square className="w-4 h-4 text-black" />
-                                            <span>Predefined Paper Sizes (Blank Canvas)</span>
-                                        </h4>
-                                        <p className="text-xs text-neutral-600 font-medium mt-0.5">
-                                            Select a certified print standard to launch a clean blank canvas with auto-proportioned margins.
-                                        </p>
-                                    </div>
-                                    <span className="text-[11px] font-bold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-300">
-                                        5 Formats Available
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-                                    {PREDEFINED_PAPER_SIZES.map((spec) => {
-                                        const isPortrait = spec.orientation === "portrait";
-                                        const isSquare = spec.id === "square-credential";
-
-                                        return (
-                                            <div
-                                                key={spec.id}
-                                                onClick={() => {
-                                                    const design = createBlankPaperDesign(spec);
-                                                    onSelectTemplate(design, `Blank ${spec.name}`);
-                                                }}
-                                                className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-[#FAF6EE] transition-all cursor-pointer flex flex-col justify-between group space-y-3"
-                                            >
-                                                {/* Mini ratio mockup */}
-                                                <div className="w-full h-24 rounded-lg bg-[#F5F1E6] border border-black/20 flex items-center justify-center p-2">
-                                                    <div
-                                                        className={`border-2 border-black bg-white rounded shadow-sm flex items-center justify-center font-black text-[10px] text-neutral-700 transition-transform group-hover:scale-105 ${
-                                                            isSquare
-                                                                ? "w-16 h-16"
-                                                                : isPortrait
-                                                                ? "w-12 h-18"
-                                                                : "w-20 h-13"
-                                                        }`}
-                                                    >
-                                                        {spec.aspectRatio}
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="font-black text-xs text-black group-hover:text-blue-700 transition-colors">
-                                                            {spec.name}
-                                                        </span>
-                                                        <ArrowRight className="w-3.5 h-3.5 text-black opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-                                                    </div>
-                                                    <div className="text-[10px] font-mono text-neutral-500 font-bold">
-                                                        {spec.width} &times; {spec.height} pt
-                                                    </div>
-                                                    <p className="text-[10px] text-neutral-600 line-clamp-2 leading-tight">
-                                                        {spec.description}
-                                                    </p>
-                                                </div>
-
-                                                <div className="pt-2 border-t border-black/10">
-                                                    <span className="text-[10px] font-black uppercase text-black inline-flex items-center gap-1 group-hover:underline">
-                                                        Open Canvas &rarr;
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            {paperSizes}
 
                             {/* Section 2: Reusable Coordinated Design Presets */}
                             <div className="space-y-3">
@@ -2441,344 +2080,6 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
             )}
 
             {/* ================================================================ */}
-            {/* OPTION 4: MY CLUB SAVED TEMPLATES (PHASE 8) */}
-            {/* ================================================================ */}
-            {startTab === "my-templates" && (
-                <div className="space-y-6">
-                    {/* Club Templates Toolbar: Search, Filters, Sort & Actions */}
-                    <div className="p-5 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-                            {/* Search Input */}
-                            <div className="relative flex-1">
-                                <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input
-                                    type="text"
-                                    value={myTemplatesSearch}
-                                    onChange={(e) => setMyTemplatesSearch(e.target.value)}
-                                    placeholder="Search your templates by name, category, or creator..."
-                                    className="w-full pl-9 pr-8 py-2 rounded-xl border-2 border-black text-xs font-bold focus:outline-none bg-[#FAF6EE]"
-                                />
-                                {myTemplatesSearch && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setMyTemplatesSearch("")}
-                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Filters & Sort Controls */}
-                            <div className="flex flex-wrap items-center gap-2">
-                                {templateFilterButton}
-
-                                {/* Status Filter */}
-                                <NeoSelect
-                                    value={myTemplatesStatus}
-                                    onChange={(val) => setMyTemplatesStatus(val)}
-                                    size="sm"
-                                    triggerClassName="px-3 py-2 rounded-xl text-xs font-bold shadow-[2px_2px_0px_#000]"
-                                >
-                                    <option value="all">All Statuses</option>
-                                    <option value="draft">Draft</option>
-                                    <option value="published">Published</option>
-                                    <option value="archived">Archived</option>
-                                </NeoSelect>
-
-                                {/* Sort Order */}
-                                <NeoSelect
-                                    value={myTemplatesSort}
-                                    onChange={(val) => setMyTemplatesSort(val as any)}
-                                    size="sm"
-                                    triggerClassName="px-3 py-2 rounded-xl text-xs font-bold bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
-                                >
-                                    <option value="updated">Recently Edited</option>
-                                    <option value="usage">Most Issued</option>
-                                    <option value="name">Alphabetical (A-Z)</option>
-                                </NeoSelect>
-
-                                {/* Quick Creation Shortcuts */}
-                                <button
-                                    type="button"
-                                    onClick={() => setStartTab("scratch")}
-                                    className="px-3 py-2 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1"
-                                >
-                                    <Plus className="w-3.5 h-3.5 text-black" />
-                                    <span>Blank Canvas</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setStartTab("upload")}
-                                    className="px-3 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1"
-                                >
-                                    <UploadCloud className="w-3.5 h-3.5 text-black" />
-                                    <span>Upload Design</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {templateFilterPanel}
-
-                        {/* Summary Pill Bar */}
-                        <div className="flex items-center justify-between pt-2 border-t border-black/10 text-xs">
-                            <span className="font-bold text-neutral-600">
-                                Showing <strong className="text-black">{filteredClubTemplates.length}</strong> of{" "}
-                                <strong className="text-black">{clubTemplates.length}</strong> club templates
-                            </span>
-                            {(myTemplatesSearch || myTemplateFilterCount > 0 || myTemplatesStatus !== "all") && (
-                                <button
-                                    type="button"
-                                    onClick={resetMyTemplateFilters}
-                                    className="text-xs font-black text-neutral-700 hover:text-black underline"
-                                >
-                                    Reset Filters
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Template Grid or Empty States */}
-                    {clubTemplates.length === 0 ? (
-                        <div className="p-12 bg-white rounded-2xl border-3 border-black text-center space-y-4 shadow-[4px_4px_0px_#000]">
-                            <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-3 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000]">
-                                <FileText className="w-7 h-7 text-black" />
-                            </div>
-                            <div className="space-y-1">
-                                <h4 className="font-black text-lg text-black">No Custom Club Templates Yet</h4>
-                                <p className="text-xs text-neutral-600 max-w-md mx-auto">
-                                    Your club haven&apos;t saved any custom templates yet. You can duplicate a professionally designed template from the Orbix Library, upload background artwork, or build one from scratch.
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setStartTab("library")}
-                                    className="px-5 py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] text-xs font-black shadow-[3px_3px_0px_#000]"
-                                >
-                                    Browse Orbix Library
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setStartTab("scratch")}
-                                    className="px-5 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs font-black shadow-[3px_3px_0px_#000]"
-                                >
-                                    Create From Scratch
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setStartTab("upload")}
-                                    className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[3px_3px_0px_#000]"
-                                >
-                                    Upload Artwork
-                                </button>
-                            </div>
-                        </div>
-                    ) : filteredClubTemplates.length === 0 ? (
-                        <div className="p-12 bg-white rounded-2xl border-3 border-black text-center space-y-3 shadow-[4px_4px_0px_#000]">
-                            <Filter className="w-10 h-10 text-neutral-400 mx-auto" />
-                            <h4 className="font-black text-base text-black">No Templates Match Your Filters</h4>
-                            <p className="text-xs text-neutral-600">
-                                Try changing your search or filters.
-                            </p>
-                            <button
-                                type="button"
-                                onClick={resetMyTemplateFilters}
-                                className="px-4 py-2 rounded-xl border-2 border-black bg-[#FFE566] text-xs font-black shadow-[2px_2px_0px_#000]"
-                            >
-                                Clear All Filters
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredClubTemplates.map((tmpl) => (
-                                <div
-                                    key={tmpl.id}
-                                    className="p-5 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all flex flex-col justify-between group space-y-4"
-                                >
-                                    {/* 1. Card Top Bar: Status, Version, and Usage Count */}
-                                    <div className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-1.5">
-                                            {/* Status Badge */}
-                                            {tmpl.status === "published" ? (
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black/40 text-black">
-                                                    Published
-                                                </span>
-                                            ) : tmpl.status === "archived" ? (
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-neutral-200 border border-neutral-400 text-neutral-700">
-                                                    Archived
-                                                </span>
-                                            ) : (
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 border border-amber-400 text-amber-900">
-                                                    Draft
-                                                </span>
-                                            )}
-
-                                            {/* Version Pill */}
-                                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-black text-white">
-                                                v{tmpl.version}
-                                            </span>
-                                        </div>
-
-                                        {/* Usage Count Pill */}
-                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center gap-1">
-                                            <Award className="w-3 h-3 text-emerald-600" />
-                                            <span>{tmpl.usageCount || 0} Issued</span>
-                                        </span>
-                                    </div>
-
-                                    {/* 2. Authentic Miniature Certificate Thumbnail Preview */}
-                                    <div
-                                        onClick={() => setPreviewTemplate(tmpl)}
-                                        className="w-full rounded-xl border-2 border-black bg-neutral-900/5 relative p-2 flex flex-col items-center justify-center cursor-pointer group-hover:scale-[1.01] transition-transform overflow-hidden shadow-inner"
-                                    >
-                                        <div className="w-full rounded-lg overflow-hidden border border-black/30 shadow-md">
-                                            <CertificateThumbnailPreview
-                                                design={tmpl.design}
-                                                sampleRecipientName="Recipient Full Name"
-                                            />
-                                        </div>
-
-                                        {/* Hover Overlay Pill */}
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span className="px-3 py-1.5 rounded-xl bg-white border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
-                                                <Eye className="w-3.5 h-3.5" /> Full Preview
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* 3. Template Metadata Details */}
-                                    <div className="space-y-2">
-                                        {/* Badges: Category, Orientation, Page Size */}
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FFE566] border border-black/30 text-black">
-                                                {tmpl.category}
-                                            </span>
-                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 border border-black/20 text-neutral-700 capitalize">
-                                                {tmpl.orientation}
-                                            </span>
-                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 border border-black/20 text-neutral-700">
-                                                {tmpl.pageSizeLabel || `${tmpl.pageWidth} × ${tmpl.pageHeight} pt`}
-                                            </span>
-                                        </div>
-
-                                        {/* Name with Rename button */}
-                                        <div className="flex items-center justify-between gap-2 group/title">
-                                            <h3 className="font-black text-base text-black truncate flex-1" title={tmpl.name}>
-                                                {tmpl.name}
-                                            </h3>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleStartRename(tmpl)}
-                                                className="p-1 rounded-md hover:bg-neutral-100 border border-transparent hover:border-black/30 text-neutral-400 hover:text-black transition-colors"
-                                                title="Rename template"
-                                            >
-                                                <Edit3 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-
-                                        {/* Detailed Metadata Grid: Owner Club, Creator, Last Edited */}
-                                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] pt-1.5 border-t border-black/10 text-neutral-600">
-                                            <div className="flex items-center gap-1 truncate" title={tmpl.ownerClubName || "Your Club"}>
-                                                <Building2 className="w-3 h-3 text-neutral-400 shrink-0" />
-                                                <span className="font-semibold truncate">{tmpl.ownerClubName || "Your Club"}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 truncate" title={tmpl.creatorName || "Club Staff"}>
-                                                <User className="w-3 h-3 text-neutral-400 shrink-0" />
-                                                <span className="font-medium truncate">{tmpl.creatorName || "Club Staff"}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 col-span-2 text-neutral-500 font-medium">
-                                                <Calendar className="w-3 h-3 text-neutral-400 shrink-0" />
-                                                <span>
-                                                    Edited {new Date(tmpl.updatedAt).toLocaleDateString("en-US", {
-                                                        month: "short",
-                                                        day: "numeric",
-                                                        year: "numeric",
-                                                    })}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Immutability Snapshot Notice for Issued Templates */}
-                                        {Boolean(tmpl.usageCount && tmpl.usageCount > 0) && (
-                                            <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[10px] text-emerald-900 font-bold flex items-center gap-1.5 leading-snug">
-                                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                                <span>Immutable snapshot active for past credentials. Changes save as v{tmpl.version + 1}.</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* 4. Actions Toolbar */}
-                                    <div className="pt-3 border-t-2 border-black/10 flex items-center gap-1.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPreviewTemplate(tmpl)}
-                                            className="p-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000]"
-                                            title="Full resolution preview"
-                                        >
-                                            <Eye className="w-3.5 h-3.5" />
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleStartRename(tmpl)}
-                                            className="p-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000]"
-                                            title="Rename template"
-                                        >
-                                            <Edit3 className="w-3.5 h-3.5" />
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDuplicateClubTemplate(tmpl.id)}
-                                            className="p-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000]"
-                                            title="Duplicate template"
-                                        >
-                                            <Copy className="w-3.5 h-3.5" />
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleArchiveClubTemplate(tmpl)}
-                                            className="p-2 rounded-xl border-2 border-black bg-white hover:bg-red-50 text-red-600 shadow-[2px_2px_0px_#000] cursor-pointer"
-                                            title="Archive template"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => onSelectTemplate(tmpl.design, tmpl.name, tmpl.id)}
-                                            className="flex-1 py-2 px-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1 transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                            title="Edit in Certificate Studio"
-                                        >
-                                            <Edit3 className="w-3.5 h-3.5 text-black" />
-                                            <span>Edit</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                onIssueWithTemplate
-                                                    ? onIssueWithTemplate(tmpl.design, tmpl.name, tmpl.id)
-                                                    : onSelectTemplate(tmpl.design, tmpl.name, tmpl.id)
-                                            }
-                                            className="py-2 px-3 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1 transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                            title="Use this template for certificate issuance"
-                                        >
-                                            <Sparkles className="w-3.5 h-3.5 text-black" />
-                                            <span>Issue</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ================================================================ */}
             {/* RENAME TEMPLATE MODAL (PHASE 8) */}
             {/* ================================================================ */}
             {renameModalTemplate && (
@@ -2875,9 +2176,14 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
             {/* HIGH-FIDELITY PREVIEW MODAL */}
             {/* ================================================================ */}
             {previewTemplate && (
-                <div
-                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
-                    onClick={() => setPreviewTemplate(null)}
+                <dialog
+                    ref={previewDialog}
+                    aria-labelledby={previewTitleId}
+                    className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto rounded-3xl border-0 bg-white p-0 backdrop:bg-black/60"
+                    onClose={() => setPreviewTemplate(null)}
+                    onClick={(event) => {
+                        if (event.target === event.currentTarget) setPreviewTemplate(null);
+                    }}
                 >
                     <div
                         className="bg-white rounded-3xl border-4 border-black shadow-[8px_8px_0px_#000] w-full max-w-4xl p-6 sm:p-8 space-y-6 relative"
@@ -2900,13 +2206,15 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                                         </span>
                                     )}
                                 </div>
-                                <h3 className="text-xl sm:text-2xl font-black text-black">
+                                <h3 id={previewTitleId} className="text-xl sm:text-2xl font-black text-black">
                                     {previewTemplate.name}
                                 </h3>
+                                {previewTemplate.description && <p className="mt-1 text-sm text-neutral-700">{previewTemplate.description}</p>}
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setPreviewTemplate(null)}
+                                aria-label="Close template preview"
                                 className="w-9 h-9 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-neutral-200 flex items-center justify-center font-black"
                             >
                                 <X className="w-5 h-5 text-black" />
@@ -2954,6 +2262,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                             <div className="p-3 rounded-xl border-2 border-black bg-[#FAF6EE]">
                                 <span className="text-[10px] font-bold text-neutral-500 uppercase block">Category</span>
                                 <span className="font-black text-black capitalize">{previewTemplate.category}</span>
+                                <span className="mt-1 block capitalize text-neutral-700">{(previewTemplate.style || previewTemplate.design.style || "classic").replace(/_/g, " ")}</span>
                             </div>
                             <div className="p-3 rounded-xl border-2 border-black bg-[#FAF6EE]">
                                 <span className="text-[10px] font-bold text-neutral-500 uppercase block">Page Size</span>
@@ -2989,7 +2298,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                                 Close Preview
                             </button>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 {previewTemplate.isSystem ? (
                                     <button
                                         type="button"
@@ -3000,11 +2309,23 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                                         }}
                                         className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                     >
-                                        <span>Duplicate to My Templates</span>
+                                        <span>Use template</span>
                                         <ArrowRight className="w-4 h-4" />
                                     </button>
                                 ) : (
                                     <>
+                                        <button type="button" onClick={() => {
+                                            handleStartRename(previewTemplate);
+                                            setPreviewTemplate(null);
+                                        }} className="rounded-xl border-2 border-black bg-white px-4 py-2 text-xs font-bold hover:bg-neutral-100">
+                                            Rename
+                                        </button>
+                                        <button type="button" onClick={() => {
+                                            handleArchiveClubTemplate(previewTemplate);
+                                            setPreviewTemplate(null);
+                                        }} className="rounded-xl border-2 border-black bg-white px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50">
+                                            Archive
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -3052,7 +2373,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                             </div>
                         </div>
                     </div>
-                </div>
+                </dialog>
             )}
 
             {/* Archive Template Confirmation Modal */}

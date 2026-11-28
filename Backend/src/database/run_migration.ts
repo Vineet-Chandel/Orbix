@@ -187,6 +187,10 @@ export const MIGRATION_SIGNATURES: Record<string, { tables?: string[]; columns?:
     "071_leaderboard_provider_snapshot.sql": {
         columns: ["user_links.leaderboard_snapshot"],
     },
+    "072_certificate_template_discovery.sql": {
+        tables: ["certificate_template_view_history"],
+        columns: ["certificate_templates.official_template_id", "certificate_templates.is_starter_copy", "certificate_templates.creation_key", "certificate_templates.last_used_at"],
+    },
 };
 
 /**

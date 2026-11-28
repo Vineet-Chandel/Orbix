@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     Award,
     Sparkles,
@@ -13,7 +13,6 @@ import {
     UserCheck,
     Ban,
     Settings,
-    Layers,
     History,
     ExternalLink,
     Eye,
@@ -24,6 +23,7 @@ import type {
 import {
     fetchCertificateStats,
     createCertificateTemplate,
+    updateCertificateTemplate,
     verifyCertificatePublic,
     type CertificateDashboardStats,
     type PublicVerificationResult,
@@ -40,8 +40,8 @@ import { CertificateSettingsView } from "./CertificateSettingsView";
 export type StudioWorkspaceTab =
     | "overview"
     | "studio"
+    | "upload"
     | "preview-studio"
-    | "templates"
     | "event-issuance"
     | "manual-issuance"
     | "batches"
@@ -187,9 +187,14 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
 
     // Active design document and template reference
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+    const designSession = useRef<{
+        id: string | null;
+        initialSave?: { name: string; design: CertificateDesign; creationKey: string };
+        pending?: Promise<void>;
+    }>({ id: null });
     const [activeDesign, setActiveDesign] = useState<CertificateDesign>(defaultDesign);
     const [templateName, setTemplateName] = useState<string>("Orbix Standard Certificate");
-    const [templateInitialTab, setTemplateInitialTab] = useState<"library" | "upload" | "scratch" | "my-templates">("library");
+    const [templateInitialTab, setTemplateInitialTab] = useState<"library" | "scratch">("library");
 
     // 8 Dashboard Metrics
     const [metrics, setMetrics] = useState<CertificateDashboardStats>({
@@ -226,32 +231,47 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
         loadWorkspaceData();
     }, [loadWorkspaceData]);
 
-    // Quick Action: Create Certificate Design -> Opens professional template selection experience
-    const handleActionCreateDesign = () => {
-        setTemplateInitialTab("library");
-        setActiveTab("templates");
+    const saveDesign = (design: CertificateDesign, name: string) => {
+        const session = designSession.current;
+        if (session.pending) return session.pending;
+        session.pending = (async () => {
+            if (session.id) {
+                await updateCertificateTemplate(session.id, { name, design }, clubId);
+            } else {
+                const initial = session.initialSave ??= { name, design, creationKey: crypto.randomUUID() };
+                const saved = await createCertificateTemplate({
+                    ...initial,
+                    orientation: initial.design.page?.orientation,
+                    pageWidth: initial.design.page?.width,
+                    pageHeight: initial.design.page?.height,
+                }, clubId);
+                session.id = saved.id;
+                if (initial.name !== name || initial.design !== design) {
+                    await updateCertificateTemplate(saved.id, { name, design }, clubId);
+                }
+            }
+            if (designSession.current === session) {
+                setActiveTemplateId(session.id);
+                setActiveDesign(design);
+                setTemplateName(name);
+            }
+        })().finally(() => {
+            delete session.pending;
+        });
+        return session.pending;
     };
 
-    // Quick Action: Upload Certificate Design -> Opens upload option
-    const handleActionUploadDesign = () => {
-        setTemplateInitialTab("upload");
-        setActiveTab("templates");
+    // Quick Action: Create Certificate Design -> Opens professional template selection experience
+    const handleActionCreateDesign = () => {
+        setTemplateInitialTab("scratch");
+        setActiveTab("overview");
     };
 
     // Quick Action: Choose Template -> Opens library option
     const handleActionChooseTemplate = () => {
         setTemplateInitialTab("library");
-        setActiveTab("templates");
-    };
-
-    // Quick Action: Issue Event
-    const handleActionIssueEvent = () => {
-        setActiveTab("event-issuance");
-    };
-
-    // Quick Action: Issue Manual
-    const handleActionIssueManual = () => {
-        setActiveTab("manual-issuance");
+        setActiveTab("overview");
+        requestAnimationFrame(() => document.getElementById("certificate-template-overview")?.scrollIntoView({ block: "start" }));
     };
 
     // Quick Action: Test Code Verification
@@ -278,10 +298,10 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
     const navItems: Array<{ id: StudioWorkspaceTab; label: string; icon: any }> = [
         { id: "overview", label: "Overview", icon: Award },
         { id: "studio", label: "Certificate Studio", icon: Palette },
+        { id: "upload", label: "Upload Certificate Design", icon: UploadCloud },
         ...(activeTab === "preview-studio"
             ? [{ id: "preview-studio" as StudioWorkspaceTab, label: "Preview & Validation", icon: Eye }]
             : []),
-        { id: "templates", label: "My Templates", icon: Layers },
         { id: "event-issuance", label: "Event Issuance", icon: CalendarDays },
         { id: "manual-issuance", label: "Manual Issuance", icon: UserCheck },
         { id: "batches", label: "Certificate Batches", icon: Clock },
@@ -443,7 +463,10 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
                             <button
                                 key={item.id}
                                 type="button"
-                                onClick={() => setActiveTab(item.id)}
+                                onClick={() => {
+                                    if (item.id === "overview") setTemplateInitialTab("library");
+                                    setActiveTab(item.id);
+                                }}
                                 className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
                                     isActive
                                         ? "bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
@@ -458,147 +481,25 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
                 </nav>
             </div>
 
-            {/* TAB: OVERVIEW */}
-            {activeTab === "overview" && (
-                <div className="space-y-6">
-                    {/* PROMINENT MAIN ACTIONS BAR (The 5 requested main actions) */}
-                    <div className="space-y-3">
-                        <div className="text-xs font-black uppercase tracking-wider text-neutral-500">
-                            Main Workflows & Actions
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-                            <button
-                                type="button"
-                                onClick={handleActionCreateDesign}
-                                className="p-4 rounded-xl bg-[#FFE566] hover:bg-[#fed93d] border-3 border-black shadow-[3px_3px_0px_#000] text-left transition-transform active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer flex flex-col justify-between h-full"
-                            >
-                                <div className="space-y-1">
-                                    <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center mb-2">
-                                        <Palette className="w-4 h-4 stroke-[2.5]" />
-                                    </div>
-                                    <h4 className="font-black text-xs sm:text-sm text-black">
-                                        Create Certificate Design
-                                    </h4>
-                                    <p className="text-[11px] font-semibold text-neutral-800 leading-snug">
-                                        Start with visual canvas & dynamic data tokens
-                                    </p>
-                                </div>
-                                <div className="mt-3 text-[11px] font-black text-black flex items-center gap-1">
-                                    <span>Launch Canvas</span> &rarr;
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleActionUploadDesign}
-                                className="p-4 rounded-xl bg-white hover:bg-neutral-50 border-3 border-black shadow-[3px_3px_0px_#000] text-left transition-transform active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer flex flex-col justify-between h-full"
-                            >
-                                <div className="space-y-1">
-                                    <div className="w-8 h-8 rounded-lg bg-[#70D6FF] text-black border border-black flex items-center justify-center mb-2">
-                                        <UploadCloud className="w-4 h-4 stroke-[2.5]" />
-                                    </div>
-                                    <h4 className="font-black text-xs sm:text-sm text-black">
-                                        Upload Certificate Design
-                                    </h4>
-                                    <p className="text-[11px] font-semibold text-neutral-600 leading-snug">
-                                        Import custom PNG, JPG or sanitized SVG art
-                                    </p>
-                                </div>
-                                <div className="mt-3 text-[11px] font-black text-black flex items-center gap-1">
-                                    <span>Upload Art</span> &rarr;
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleActionChooseTemplate}
-                                className="p-4 rounded-xl bg-white hover:bg-neutral-50 border-3 border-black shadow-[3px_3px_0px_#000] text-left transition-transform active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer flex flex-col justify-between h-full"
-                            >
-                                <div className="space-y-1">
-                                    <div className="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center mb-2">
-                                        <Layers className="w-4 h-4 stroke-[2.5]" />
-                                    </div>
-                                    <h4 className="font-black text-xs sm:text-sm text-black">
-                                        Choose Existing Template
-                                    </h4>
-                                    <p className="text-[11px] font-semibold text-neutral-600 leading-snug">
-                                        Browse 6 Orbix system master presets
-                                    </p>
-                                </div>
-                                <div className="mt-3 text-[11px] font-black text-black flex items-center gap-1">
-                                    <span>Explore Presets</span> &rarr;
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleActionIssueEvent}
-                                className="p-4 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] border-3 border-black shadow-[3px_3px_0px_#000] text-left transition-transform active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer flex flex-col justify-between h-full"
-                            >
-                                <div className="space-y-1">
-                                    <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center mb-2">
-                                        <CalendarDays className="w-4 h-4 stroke-[2.5]" />
-                                    </div>
-                                    <h4 className="font-black text-xs sm:text-sm text-black">
-                                        Issue Event Certificates
-                                    </h4>
-                                    <p className="text-[11px] font-semibold text-neutral-800 leading-snug">
-                                        Turnout-verified attendance roster delivery
-                                    </p>
-                                </div>
-                                <div className="mt-3 text-[11px] font-black text-black flex items-center gap-1">
-                                    <span>Select Event</span> &rarr;
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleActionIssueManual}
-                                className="p-4 rounded-xl bg-white hover:bg-neutral-50 border-3 border-black shadow-[3px_3px_0px_#000] text-left transition-transform active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer flex flex-col justify-between h-full"
-                            >
-                                <div className="space-y-1">
-                                    <div className="w-8 h-8 rounded-lg bg-[#FFDE59] text-black border border-black flex items-center justify-center mb-2">
-                                        <UserCheck className="w-4 h-4 stroke-[2.5]" />
-                                    </div>
-                                    <h4 className="font-black text-xs sm:text-sm text-black">
-                                        Issue Manual Certificates
-                                    </h4>
-                                    <p className="text-[11px] font-semibold text-neutral-600 leading-snug">
-                                        Direct search across campus student network
-                                    </p>
-                                </div>
-                                <div className="mt-3 text-[11px] font-black text-black flex items-center gap-1">
-                                    <span>Search Students</span> &rarr;
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* TAB: CERTIFICATE STUDIO (VISUAL BUILDER) */}
             {activeTab === "studio" && (
                 <div className="space-y-4">
+                    <button
+                        type="button"
+                        onClick={handleActionCreateDesign}
+                        className="cursor-pointer rounded-xl border-2 border-black bg-white px-4 py-2 text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#FFE566]"
+                    >
+                        Blank canvas
+                    </button>
                     <CertificateDesignEditor
                         initialDesign={activeDesign}
                         templateName={templateName}
-                        onSave={async (design, name) => {
-                            setActiveDesign(design);
-                            setTemplateName(name);
-                            await createCertificateTemplate({
-                                name,
-                                design,
-                                orientation: design.page?.orientation || "landscape",
-                                pageWidth: design.page?.width || 842,
-                                pageHeight: design.page?.height || 595,
-                            });
-                            loadWorkspaceData();
-                        }}
+                        onSave={saveDesign}
                         onProceedToIssuance={(design) => {
                             setActiveDesign(design);
                             setActiveTab("preview-studio");
                         }}
-                        onBack={() => setActiveTab("overview")}
+                        onBack={() => { setTemplateInitialTab("library"); setActiveTab("overview"); }}
                     />
                 </div>
             )}
@@ -620,90 +521,30 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
                 </div>
             )}
 
-            {/* TAB: MY TEMPLATES / TEMPLATE SELECTION EXPERIENCE */}
-            {activeTab === "templates" && (
-                <div className="space-y-4">
-                    <TemplateSelectionView
-                        initialTab={templateInitialTab}
-                        onSelectTemplate={(design, name, id) => {
-                            setActiveDesign(design);
-                            setTemplateName(name);
-                            setActiveTemplateId(id || null);
-                            setActiveTab("studio");
-                        }}
-                        onIssueWithTemplate={(design: CertificateDesign, name: string, id?: string) => {
-                            setActiveDesign(design);
-                            setTemplateName(name);
-                            setActiveTemplateId(id || null);
-                            setActiveTab("event-issuance");
-                        }}
-                        onStartScratch={(orientation, themePreset) => {
-                            const width = orientation === "landscape" ? 842 : 595;
-                            const height = orientation === "landscape" ? 595 : 842;
-                            const scratchDesign: CertificateDesign = {
-                                page: { width, height, orientation, unit: "pt" },
-                                background: {
-                                    type: "color",
-                                    color: themePreset === "dark" ? "#0F172A" : "#FFFFFF",
-                                    borderStyle: "double",
-                                    borderColor: "#000000",
-                                    borderWidth: 4,
-                                },
-                                elements: [
-                                    {
-                                        id: "el_title",
-                                        type: "static-text",
-                                        x: 50,
-                                        y: 60,
-                                        width: width - 100,
-                                        height: 50,
-                                        zIndex: 1,
-                                        text: "CERTIFICATE OF ACHIEVEMENT",
-                                        style: {
-                                            fontFamily: "Space Grotesk",
-                                            fontSize: 28,
-                                            fontWeight: "900",
-                                            color: themePreset === "dark" ? "#FFFFFF" : "#000000",
-                                            textAlign: "center",
-                                        },
-                                    },
-                                    {
-                                        id: "el_name",
-                                        type: "dynamic-text",
-                                        x: 80,
-                                        y: 180,
-                                        width: width - 160,
-                                        height: 60,
-                                        zIndex: 2,
-                                        fieldKey: "recipient.name",
-                                        fallbackValue: "Jane Doe",
-                                        style: {
-                                            fontFamily: "Playfair Display",
-                                            fontSize: 36,
-                                            fontWeight: "bold",
-                                            color: themePreset === "dark" ? "#FFE566" : "#000000",
-                                            textAlign: "center",
-                                        },
-                                    },
-                                    {
-                                        id: "el_qr",
-                                        type: "qr-code",
-                                        x: 50,
-                                        y: height - 120,
-                                        width: 70,
-                                        height: 70,
-                                        zIndex: 2,
-                                        fieldKey: "certificate.credentialCode",
-                                    },
-                                ],
-                            };
-                            setActiveDesign(scratchDesign);
-                            setTemplateName("New Custom Certificate");
-                            setActiveTemplateId(null);
-                            setActiveTab("studio");
-                        }}
-                    />
-                </div>
+            {(activeTab === "overview" || activeTab === "upload") && (
+                <TemplateSelectionView
+                    clubId={clubId}
+                    key={`${clubId}:${activeTab === "upload" ? "upload" : templateInitialTab}`}
+                    initialTab={activeTab === "upload" ? "upload" : templateInitialTab}
+                    onBackToLibrary={() => {
+                        setTemplateInitialTab("library");
+                        setActiveTab("overview");
+                    }}
+                    onSelectTemplate={(design, name, id) => {
+                        setActiveDesign(design);
+                        setTemplateName(name);
+                        designSession.current = { id: id || null };
+                        setActiveTemplateId(id || null);
+                        setActiveTab("studio");
+                    }}
+                    onIssueWithTemplate={(design, name, id) => {
+                        setActiveDesign(design);
+                        setTemplateName(name);
+                        designSession.current = { id: id || null };
+                        setActiveTemplateId(id || null);
+                        setActiveTab("event-issuance");
+                    }}
+                />
             )}
 
             {/* TAB: EVENT ISSUANCE */}
@@ -735,7 +576,7 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
                             loadWorkspaceData();
                             setActiveTab("history");
                         }}
-                        onNavigateToTemplates={() => setActiveTab("templates")}
+                        onNavigateToTemplates={handleActionChooseTemplate}
                         onOpenPreview={() => setActiveTab("preview-studio")}
                     />
                 </div>

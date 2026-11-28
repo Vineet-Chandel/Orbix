@@ -9,7 +9,6 @@ import {
     CheckCheck,
     FileText,
     Ban,
-    Menu,
     TrendingUp,
     ArrowUpRight,
     Search,
@@ -23,14 +22,12 @@ interface ClubEventAnalyticsSectionProps {
     events: ClubEvent[];
     currentFilter: ClubEventFilter;
     onSelectFilter: (filter: ClubEventFilter) => void;
-    onOpenMobileSidebar: () => void;
 }
 
 export const ClubEventAnalyticsSection: React.FC<ClubEventAnalyticsSectionProps> = ({
     events,
     currentFilter,
     onSelectFilter,
-    onOpenMobileSidebar,
 }) => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState("");
@@ -127,14 +124,6 @@ export const ClubEventAnalyticsSection: React.FC<ClubEventAnalyticsSectionProps>
         <div className="min-w-0 space-y-6">
             <header className="flex flex-col items-start justify-between gap-4 border-b-2 border-black/55 pb-5 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        onClick={onOpenMobileSidebar}
-                        className="shrink-0 cursor-pointer rounded-lg border-2 border-black bg-white p-2 text-black shadow-[2px_2px_0px_#000] lg:hidden"
-                        aria-label="Open sidebar"
-                    >
-                        <Menu className="h-4 w-4 stroke-[2.5]" />
-                    </button>
                     <span className="orbix-page-heading-icon orbix-page-heading-icon--club-dashboard hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000] lg:flex">
                         <TrendingUp aria-hidden="true" className="h-4 w-4 stroke-[2.5]" />
                     </span>

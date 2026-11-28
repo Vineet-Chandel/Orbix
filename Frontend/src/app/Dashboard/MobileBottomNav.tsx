@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { matchPath, useLocation, useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import React, { useMemo } from "react";
+import { useLocation } from "react-router-dom";
+import { MobileNavigationDock, type DockItem, type DockTab } from "../common/MobileNavigationDock";
 import {
     LayoutDashboard,
     Compass,
@@ -14,7 +13,6 @@ import {
     GraduationCap,
     Calendar,
     ClipboardCheck,
-    Check,
     Briefcase,
     UserPlus,
     User,
@@ -40,30 +38,6 @@ export interface MobileBottomNavProps {
     onOpenJoinClub: () => void;
 }
 
-type NavigationMenuKey = "hub" | "events" | "workspaces" | "profile" | null;
-
-interface SubMenuItem {
-    id: string;
-    label: string;
-    icon: React.ReactNode;
-    path?: string;
-    action?: () => void;
-    badge?: string | number;
-    badgeVariant?: "danger" | "default";
-    color: string;
-}
-
-interface DockTabItem {
-    id: "home" | "explore" | "events" | "clubs" | "profile";
-    label: string;
-    icon: React.ReactNode;
-    shaderColor: string;
-    hasSubItems: boolean;
-    menuKey?: NavigationMenuKey;
-    path?: string;
-    badge?: number | string;
-}
-
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     activeTab,
     onTabChange,
@@ -77,38 +51,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     onOpenJoinClub,
 }) => {
     const location = useLocation();
-    const navigate = useNavigate();
-    const [activeMenu, setActiveMenu] = useState<NavigationMenuKey>(null);
-
-    // Close the menu when route changes or outside-tap occurs
-    useEffect(() => {
-        setActiveMenu(null);
-    }, [location.pathname]);
-
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                setActiveMenu(null);
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, []);
-
-    const handleSelectSubItem = (item: SubMenuItem) => {
-        setActiveMenu(null);
-        if (item.action) {
-            item.action();
-        } else if (item.path) {
-            navigate(item.path);
-            if (onTabChange) {
-                onTabChange(item.id as SidebarTab);
-            }
-        }
-    };
-
     // Sub-items for Option 2: Hub / Explore
-    const hubSubItems: SubMenuItem[] = [
+    const hubSubItems: DockItem[] = [
         {
             id: "explore",
             label: "Explore",
@@ -147,7 +91,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     ];
 
     // Sub-items for Option 3: Events
-    const eventsSubItems: SubMenuItem[] = [
+    const eventsSubItems: DockItem[] = [
         {
             id: "clubs",
             label: "Clubs",
@@ -179,7 +123,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     ];
 
     // Sub-items for Option 4: Workspaces
-    const workspaceSubItems: SubMenuItem[] =
+    const workspaceSubItems: DockItem[] =
         clubWorkspaces.length > 0
             ? [
                   ...clubWorkspaces.slice(0, 4).map((ws, i) => ({
@@ -219,7 +163,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               ];
 
     // Sub-items for Option 5: Profile / Account
-    const profileSubItems: SubMenuItem[] = [
+    const profileSubItems: DockItem[] = [
         {
             id: "profile",
             label: "Profile",
@@ -261,25 +205,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         },
     ];
 
-    // Current active sub-item list
-    const activeSubItems: SubMenuItem[] =
-        activeMenu === "hub"
-            ? hubSubItems
-            : activeMenu === "events"
-            ? eventsSubItems
-            : activeMenu === "workspaces"
-            ? workspaceSubItems
-            : activeMenu === "profile"
-            ? profileSubItems
-            : [];
-
     // Determine currently active dock item for the sliding toggle shader
     const currentActiveId = useMemo((): "home" | "explore" | "events" | "clubs" | "profile" => {
-        if (activeMenu === "hub") return "explore";
-        if (activeMenu === "events") return "events";
-        if (activeMenu === "workspaces") return "clubs";
-        if (activeMenu === "profile") return "profile";
-
         if (location.pathname === "/dashboard" || activeTab === "dashboard") return "home";
         if (
             location.pathname.startsWith("/explore") ||
@@ -327,16 +254,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         }
 
         return "home";
-    }, [activeMenu, location.pathname, activeTab]);
+    }, [location.pathname, activeTab]);
 
     // The 5 balanced dock tab items
-    const dockTabs: DockTabItem[] = [
+    const dockTabs: DockTab[] = [
         {
             id: "home",
             label: "Home",
             icon: <LayoutDashboard className="w-5 h-5 stroke-[2.3]" />,
             shaderColor: "#a2ff86",
-            hasSubItems: false,
             path: "/dashboard",
         },
         {
@@ -344,24 +270,21 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             label: "Explore",
             icon: <Compass className="w-5 h-5 stroke-[2.3]" />,
             shaderColor: "#FFE566",
-            hasSubItems: true,
-            menuKey: "hub",
+            items: hubSubItems.map((item) => ({ ...item, current: item.id === activeTab || undefined })),
         },
         {
             id: "events",
             label: "Events",
             icon: <CalendarDays className="w-5 h-5 stroke-[2.3]" />,
             shaderColor: "#A6FF70",
-            hasSubItems: true,
-            menuKey: "events",
+            items: eventsSubItems.map((item) => ({ ...item, current: item.id === activeTab || undefined })),
         },
         {
             id: "clubs",
             label: "Clubs",
             icon: <Briefcase className="w-5 h-5 stroke-[2.3]" />,
             shaderColor: "#38BDF8",
-            hasSubItems: true,
-            menuKey: "workspaces",
+            items: workspaceSubItems.map((item) => ({ ...item, current: item.id === activeTab || undefined })),
             badge: clubWorkspaces.length > 0 ? clubWorkspaces.length : undefined,
         },
         {
@@ -409,145 +332,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 </div>
             ),
             shaderColor: "#ff80d7ff",
-            hasSubItems: true,
-            menuKey: "profile",
+            items: profileSubItems.map((item) => ({ ...item, current: item.id === activeTab || undefined })),
             badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
         },
     ];
 
-    const handleDockTabClick = (item: DockTabItem) => {
-        if (item.id === "home") {
-            setActiveMenu(null);
-            navigate("/dashboard");
-            if (onTabChange) onTabChange("dashboard");
-            return;
-        }
-
-        if (item.hasSubItems && item.menuKey) {
-            setActiveMenu((prev) => (prev === item.menuKey ? null : item.menuKey!));
-        }
-    };
-
-    if (typeof document === "undefined") return null;
-
-    return createPortal(
-        <>
-            <AnimatePresence>
-                {activeMenu && (
-                    <motion.div
-                        key="navigation-backdrop"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setActiveMenu(null)}
-                        className="fixed inset-0 z-[9990] bg-black/50 lg:hidden"
-                    />
-                )}
-            </AnimatePresence>
-
-            <nav
-                id="orbix-mobile-bottom-nav"
-                aria-label="Mobile navigation"
-                className="fixed bottom-[var(--mobile-dock-bottom)] inset-x-0 mx-auto z-[9991] w-[calc(100%-1.5rem)] max-w-md lg:hidden"
-            >
-                <AnimatePresence>
-                    {activeMenu && (
-                        <motion.div
-                            key={activeMenu}
-                            id="orbix-mobile-navigation-menu"
-                            initial={{ opacity: 0, scale: 0.97 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.97 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute bottom-[calc(100%+0.75rem)] inset-x-0 grid max-h-[50dvh] grid-cols-2 gap-2 overflow-y-auto rounded-2xl border-2 border-black bg-[#FAF6EE] p-2.5 shadow-[4px_4px_0px_#000]"
-                        >
-                            {activeSubItems.map((item) => {
-                                const isCurrent = item.path && (
-                                    item.id === activeTab || matchPath({ path: item.path, end: false }, location.pathname)
-                                );
-                                return (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        onClick={() => handleSelectSubItem(item)}
-                                        aria-current={isCurrent ? "page" : undefined}
-                                        className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border-2 border-black bg-white px-2 py-1.5 text-left text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black aria-[current=page]:bg-[#a2ff86]"
-                                    >
-                                        <span
-                                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-black"
-                                            style={{ backgroundColor: item.color }}
-                                        >
-                                            {item.icon}
-                                        </span>
-                                        <span className="min-w-0 flex-1 break-words">{item.label}</span>
-                                        {item.badge !== undefined && (
-                                            <span className={`shrink-0 rounded-full border border-black px-1 text-[10px] ${item.badgeVariant === "danger" ? "bg-[#FF6B6B]" : "bg-[#FFE566]"}`}>
-                                                {item.badge}
-                                            </span>
-                                        )}
-                                        {isCurrent && <Check aria-hidden="true" className="h-4 w-4 shrink-0 stroke-[3]" />}
-                                    </button>
-                                );
-                            })}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Main 5-Option Toggle Dock Bar with Moving Shader */}
-                <div className="grid h-[var(--mobile-dock-height)] grid-cols-5 gap-1 rounded-2xl border-2 border-black bg-[#FAF6EE] p-1.5 shadow-[4px_4px_0px_#000]">
-                    {dockTabs.map((tab) => {
-                        const isActive = currentActiveId === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => handleDockTabClick(tab)}
-                                className="relative flex min-w-0 flex-col items-center justify-center rounded-xl border border-black bg-white text-black shadow-[2px_2px_0px_#000] transition-transform active:scale-95 focus-visible:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
-                                aria-label={tab.label}
-                                aria-controls={activeMenu && activeMenu === tab.menuKey ? "orbix-mobile-navigation-menu" : undefined}
-                                aria-current={isActive && !activeMenu && tab.id === "home" ? "page" : undefined}
-                                aria-expanded={tab.hasSubItems && tab.menuKey ? activeMenu === tab.menuKey : undefined}
-                            >
-                                {/* Moving Shader / Active Pill Indicator */}
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="mobileNavShader"
-                                        className="absolute inset-0 rounded-[inherit] pointer-events-none"
-                                        style={{ backgroundColor: tab.shaderColor }}
-                                        transition={{
-                                            type: "spring",
-                                            stiffness: 480,
-                                            damping: 32,
-                                        }}
-                                    />
-                                )}
-
-                                {/* Icon and Text Content */}
-                                <div
-                                    className={`relative z-10 flex flex-col items-center justify-center transition-colors duration-150 ${
-                                        isActive
-                                            ? "text-black font-black"
-                                            : "text-neutral-700 hover:text-black font-bold"
-                                    }`}
-                                >
-                                    <div className="relative flex items-center justify-center">
-                                        {tab.icon}
-                                        {tab.badge !== undefined && (
-                                            <span className="absolute -top-1 -right-2 z-20 px-1 h-3.5 min-w-[14px] flex items-center justify-center rounded-full text-[8.5px] font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] leading-none pointer-events-none">
-                                                {tab.badge}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] tracking-tight mt-0.5 leading-none">
-                                        {tab.label}
-                                    </span>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </nav>
-        </>,
-        document.body
+    return (
+        <MobileNavigationDock
+            tabs={dockTabs}
+            currentTab={currentActiveId}
+            onItemSelect={(item) => {
+                if (item.path) onTabChange?.(item.id === "home" ? "dashboard" : item.id as SidebarTab);
+            }}
+        />
     );
 };

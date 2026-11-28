@@ -11,7 +11,6 @@ export {
     DashboardRouteSkeleton,
     DocsRouteSkeleton,
     ContentRouteSkeleton,
-    AuthRouteSkeleton,
 } from "./OrbixPageSkeletons";
 export type { DashboardRouteSkeletonProps } from "./OrbixPageSkeletons";
 export { OrbixButton } from "../button/OrbixButton";
@@ -26,3 +25,5 @@ export { OrbixLoadingContext, useGlobalLoader } from "./OrbixLoadingContext";
 export * from "./loader.types";
 export * from "./loader.constants";
 export * from "./loader.utils";
+
+export { AuthRouteLoader } from "./AuthRouteLoader";
